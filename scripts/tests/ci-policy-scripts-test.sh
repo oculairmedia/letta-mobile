@@ -803,4 +803,102 @@ printf '\nThe restart-replay evidence stays at 0.0.1 until re-captured live.\n' 
 output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
 assert_contains "$output" 'restart-replay claim 0.0.1 differs from captured evidence'
 
+# The pre-push hook runs the two fast CI checks when the push changes their inputs
+# (.kt for KDoc hygiene, *.api for the mingw dump mirror), skips them otherwise,
+# and blocks the push on failure: each fix takes seconds, the CI runs they burn
+# take half an hour. Behavioural: the real hook, the real check scripts, a fixture
+# repo whose push ranges are faked on stdin.
+pre_push="$(<"$SOURCE_ROOT/.githooks/pre-push")"
+assert_contains "$pre_push" 'scripts/ci/check-kdoc-hygiene.py'
+assert_contains "$pre_push" 'scripts/ci/api-dump-mirror-check.sh'
+
+repo="$TMP/pre-push"
+new_repo "$repo"
+cp "$SOURCE_ROOT/scripts/ci/check-kdoc-hygiene.py" "$repo/scripts/ci/"
+cp "$SOURCE_ROOT/scripts/ci/check-api-package-coverage.py" "$repo/scripts/ci/"
+cp "$SOURCE_ROOT/scripts/ci/api-dump-mirror-check.sh" "$repo/scripts/ci/"
+mkdir -p "$repo/scripts/codescene" "$repo/.githooks"
+cp "$SOURCE_ROOT/scripts/codescene/cs-delta.sh" "$repo/scripts/codescene/"
+cp "$SOURCE_ROOT/.githooks/pre-push" "$repo/.githooks/"
+# The hygiene check discovers published modules through the dokka aggregate, so the
+# fixture declares exactly one module with one package and matching overviews.
+printf 'dependencies {\n    add("dokka", project(":fake"))\n}\n' >"$repo/android-compose/build.gradle.kts"
+mkdir -p "$repo/android-compose/fake/src/main/kotlin" "$repo/android-compose/fake/api/linux_x64" \
+  "$repo/android-compose/fake/api/mingw_x64"
+printf '# Module Letta Mobile API\n\nOverview words that are long enough to count as an introduction here.\n' \
+  >"$repo/android-compose/Module.md"
+printf '# Module :fake\n\nOverview words that are long enough to count as an introduction here.\n\n# Package com.example.fake\n\nMore overview words that are long enough to count as a paragraph.\n' \
+  >"$repo/android-compose/fake/Module.md"
+printf 'package com.example.fake\n\nval answer = 42\n' >"$repo/android-compose/fake/src/main/kotlin/Fake.kt"
+printf '// api\n' >"$repo/android-compose/fake/api/linux_x64/fake.api"
+printf '// api\n' >"$repo/android-compose/fake/api/mingw_x64/fake.api"
+git -C "$repo" add . && git -C "$repo" commit -qm fixtures
+zero_sha="0000000000000000000000000000000000000000"
+run_pre_push() { # $1 = local_sha, $2 = remote_sha; prints combined hook output
+  # git runs pre-push from the repo root, and the hook resolves its scripts from
+  # `git rev-parse --show-toplevel`, so the fake invocation must run there too.
+  (
+    cd "$repo" || exit 2
+    printf 'refs/heads/feat %s refs/heads/feat %s\n' "$1" "$2" \
+      | JAVA_HOME="${JAVA_HOME:-/usr}" bash .githooks/pre-push 2>&1
+  )
+}
+
+# A clean .kt change runs the hygiene check (and passes); the mirror check is skipped.
+printf 'package com.example.fake\n\nval other = 7\n' >"$repo/android-compose/fake/src/main/kotlin/Fake.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm clean-kt
+base="$(git -C "$repo" rev-parse HEAD~1)"
+clean_kt_sha="$(git -C "$repo" rev-parse HEAD)"
+out="$(run_pre_push "$clean_kt_sha" "$base")" || fail "pre-push rejected a clean .kt push: $out"
+assert_contains "$out" 'check-kdoc-hygiene.py: clean'
+assert_contains "$out" 'skipping scripts/ci/api-dump-mirror-check.sh'
+
+# A bead id in a pushed .kt file's KDoc blocks the push outright.
+printf 'package com.example.fake\n\n/** Documents the fake. See bead abcde.1 for the story. */\nval answer = 42\n' \
+  >"$repo/android-compose/fake/src/main/kotlin/Fake.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm bead-kdoc
+bead_kt_sha="$(git -C "$repo" rev-parse HEAD)"
+if out="$(run_pre_push "$bead_kt_sha" "$clean_kt_sha")"; then
+  fail "pre-push allowed a .kt push whose KDoc cites a bead id"
+fi
+assert_contains "$out" 'describe intent instead of abcde.1'
+
+# A push with no .kt and no .api change runs neither check.
+git -C "$repo" checkout -q -b notes "$base"
+printf 'notes\n' >"$repo/NOTES.md"
+git -C "$repo" add . && git -C "$repo" commit -qm notes
+notes_sha="$(git -C "$repo" rev-parse HEAD)"
+out="$(run_pre_push "$notes_sha" "$base")" || fail "pre-push rejected a non-Kotlin push: $out"
+assert_contains "$out" 'skipping scripts/ci/check-kdoc-hygiene.py'
+assert_contains "$out" 'skipping scripts/ci/api-dump-mirror-check.sh'
+
+# An .api change with a stale mingw mirror blocks the push, while a KDoc-free push
+# proves the mirror gate runs on .api changes alone.
+git -C "$repo" checkout -q -b api "$base"
+printf '// api v2\n' >"$repo/android-compose/fake/api/linux_x64/fake.api"
+git -C "$repo" add . && git -C "$repo" commit -qm stale-mirror
+stale_api_sha="$(git -C "$repo" rev-parse HEAD)"
+if out="$(run_pre_push "$stale_api_sha" "$base")"; then
+  fail "pre-push allowed an .api push with a stale mingw mirror"
+fi
+assert_contains "$out" 'api-dump-mirror'
+assert_contains "$out" 'skipping scripts/ci/check-kdoc-hygiene.py'
+
+# A brand-new branch (zero remote sha) still finds its changes via merge-base
+# with origin/main and blocks a violating push.
+git -C "$repo" checkout -q -b newbranch "$base"
+git -C "$repo" update-ref "refs/remotes/origin/main" "$base"
+printf 'package com.example.fake\n\n/** Fake. See bead abcde.1 again. */\nval answer = 42\n' \
+  >"$repo/android-compose/fake/src/main/kotlin/Fake.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm new-branch-bead
+new_branch_sha="$(git -C "$repo" rev-parse HEAD)"
+if out="$(run_pre_push "$new_branch_sha" "$zero_sha")"; then
+  fail "pre-push allowed a first push of a branch with a KDoc bead id"
+fi
+assert_contains "$out" 'describe intent instead of abcde.1'
+
+# Delete-only pushes exit before any check, as before.
+out="$(run_pre_push "$zero_sha" "$base")" || fail "pre-push rejected a delete-only push: $out"
+assert_eq "$out" ""
+
 echo "ci policy script tests: PASS"
