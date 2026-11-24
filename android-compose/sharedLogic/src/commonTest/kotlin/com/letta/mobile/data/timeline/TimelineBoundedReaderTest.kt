@@ -1,6 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.StoredToolCall
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -85,6 +88,41 @@ class TimelineBoundedReaderTest {
             assertEquals(2, store.bodyReads)
             assertTrue(store.metadataLimits.all { it == 1 })
         }
+    }
+
+    /**
+     * letta-mobile-032ia: an ordinary tool call is not a "message too large to show inline". 40 KiB
+     * of tool-call body - a heredoc script and its output - decodes with the page and projects as a
+     * tool row, exactly as a 2 KiB one does.
+     */
+    @Test fun anOrdinaryToolCallDecodesInlineWithItsPage() = runTest {
+        val json = toolCallBody(outputBytes = 40 * 1024)
+        assertTrue(json.size in 32 * 1024..48 * 1024, "an ordinary tool row: ${json.size} bytes")
+        val metadata = row(1, json.size.toLong()).copy(contentType = canonicalType)
+        val store = Store(listOf(metadata)).apply { payload = json }
+        val page = TimelineBoundedReader(store).preview(scope, TimelineReadPosition.Tail, TimelinePageBudget(1, 2L * 1024 * 1024))
+        kotlin.test.assertContentEquals(json, page.bodies.single())
+        val record = TimelineSettledRecord(metadata.key, metadata.contentType, page.bodies.single(), 1, metadata.body)
+        kotlin.test.assertFalse(record.isPreview)
+        val rendered = kotlin.test.assertIs<TimelineSettledProjection.Rendered>(record.projectBounded(scope))
+        val call = rendered.item.messagesInOrder().single().toolCalls?.single()
+        assertEquals("Bash", call?.name)
+        // Its return is on the row itself, so nothing is held back.
+        assertTrue(call?.result.orEmpty().length > 32 * 1024)
+    }
+
+    /** A row genuinely too large is still held back whole, and its run evidence is not guessed at. */
+    @Test fun aGenuinelyHugeToolCallIsHeldBackWhole() = runTest {
+        val json = toolCallBody(outputBytes = 3 * 1024 * 1024)
+        val metadata = row(1, json.size.toLong()).copy(contentType = canonicalType)
+        val store = Store(listOf(metadata)).apply { payload = json }
+        val page = TimelineBoundedReader(store).preview(scope, TimelineReadPosition.Tail, TimelinePageBudget(1, 2L * 1024 * 1024))
+        assertTrue(page.bodies.single().isEmpty())
+        assertEquals(0, store.bodyReads)
+        val record = TimelineSettledRecord(metadata.key, metadata.contentType, page.bodies.single(), 1, metadata.body)
+        assertTrue(record.isPreview)
+        val deferred = kotlin.test.assertIs<TimelineSettledProjection.Deferred>(record.projectBounded(scope))
+        assertEquals(metadata.body, deferred.reference.pointer)
     }
 
     @Test fun chunkRejectsStaleReferencesAndInvalidLimitsBeforeBodyRead() = runTest {
@@ -260,5 +298,21 @@ class TimelineBoundedReaderTest {
         }
         private fun key(order: Long) = TimelinePageKey(order, TimelineMessageId("id-$order"))
         private fun row(order: Long, bytes: Long) = TimelineLedgerMetadata(key(order), TimelineBodyPointer("body-$order", bytes), "message", 1)
+
+        /**
+         * The shape the device ledger stores for a settled shell call: `content` is the
+         * `name(arguments)` artifact, and the output is keyed by call id.
+         */
+        private fun toolCallBody(outputBytes: Int): ByteArray = TimelineSnapshotCodec.json.encodeToString(
+            StoredTimelineEvent.serializer(),
+            StoredTimelineEvent(
+                position = 1.0, otid = "otid", content = """Bash({"command":"python3 - <<'PY'"})""",
+                serverId = "id-1", messageType = "tool_call_message", dateIso = "2026-01-01T00:00:00Z",
+                runId = "run-a",
+                toolCalls = listOf(StoredToolCall("call-1", "Bash", """{"command":"python3 - <<'PY'"}""")),
+                toolReturnContentByCallId = mapOf("call-1" to "y".repeat(outputBytes)),
+            ),
+        ).encodeToByteArray()
+
     }
 }

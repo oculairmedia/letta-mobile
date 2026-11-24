@@ -60,7 +60,13 @@ sealed interface TimelineSemanticField {
 
 class TimelineSemanticBudget(
     val maxInputBytes: Long = 2L * 1024 * 1024,
-    val maxOutputBytes: Int = 16 * 1024,
+    /**
+     * One page of a window. A held-back tool call now keeps its step line on
+     * screen, and what is left of it is its output, which has to be readable a page at a time (16
+     * KiB pages took a dozen taps through a 256 KiB return). Each page is still bounded, and
+     * `chunkBytes * maxReads` keeps any one window under 2 MiB of body.
+     */
+    val maxOutputBytes: Int = 64 * 1024,
     val chunkBytes: Int = 16 * 1024,
     val maxReads: Int = 128,
 ) {

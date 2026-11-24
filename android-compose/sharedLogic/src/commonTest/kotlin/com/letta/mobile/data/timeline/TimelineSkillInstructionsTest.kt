@@ -47,7 +47,16 @@ class TimelineSkillInstructionsTest {
     }
 
     @Test fun anUnrelatedOversizedMessageKeepsItsFallback() = runTest {
-        for (content in listOf("Paragraph. ".repeat(3_000), "name: notes\ndescription: a pasted file\n" + "Line.\n".repeat(4_000))) {
+        // Test change reason (letta-mobile-032ia): the per-row inline limit moved from 16 KiB to
+        // TimelineBoundedReader.MAX_INLINE_ROW_BYTES, so both texts are sized over it; the behaviour
+        // under test - an unrelated oversized message keeps the held-back fallback - is unchanged.
+        // Each body stays under the store's 64 KiB read so the fixture's own walk can read it.
+        val paragraphs = (TimelineBoundedReader.MAX_INLINE_ROW_BYTES / 11L).toInt() + 1
+        val lines = (TimelineBoundedReader.MAX_INLINE_ROW_BYTES / 5L).toInt() + 1
+        for (content in listOf(
+            "Paragraph. ".repeat(paragraphs),
+            "name: notes\ndescription: a pasted file\n" + "Line.\n".repeat(lines),
+        )) {
             val page = prepare(content)
             assertEquals(1, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Defer }, content.take(20))
             assertTrue(page.renders().all { it.skillInstructionBodies.isEmpty() })
@@ -63,7 +72,9 @@ class TimelineSkillInstructionsTest {
         put(store, message(2, "user_message", instructions))
         put(store, toolCall(3, StoredToolCall("call-bash", "Bash", """{"command":"ls"}""")))
         val writer = TimelineExactCanonicalWriter(scope, 64 * 1024)
-        val engine = CanonicalTimelineEngine(store, writer, TimelinePageBudget(32, 64 * 1024), enabled = true)
+        // Test change reason (letta-mobile-032ia): a page must be able to hold a row over the raised
+        // per-row inline limit; 2 MiB is the production page budget.
+        val engine = CanonicalTimelineEngine(store, writer, TimelinePageBudget(32, 2L * 1024 * 1024), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         return engine.preparePage(selection, TimelineReadPosition.Tail, 32, "own-agent", DefaultTimelineSettledProjectionAdapter)
     }

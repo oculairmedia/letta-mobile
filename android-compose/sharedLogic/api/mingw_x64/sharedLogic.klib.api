@@ -68241,6 +68241,8 @@ final class com.letta.mobile.data.timeline/TimelineBoundedReader { // com.letta.
     final object Companion { // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion|null[0]
         final const val MAX_CHUNK_BYTES // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_CHUNK_BYTES|{}MAX_CHUNK_BYTES[0]
             final fun <get-MAX_CHUNK_BYTES>(): kotlin/Int // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_CHUNK_BYTES.<get-MAX_CHUNK_BYTES>|<get-MAX_CHUNK_BYTES>(){}[0]
+        final const val MAX_INLINE_ROW_BYTES // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_INLINE_ROW_BYTES|{}MAX_INLINE_ROW_BYTES[0]
+            final fun <get-MAX_INLINE_ROW_BYTES>(): kotlin/Long // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_INLINE_ROW_BYTES.<get-MAX_INLINE_ROW_BYTES>|<get-MAX_INLINE_ROW_BYTES>(){}[0]
         final const val MAX_PAGE_BODY_BYTES // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_PAGE_BODY_BYTES|{}MAX_PAGE_BODY_BYTES[0]
             final fun <get-MAX_PAGE_BODY_BYTES>(): kotlin/Long // com.letta.mobile.data.timeline/TimelineBoundedReader.Companion.MAX_PAGE_BODY_BYTES.<get-MAX_PAGE_BODY_BYTES>|<get-MAX_PAGE_BODY_BYTES>(){}[0]
     }

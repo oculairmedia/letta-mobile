@@ -9,8 +9,13 @@ internal object SkillEnvelopeFixtures {
     const val SKILL_CALL = "call-skill"
     const val RUN = "run-1"
 
-    /** Well past the 16 KiB a page decodes inline. */
-    val OVERSIZED = "Keep sentences short and lead with the change.\n".repeat(600)
+    /**
+     * letta-mobile-032ia: "too large to hold inline" follows the per-row inline limit, which moved
+     * from 16 KiB to [TimelineBoundedReader.MAX_INLINE_ROW_BYTES]; the fixture stays over the limit so
+     * the oversized paths it exercises are the oversized paths it tests.
+     */
+    val OVERSIZED = "Keep sentences short and lead with the change.\n"
+        .repeat((TimelineBoundedReader.MAX_INLINE_ROW_BYTES / 46L).toInt() + 1)
 
     fun envelope(body: String) =
         "<skill_content name=\"release-notes\">\n---\nname: release-notes\ndescription: House style for \"release\" notes.\n---\n\n" +

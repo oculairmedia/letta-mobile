@@ -1177,7 +1177,6 @@
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticBudget/ (common)
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticBudget/chunkBytes/#/ (common)
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticBudget/maxInputBytes/#/ (common)
-:sharedLogic com.letta.mobile.data.timeline/TimelineSemanticBudget/maxOutputBytes/#/ (common)
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticBudget/maxReads/#/ (common)
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticField.Companion/ (common)
 :sharedLogic com.letta.mobile.data.timeline/TimelineSemanticField.Companion/Content/#/ (common)

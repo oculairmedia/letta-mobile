@@ -59199,6 +59199,7 @@ public final class com/letta/mobile/data/timeline/TimelineBodyReference {
 public final class com/letta/mobile/data/timeline/TimelineBoundedReader {
 	public static final field Companion Lcom/letta/mobile/data/timeline/TimelineBoundedReader$Companion;
 	public static final field MAX_CHUNK_BYTES I
+	public static final field MAX_INLINE_ROW_BYTES J
 	public static final field MAX_PAGE_BODY_BYTES J
 	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;)V
 	public final fun load (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lcom/letta/mobile/data/timeline/TimelineReadPosition;Lcom/letta/mobile/data/timeline/TimelinePageBudget;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -47,7 +47,7 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
         var remaining = minOf(budget.maxDecodedBodyBytes, MAX_PAGE_BODY_BYTES)
         val bodies = page.rows.map { row ->
             // Serialized prefixes are not events. Defer the entire body if it cannot fit.
-            val size = if (row.body.encodedBytes <= minOf(remaining, 16L * 1024)) {
+            val size = if (row.body.encodedBytes <= minOf(remaining, MAX_INLINE_ROW_BYTES)) {
                 row.body.encodedBytes.toInt()
             } else 0
             val bytes = if (size == 0) byteArrayOf() else body(row.body, 0, size)
@@ -88,6 +88,16 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
     companion object {
         const val MAX_PAGE_BODY_BYTES: Long = 2L * 1024 * 1024
         const val MAX_CHUNK_BYTES: Int = 64 * 1024
+
+        /**
+         * The most one row may decode inline. A row over this reads on screen as
+         * a held-back card, so at 16 KiB an ordinary tool call ("Ran python3 - <<'PY'" with a few KB
+         * of output) was deferred and lost the line saying what ran. A row is decoded in one page
+         * and lives no longer than that page, and [MAX_PAGE_BODY_BYTES] still bounds the page: this
+         * is an eighth of it, so several ordinary rows fit alongside it and only a genuinely huge
+         * row (a whole file read, a full image) is held back.
+         */
+        const val MAX_INLINE_ROW_BYTES: Long = 256L * 1024
     }
 
     suspend fun load(
