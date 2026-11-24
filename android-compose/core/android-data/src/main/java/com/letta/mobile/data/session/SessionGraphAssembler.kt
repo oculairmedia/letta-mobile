@@ -94,7 +94,7 @@ class SessionGraphAssembler @Inject constructor(
                     runRepository = adminRepositories.runRepository,
                 ),
                 scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
-                stepRepository = StepRepository(remoteSources.steps.orNull()),
+                stepRepository = StepRepository(),
             ),
             transportBound = transportBound,
         )

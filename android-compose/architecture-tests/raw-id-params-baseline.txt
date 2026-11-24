@@ -20,7 +20,6 @@ core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedChann
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedConversationRepository.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedScheduleRepository.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedSelfTodoRepository.kt 2
-core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedStepRepository.kt 5
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedSubagentRepository.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedToolRepository.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/session/TimelineFrameCollectorOverflowReconciler.kt 1
@@ -149,7 +148,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/LastChatSelec
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/RosterNameTelemetry.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/ScheduleRepository.kt 7
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/SelfTodoRepository.kt 4
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/StepRepository.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/SubagentRepository.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/ToolRepository.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/AgentDataSources.kt 2
@@ -163,10 +161,9 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ISchedule
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ISelfTodoRepository.kt 6
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ISettingsRepository.kt 6
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ISlashCommandRepository.kt 5
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/IStepRepository.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ISubagentRepository.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/IToolRepository.kt 8
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/McpServerDataSources.kt 6
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/McpServerDataSources.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ProviderDataSources.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/RunDataSources.kt 10
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/api/ScheduleRemoteSource.kt 6

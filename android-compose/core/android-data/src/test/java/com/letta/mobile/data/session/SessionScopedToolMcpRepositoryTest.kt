@@ -10,18 +10,17 @@ import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerId
+import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakeProjectApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
-import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -80,11 +79,10 @@ class SessionScopedToolMcpRepositoryTest {
     }
 
     @Test
-    fun `mcp server repository proxy switches caches to rebuilt graph`() = runTest {
+    fun `mcp server repository proxy switches the server list to the rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakeMcpServerApi = FakeMcpServerApi().apply {
+        val fakeMcpServerApi = RecordingMcpServerSource().apply {
             servers = mutableListOf(sampleMcpServer("server-a"))
-            serverTools["server-a"] = listOf(sampleTool("mcp-tool-a"))
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
@@ -95,29 +93,21 @@ class SessionScopedToolMcpRepositoryTest {
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val mcpProxy = sessionManager.sessionScoped(IMcpServerRepository::class) { it.mcpServerRepository }
-        val serverTools = mcpProxy.getServerTools(McpServerId("server-a"))
 
         mcpProxy.refreshServers()
-        mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
         assertEquals(listOf(McpServerId("server-a")), mcpProxy.servers.value.map { it.id })
-        assertEquals(listOf("mcp-tool-a"), serverTools.first().map { it.id.value })
 
         fakeMcpServerApi.servers = mutableListOf(sampleMcpServer("server-b"))
-        fakeMcpServerApi.serverTools = mutableMapOf("server-a" to listOf(sampleTool("mcp-tool-b")))
         settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<McpServerId>(), mcpProxy.servers.value.map { it.id })
-        assertEquals(emptyList<String>(), serverTools.first().map { it.id.value })
 
-        val rebuiltServerTools = mcpProxy.getServerTools(McpServerId("server-a"))
         mcpProxy.refreshServers()
-        mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
 
         assertEquals(listOf(McpServerId("server-b")), mcpProxy.servers.value.map { it.id })
-        assertEquals(listOf("mcp-tool-b"), rebuiltServerTools.first().map { it.id.value })
     }
 
     private fun sampleTool(id: String) = Tool(
@@ -129,4 +119,13 @@ class SessionScopedToolMcpRepositoryTest {
         id = McpServerId(id),
         serverName = id,
     )
+
+    /** The MCP catalog the fake backend answers, so the graph caches one row per generation. */
+    private class RecordingMcpServerSource : McpServerRemoteSource {
+        var servers: List<McpServer> = emptyList()
+
+        override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> = servers
+
+        override suspend fun listMcpServerTools(serverId: String): List<Tool> = emptyList()
+    }
 }

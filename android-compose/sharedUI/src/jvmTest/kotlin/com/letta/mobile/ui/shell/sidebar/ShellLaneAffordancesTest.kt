@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
@@ -218,7 +219,7 @@ class ShellLaneAffordancesTest {
                 runRepository = unavailable(SessionRoute.RUNS),
             ),
             scheduleRepository = unavailable(SessionRoute.SCHEDULES),
-            stepRepository = unavailable(SessionRoute.STEPS),
+            stepRepository = StepRepository(),
         ),
         transportBound = SharedSessionGraph.transportBound(transport, scope),
     )

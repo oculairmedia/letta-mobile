@@ -2,7 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CyclomaticComplexMethod:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: Any?): List&lt;String&gt;</ID>
     <ID>CyclomaticComplexMethod:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$private fun read(scope: TimelineScope): State</ID>
     <ID>LargeClass:MessageMapperTest.kt$MessageMapperTest : WordSpec</ID>
     <ID>LongMethod:AgentUpdateParamsSerializationTest.kt$AgentUpdateParamsSerializationTest$@Test fun `agent update advanced settings serialize with server wire keys and typed values`()</ID>
@@ -34,8 +33,6 @@
     <ID>MaxLineLength:AllConversationsRepositoryTest.kt$AllConversationsRepositoryTest$result = Json.parseToJsonElement("""{"id":"1","agent_id":"agent-1","summary":"Archived elsewhere","archived":true}""")</ID>
     <ID>MaxLineLength:BlockRepositoryTest.kt$BlockRepositoryTest$initialActiveConfig = LettaConfig(id = "test", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")</ID>
     <ID>MaxLineLength:ConversationPagingSourceTest.kt$ConversationPagingSourceTest$"""{"agent_id":"agent-1","limit":"20","archive_status":"unarchived","summary_search":"important","order":"desc","order_by":"last_message_at"}"""</ID>
-    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken</ID>
-    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$customHeaders = config?.get("custom_headers")?.jsonObject?.mapValues { (_, value) -&gt; value.jsonPrimitive.content } ?: current.customHeaders</ID>
     <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$override suspend</ID>
     <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$val provider = Provider(id = ProviderId("provider-${providers.size + 1}"), name = params.name, providerType = params.providerType, apiKey = params.apiKey, baseUrl = params.baseUrl, accessKey = params.accessKey, region = params.region)</ID>
     <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$val updated = providers[index].copy(apiKey = params.apiKey, baseUrl = params.baseUrl, accessKey = params.accessKey, region = params.region)</ID>
@@ -118,9 +115,6 @@
     <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun pauseSchedule(target: CronScheduleRef): Result&lt;Unit&gt;</ID>
     <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun refresh(scope: AgentScheduleScope): Result&lt;List&lt;CronTask&gt;&gt;</ID>
     <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun resumeSchedule(target: CronResumeTarget): Result&lt;Unit&gt;</ID>
-    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun createServer(params: McpServerCreateParams): McpServer</ID>
-    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun refreshServerTools(serverId: McpServerId): Unit</ID>
-    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer</ID>
     <ID>MaxLineLength:SessionScopedPassageRepository.kt$SessionScopedPassageRepository$override suspend fun createPassage(agentId: AgentId, text: String): Passage</ID>
     <ID>MaxLineLength:SessionScopedPassageRepository.kt$SessionScopedPassageRepository$override suspend fun refreshPassages(agentId: AgentId): Unit</ID>
     <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun archiveProject(identifier: String): ProjectSummary</ID>
@@ -138,11 +132,6 @@
     <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun getRunMetrics(runId: RunId): RunMetrics</ID>
     <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun getRunUsage(runId: RunId): UsageStatistics</ID>
     <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun refreshRuns(params: RunListParams): Unit</ID>
-    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepMessages(stepId: String): List&lt;LettaMessage&gt;</ID>
-    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepMetrics(stepId: String): StepMetrics</ID>
-    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepTrace(stepId: String): ProviderTrace?</ID>
-    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun listSteps(params: StepListParams): List&lt;Step&gt;</ID>
-    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun refreshSteps(params: StepListParams): Unit</ID>
     <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun attachTool(agentId: AgentId, toolId: ToolId): Unit</ID>
     <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun detachTool(agentId: AgentId, toolId: ToolId): Unit</ID>
     <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun fetchToolsPage(limit: Int, offset: Int): List&lt;Tool&gt;</ID>
@@ -198,7 +187,6 @@
     <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")</ID>
     <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), testTools)</ID>
     <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest.&lt;no name provided&gt;$override suspend</ID>
-    <ID>NestedBlockDepth:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: Any?): List&lt;String&gt;</ID>
     <ID>NestedBlockDepth:TimelineKeysetStrategyTest.kt$TimelineKeysetStrategyTest$@Test fun `metadata projection excludes heavy bodies and body slices obey byte limit`()</ID>
     <ID>NewLineAtEndOfFile:BlockPaginationTest.kt$com.letta.mobile.data.repository.BlockPaginationTest.kt</ID>
     <ID>NewLineAtEndOfFile:PaginationHelpersTest.kt$com.letta.mobile.data.repository.PaginationHelpersTest.kt</ID>
@@ -242,7 +230,6 @@
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
-    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -250,7 +237,6 @@
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionGraphTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -263,7 +249,6 @@
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
-    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -271,7 +256,6 @@
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionManagerTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -284,7 +268,6 @@
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
-    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -292,7 +275,6 @@
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -304,7 +286,6 @@
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
-    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -312,7 +293,6 @@
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -326,7 +306,6 @@
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
-    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -334,7 +313,6 @@
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -347,7 +325,6 @@
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
-    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
@@ -355,7 +332,6 @@
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -368,14 +344,12 @@
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
-    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
@@ -395,7 +369,6 @@
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
-    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import io.mockk.mockk</ID>
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
     <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>

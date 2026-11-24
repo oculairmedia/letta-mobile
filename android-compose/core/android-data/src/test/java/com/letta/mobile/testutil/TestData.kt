@@ -10,13 +10,11 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerId
-import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import java.time.Instant
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.serialization.json.JsonPrimitive
 
 object TestData {
     fun agent(
@@ -100,18 +98,6 @@ object TestData {
         serverName = serverName,
         serverUrl = serverUrl,
         type = "streamable_http",
-    )
-
-    fun mcpToolExecutionResult(
-        status: String = "success",
-        funcReturn: String = "ok",
-        stdout: List<String>? = null,
-        stderr: List<String>? = null,
-    ) = McpToolExecutionResult(
-        status = status,
-        funcReturn = JsonPrimitive(funcReturn),
-        stdout = stdout,
-        stderr = stderr,
     )
 
     fun lettaConfig(

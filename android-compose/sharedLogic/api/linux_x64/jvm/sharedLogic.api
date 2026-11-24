@@ -32279,35 +32279,6 @@ public final class com/letta/mobile/data/model/McpServer$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public final class com/letta/mobile/data/model/McpServerCreateParams {
-	public static final field Companion Lcom/letta/mobile/data/model/McpServerCreateParams$Companion;
-	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
-	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/model/McpServerCreateParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/McpServerCreateParams;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/model/McpServerCreateParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConfig ()Lkotlinx/serialization/json/JsonObject;
-	public final fun getServerName ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/McpServerCreateParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/McpServerCreateParams$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/McpServerCreateParams;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/McpServerCreateParams;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpServerCreateParams$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
 public final class com/letta/mobile/data/model/McpServerKt {
 	public static final fun effectiveArgs (Lcom/letta/mobile/data/model/McpServer;)Ljava/util/List;
 	public static final fun effectiveAuthHeader (Lcom/letta/mobile/data/model/McpServer;)Ljava/lang/String;
@@ -32317,135 +32288,6 @@ public final class com/letta/mobile/data/model/McpServerKt {
 	public static final fun effectiveEnv (Lcom/letta/mobile/data/model/McpServer;)Ljava/util/Map;
 	public static final fun effectiveServerType (Lcom/letta/mobile/data/model/McpServer;)Ljava/lang/String;
 	public static final fun effectiveServerUrl (Lcom/letta/mobile/data/model/McpServer;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/model/McpServerResyncResult {
-	public static final field Companion Lcom/letta/mobile/data/model/McpServerResyncResult$Companion;
-	public fun <init> ()V
-	public fun <init> (Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;)V
-	public synthetic fun <init> (Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun component2 ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun component3 ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun copy (Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;)Lcom/letta/mobile/data/model/McpServerResyncResult;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/McpServerResyncResult;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;ILjava/lang/Object;)Lcom/letta/mobile/data/model/McpServerResyncResult;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAdded ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun getDeleted ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun getUpdated ()Lkotlinx/collections/immutable/ImmutableList;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/McpServerResyncResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/McpServerResyncResult$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/McpServerResyncResult;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/McpServerResyncResult;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpServerResyncResult$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpServerUpdateParams {
-	public static final field Companion Lcom/letta/mobile/data/model/McpServerUpdateParams$Companion;
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
-	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/model/McpServerUpdateParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/McpServerUpdateParams;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/model/McpServerUpdateParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConfig ()Lkotlinx/serialization/json/JsonObject;
-	public final fun getServerName ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/McpServerUpdateParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/McpServerUpdateParams$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/McpServerUpdateParams;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/McpServerUpdateParams;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpServerUpdateParams$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpToolExecuteParams {
-	public static final field Companion Lcom/letta/mobile/data/model/McpToolExecuteParams$Companion;
-	public fun <init> ()V
-	public fun <init> (Lkotlinx/serialization/json/JsonObject;)V
-	public synthetic fun <init> (Lkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
-	public final fun copy (Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/model/McpToolExecuteParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/McpToolExecuteParams;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/model/McpToolExecuteParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getArgs ()Lkotlinx/serialization/json/JsonObject;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/McpToolExecuteParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/McpToolExecuteParams$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/McpToolExecuteParams;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/McpToolExecuteParams;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpToolExecuteParams$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpToolExecutionResult {
-	public static final field Companion Lcom/letta/mobile/data/model/McpToolExecutionResult$Companion;
-	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component3 ()Ljava/util/List;
-	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/model/McpToolExecutionResult;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/McpToolExecutionResult;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/McpToolExecutionResult;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getFuncReturn ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getSandboxConfigFingerprint ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getStderr ()Ljava/util/List;
-	public final fun getStdout ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/McpToolExecutionResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/McpToolExecutionResult$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/McpToolExecutionResult;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/McpToolExecutionResult;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/McpToolExecutionResult$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public abstract class com/letta/mobile/data/model/MessageContentPart {
@@ -34387,92 +34229,6 @@ public final synthetic class com/letta/mobile/data/model/Step$$serializer : kotl
 }
 
 public final class com/letta/mobile/data/model/Step$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/StepFeedbackUpdateParams {
-	public static final field Companion Lcom/letta/mobile/data/model/StepFeedbackUpdateParams$Companion;
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getFeedback ()Ljava/lang/String;
-	public final fun getTags ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/StepFeedbackUpdateParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/StepFeedbackUpdateParams$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/StepFeedbackUpdateParams$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/StepListParams {
-	public static final field Companion Lcom/letta/mobile/data/model/StepListParams$Companion;
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/util/List;
-	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Ljava/lang/Boolean;
-	public final fun component13 ()Ljava/util/List;
-	public final fun component14 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/Integer;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/model/StepListParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/StepListParams;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/StepListParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAfter ()Ljava/lang/String;
-	public final fun getAgentId ()Ljava/lang/String;
-	public final fun getBefore ()Ljava/lang/String;
-	public final fun getEndDate ()Ljava/lang/String;
-	public final fun getFeedback ()Ljava/lang/String;
-	public final fun getHasFeedback ()Ljava/lang/Boolean;
-	public final fun getLimit ()Ljava/lang/Integer;
-	public final fun getModel ()Ljava/lang/String;
-	public final fun getOrder ()Ljava/lang/String;
-	public final fun getOrderBy ()Ljava/lang/String;
-	public final fun getProjectId ()Ljava/lang/String;
-	public final fun getStartDate ()Ljava/lang/String;
-	public final fun getTags ()Ljava/util/List;
-	public final fun getTraceIds ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/StepListParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/StepListParams$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/StepListParams;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/StepListParams;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/StepListParams$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -45622,17 +45378,9 @@ public class com/letta/mobile/data/repository/CachedBugReportRepository : com/le
 public class com/letta/mobile/data/repository/CachedMcpServerRepository : com/letta/mobile/data/repository/api/IMcpServerRepository {
 	public fun <init> (Lcom/letta/mobile/data/backend/RemoteRoute;Lcom/letta/mobile/data/repository/api/McpServerIrohSource;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/backend/RemoteRoute;Lcom/letta/mobile/data/repository/api/McpServerIrohSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun createServer (Lcom/letta/mobile/data/model/McpServerCreateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun deleteServer-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun fetchAllMcpTools (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getServerTools-xo5nkVY (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
-	public fun getServers ()Lkotlinx/coroutines/flow/Flow;
 	public fun getServers ()Lkotlinx/coroutines/flow/StateFlow;
-	public fun refreshServerTools-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun refreshServers (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun resyncServerTools-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun runServerTool-3LS7dJY (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/McpToolExecuteParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateServer-JxJrDEc (Ljava/lang/String;Lcom/letta/mobile/data/model/McpServerUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public class com/letta/mobile/data/repository/CachedMessageRepository : com/letta/mobile/data/repository/api/IConversationInspectorMessageRepository, com/letta/mobile/data/repository/api/IMessageRepository {
@@ -46357,18 +46105,8 @@ public abstract interface class com/letta/mobile/data/repository/SettingsBackend
 
 public final class com/letta/mobile/data/repository/StepRepository : com/letta/mobile/data/repository/api/IStepRepository {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/repository/api/StepRemoteSource;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/repository/api/StepRemoteSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun getStep (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getStepMessages (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getStepMetrics (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getStepTrace (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getSteps ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsStepQueries ()Z
-	public fun listSteps (Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun refreshSteps (Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateStepFeedback (Ljava/lang/String;Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun upsertStep (Lcom/letta/mobile/data/model/Step;)V
 }
 
 public class com/letta/mobile/data/repository/SubagentRepository : com/letta/mobile/data/repository/api/ISubagentRepository {
@@ -46846,17 +46584,9 @@ public final class com/letta/mobile/data/repository/api/ICronRepository$DefaultI
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/IMcpServerRepository {
-	public abstract fun createServer (Lcom/letta/mobile/data/model/McpServerCreateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun deleteServer-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun fetchAllMcpTools (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun getServerTools-xo5nkVY (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
-	public abstract fun getServers ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getServers ()Lkotlinx/coroutines/flow/StateFlow;
-	public abstract fun refreshServerTools-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refreshServers (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun resyncServerTools-EjLxAco (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun runServerTool-3LS7dJY (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/McpToolExecuteParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun updateServer-JxJrDEc (Ljava/lang/String;Lcom/letta/mobile/data/model/McpServerUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/IMessageRepository : com/letta/mobile/data/repository/api/IConversationInspectorMessageRepository {
@@ -47064,24 +46794,8 @@ public abstract interface class com/letta/mobile/data/repository/api/ISlashComma
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/IStepRepository {
-	public abstract fun getStep (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun getStepMessages (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun getStepMetrics (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun getStepTrace (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getSteps ()Lkotlinx/coroutines/flow/StateFlow;
-	public fun getSupportsStepQueries ()Z
-	public abstract fun listSteps (Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listSteps$default (Lcom/letta/mobile/data/repository/api/IStepRepository;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun refreshSteps (Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun refreshSteps$default (Lcom/letta/mobile/data/repository/api/IStepRepository;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun updateStepFeedback (Ljava/lang/String;Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun upsertStep (Lcom/letta/mobile/data/model/Step;)V
-}
-
-public final class com/letta/mobile/data/repository/api/IStepRepository$DefaultImpls {
-	public static fun getSupportsStepQueries (Lcom/letta/mobile/data/repository/api/IStepRepository;)Z
-	public static synthetic fun listSteps$default (Lcom/letta/mobile/data/repository/api/IStepRepository;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun refreshSteps$default (Lcom/letta/mobile/data/repository/api/IStepRepository;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getSupportsStepQueries ()Z
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/ISubagentRepository {
@@ -47137,14 +46851,9 @@ public abstract interface class com/letta/mobile/data/repository/api/McpServerIr
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/McpServerRemoteSource {
-	public abstract fun createMcpServer (Lcom/letta/mobile/data/model/McpServerCreateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun deleteMcpServer (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun listMcpServerTools (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun listMcpServers (Ljava/lang/Integer;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listMcpServers$default (Lcom/letta/mobile/data/repository/api/McpServerRemoteSource;Ljava/lang/Integer;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun refreshMcpServerTools (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun runMcpServerTool (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/McpToolExecuteParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun updateMcpServer (Ljava/lang/String;Lcom/letta/mobile/data/model/McpServerUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/McpServerRemoteSource$DefaultImpls {
@@ -47336,40 +47045,6 @@ public abstract interface class com/letta/mobile/data/repository/api/SlashComman
 	public abstract fun listForAgent (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun listGlobal (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun uninstallFromAgent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/letta/mobile/data/repository/api/StepId {
-	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/repository/api/StepId;
-	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
-	public fun equals (Ljava/lang/Object;)Z
-	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
-	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
-	public final fun getValue ()Ljava/lang/String;
-	public fun hashCode ()I
-	public static fun hashCode-impl (Ljava/lang/String;)I
-	public fun toString ()Ljava/lang/String;
-	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
-	public final synthetic fun unbox-impl ()Ljava/lang/String;
-}
-
-public abstract interface class com/letta/mobile/data/repository/api/StepRemoteSource {
-	public fun listStepMessages-2yZwaVs (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun listSteps (Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listSteps$default (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun retrieveStep-2yZwaVs (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun retrieveStepMetrics-2yZwaVs (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun retrieveStepTrace-2yZwaVs (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateStepFeedback--plXyCE (Ljava/lang/String;Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/letta/mobile/data/repository/api/StepRemoteSource$DefaultImpls {
-	public static fun listStepMessages-2yZwaVs (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun listSteps (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listSteps$default (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Lcom/letta/mobile/data/model/StepListParams;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun retrieveStep-2yZwaVs (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun retrieveStepMetrics-2yZwaVs (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun retrieveStepTrace-2yZwaVs (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun updateStepFeedback--plXyCE (Lcom/letta/mobile/data/repository/api/StepRemoteSource;Ljava/lang/String;Lcom/letta/mobile/data/model/StepFeedbackUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/SubagentParentScope {

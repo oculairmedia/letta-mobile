@@ -1,13 +1,10 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunRequestConfig
-import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.testutil.FakeRunApi
-import com.letta.mobile.testutil.FakeStepApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -36,27 +33,6 @@ class SessionScopedExecutionRepositoriesTest {
         )
     }
 
-    @Test
-    fun `step repository proxy switches caches to rebuilt graph`() = runTest {
-        val fakeStepApi = FakeStepApi().apply {
-            steps = mutableListOf(sampleStep("step-a"))
-        }
-        assertProxySwitchesCaches(
-            testScheduler,
-            ProxySwitchScenario(
-                setupGraph = { stepApi = fakeStepApi },
-                createProxy = { sm, _ -> sm.sessionScoped(IStepRepository::class) { it.stepRepository } },
-                refresh = { it.refreshSteps(StepListParams()) },
-                observeIds = { it.steps.value.map { s -> s.id } },
-                mutateForBackendB = {
-                    fakeStepApi.steps = mutableListOf(sampleStep("step-b"))
-                },
-                expectedBefore = listOf("step-a"),
-                expectedAfter = listOf("step-b"),
-            ),
-        )
-    }
-
     private fun sampleRun(id: String, agentId: String) = Run(
         id = id,
         agentId = agentId,
@@ -64,6 +40,4 @@ class SessionScopedExecutionRepositoriesTest {
         background = false,
         requestConfig = RunRequestConfig(useAssistantMessage = true),
     )
-
-    private fun sampleStep(id: String) = FakeStepApi().sampleStep(id)
 }

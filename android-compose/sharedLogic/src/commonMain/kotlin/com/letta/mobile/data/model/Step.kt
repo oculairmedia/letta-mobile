@@ -58,27 +58,3 @@ data class ProviderTrace(
     @SerialName("step_id") val stepId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
 )
-
-@Serializable
-data class StepListParams(
-    val before: String? = null,
-    val after: String? = null,
-    val limit: Int? = null,
-    val order: String? = null,
-    @SerialName("order_by") val orderBy: String? = null,
-    @SerialName("start_date") val startDate: String? = null,
-    @SerialName("end_date") val endDate: String? = null,
-    val model: String? = null,
-    @SerialName("agent_id") val agentId: String? = null,
-    @SerialName("trace_ids") val traceIds: List<String>? = null,
-    val feedback: String? = null,
-    @SerialName("has_feedback") val hasFeedback: Boolean? = null,
-    val tags: List<String>? = null,
-    @SerialName("project_id") val projectId: String? = null,
-)
-
-@Serializable
-data class StepFeedbackUpdateParams(
-    val feedback: String? = null,
-    val tags: List<String>? = null,
-)

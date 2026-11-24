@@ -1,12 +1,6 @@
 package com.letta.mobile.data.tools
 
 import com.letta.mobile.data.model.McpServer
-import com.letta.mobile.data.model.McpServerCreateParams
-import com.letta.mobile.data.model.McpServerId
-import com.letta.mobile.data.model.McpServerResyncResult
-import com.letta.mobile.data.model.McpServerUpdateParams
-import com.letta.mobile.data.model.McpToolExecuteParams
-import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
@@ -19,7 +13,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -152,30 +145,9 @@ class ToolLibraryControllerTest {
     ) : IMcpServerRepository {
         override val servers: StateFlow<List<McpServer>> = MutableStateFlow(emptyList())
 
-        override fun getServers(): Flow<List<McpServer>> = flowOf(emptyList())
-
-        override fun getServerTools(serverId: McpServerId): Flow<List<Tool>> = flowOf(emptyList())
-
         override suspend fun refreshServers() = Unit
 
-        override suspend fun refreshServerTools(serverId: McpServerId) = Unit
-
-        override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult = error("unused")
-
-        override suspend fun runServerTool(
-            serverId: McpServerId,
-            toolId: ToolId,
-            params: McpToolExecuteParams,
-        ): McpToolExecutionResult = error("unused")
-
         override suspend fun fetchAllMcpTools(): List<Tool> = fetchTools()
-
-        override suspend fun createServer(params: McpServerCreateParams): McpServer = error("unused")
-
-        override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer =
-            error("unused")
-
-        override suspend fun deleteServer(id: McpServerId) = Unit
     }
 
     private fun tool(

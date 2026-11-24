@@ -1,5 +1,8 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.RemoteRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.session.graph.AdminRemoteRoutes
 
 import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
@@ -10,14 +13,12 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakeProjectApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
-import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -106,14 +107,14 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
     var conversationDao: dagger.Lazy<ConversationDao> = lazyOf(FakeConversationDao()),
-    var mcpServerApi: FakeMcpServerApi = FakeMcpServerApi(),
     var modelApi: FakeModelApi = FakeModelApi(),
     var projectApi: FakeProjectApi = FakeProjectApi(),
     var runApi: FakeRunApi = FakeRunApi(),
     var providerApi: FakeProviderApi = FakeProviderApi(),
     var scheduleApi: FakeScheduleApi = FakeScheduleApi(),
-    var stepApi: FakeStepApi = FakeStepApi(),
     var toolApi: FakeToolApi = FakeToolApi(),
+    /** The MCP catalog source a test binds; the builder otherwise binds none. */
+    var mcpServerApi: McpServerRemoteSource? = null,
     var settingsRepository: ISettingsRepository? = null,
     var appContext: android.content.Context = mockk(relaxed = true),
 ) {
@@ -131,7 +132,7 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
         agents = agentApi.bound(),
         conversations = conversationApi.bound(),
         admin = AdminRemoteRoutes(
-            mcpServers = mcpServerApi.bound(),
+            mcpServers = mcpServerApi?.let { it.bound() } ?: RemoteRoute.Absent(SessionRoute.MCP_SERVERS),
             models = modelApi.bound(),
             projects = projectApi.bound(),
             providers = providerApi.bound(),
@@ -139,7 +140,6 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
             tools = toolApi.bound(),
         ),
         schedules = scheduleApi.bound(),
-        steps = stepApi.bound(),
     )
 
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(

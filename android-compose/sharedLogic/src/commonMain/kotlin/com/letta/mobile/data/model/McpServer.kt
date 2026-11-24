@@ -34,39 +34,6 @@ data class McpServer(
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 
-@Serializable
-data class McpServerCreateParams(
-    @SerialName("server_name") val serverName: String,
-    val config: JsonObject,
-)
-
-@Serializable
-data class McpServerUpdateParams(
-    @SerialName("server_name") val serverName: String? = null,
-    val config: JsonObject? = null,
-)
-
-@Serializable
-data class McpServerResyncResult(
-    @Serializable(with = ImmutableListSerializer::class) val deleted: ImmutableList<ToolId> = persistentListOf(),
-    @Serializable(with = ImmutableListSerializer::class) val updated: ImmutableList<ToolId> = persistentListOf(),
-    @Serializable(with = ImmutableListSerializer::class) val added: ImmutableList<ToolId> = persistentListOf(),
-)
-
-@Serializable
-data class McpToolExecuteParams(
-    val args: JsonObject = JsonObject(emptyMap()),
-)
-
-@Serializable
-data class McpToolExecutionResult(
-    val status: String,
-    @SerialName("func_return") val funcReturn: JsonElement? = null,
-    val stdout: List<String>? = null,
-    val stderr: List<String>? = null,
-    @SerialName("sandbox_config_fingerprint") val sandboxConfigFingerprint: String? = null,
-)
-
 fun McpServer.effectiveServerType(): String? =
     type ?: serverType ?: mcpServerType ?: config.stringValue("type", "server_type", "mcp_server_type")
 
