@@ -61,7 +61,7 @@ sealed interface TimelineSemanticField {
 class TimelineSemanticBudget(
     val maxInputBytes: Long = 2L * 1024 * 1024,
     /**
-     * One page of a window. letta-mobile-032ia: a held-back tool call now keeps its step line on
+     * One page of a window. a held-back tool call now keeps its step line on
      * screen, and what is left of it is its output, which has to be readable a page at a time (16
      * KiB pages took a dozen taps through a 256 KiB return). Each page is still bounded, and
      * `chunkBytes * maxReads` keeps any one window under 2 MiB of body.

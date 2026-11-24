@@ -269,7 +269,7 @@ internal suspend fun TimelineStoreReader.runEnvelope(
 }
 
 /**
- * letta-mobile-032ia: a run boundary decodes its neighbouring row whole or not at all, so it shares
+ * a run boundary decodes its neighbouring row whole or not at all, so it shares
  * the per-row inline limit; at a fixed 16 KiB it could not recognise the run either side of a
  * deferred row, and the page claimed no evidence of a split or a join.
  */

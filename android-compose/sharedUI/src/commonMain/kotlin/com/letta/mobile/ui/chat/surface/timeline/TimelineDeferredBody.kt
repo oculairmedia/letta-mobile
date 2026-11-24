@@ -154,7 +154,7 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
-            // letta-mobile-032ia: a tool call names what ran, so a deferred row is never a card that
+            // a tool call names what ran, so a deferred row is never a card that
             // only says it is too large.
             Text(
                 text = deferredNotice(rememberDeferredTool(rowKey, read)),
@@ -167,7 +167,7 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
 }
 
 /**
- * letta-mobile-032ia: the tool [rowKey]'s held-back body is a call to, read once from the body's
+ * the tool [rowKey]'s held-back body is a call to, read once from the body's
  * own `toolCalls[0].name`; null for a plain message, and until the read lands.
  */
 @Composable

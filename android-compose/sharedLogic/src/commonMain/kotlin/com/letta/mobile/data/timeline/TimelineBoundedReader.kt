@@ -90,7 +90,7 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
         const val MAX_CHUNK_BYTES: Int = 64 * 1024
 
         /**
-         * The most one row may decode inline. letta-mobile-032ia: a row over this reads on screen as
+         * The most one row may decode inline. a row over this reads on screen as
          * a held-back card, so at 16 KiB an ordinary tool call ("Ran python3 - <<'PY'" with a few KB
          * of output) was deferred and lost the line saying what ran. A row is decoded in one page
          * and lives no longer than that page, and [MAX_PAGE_BODY_BYTES] still bounds the page: this
