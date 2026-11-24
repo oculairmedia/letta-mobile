@@ -157,10 +157,7 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
             // Read the tool name once per row from toolCalls[0].name so a deferred tool call
             // never renders as a context-free "too large" card.
             var tool by remember(rowKey) { mutableStateOf<String?>(null) }
-            LaunchedEffect(rowKey) {
-                tool = (read(TimelineSemanticField.toolName(), 0) as? TimelineSemanticWindowResult.Text)?.value
-                    ?.takeIf { it.isNotBlank() }
-            }
+            LaunchedEffect(rowKey) { tool = readToolName(read) }
             Text(
                 text = deferredNotice(tool),
                 style = MaterialTheme.typography.labelMedium,
@@ -170,6 +167,26 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
         }
     }
 }
+
+/**
+ * The tool a deferred row belongs to, or null when its body does not name one.
+ *
+ * This lookup runs unattended, when the row enters composition and before anything is asked for,
+ * so it cannot share the pager's retry: a body whose chunk no longer matches its reference (a
+ * presentation replaced under the row, a closed one) propagates an IllegalStateException out of
+ * the window reader, and an unhandled failure in [LaunchedEffect] takes the whole timeline down.
+ * Such a failure only means the name is unknown, so the row keeps the plain notice and a failed
+ * page read still reports itself through the pager. Cancellation is not a failure and is rethrown.
+ */
+internal suspend fun readToolName(read: DeferredBodyRead): String? =
+    try {
+        (read(TimelineSemanticField.toolName(), 0) as? TimelineSemanticWindowResult.Text)?.value
+            ?.takeIf { it.isNotBlank() }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: IllegalStateException) {
+        null
+    }
 
 /** "Ran <tool> · output too large to show inline" for a call, else the plain notice every held-back body has. */
 internal fun deferredNotice(tool: String?): String =
