@@ -184,9 +184,12 @@ private class ElasticOffsetNode(private val effect: TimelineElasticOverscroll) :
 
 /**
  * The timeline's elastic overscroll, standing down under reduced motion and while [pinching].
- * [canBouncePastPositiveEdge] / [canBouncePastNegativeEdge] say whether a fling toward that
- * physical edge (positive: the finger moving down, toward the oldest rows of a reversed list) has
- * reached the true end of the history rather than a page still to load.
+ * [canBouncePastPositiveEdge] / [canBouncePastNegativeEdge] say whether the edge physically sits
+ * at the true end of the history rather than a page still to load (positive: the finger moving
+ * down, toward the oldest rows of a reversed list), both for launching a bounce and while it
+ * settles. They answer the history, never the reading position: a fling only leaves velocity at
+ * a truly exhausted edge, and a streamed row landing grows the newest edge and moves the reader
+ * off it mid-bounce — that growth must not stand a settling bounce down.
  */
 @Composable
 internal fun rememberTimelineElasticOverscroll(
