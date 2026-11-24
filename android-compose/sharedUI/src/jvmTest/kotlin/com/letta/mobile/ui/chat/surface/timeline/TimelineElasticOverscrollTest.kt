@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -8,17 +12,25 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MonotonicFrameClock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipeWithVelocity
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.surface.timeline.rows.rowCallbacks
+import com.letta.mobile.ui.chat.surface.timeline.rows.rowContext
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -163,6 +175,185 @@ class TimelineElasticOverscrollTest {
         mainClock.autoAdvance = true
     }
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun aTouchMidBounceTakesOverImmediately() = runTest {
+        val effect = effect()
+        val frames = TestFrameClock()
+        val fling = launch(frames) { effect.applyToFling(Velocity(0f, -1_200f)) { Velocity.Zero } }
+        frames.advanceUntil { effect.offsetPx < 0f }
+
+        effect.applyToScroll(Offset(0f, -6f), NestedScrollSource.UserInput) { it }
+        runCurrent()
+        assertEquals(0f, effect.offsetPx)
+        assertTrue(fling.isCancelled)
+        frames.finish(fling)
+    }
+
+    /**
+     * The v0.29 fling judder: while the newest edge's bounce settles, a streamed row lands and the
+     * list's reading position leaves the newest edge (canScrollBackward flips true). That must not
+     * snap the rows back to rest in one frame: the overshoot keeps settling smoothly, then exactly
+     * back at rest. Observed frame-by-frame off the drawn marker row, through the list frame wired
+     * exactly as production wires it.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun aStreamedRowLandingMidBounceDoesNotSnapTheOvershootBack() = runComposeUiTest {
+        val harness = StreamFrameHarness()
+        mainClock.autoAdvance = false
+        setContent { harness.Content() }
+        waitForIdle()
+
+        // The list opens on its newest edge: the marker row rests just above the bottom edge.
+        val restY = markerTopY(this)
+        onNodeWithTag(STREAM_FRAME).performTouchInput {
+            swipeWithVelocity(bottomCenter, topCenter, endVelocity = 8_000f)
+        }
+        val trace = mutableListOf(restY)
+        while (restY - trace.last() < MIN_DISPLACED_PX && trace.size < 300) {
+            mainClock.advanceTimeByFrame()
+            runOnIdle { trace += markerTopY(this) }
+        }
+        assertTrue(
+            restY - trace.last() >= MIN_DISPLACED_PX,
+            "Expected a bounce past the newest edge, saw $trace",
+        )
+        assertFalse(harness.listState.canScrollBackward, "The fling never left the newest edge")
+
+        // The stream lands mid-bounce: the reader's position leaves the newest edge.
+        runOnIdle { harness.prependStreamedRow() }
+        repeat(4) {
+            mainClock.advanceTimeByFrame()
+            runOnIdle { trace += markerTopY(this) }
+        }
+        assertTrue(harness.listState.canScrollBackward, "The streamed row must move the reader off the newest edge")
+        assertTrue(
+            trace.takeLast(4).all { restY - it > 0 },
+            "The bounce must settle gradually, not snap back in one frame: $trace",
+        )
+
+        var framesLeft = 240
+        while (abs(restY - trace.last()) > 1 && framesLeft-- > 0) {
+            mainClock.advanceTimeByFrame()
+            runOnIdle { trace += markerTopY(this) }
+        }
+        assertTrue(abs(restY - trace.last()) <= 1, "The overshoot must settle exactly back at rest: $trace")
+        mainClock.autoAdvance = true
+    }
+
+    /**
+     * A bounce past a revealed page boundary stands down mid-flight: when Paging reports that the
+     * newest edge is a page still to load, not the conversation's confirmed end, the overshoot
+     * snaps back at once, exactly as a disable does.
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun aBoundaryOpeningMidBounceStandsTheOvershootDownAtOnce() = runComposeUiTest {
+        val harness = StreamFrameHarness()
+        mainClock.autoAdvance = false
+        setContent { harness.Content() }
+        waitForIdle()
+
+        val restY = markerTopY(this)
+        onNodeWithTag(STREAM_FRAME).performTouchInput {
+            swipeWithVelocity(bottomCenter, topCenter, endVelocity = 8_000f)
+        }
+        val trace = mutableListOf(restY)
+        while (restY - trace.last() < MIN_DISPLACED_PX && trace.size < 300) {
+            mainClock.advanceTimeByFrame()
+            runOnIdle { trace += markerTopY(this) }
+        }
+        assertTrue(restY - trace.last() >= MIN_DISPLACED_PX, "Expected a bounce past the newest edge: $trace")
+
+        runOnIdle { harness.revealNewestPageBoundary() }
+        mainClock.advanceTimeByFrame()
+        runOnIdle { trace += markerTopY(this) }
+        assertTrue(
+            abs(restY - trace.last()) <= 1,
+            "A revealed page boundary must cancel the bounce at once: $trace",
+        )
+        mainClock.autoAdvance = true
+    }
+
+    /**
+     * The list frame with the frame's own wiring, a marker row at the newest edge, and the newest
+     * history's confirmed end as the frame holds it: [revealNewestPageBoundary] flips it to play
+     * Paging revealing a boundary there mid-bounce.
+     */
+    private class StreamFrameHarness {
+        private var rowKeys by mutableStateOf(listOf(MARKER_KEY) + (0..19).map { "row-$it" })
+        private var newestIsAConfirmedEnd by mutableStateOf(true)
+        lateinit var listState: LazyListState
+
+        /** Landing one streamed row at the head, as a live run's delta does. */
+        fun prependStreamedRow() {
+            rowKeys = listOf("streamed-${rowKeys.size}") + rowKeys
+        }
+
+        /** Paging reveals the newest edge is a page still to load, not the conversation's end. */
+        fun revealNewestPageBoundary() {
+            newestIsAConfirmedEnd = false
+        }
+
+        @androidx.compose.runtime.Composable
+        fun Content() {
+            CompositionLocalProvider(LocalReducedMotion provides false) {
+                listState = rememberLazyListState()
+                TimelineListFrame(
+                    listState = listState,
+                    bindings = TimelineRowBindings(
+                        contexts = TimelineRowContexts(base = rowContext(), streaming = null),
+                        callbacks = rowCallbacks(),
+                    ),
+                    overlays = TimelineFrameOverlays(
+                        pinnedPrompt = rememberPinnedPrompt(
+                            listState = listState,
+                            itemCount = rowKeys.size,
+                            topReserve = 0.dp,
+                            itemAt = { null },
+                        ),
+                        showScrollToLatest = false,
+                        onScrollToLatest = {},
+                        glide = rememberNewestEdgeGlide(listState),
+                        bottomReserve = 0.dp,
+                    ),
+                    modifier = Modifier.width(200.dp).height(240.dp).testTag(STREAM_FRAME),
+                    olderHistoryComplete = { true },
+                    newerHistoryComplete = { newestIsAConfirmedEnd },
+                    content = {
+                        items(rowKeys.size, key = { rowKeys[it] }) { index ->
+                            if (rowKeys[index] == MARKER_KEY) {
+                                Box(Modifier.fillMaxWidth().height(12.dp).background(MARKER_COLOR))
+                            } else {
+                                Text(rowKeys[index], Modifier.height(48.dp))
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    /** The marker row's drawn top edge, in px from the frame's top: the rows' live displacement. */
+    @OptIn(ExperimentalTestApi::class)
+    private fun markerTopY(test: androidx.compose.ui.test.ComposeUiTest): Int {
+        val frame = test.onNodeWithTag(STREAM_FRAME).captureToImage().toPixelMap()
+        for (y in 0 until frame.height) {
+            for (x in 0 until frame.width) {
+                val color = frame[x, y]
+                val hasRedBlue = color.red > 0.47f && color.blue > 0.47f
+                if (hasRedBlue && color.green < 0.39f) return y
+            }
+        }
+        val colours = mutableMapOf<Int, Int>()
+        for (y in 0 until frame.height) for (x in 0 until frame.width) colours.merge(frame[x, y].hashCode(), 1, Int::plus)
+        error(
+            "The marker row never drew: no $MARKER_COLOR pixel found in ${frame.width}x${frame.height}; " +
+                "top colours: " + colours.entries.sortedByDescending { it.value }.take(6).toList(),
+        )
+    }
+
     private class ListHarness {
         lateinit var state: LazyListState
         lateinit var effect: TimelineElasticOverscroll
@@ -235,5 +426,9 @@ class TimelineElasticOverscrollTest {
 
     private companion object {
         const val LIST = "elastic-list"
+        const val STREAM_FRAME = "elastic-stream-frame"
+        const val MARKER_KEY = "__stream_marker__"
+        const val MIN_DISPLACED_PX = 2
+        val MARKER_COLOR = Color(0xFFFF00FF)
     }
 }

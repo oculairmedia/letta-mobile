@@ -120,6 +120,36 @@ class PagedTimelineFollowTest {
         assertFalse(follow().following, "the reader left the newest edge")
     }
 
+    /**
+     * The positive pin the bounce fix must never break: a reader resting at the newest edge still
+     * follows it while the stream runs — rows arriving at the head are followed onto the edge,
+     * without the reader touching anything.
+     */
+    @Test
+    fun anIdleReaderAtTheNewestEdgeStillFollowsStreamingRows() = runComposeUiTest {
+        var rows by mutableStateOf(history(ROWS))
+        val (follow, listState) = mount(rows = { rows }, newerHistoryComplete = { true })
+        assertTrue(follow().following, "a list that opens on its newest edge follows it")
+        assertTrue(listState().isAtNewestEdge())
+
+        rows = Rows(listOf("reply-1") + rows.keys, newestIsPrompt = false)
+        waitForIdle()
+        assertTrue(follow().following, "streaming rows must not detach the idle reader's follow")
+        assertTrue(listState().isAtNewestEdge(), "a streamed row lands the reader on the newest edge")
+
+        // A tick inside the snap cadence waits out the rest of it before it snaps (coalesced), so
+        // drive the clock past the interval the way real stream ticks do.
+        rows = Rows(listOf("reply-2") + rows.keys, newestIsPrompt = false)
+        mainClock.advanceTimeBy(STREAM_SNAP_INTERVAL_MS * 2)
+        waitForIdle()
+        assertTrue(follow().following)
+        assertTrue(
+            listState().isAtNewestEdge(),
+            "a second streamed row still lands on the newest edge, at " +
+                "${listState().firstVisibleItemIndex}/${listState().firstVisibleItemScrollOffset}",
+        )
+    }
+
     private companion object {
         const val LIST = "follow-list"
         const val ROWS = 40

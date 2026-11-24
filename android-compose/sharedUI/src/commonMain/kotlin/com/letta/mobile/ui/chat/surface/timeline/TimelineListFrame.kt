@@ -102,10 +102,15 @@ internal fun TimelineListFrame(
     content: LazyListScope.() -> Unit,
 ) {
     // Reversed list: a fling with the finger moving down (positive) runs toward the oldest rows.
+    // The reading position is deliberately no part of a gate: a fling only leaves velocity at a
+    // truly exhausted edge, and a streamed row landing grows the newest edge mid-bounce, moving
+    // the reader off it — a position gate would mistake that growth for a revealed page boundary,
+    // and snap the settling spring to rest in one frame (the v0.29 fling judder). Only the
+    // history falling short of its true end (Paging revealing a page boundary) cancels a bounce.
     val overscroll = rememberTimelineElasticOverscroll(
         pinching = bindings.pinch?.isPinching == true,
-        canBouncePastPositiveEdge = { !listState.canScrollForward && olderHistoryComplete() },
-        canBouncePastNegativeEdge = { !listState.canScrollBackward && newerHistoryComplete() },
+        canBouncePastPositiveEdge = olderHistoryComplete,
+        canBouncePastNegativeEdge = newerHistoryComplete,
     )
     val pinned = overlays.pinnedPrompt
     val fades = rememberTimelineFadeAlphas(
