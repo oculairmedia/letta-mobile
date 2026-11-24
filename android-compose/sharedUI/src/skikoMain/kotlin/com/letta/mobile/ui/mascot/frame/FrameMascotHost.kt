@@ -18,6 +18,7 @@ import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotStills
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -54,15 +55,13 @@ class FrameMascotEntry private constructor(
     }
 
     override suspend fun load() {
-        val created = withContext(renderer.dispatcher) {
-            runCatching { renderer.createScene() }
-                .onFailure { println("[mascot] scene failed to load: $it") }
-                .getOrNull()
-        }
-        if (created == null) {
-            failed = true
-            return
-        }
+        // This runs in a composition's LaunchedEffect, where any throw would fail the window - but a
+        // cancelled load only means the surface that asked left, so it must not fail the entry.
+        val created = runCatchingCancellable { withContext(renderer.dispatcher) { renderer.createScene() } }.getOrElse { thrown ->
+            println("[mascot] scene failed to load, this mascot falls back to its stand-in: $thrown")
+            markFailed()
+            null
+        } ?: return
         // Back on the UI thread, where every write is made: attaching replays them in order, the
         // identity first, ahead of the first advance the frame loop queues. Every write wakes a
         // settled scene: a new value is something to animate toward.
@@ -74,6 +73,19 @@ class FrameMascotEntry private constructor(
         )
         rive.load(MASCOT_MODEL)
         scene = created
+    }
+
+    /**
+     * The scene threw while being drawn - the browser's Rive binding, a frame's pixels, an already
+     * released scene - and [RiveFrameSurface] has released it. The entry is failed, so the host
+     * stops offering it and every surface of this agent draws its fallback.
+     *
+     * Internal because [FrameMascotHost] binds it as the surface's `onFailure`.
+     */
+    internal fun markFailed() {
+        if (failed) return
+        scene = null
+        failed = true
     }
 
     override fun writeIdentity(identity: MascotIdentity) = RiveAvatarContract.applyIdentity(sink.sink, identity)
@@ -107,8 +119,11 @@ class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
     @Composable
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
         // Nothing until the scene is up; the entry's state flips and this recomposes into it.
-        val scene = (entry as FrameMascotEntry).scene ?: return
-        RiveFrameSurface(scene, renderer.dispatcher, modifier, playing = playing, onFrameStats = frameStats)
+        val frame = entry as FrameMascotEntry
+        val scene = frame.scene ?: return
+        RiveFrameSurface(scene, renderer.dispatcher, modifier, playing = playing, onFrameStats = frameStats) {
+            frame.markFailed()
+        }
     }
 
     /** Captured once per identity (see [MascotStills]); none until the renderer is available. */

@@ -5777,7 +5777,7 @@ public final class com/letta/mobile/ui/mascot/frame/RiveFrameStep {
 }
 
 public final class com/letta/mobile/ui/mascot/frame/RiveFrameSurfaceKt {
-	public static final fun RiveFrameSurface (Lcom/letta/mobile/ui/mascot/frame/RiveFrameScene;Lkotlinx/coroutines/CoroutineDispatcher;Landroidx/compose/ui/Modifier;ZLkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/mascot/frame/RiveOnionSkin;Landroidx/compose/runtime/Composer;II)V
+	public static final fun RiveFrameSurface (Lcom/letta/mobile/ui/mascot/frame/RiveFrameScene;Lkotlinx/coroutines/CoroutineDispatcher;Landroidx/compose/ui/Modifier;ZLkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/mascot/frame/RiveOnionSkin;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/mascot/frame/RiveOnionSkin {

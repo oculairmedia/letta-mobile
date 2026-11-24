@@ -39,7 +39,8 @@ interface RiveFrameRenderer {
     /**
      * Brings the renderer up when that is asynchronous (the browser fetches its runtime and the
      * mascot); [available] turns true once it has. A renderer that cannot come up stays
-     * unavailable and every mascot draws its fallback. Called once by [ProvideFrameMascots].
+     * unavailable and every mascot draws its fallback. [ProvideFrameMascots] calls it once, through
+     * [bringUpSafely].
      */
     suspend fun prepare() = Unit
 
@@ -55,7 +56,6 @@ interface RiveFrameRenderer {
 
 /** Pointer events a scene hit-tests, in render pixels. */
 enum class RivePointer { MOVE, DOWN, UP, EXIT }
-
 /** One pointer event for a scene: what happened, and where in render pixels. */
 data class RivePointerEvent(val kind: RivePointer, val position: Offset)
 

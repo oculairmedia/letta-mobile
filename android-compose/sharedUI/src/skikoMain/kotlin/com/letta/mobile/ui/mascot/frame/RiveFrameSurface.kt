@@ -27,8 +27,10 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import com.letta.mobile.util.runCatchingCancellable
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -97,15 +99,21 @@ private class RiveFrameSlots {
 /**
  * One run of the frame loop. The size is pinned for the run: `size` is state and can change under
  * a frame callback before the effect restarts, and a frame of one size shown at another is wrong.
+ *
+ * A scene call that throws - the browser's Rive binding throwing out of an interop call, a frame
+ * that cannot allocate its pixels, a scene the runtime already released - marks the mascot failed
+ * instead of escaping the surface's effect and taking the window down with it; a cancelled loop
+ * rethrows, because the surface left composition and that is not a failure.
  */
 private class RiveRenderTarget(
     val scene: RiveFrameScene,
     private val dispatcher: CoroutineDispatcher,
     private val size: IntSize,
     private val slots: RiveFrameSlots,
+    private val markFailed: () -> Unit,
 ) {
     /** One frame of the scene as it stands; whichever live surface shares it advances it. */
-    suspend fun renderStill() {
+    suspend fun renderStill() = guardFrameWork(scene, dispatcher, markFailed) {
         slots.show(withContext(dispatcher) { scene.renderImage(size) })
     }
 
@@ -115,18 +123,19 @@ private class RiveRenderTarget(
      * readback never run on the UI thread; a frame that takes longer than the vsync simply delays
      * the next one.
      */
-    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean): Image? {
-        val (image, ghostImage) = withContext(dispatcher) {
-            scene.advanceTo(now)
-            val started = TimeSource.Monotonic.markNow()
-            val frame = scene.renderImage(size)
-            onFrameStats?.invoke(started.elapsedNow().inWholeNanoseconds / 1e6)
-            // A ghost gets its own image - the two-slot rotation closes its images a frame later.
-            frame to (if (ghost) scene.renderImage(size) else null)
+    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean) =
+        guardFrameWork(scene, dispatcher, markFailed) {
+            val (image, ghostImage) = withContext(dispatcher) {
+                scene.advanceTo(now)
+                val started = TimeSource.Monotonic.markNow()
+                val frame = scene.renderImage(size)
+                onFrameStats?.invoke(started.elapsedNow().inWholeNanoseconds / 1e6)
+                // A ghost gets its own image - the two-slot rotation closes its images a frame later.
+                frame to (if (ghost) scene.renderImage(size) else null)
+            }
+            slots.show(image)
+            ghostImage
         }
-        slots.show(image)
-        return ghostImage
-    }
 }
 
 /**
@@ -166,6 +175,45 @@ private suspend fun RiveRenderTarget.play(
         tick++
     }
 }
+
+/**
+ * Runs one piece of frame work on [scene], whose every call but a pointer event belongs on
+ * [dispatcher]; if it fails with anything but a cancellation the mascot is failed ([onFailure] -
+ * the host stops offering the entry, so the seat draws its fallback) and this throws [SceneFailure]
+ * to end the frame loop.
+ *
+ * The failure never reaches the composition: an exception out of a [LaunchedEffect] fails it, and
+ * one dead mascot must not cost the screen.
+ */
+internal suspend fun <T> guardFrameWork(
+    scene: RiveFrameScene,
+    dispatcher: CoroutineDispatcher,
+    onFailure: () -> Unit,
+    block: suspend () -> T,
+): T =
+    runCatchingCancellable(block).getOrElse { failure ->
+        println("[mascot] Rive scene failed while drawing, drawing the fallback: $failure")
+        releaseFailedScene(scene, dispatcher)
+        onFailure()
+        throw SceneFailure(failure)
+    }
+
+/**
+ * Releases the scene that failed, on the thread that owns it ([RiveFrameScene] contract). Closing
+ * is best effort: a runtime that already trapped throws again, and that must not replace the
+ * failure the caller is about to handle.
+ */
+private suspend fun releaseFailedScene(scene: RiveFrameScene, dispatcher: CoroutineDispatcher) {
+    runCatchingCancellable { withContext(dispatcher) { scene.close() } }
+        .onFailure { println("[mascot] releasing the failed scene also threw: $it") }
+}
+
+/**
+ * The end of a frame loop whose scene failed: the mascot is already marked failed and the scene
+ * released, so this ends the loop (and any other surface drawing the same scene) without reaching
+ * the composition's exception handler.
+ */
+internal class SceneFailure(val failure: Throwable) : CancellationException("this Rive scene cannot be drawn: $failure")
 
 private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
     PointerEventType.Press -> RivePointer.DOWN
@@ -218,6 +266,9 @@ private fun DrawScope.drawOnionGhosts(ghosts: List<ImageBitmap>, onion: RiveOnio
  * @param playing false renders the scene once as it stands and never advances it here - a still.
  * @param onion non-null turns on the bench's live onion skin; null keeps the production path
  * allocation-free.
+ * @param onFailure called once when a scene call throws (never for cancellation), after the scene
+ * is released: the mascot cannot be drawn, so the host stops offering it and the seat falls back to
+ * its stand-in. Composition and every other surface are untouched.
  */
 @Composable
 fun RiveFrameSurface(
@@ -227,6 +278,7 @@ fun RiveFrameSurface(
     playing: Boolean = true,
     onFrameStats: ((nativeMs: Double) -> Unit)? = null,
     onion: RiveOnionSkin? = null,
+    onFailure: () -> Unit = {},
 ) {
     var nodeSize by remember { mutableStateOf(IntSize.Zero) }
     // Rendered at the node's physical size up to [MAX_RENDER_PX] on the long side: the cost of a
@@ -244,12 +296,18 @@ fun RiveFrameSurface(
     val currentOnion = rememberUpdatedState(onion)
     // Read inside the frame loop, so scrolling out of sight pauses it rather than restarting it.
     val visible = remember { mutableStateOf(true) }
+    val currentOnFailure = rememberUpdatedState(onFailure)
 
     LaunchedEffect(scene, size, playing) {
         val pinned = size
         if (pinned.width <= 0 || pinned.height <= 0) return@LaunchedEffect
-        val target = RiveRenderTarget(scene, dispatcher, pinned, slots)
-        if (playing) target.play(ring, currentOnion, onFrameStats, visible) else target.renderStill()
+        val target = RiveRenderTarget(scene, dispatcher, pinned, slots) { currentOnFailure.value() }
+        try {
+            if (playing) target.play(ring, currentOnion, onFrameStats, visible) else target.renderStill()
+        } catch (_: SceneFailure) {
+            // Marked failed and released already; this surface has nothing left to draw and simply
+            // ends. Guarded here so nothing reaches the composition's exception handler.
+        }
     }
 
     val node = modifier

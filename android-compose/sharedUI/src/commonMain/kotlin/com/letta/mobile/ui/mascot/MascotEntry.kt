@@ -7,6 +7,7 @@ import com.letta.mobile.avatar.core.gaze.GazeWorld
 import com.letta.mobile.avatar.core.model.AvatarState
 import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlin.random.Random
@@ -104,11 +105,22 @@ abstract class MascotEntry internal constructor(
      * tail of the queue appears never to arrive. Throughput is unchanged (the
      * renderer is serial either way); what this buys is that rendering keeps
      * getting slices while the backlog drains.
+     *
+     * A load that is cancelled - the surface that asked left composition - counts for nothing: the
+     * rethrow leaves the entry unloaded, so the next surface to draw this agent runs [load] instead of
+     * waiting forever on a scene that will never exist.
      */
     suspend fun ensureLoaded() {
         if (loaded) return
         loaded = true
-        firstLoadGate.withPermit { load() }
+        try {
+            firstLoadGate.withPermit { load() }
+        } catch (cancelled: CancellationException) {
+            // The surface that asked left before its scene existed: nothing was loaded, and the flag
+            // must not keep every later surface from trying (it stays set while a load is in flight).
+            loaded = false
+            throw cancelled
+        }
     }
 
     /**

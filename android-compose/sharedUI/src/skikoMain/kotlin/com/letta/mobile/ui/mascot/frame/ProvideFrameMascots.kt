@@ -11,6 +11,7 @@ import com.letta.mobile.ui.mascot.LocalMascotTransport
 import com.letta.mobile.ui.mascot.MascotCursorCapture
 import com.letta.mobile.ui.mascot.MascotIdentityRegistry
 import com.letta.mobile.ui.mascot.MascotTransport
+import com.letta.mobile.util.runCatchingCancellable
 
 /**
  * The mascot layer at a pointer host's root: the frame host over [renderer], [registry] (the
@@ -26,7 +27,7 @@ fun ProvideFrameMascots(
 ) {
     val host = remember(renderer) { FrameMascotHost(renderer) }
     val transport = remember { MascotTransport() }
-    LaunchedEffect(renderer) { renderer.prepare() }
+    LaunchedEffect(renderer) { bringUpSafely(renderer) }
     DisposableEffect(host) { onDispose { host.closeAll() } }
     CompositionLocalProvider(
         LocalMascotHost provides host,
@@ -35,4 +36,19 @@ fun ProvideFrameMascots(
     ) {
         MascotCursorCapture(registry, content)
     }
+}
+
+/**
+ * [renderer]'s bring-up, with every failure but cancellation absorbed: the renderer simply stays
+ * unavailable and every mascot draws its fallback.
+ *
+ * One broken renderer must not cost the screen. An exception out of this composable's
+ * [LaunchedEffect] fails the composition, and a browser's Rive interop throws exactly here - a JS
+ * throw, a fired launch, a wasm trap, a mascot file that does not read - so this is where the
+ * renderer ends. A cancelled bring-up rethrows: the effect's composition is gone, which is not a
+ * failure.
+ */
+internal suspend fun bringUpSafely(renderer: RiveFrameRenderer) {
+    runCatchingCancellable { renderer.prepare() }
+        .onFailure { println("[mascot] Rive renderer unavailable, drawing fallbacks: $it") }
 }
