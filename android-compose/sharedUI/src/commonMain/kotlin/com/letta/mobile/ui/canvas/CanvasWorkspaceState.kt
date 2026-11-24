@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -103,12 +104,21 @@ internal class CanvasBoardUi {
     // The elements as they were when the drawing was last saved, so a save that changed nothing
     // about them records no step.
     var lastSavedElements by mutableStateOf<List<Element>?>(null)
+
+    // The drawing storage has taken: the very elements list that was saved and the background it
+    // was saved with. A handoff or autosave has nothing to write while the controller holds these.
+    var acknowledgedDrawing: Pair<List<Element>, Color>? = null
+
+    // The drawing a write is in flight for, so a flush for the same one waits on that write rather
+    // than queue a duplicate of it behind the save mutex.
+    var pendingDrawingWrite: Pair<List<Element>, Color>? = null
+
     var lastExportedJson by mutableStateOf<String?>(null)
 
     // The elements (as that very list) and background a change from elsewhere left on the board.
     // While the board still holds them there is nothing of this app's to save: the session
     // already has it. A plain field, not state: nothing is drawn from it.
-    var importedDrawing: Pair<List<Element>, androidx.compose.ui.graphics.Color>? = null
+    var importedDrawing: Pair<List<Element>, Color>? = null
 
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
