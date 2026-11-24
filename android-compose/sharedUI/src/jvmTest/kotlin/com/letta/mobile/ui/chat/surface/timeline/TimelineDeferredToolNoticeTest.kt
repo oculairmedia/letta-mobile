@@ -8,6 +8,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.timeline.TIMELINE_EVENT_CONTENT_TYPE
+import com.letta.mobile.data.timeline.TimelineBodyChunk
 import com.letta.mobile.data.timeline.TimelineBodyPointer
 import com.letta.mobile.data.timeline.TimelineBodyReference
 import com.letta.mobile.data.timeline.TimelineBoundedReader
@@ -75,7 +76,7 @@ class TimelineDeferredToolNoticeTest {
         val body = """{"messageType":"$TOOL_CALL","toolCalls":[{"name":"Bash","arguments":"{}"}]}"""
         val stored = StaleChunkStore(body)
         show { field, offset ->
-            TimelineSemanticBodyWindow.read(stored.reference, field, offset, readChunk = stored::chunk)
+            TimelineSemanticBodyWindow.read(stored.reference, field, offset, readChunk = stored.chunks)
         }
         onNodeWithText("Message too large to show inline").assertExists()
     }
@@ -106,13 +107,14 @@ class TimelineDeferredToolNoticeTest {
         private val reader = object : TimelineStoreReader {
             override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = null
 
-            override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int) = emptyList<TimelineToolIndexEntry>()
+            override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> = emptyList()
 
             override suspend fun toolSweepGeneration(): Long = 0
 
-            override suspend fun checkpoint() = TimelineDurableCheckpoint(EMPTY_REVISION, continuation = null, hasMore = false)
+            override suspend fun checkpoint(): TimelineDurableCheckpoint =
+                TimelineDurableCheckpoint(revision = 0, continuation = null, hasMore = false)
 
-            override suspend fun metadata(position: TimelineReadPosition, maxRows: Int) = TimelineMetadataPage(
+            override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage = TimelineMetadataPage(
                 rows = listOf(
                     TimelineLedgerMetadata(
                         key = key,
@@ -135,8 +137,13 @@ class TimelineDeferredToolNoticeTest {
             override suspend fun evidence(key: String, maxBytes: Int): ByteArray? = null
         }
 
-        /** The store as the pager sees it: one chunk read through the production bounded reader. */
-        suspend fun chunk(offset: Long, maxBytes: Int) = TimelineBoundedReader(this).readChunk(reference, offset, maxBytes)
+        /**
+         * The store as the pager reads it, through the production bounded reader, so the chunk the
+         * window reader gets is the reader's own, not one re-derived here.
+         */
+        val chunks: suspend (Long, Int) -> TimelineBodyChunk = { offset, maxBytes ->
+            TimelineBoundedReader(this).readChunk(reference, offset, maxBytes)
+        }
 
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T = reader.block()
 
@@ -147,6 +154,5 @@ class TimelineDeferredToolNoticeTest {
     private companion object {
         const val TOOL_CALL = "tool_call"
         const val STALE_BODY_REVISION = 7L
-        const val EMPTY_REVISION = 0L
     }
 }
