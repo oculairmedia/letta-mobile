@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
 import kotlin.jvm.JvmInline
 import com.letta.mobile.ui.mascot.MascotStillStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -40,6 +41,10 @@ interface RiveFrameRenderer {
      * Brings the renderer up when that is asynchronous (the browser fetches its runtime and the
      * mascot); [available] turns true once it has. A renderer that cannot come up stays
      * unavailable and every mascot draws its fallback. Called once by [ProvideFrameMascots].
+     *
+     * Anything it throws except [CancellationException] escapes into that effect, and an exception
+     * thrown by a [LaunchedEffect] takes composition down with it. A bring-up that can fail
+     * therefore extends [PreparedFrameRenderer] rather than implementing this itself.
      */
     suspend fun prepare() = Unit
 
@@ -51,6 +56,34 @@ interface RiveFrameRenderer {
 
     /** PNG bytes of a rendered still (premultiplied or not, as the image says). Off the render thread. */
     fun encodePng(image: Image): ByteArray?
+}
+
+/**
+ * A [RiveFrameRenderer] whose bring-up can fail: [bringUp] does the platform's work and this makes
+ * every way it can go wrong - a JS throw from the browser's interop, a failed fetch, a file that
+ * does not load, a null runtime - leave [available] false instead of escaping into
+ * [ProvideFrameMascots]' effect and taking the screen down. [CancellationException] is rethrown: the
+ * effect that called it is gone, and cancelling is not a failure.
+ */
+abstract class PreparedFrameRenderer : RiveFrameRenderer {
+    /**
+     * Brings the platform's runtime and mascot up. Throws, or leaves [RiveFrameRenderer.available]
+     * false, when it cannot: either way the renderer stays unavailable and every mascot draws its
+     * fallback.
+     */
+    protected abstract suspend fun bringUp()
+
+    final override suspend fun prepare() {
+        try {
+            bringUp()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Throwable) {
+            // Not Exception alone: the wasm interop reports a failed JS call, and a wasm trap, as a
+            // Throwable, and any of them is the fallback path, never a composition crash.
+            reportBringUpFailure(failure)
+        }
+    }
 }
 
 /** Pointer events a scene hit-tests, in render pixels. */

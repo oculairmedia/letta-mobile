@@ -11,7 +11,7 @@ import com.letta.mobile.avatar.rive.RiveInputSink
 import com.letta.mobile.avatar.rive.RiveWrite
 import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.MascotStillStore
-import com.letta.mobile.ui.mascot.frame.RiveFrameRenderer
+import com.letta.mobile.ui.mascot.frame.PreparedFrameRenderer
 import com.letta.mobile.ui.mascot.frame.RiveFrameScene
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
 import com.letta.mobile.ui.mascot.frame.RivePointerEvent
@@ -33,10 +33,12 @@ import org.jetbrains.skia.ImageInfo
  * copied into a Skia image the shared [com.letta.mobile.ui.mascot.frame.RiveFrameSurface] draws.
  * Nothing is put in the DOM.
  *
- * Unavailable until [prepare] has the runtime and the mascot file; if either fails, it stays
- * unavailable and every mascot keeps drawing its fallback (one console line, no retry loop).
+ * Unavailable until [bringUp] has the runtime and the mascot file; if either fails - a JS throw out
+ * of the interop, a missing file, a `load` that returns nothing - it stays unavailable and every
+ * mascot keeps drawing its fallback (one console line, no retry loop). [PreparedFrameRenderer](com.letta.mobile.ui.mascot.frame.PreparedFrameRenderer)
+ * makes that throw-proof: nothing here escapes `prepare()` into the composition.
  */
-internal class RiveCanvasRenderer : RiveFrameRenderer {
+internal class RiveCanvasRenderer : PreparedFrameRenderer() {
     private class Loaded(val rive: JsAny, val file: JsAny, val version: String)
 
     private val preparing = Mutex()
@@ -51,16 +53,14 @@ internal class RiveCanvasRenderer : RiveFrameRenderer {
     override val stillStore: MascotStillStore? = null
 
     /** Brings up the runtime and the shipped mascot; safe to call again (it returns once loaded). */
-    override suspend fun prepare() = preparing.withLock {
+    override suspend fun bringUp() = preparing.withLock {
         if (loaded != null) return@withLock
-        try {
-            val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
-            val bytes = riveFetchBytes(MASCOT_PATH).await<JsAny>()
-            val file = riveLoadFile(rive, bytes).await<JsAny>()
-            loaded = Loaded(rive, file, riveFingerprint(bytes))
-        } catch (failure: JsException) {
-            println("[mascot] Rive runtime unavailable, drawing fallbacks: ${failure.message}")
-        }
+        val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
+        val bytes = riveFetchBytes(MASCOT_PATH).await<JsAny>()
+        // rive.load answers null for a file it cannot read; a null here is not a loaded runtime.
+        val file = riveLoadFile(rive, bytes).await<JsAny?>()
+            ?: error("$MASCOT_PATH did not load")
+        loaded = Loaded(rive, file, riveFingerprint(bytes))
     }
 
     override fun createScene(): RiveFrameScene {
