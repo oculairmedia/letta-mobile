@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * The conversation repositories a host graph leaves unbound.
  *
- * letta-mobile-ckmub.17.1: a host that binds no conversation repository gets this stand-in, which
+ * a host that binds no conversation repository gets this stand-in, which
  * fails every call as the unserved [SessionRoute.CONVERSATIONS] route. The agent, admin, schedule and
  * step repositories need no equivalent here: an App Server repository with no client, or their
  * [com.letta.mobile.data.backend.RemoteRoute.Absent] form, already answers that way.
