@@ -342,7 +342,8 @@ class TimelineElasticOverscrollTest {
         for (y in 0 until frame.height) {
             for (x in 0 until frame.width) {
                 val color = frame[x, y]
-                if (color.red > 0.47f && color.blue > 0.47f && color.green < 0.39f) return y
+                val hasRedBlue = color.red > 0.47f && color.blue > 0.47f
+                if (hasRedBlue && color.green < 0.39f) return y
             }
         }
         val colours = mutableMapOf<Int, Int>()
