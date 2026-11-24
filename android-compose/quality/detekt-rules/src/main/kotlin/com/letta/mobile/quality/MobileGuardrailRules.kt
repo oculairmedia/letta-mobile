@@ -7,6 +7,7 @@ import com.letta.mobile.quality.guardrails.ClientPersistenceOutsideClientStore
 import com.letta.mobile.quality.guardrails.DeviceFactWithoutJustification
 import com.letta.mobile.quality.guardrails.NoDeprecatedBrowserUnloadEvent
 import com.letta.mobile.quality.guardrails.NoHardcodedPaddingDirection
+import com.letta.mobile.quality.guardrails.NonObservableStateInSnapshotFlow
 import com.letta.mobile.quality.guardrails.NoNonAtomicStateFlowSelfCopy
 import com.letta.mobile.quality.guardrails.NoUnrememberedToolFactsInComposable
 import io.gitlab.arturbosch.detekt.api.Config
@@ -371,6 +372,7 @@ class MobileGuardrailProvider : RuleSetProvider {
             SecretBearingDataClass(config),
             ClientPersistenceOutsideClientStore(config),
             DeviceFactWithoutJustification(config),
+            NonObservableStateInSnapshotFlow(config),
         ),
     )
 }

@@ -8,6 +8,10 @@
 #   3. Optional CodeScene delta (advisory) — skips when `cs` / token absent.
 #   4. OPTIONAL Kotlin compile. Off by default.
 #   5. OPTIONAL scripts/ci/quick-check.sh (PRE_PUSH_QUICK_CHECK=1). Off by default.
+#   6. ALWAYS-ON fast guardrails (<2s each, no Gradle): KDoc hygiene when the push
+#      changes .kt files, API-dump mirror freshness when it changes *.api files.
+#      Both have turned full 30-minute CI runs red in seconds, so they run here
+#      first; CI still owns the full gate set.
 #
 # Why the compile is opt-in (2026-08-05):
 #   `:app:compileRootDebugKotlin` cold-starts Gradle + Kotlin daemons and
@@ -24,6 +28,12 @@ set -euo pipefail
 # source code being pushed, so any compile would be meaningless.
 ZERO_SHA="0000000000000000000000000000000000000000"
 has_content_push=0
+# Push-shape inputs for the always-on fast guardrails below: whether any pushed
+# range changes .kt or *.api files. `unknown_change_base` marks a range whose diff
+# base cannot be resolved locally; the guardrails then run unconditionally.
+kt_changed=0
+api_changed=0
+unknown_change_base=0
 
 # stdin format (one line per ref being pushed):
 #   <local_ref> <local_sha> <remote_ref> <remote_sha>
@@ -48,6 +58,26 @@ EOF
 
   if [ "$local_sha" != "$ZERO_SHA" ]; then
     has_content_push=1
+    # Diff base for "what does this push change?": the remote head when the branch
+    # exists there, else the branch point (merge-base with main).
+    base="$remote_sha"
+    if [ "$base" = "$ZERO_SHA" ]; then
+      base="$(git merge-base refs/remotes/origin/main "$local_sha" 2>/dev/null || true)"
+      if [ -z "$base" ]; then
+        # No common history with origin/main (orphan/very fresh repo): we cannot
+        # tell what changed, so the guardrails below run unconditionally.
+        unknown_change_base=1
+        continue
+      fi
+    fi
+    if push_changes="$(git diff --name-only "$base" "$local_sha" 2>/dev/null)"; then
+      grep -qE '\.kt$' <<<"$push_changes" && kt_changed=1 || true
+      grep -qE '\.api$' <<<"$push_changes" && api_changed=1 || true
+    else
+      # The remote head is unknown locally (pushing over someone else's move):
+      # run both guardrails rather than guessing.
+      unknown_change_base=1
+    fi
   fi
 done
 
@@ -63,6 +93,32 @@ repo_root="$(git rev-parse --show-toplevel)"
 if [ -z "${JAVA_HOME:-}" ]; then
   printf '%s\n' "JAVA_HOME is not set. Point it at a JDK before pushing (needed for local Android builds)." >&2
   exit 1
+fi
+
+# ALWAYS-ON fast guardrails: the two CI checks that are seconds of work but whose
+# failures have burned full 30-minute CI runs on multiple PRs — bead/tracker ids in
+# the KDoc of a changed .kt file, and a stale mingw_x64 mirror of a changed *.api dump
+# (only the Windows CI job regenerates that mirror, so Linux `apiCheck` stays green).
+# Each runs only when the push changes a file in its scope; CI still owns the full gate
+# set, so these are about failing in seconds instead of half an hour.
+if [ "$kt_changed" -eq 1 ] || [ "$unknown_change_base" -eq 1 ]; then
+  python3 "$repo_root/scripts/ci/check-kdoc-hygiene.py" || {
+    printf '%s\n' "✗ KDoc hygiene failed: describe intent instead of citing bead/tracker ids. Fix the files above and push again." >&2
+    exit 1
+  }
+  printf '%s\n' "[pre-push] scripts/ci/check-kdoc-hygiene.py: clean." >&2
+else
+  printf '%s\n' "[pre-push] skipping scripts/ci/check-kdoc-hygiene.py (no .kt files in this push)." >&2
+fi
+
+if [ "$api_changed" -eq 1 ] || [ "$unknown_change_base" -eq 1 ]; then
+  bash "$repo_root/scripts/ci/api-dump-mirror-check.sh" || {
+    printf '%s\n' "✗ API dump mirror check failed: after apiDump, copy each api/linux_x64 dump over its api/mingw_x64 twin (keep the klib '// Targets:' lines)." >&2
+    exit 1
+  }
+  printf '%s\n' "[pre-push] scripts/ci/api-dump-mirror-check.sh: clean." >&2
+else
+  printf '%s\n' "[pre-push] skipping scripts/ci/api-dump-mirror-check.sh (no *.api files in this push)." >&2
 fi
 
 # Optional heavy compile — off by default (see header).

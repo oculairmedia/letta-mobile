@@ -20,6 +20,10 @@ letta-mobile-guardrails:
   # Literal bidi / zero-width characters in any Kotlin file (SonarCloud blocks them). Zero on main.
   InvisibleOrBidiCharacter:
     active: true
+  # snapshotFlow only re-emits on Snapshot state reads; a plain var read never invalidates the
+  # flow (auto-follow shipped broken that way once). Zero findings on every module when enabled.
+  NonObservableStateInSnapshotFlow:
+    active: true
   # Ratchet: each rule below had zero findings in exactly these paths on main (2026-11-12). It runs
   # on changed files without a baseline, so a path may only join an includes list once it is clean.
   # Counts and hit lists for everything else are in the change that added them; fix, then widen.

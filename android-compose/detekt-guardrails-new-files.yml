@@ -25,3 +25,7 @@ letta-mobile-guardrails:
       - "**/web/src/**"
   DeviceFactWithoutJustification:
     active: true
+  # snapshotFlow reads of plain vars emit once and quietly stop tracking; every file added from
+  # now on must use snapshot-backed state. Zero findings across all modules when enabled.
+  NonObservableStateInSnapshotFlow:
+    active: true
