@@ -136,8 +136,11 @@ class RecentsFirstAllConversationsTest {
 
         host.lists.clear()
         repository.refresh()
-        assertEquals(0, host.lists.count { it == Read.Recents }, "a host found without recents is not asked again")
-        assertEquals(ROSTER_SIZE, host.lists.size)
+        // letta-mobile-fj56l: the probe is re-asked every refresh, so a host that gains recents stops being
+        // listed agent by agent; a host that still refuses keeps its per-agent read.
+        assertEquals(1, host.lists.count { it == Read.Recents }, "each refresh asks once whether recents are served now")
+        assertEquals(ROSTER_SIZE, host.lists.count { it is Read.Agent }, "a host that still refuses lists every agent")
+        assertEquals(ROSTER_SIZE + 1, host.lists.size)
     }
 
     @Test

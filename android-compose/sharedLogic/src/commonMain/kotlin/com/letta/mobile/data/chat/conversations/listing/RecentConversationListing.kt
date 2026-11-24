@@ -80,8 +80,10 @@ private suspend fun ChatConversationStore.readRecents(): RecentsRead = try {
 }
 
 /**
- * Session-local recents plus explicitly requested agent pages; legacy hosts retain their eager policy.
- * Every conversation list (web and desktop timelines, Android's fleet list) reads through this one listing.
+ * Session-local recents plus explicitly requested agent pages; a host that answers it cannot serve recents is
+ * read agent by agent instead, and asked again on the next refresh so that a host which gains recents stops
+ * costing one read per agent. Every conversation list (web and desktop timelines, Android's fleet list) reads
+ * through this one listing.
  */
 internal class RecentConversationListing(
     private val gateway: ChatConversationStore,
@@ -126,7 +128,10 @@ internal class RecentConversationListing(
 
     override suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
         knownHiddenAgents = knownHiddenAgents + hiddenAgentsIn(roster)
-        if (!legacyMode) refreshRecents()
+        // Probed on every refresh, never only until the first refusal: a host that once answered Unsupported
+        // and serves recents now would otherwise stay in the per-agent fallback for the life of the session,
+        // listing one agent per roster entry on every refresh.
+        refreshRecents()
         if (legacyMode) {
             legacy.refresh(roster)
         } else {
@@ -139,39 +144,43 @@ internal class RecentConversationListing(
         conversations
     }
 
+    /**
+     * One read of the host's recents. A page replaces them and leaves [legacyMode], since the host can serve one;
+     * an answer that it cannot leaves the listing reading agents one page each.
+     */
     private suspend fun refreshRecents() {
         when (val read = gateway.readRecents()) {
-            is RecentsRead.Rows -> recents = read.rows
-            is RecentsRead.Unsupported -> fallBackToLegacy(read.reason)
+            is RecentsRead.Rows -> takeRecents(read.rows)
+            is RecentsRead.Unsupported -> {
+                legacyMode = true
+                Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr read.reason.orEmpty())
+            }
         }
     }
 
-    private fun fallBackToLegacy(reason: String?) {
-        legacyMode = true
-        Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr reason.orEmpty())
+    /** The host answered with a page: it replaces the recents, and a loaded agent's own pages stay authoritative. */
+    private suspend fun takeRecents(rows: List<Conversation>) {
+        legacyMode = false
+        val (owned, others) = rows.partition { it.agentId in fleet.loadedAgents }
+        owned.forEach { fleet.record(it) }
+        recents = others
     }
 
     /**
      * A reconnect re-reads the one bounded recents page, never an agent: pushes sent while offline are lost, and
      * the recents page is what shows them. Agents the person opened or pinned are read when the list is next
-     * opened ([refresh]). A host found without recents is asked once more (a restarted host may have gained
-     * them) and leaves legacy mode when it answers; its per-agent reads run only for an explicit [refresh].
+     * opened ([refresh]). A host that lost its recents keeps what it listed; the next [refresh] finds out.
      */
     override suspend fun reconnect(): List<Conversation> = mutex.withLock {
         when (val read = gateway.readRecents()) {
-            is RecentsRead.Rows -> {
-                legacyMode = false
-                // A loaded agent's own pages stay authoritative: its changed rows fold into them, the rest are recents.
-                val (owned, others) = read.rows.partition { it.agentId in fleet.loadedAgents }
-                owned.forEach { fleet.record(it) }
-                recents = others
-            }
+            is RecentsRead.Rows -> takeRecents(read.rows)
             // A host that lost its recents is found out by the next explicit refresh; a reconnect never empties the list.
             is RecentsRead.Unsupported ->
                 Telemetry.event("Conversations", "list.reconnect_without_recents", "reason" attr read.reason.orEmpty())
         }
         conversations
     }
+
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
         val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }

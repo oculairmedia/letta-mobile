@@ -132,6 +132,37 @@ class TimelineConversationsIrohTest {
         }, "only the visible opt-in probe may cross agents")
     }
 
+    /**
+     * letta-mobile-fj56l: the host log shows 76.5% of every `conversation.list` call arriving as runs of
+     * exactly one per roster agent, re-issued on every refresh of this owner, across 178 connections. The one
+     * cause was that a single `no-index` answer from a host that does serve recents pinned the listing to its
+     * per-agent fallback for the life of the session: `refresh()` skipped the recents probe once legacy.
+     *
+     * A host that answered `no-index` once and serves recents afterwards must leave the fallback on the next
+     * refresh: one recents page, no agent listed.
+     */
+    @Test
+    fun aRefreshProbesRecentsAgainAndLeavesThePerAgentFallback() = runTest {
+        val workers = List(3) { HostConversation("worker-$it", agent = null) }
+        val host = IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2"), *workers.toTypedArray())
+        val owner = owner(host)
+        runCurrent()
+        // The first read's refusal left it listing agents one at a time.
+        assertEquals(3, host.methods.size, "one refused recents probe plus one page per agent: ${host.calls}")
+        host.servesRecents = true
+        host.calls.clear()
+        host.methods.clear()
+
+        owner.refresh()
+
+        assertEquals(
+            listOf("conversation.list"), host.methods,
+            "a refresh costs one admin call once the host serves recents: ${host.calls}",
+        )
+        assertEquals("true", host.calls.single().second.text("visible_only"), "that call is the recents page")
+        assertEquals(setOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet())
+    }
+
     private fun TestScope.owner(host: IrohHost, roster: List<String> = listOf("agent-1", "agent-2")) = TimelineConversations(
         backgroundScope,
         host.chatGateway(backgroundScope),
