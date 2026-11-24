@@ -279,6 +279,9 @@ private fun CanvasBoard.keepRestoredScene(restored: CanvasHistoryRestorer.Restor
     ui.lastSyncedScene = restored.sceneJson
     ui.lastDrawing = CanvasOpProjector.parseSceneOrNull(restored.cleanDrawing)
     ui.lastSavedElements = restored.elements
+    // The session wrote the restored scene itself, so the drawing on the board is already stored:
+    // an autosave (or a handoff) would otherwise write it back over the peer as a new edit.
+    ui.acknowledgeDrawing(restored.elements, controller.state.value.bgColor)
 }
 
 private fun CanvasBoard.restoreFailed(message: String) {
