@@ -5,7 +5,6 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
 import com.letta.mobile.data.repository.api.ScheduleRemoteSource
-import com.letta.mobile.data.repository.api.StepRemoteSource
 import com.letta.mobile.data.session.graph.AdminRemoteRoutes
 
 /**
@@ -27,8 +26,6 @@ class SessionRemoteSources(
     val conversations: RemoteRoute<ConversationCrudRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     val admin: AdminRemoteRoutes = AdminRemoteRoutes(),
     val schedules: RemoteRoute<ScheduleRemoteSource> = RemoteRoute.Absent(SessionRoute.SCHEDULES),
-    /** Absent: no backend answers step queries, so the step repository reports none. */
-    val steps: RemoteRoute<StepRemoteSource> = RemoteRoute.Absent(SessionRoute.STEPS),
 ) {
     /** The routes a bound source serves on top of the backend kind's own row of the matrix. */
     fun boundRoutes(): Set<SessionRoute> = mapOf(
@@ -41,7 +38,6 @@ class SessionRemoteSources(
         SessionRoute.PROVIDERS to admin.providers,
         SessionRoute.RUNS to admin.runs,
         SessionRoute.SCHEDULES to schedules,
-        SessionRoute.STEPS to steps,
         SessionRoute.TOOLS to admin.tools,
     ).filterValues { it.isBound }.keys
 

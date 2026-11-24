@@ -3,6 +3,7 @@ package com.letta.mobile.data.session.graph
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.unavailable
+import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
@@ -114,6 +115,6 @@ class SharedSessionRepositoryGraphTest {
             runRepository = unavailable(SessionRoute.RUNS),
         ),
         scheduleRepository = unavailable(SessionRoute.SCHEDULES),
-        stepRepository = unavailable(SessionRoute.STEPS),
+        stepRepository = StepRepository(),
     )
 }

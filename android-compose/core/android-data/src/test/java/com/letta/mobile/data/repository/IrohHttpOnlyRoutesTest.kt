@@ -6,15 +6,12 @@ import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Step
-import com.letta.mobile.data.model.StepFeedbackUpdateParams
-import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.api.ToolUnavailableException
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeSettingsRepository
-import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.test.runTest
@@ -185,7 +182,7 @@ class IrohHttpOnlyRoutesTest {
     @Test
     fun `run list and run steps work under iroh while run detail is gated off without HTTP`() = runTest {
         val runs = listOf(Run(id = "r1", agentId = "a1", status = "completed"))
-        val steps = listOf(FakeStepApi().sampleStep("s1").copy(runId = "r1"))
+        val steps = listOf(Step(id = "s1", runId = "r1", origin = "sdk"))
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { method, _, _ ->
                 when (method) {
@@ -231,33 +228,13 @@ class IrohHttpOnlyRoutesTest {
         assertTrue(fakeApi.calls.contains("listRunMessages:r1"))
     }
 
-    /** letta-mobile-ckmub.4: no backend answers step queries, so the repository reports none. */
+    /** No backend answers step queries, so the repository reports none and caches nothing. */
     @Test
-    fun `step queries without a remote source degrade to empty or no-route`() = runTest {
+    fun `step queries report no route and cache no steps`() = runTest {
         val repository = StepRepository()
 
         assertFalse(repository.supportsStepQueries)
-        assertEquals(emptyList<Step>(), repository.listSteps(StepListParams(limit = 10)))
-        repository.refreshSteps()
         assertEquals(emptyList<Step>(), repository.steps.value)
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getStep("s1") } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getStepMetrics("s1") } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getStepTrace("s1") } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getStepMessages("s1") } }
-        assertThrows(UnsupportedOperationException::class.java) {
-            runBlockingUnit { repository.updateStepFeedback("s1", StepFeedbackUpdateParams(feedback = "positive")) }
-        }
-    }
-
-    @Test
-    fun `step queries use the remote source when a backend supplies one`() = runTest {
-        val fakeApi = FakeStepApi()
-        fakeApi.steps.add(fakeApi.sampleStep("s1"))
-        val repository = StepRepository(fakeApi)
-
-        assertTrue(repository.supportsStepQueries)
-        assertEquals(1, repository.listSteps().size)
-        assertEquals(listOf("listSteps"), fakeApi.calls)
     }
 
     private fun runBlockingUnit(block: suspend () -> Unit) = kotlinx.coroutines.runBlocking { block() }

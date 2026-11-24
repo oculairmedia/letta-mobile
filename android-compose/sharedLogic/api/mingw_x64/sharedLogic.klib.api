@@ -6859,16 +6859,8 @@ abstract interface com.letta.mobile.data.repository.api/IMcpServerRepository { /
     abstract val servers // com.letta.mobile.data.repository.api/IMcpServerRepository.servers|{}servers[0]
         abstract fun <get-servers>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/McpServer>> // com.letta.mobile.data.repository.api/IMcpServerRepository.servers.<get-servers>|<get-servers>(){}[0]
 
-    abstract fun getServerTools(com.letta.mobile.data.model/McpServerId): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/Tool>> // com.letta.mobile.data.repository.api/IMcpServerRepository.getServerTools|getServerTools(com.letta.mobile.data.model.McpServerId){}[0]
-    abstract fun getServers(): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/McpServer>> // com.letta.mobile.data.repository.api/IMcpServerRepository.getServers|getServers(){}[0]
-    abstract suspend fun createServer(com.letta.mobile.data.model/McpServerCreateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository.api/IMcpServerRepository.createServer|createServer(com.letta.mobile.data.model.McpServerCreateParams){}[0]
-    abstract suspend fun deleteServer(com.letta.mobile.data.model/McpServerId) // com.letta.mobile.data.repository.api/IMcpServerRepository.deleteServer|deleteServer(com.letta.mobile.data.model.McpServerId){}[0]
     abstract suspend fun fetchAllMcpTools(): kotlin.collections/List<com.letta.mobile.data.model/Tool> // com.letta.mobile.data.repository.api/IMcpServerRepository.fetchAllMcpTools|fetchAllMcpTools(){}[0]
-    abstract suspend fun refreshServerTools(com.letta.mobile.data.model/McpServerId) // com.letta.mobile.data.repository.api/IMcpServerRepository.refreshServerTools|refreshServerTools(com.letta.mobile.data.model.McpServerId){}[0]
     abstract suspend fun refreshServers() // com.letta.mobile.data.repository.api/IMcpServerRepository.refreshServers|refreshServers(){}[0]
-    abstract suspend fun resyncServerTools(com.letta.mobile.data.model/McpServerId): com.letta.mobile.data.model/McpServerResyncResult // com.letta.mobile.data.repository.api/IMcpServerRepository.resyncServerTools|resyncServerTools(com.letta.mobile.data.model.McpServerId){}[0]
-    abstract suspend fun runServerTool(com.letta.mobile.data.model/McpServerId, com.letta.mobile.data.model/ToolId, com.letta.mobile.data.model/McpToolExecuteParams): com.letta.mobile.data.model/McpToolExecutionResult // com.letta.mobile.data.repository.api/IMcpServerRepository.runServerTool|runServerTool(com.letta.mobile.data.model.McpServerId;com.letta.mobile.data.model.ToolId;com.letta.mobile.data.model.McpToolExecuteParams){}[0]
-    abstract suspend fun updateServer(com.letta.mobile.data.model/McpServerId, com.letta.mobile.data.model/McpServerUpdateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository.api/IMcpServerRepository.updateServer|updateServer(com.letta.mobile.data.model.McpServerId;com.letta.mobile.data.model.McpServerUpdateParams){}[0]
 }
 
 abstract interface com.letta.mobile.data.repository.api/IModelRepository { // com.letta.mobile.data.repository.api/IModelRepository|null[0]
@@ -7013,17 +7005,8 @@ abstract interface com.letta.mobile.data.repository.api/ISlashCommandRepository 
 abstract interface com.letta.mobile.data.repository.api/IStepRepository { // com.letta.mobile.data.repository.api/IStepRepository|null[0]
     abstract val steps // com.letta.mobile.data.repository.api/IStepRepository.steps|{}steps[0]
         abstract fun <get-steps>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Step>> // com.letta.mobile.data.repository.api/IStepRepository.steps.<get-steps>|<get-steps>(){}[0]
-    open val supportsStepQueries // com.letta.mobile.data.repository.api/IStepRepository.supportsStepQueries|{}supportsStepQueries[0]
-        open fun <get-supportsStepQueries>(): kotlin/Boolean // com.letta.mobile.data.repository.api/IStepRepository.supportsStepQueries.<get-supportsStepQueries>|<get-supportsStepQueries>(){}[0]
-
-    abstract fun upsertStep(com.letta.mobile.data.model/Step) // com.letta.mobile.data.repository.api/IStepRepository.upsertStep|upsertStep(com.letta.mobile.data.model.Step){}[0]
-    abstract suspend fun getStep(kotlin/String): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository.api/IStepRepository.getStep|getStep(kotlin.String){}[0]
-    abstract suspend fun getStepMessages(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.api/IStepRepository.getStepMessages|getStepMessages(kotlin.String){}[0]
-    abstract suspend fun getStepMetrics(kotlin/String): com.letta.mobile.data.model/StepMetrics // com.letta.mobile.data.repository.api/IStepRepository.getStepMetrics|getStepMetrics(kotlin.String){}[0]
-    abstract suspend fun getStepTrace(kotlin/String): com.letta.mobile.data.model/ProviderTrace? // com.letta.mobile.data.repository.api/IStepRepository.getStepTrace|getStepTrace(kotlin.String){}[0]
-    abstract suspend fun listSteps(com.letta.mobile.data.model/StepListParams = ...): kotlin.collections/List<com.letta.mobile.data.model/Step> // com.letta.mobile.data.repository.api/IStepRepository.listSteps|listSteps(com.letta.mobile.data.model.StepListParams){}[0]
-    abstract suspend fun refreshSteps(com.letta.mobile.data.model/StepListParams = ...) // com.letta.mobile.data.repository.api/IStepRepository.refreshSteps|refreshSteps(com.letta.mobile.data.model.StepListParams){}[0]
-    abstract suspend fun updateStepFeedback(kotlin/String, com.letta.mobile.data.model/StepFeedbackUpdateParams): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository.api/IStepRepository.updateStepFeedback|updateStepFeedback(kotlin.String;com.letta.mobile.data.model.StepFeedbackUpdateParams){}[0]
+    abstract val supportsStepQueries // com.letta.mobile.data.repository.api/IStepRepository.supportsStepQueries|{}supportsStepQueries[0]
+        abstract fun <get-supportsStepQueries>(): kotlin/Boolean // com.letta.mobile.data.repository.api/IStepRepository.supportsStepQueries.<get-supportsStepQueries>|<get-supportsStepQueries>(){}[0]
 }
 
 abstract interface com.letta.mobile.data.repository.api/ISubagentRepository { // com.letta.mobile.data.repository.api/ISubagentRepository|null[0]
@@ -7062,13 +7045,8 @@ abstract interface com.letta.mobile.data.repository.api/McpServerIrohSource { //
 }
 
 abstract interface com.letta.mobile.data.repository.api/McpServerRemoteSource { // com.letta.mobile.data.repository.api/McpServerRemoteSource|null[0]
-    abstract suspend fun createMcpServer(com.letta.mobile.data.model/McpServerCreateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository.api/McpServerRemoteSource.createMcpServer|createMcpServer(com.letta.mobile.data.model.McpServerCreateParams){}[0]
-    abstract suspend fun deleteMcpServer(kotlin/String) // com.letta.mobile.data.repository.api/McpServerRemoteSource.deleteMcpServer|deleteMcpServer(kotlin.String){}[0]
     abstract suspend fun listMcpServerTools(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/Tool> // com.letta.mobile.data.repository.api/McpServerRemoteSource.listMcpServerTools|listMcpServerTools(kotlin.String){}[0]
     abstract suspend fun listMcpServers(kotlin/Int? = ..., kotlin/Int? = ...): kotlin.collections/List<com.letta.mobile.data.model/McpServer> // com.letta.mobile.data.repository.api/McpServerRemoteSource.listMcpServers|listMcpServers(kotlin.Int?;kotlin.Int?){}[0]
-    abstract suspend fun refreshMcpServerTools(kotlin/String): com.letta.mobile.data.model/McpServerResyncResult // com.letta.mobile.data.repository.api/McpServerRemoteSource.refreshMcpServerTools|refreshMcpServerTools(kotlin.String){}[0]
-    abstract suspend fun runMcpServerTool(kotlin/String, kotlin/String, com.letta.mobile.data.model/McpToolExecuteParams): com.letta.mobile.data.model/McpToolExecutionResult // com.letta.mobile.data.repository.api/McpServerRemoteSource.runMcpServerTool|runMcpServerTool(kotlin.String;kotlin.String;com.letta.mobile.data.model.McpToolExecuteParams){}[0]
-    abstract suspend fun updateMcpServer(kotlin/String, com.letta.mobile.data.model/McpServerUpdateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository.api/McpServerRemoteSource.updateMcpServer|updateMcpServer(kotlin.String;com.letta.mobile.data.model.McpServerUpdateParams){}[0]
 }
 
 abstract interface com.letta.mobile.data.repository.api/ModelIrohSource { // com.letta.mobile.data.repository.api/ModelIrohSource|null[0]
@@ -7162,15 +7140,6 @@ abstract interface com.letta.mobile.data.repository.api/SlashCommandRemoteSource
     abstract suspend fun listForAgent(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/SlashCommand> // com.letta.mobile.data.repository.api/SlashCommandRemoteSource.listForAgent|listForAgent(kotlin.String){}[0]
     abstract suspend fun listGlobal(): kotlin.collections/List<com.letta.mobile.data.model/SlashCommand> // com.letta.mobile.data.repository.api/SlashCommandRemoteSource.listGlobal|listGlobal(){}[0]
     abstract suspend fun uninstallFromAgent(kotlin/String, kotlin/String) // com.letta.mobile.data.repository.api/SlashCommandRemoteSource.uninstallFromAgent|uninstallFromAgent(kotlin.String;kotlin.String){}[0]
-}
-
-abstract interface com.letta.mobile.data.repository.api/StepRemoteSource { // com.letta.mobile.data.repository.api/StepRemoteSource|null[0]
-    open suspend fun listStepMessages(com.letta.mobile.data.repository.api/StepId): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.api/StepRemoteSource.listStepMessages|listStepMessages(com.letta.mobile.data.repository.api.StepId){}[0]
-    open suspend fun listSteps(com.letta.mobile.data.model/StepListParams = ...): kotlin.collections/List<com.letta.mobile.data.model/Step> // com.letta.mobile.data.repository.api/StepRemoteSource.listSteps|listSteps(com.letta.mobile.data.model.StepListParams){}[0]
-    open suspend fun retrieveStep(com.letta.mobile.data.repository.api/StepId): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository.api/StepRemoteSource.retrieveStep|retrieveStep(com.letta.mobile.data.repository.api.StepId){}[0]
-    open suspend fun retrieveStepMetrics(com.letta.mobile.data.repository.api/StepId): com.letta.mobile.data.model/StepMetrics // com.letta.mobile.data.repository.api/StepRemoteSource.retrieveStepMetrics|retrieveStepMetrics(com.letta.mobile.data.repository.api.StepId){}[0]
-    open suspend fun retrieveStepTrace(com.letta.mobile.data.repository.api/StepId): com.letta.mobile.data.model/ProviderTrace? // com.letta.mobile.data.repository.api/StepRemoteSource.retrieveStepTrace|retrieveStepTrace(com.letta.mobile.data.repository.api.StepId){}[0]
-    open suspend fun updateStepFeedback(com.letta.mobile.data.repository.api/StepId, com.letta.mobile.data.model/StepFeedbackUpdateParams): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository.api/StepRemoteSource.updateStepFeedback|updateStepFeedback(com.letta.mobile.data.repository.api.StepId;com.letta.mobile.data.model.StepFeedbackUpdateParams){}[0]
 }
 
 abstract interface com.letta.mobile.data.repository.api/ToolRemoteSource { // com.letta.mobile.data.repository.api/ToolRemoteSource|null[0]
@@ -51529,164 +51498,6 @@ final class com.letta.mobile.data.model/McpServer { // com.letta.mobile.data.mod
     }
 }
 
-final class com.letta.mobile.data.model/McpServerCreateParams { // com.letta.mobile.data.model/McpServerCreateParams|null[0]
-    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonObject) // com.letta.mobile.data.model/McpServerCreateParams.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
-
-    final val config // com.letta.mobile.data.model/McpServerCreateParams.config|{}config[0]
-        final fun <get-config>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.model/McpServerCreateParams.config.<get-config>|<get-config>(){}[0]
-    final val serverName // com.letta.mobile.data.model/McpServerCreateParams.serverName|{}serverName[0]
-        final fun <get-serverName>(): kotlin/String // com.letta.mobile.data.model/McpServerCreateParams.serverName.<get-serverName>|<get-serverName>(){}[0]
-
-    final fun component1(): kotlin/String // com.letta.mobile.data.model/McpServerCreateParams.component1|component1(){}[0]
-    final fun component2(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.model/McpServerCreateParams.component2|component2(){}[0]
-    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonObject = ...): com.letta.mobile.data.model/McpServerCreateParams // com.letta.mobile.data.model/McpServerCreateParams.copy|copy(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpServerCreateParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpServerCreateParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpServerCreateParams.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpServerCreateParams> { // com.letta.mobile.data.model/McpServerCreateParams.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/McpServerCreateParams.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpServerCreateParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpServerCreateParams.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpServerCreateParams // com.letta.mobile.data.model/McpServerCreateParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpServerCreateParams) // com.letta.mobile.data.model/McpServerCreateParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpServerCreateParams){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/McpServerCreateParams.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpServerCreateParams> // com.letta.mobile.data.model/McpServerCreateParams.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/McpServerResyncResult { // com.letta.mobile.data.model/McpServerResyncResult|null[0]
-    constructor <init>(kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ..., kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ..., kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ...) // com.letta.mobile.data.model/McpServerResyncResult.<init>|<init>(kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>;kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>;kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>){}[0]
-
-    final val added // com.letta.mobile.data.model/McpServerResyncResult.added|{}added[0]
-        final fun <get-added>(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.added.<get-added>|<get-added>(){}[0]
-    final val deleted // com.letta.mobile.data.model/McpServerResyncResult.deleted|{}deleted[0]
-        final fun <get-deleted>(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.deleted.<get-deleted>|<get-deleted>(){}[0]
-    final val updated // com.letta.mobile.data.model/McpServerResyncResult.updated|{}updated[0]
-        final fun <get-updated>(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.updated.<get-updated>|<get-updated>(){}[0]
-
-    final fun component1(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.component1|component1(){}[0]
-    final fun component2(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.component2|component2(){}[0]
-    final fun component3(): kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/McpServerResyncResult.component3|component3(){}[0]
-    final fun copy(kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ..., kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ..., kotlinx.collections.immutable/ImmutableList<com.letta.mobile.data.model/ToolId> = ...): com.letta.mobile.data.model/McpServerResyncResult // com.letta.mobile.data.model/McpServerResyncResult.copy|copy(kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>;kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>;kotlinx.collections.immutable.ImmutableList<com.letta.mobile.data.model.ToolId>){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpServerResyncResult.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpServerResyncResult.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpServerResyncResult.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpServerResyncResult> { // com.letta.mobile.data.model/McpServerResyncResult.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/McpServerResyncResult.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpServerResyncResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpServerResyncResult.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpServerResyncResult // com.letta.mobile.data.model/McpServerResyncResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpServerResyncResult) // com.letta.mobile.data.model/McpServerResyncResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpServerResyncResult){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/McpServerResyncResult.Companion|null[0]
-        final val $childSerializers // com.letta.mobile.data.model/McpServerResyncResult.Companion.$childSerializers|{}$childSerializers[0]
-
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpServerResyncResult> // com.letta.mobile.data.model/McpServerResyncResult.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/McpServerUpdateParams { // com.letta.mobile.data.model/McpServerUpdateParams|null[0]
-    constructor <init>(kotlin/String? = ..., kotlinx.serialization.json/JsonObject? = ...) // com.letta.mobile.data.model/McpServerUpdateParams.<init>|<init>(kotlin.String?;kotlinx.serialization.json.JsonObject?){}[0]
-
-    final val config // com.letta.mobile.data.model/McpServerUpdateParams.config|{}config[0]
-        final fun <get-config>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.model/McpServerUpdateParams.config.<get-config>|<get-config>(){}[0]
-    final val serverName // com.letta.mobile.data.model/McpServerUpdateParams.serverName|{}serverName[0]
-        final fun <get-serverName>(): kotlin/String? // com.letta.mobile.data.model/McpServerUpdateParams.serverName.<get-serverName>|<get-serverName>(){}[0]
-
-    final fun component1(): kotlin/String? // com.letta.mobile.data.model/McpServerUpdateParams.component1|component1(){}[0]
-    final fun component2(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.model/McpServerUpdateParams.component2|component2(){}[0]
-    final fun copy(kotlin/String? = ..., kotlinx.serialization.json/JsonObject? = ...): com.letta.mobile.data.model/McpServerUpdateParams // com.letta.mobile.data.model/McpServerUpdateParams.copy|copy(kotlin.String?;kotlinx.serialization.json.JsonObject?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpServerUpdateParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpServerUpdateParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpServerUpdateParams.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpServerUpdateParams> { // com.letta.mobile.data.model/McpServerUpdateParams.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/McpServerUpdateParams.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpServerUpdateParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpServerUpdateParams.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpServerUpdateParams // com.letta.mobile.data.model/McpServerUpdateParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpServerUpdateParams) // com.letta.mobile.data.model/McpServerUpdateParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpServerUpdateParams){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/McpServerUpdateParams.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpServerUpdateParams> // com.letta.mobile.data.model/McpServerUpdateParams.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/McpToolExecuteParams { // com.letta.mobile.data.model/McpToolExecuteParams|null[0]
-    constructor <init>(kotlinx.serialization.json/JsonObject = ...) // com.letta.mobile.data.model/McpToolExecuteParams.<init>|<init>(kotlinx.serialization.json.JsonObject){}[0]
-
-    final val args // com.letta.mobile.data.model/McpToolExecuteParams.args|{}args[0]
-        final fun <get-args>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.model/McpToolExecuteParams.args.<get-args>|<get-args>(){}[0]
-
-    final fun component1(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.model/McpToolExecuteParams.component1|component1(){}[0]
-    final fun copy(kotlinx.serialization.json/JsonObject = ...): com.letta.mobile.data.model/McpToolExecuteParams // com.letta.mobile.data.model/McpToolExecuteParams.copy|copy(kotlinx.serialization.json.JsonObject){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpToolExecuteParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpToolExecuteParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpToolExecuteParams.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpToolExecuteParams> { // com.letta.mobile.data.model/McpToolExecuteParams.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/McpToolExecuteParams.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpToolExecuteParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpToolExecuteParams.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpToolExecuteParams // com.letta.mobile.data.model/McpToolExecuteParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpToolExecuteParams) // com.letta.mobile.data.model/McpToolExecuteParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpToolExecuteParams){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/McpToolExecuteParams.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpToolExecuteParams> // com.letta.mobile.data.model/McpToolExecuteParams.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/McpToolExecutionResult { // com.letta.mobile.data.model/McpToolExecutionResult|null[0]
-    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonElement? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/McpToolExecutionResult.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonElement?;kotlin.collections.List<kotlin.String>?;kotlin.collections.List<kotlin.String>?;kotlin.String?){}[0]
-
-    final val funcReturn // com.letta.mobile.data.model/McpToolExecutionResult.funcReturn|{}funcReturn[0]
-        final fun <get-funcReturn>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/McpToolExecutionResult.funcReturn.<get-funcReturn>|<get-funcReturn>(){}[0]
-    final val sandboxConfigFingerprint // com.letta.mobile.data.model/McpToolExecutionResult.sandboxConfigFingerprint|{}sandboxConfigFingerprint[0]
-        final fun <get-sandboxConfigFingerprint>(): kotlin/String? // com.letta.mobile.data.model/McpToolExecutionResult.sandboxConfigFingerprint.<get-sandboxConfigFingerprint>|<get-sandboxConfigFingerprint>(){}[0]
-    final val status // com.letta.mobile.data.model/McpToolExecutionResult.status|{}status[0]
-        final fun <get-status>(): kotlin/String // com.letta.mobile.data.model/McpToolExecutionResult.status.<get-status>|<get-status>(){}[0]
-    final val stderr // com.letta.mobile.data.model/McpToolExecutionResult.stderr|{}stderr[0]
-        final fun <get-stderr>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/McpToolExecutionResult.stderr.<get-stderr>|<get-stderr>(){}[0]
-    final val stdout // com.letta.mobile.data.model/McpToolExecutionResult.stdout|{}stdout[0]
-        final fun <get-stdout>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/McpToolExecutionResult.stdout.<get-stdout>|<get-stdout>(){}[0]
-
-    final fun component1(): kotlin/String // com.letta.mobile.data.model/McpToolExecutionResult.component1|component1(){}[0]
-    final fun component2(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/McpToolExecutionResult.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/McpToolExecutionResult.component3|component3(){}[0]
-    final fun component4(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/McpToolExecutionResult.component4|component4(){}[0]
-    final fun component5(): kotlin/String? // com.letta.mobile.data.model/McpToolExecutionResult.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonElement? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ...): com.letta.mobile.data.model/McpToolExecutionResult // com.letta.mobile.data.model/McpToolExecutionResult.copy|copy(kotlin.String;kotlinx.serialization.json.JsonElement?;kotlin.collections.List<kotlin.String>?;kotlin.collections.List<kotlin.String>?;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpToolExecutionResult.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpToolExecutionResult.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpToolExecutionResult.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpToolExecutionResult> { // com.letta.mobile.data.model/McpToolExecutionResult.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/McpToolExecutionResult.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpToolExecutionResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpToolExecutionResult.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpToolExecutionResult // com.letta.mobile.data.model/McpToolExecutionResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpToolExecutionResult) // com.letta.mobile.data.model/McpToolExecutionResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpToolExecutionResult){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/McpToolExecutionResult.Companion|null[0]
-        final val $childSerializers // com.letta.mobile.data.model/McpToolExecutionResult.Companion.$childSerializers|{}$childSerializers[0]
-
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpToolExecutionResult> // com.letta.mobile.data.model/McpToolExecutionResult.Companion.serializer|serializer(){}[0]
-    }
-}
-
 final class com.letta.mobile.data.model/MessageCreate { // com.letta.mobile.data.model/MessageCreate|null[0]
     constructor <init>(kotlin/String = ..., kotlin/String, kotlinx.serialization.json/JsonElement, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/MessageCreate.<init>|<init>(kotlin.String;kotlin.String;kotlinx.serialization.json.JsonElement;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
 
@@ -53724,104 +53535,6 @@ final class com.letta.mobile.data.model/Step { // com.letta.mobile.data.model/St
         final val $childSerializers // com.letta.mobile.data.model/Step.Companion.$childSerializers|{}$childSerializers[0]
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/Step> // com.letta.mobile.data.model/Step.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/StepFeedbackUpdateParams { // com.letta.mobile.data.model/StepFeedbackUpdateParams|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin.collections/List<kotlin/String>? = ...) // com.letta.mobile.data.model/StepFeedbackUpdateParams.<init>|<init>(kotlin.String?;kotlin.collections.List<kotlin.String>?){}[0]
-
-    final val feedback // com.letta.mobile.data.model/StepFeedbackUpdateParams.feedback|{}feedback[0]
-        final fun <get-feedback>(): kotlin/String? // com.letta.mobile.data.model/StepFeedbackUpdateParams.feedback.<get-feedback>|<get-feedback>(){}[0]
-    final val tags // com.letta.mobile.data.model/StepFeedbackUpdateParams.tags|{}tags[0]
-        final fun <get-tags>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepFeedbackUpdateParams.tags.<get-tags>|<get-tags>(){}[0]
-
-    final fun component1(): kotlin/String? // com.letta.mobile.data.model/StepFeedbackUpdateParams.component1|component1(){}[0]
-    final fun component2(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepFeedbackUpdateParams.component2|component2(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin.collections/List<kotlin/String>? = ...): com.letta.mobile.data.model/StepFeedbackUpdateParams // com.letta.mobile.data.model/StepFeedbackUpdateParams.copy|copy(kotlin.String?;kotlin.collections.List<kotlin.String>?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/StepFeedbackUpdateParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/StepFeedbackUpdateParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/StepFeedbackUpdateParams.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/StepFeedbackUpdateParams> { // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/StepFeedbackUpdateParams // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/StepFeedbackUpdateParams) // com.letta.mobile.data.model/StepFeedbackUpdateParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.StepFeedbackUpdateParams){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/StepFeedbackUpdateParams.Companion|null[0]
-        final val $childSerializers // com.letta.mobile.data.model/StepFeedbackUpdateParams.Companion.$childSerializers|{}$childSerializers[0]
-
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/StepFeedbackUpdateParams> // com.letta.mobile.data.model/StepFeedbackUpdateParams.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/StepListParams { // com.letta.mobile.data.model/StepListParams|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/StepListParams.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>?;kotlin.String?;kotlin.Boolean?;kotlin.collections.List<kotlin.String>?;kotlin.String?){}[0]
-
-    final val after // com.letta.mobile.data.model/StepListParams.after|{}after[0]
-        final fun <get-after>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.after.<get-after>|<get-after>(){}[0]
-    final val agentId // com.letta.mobile.data.model/StepListParams.agentId|{}agentId[0]
-        final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.agentId.<get-agentId>|<get-agentId>(){}[0]
-    final val before // com.letta.mobile.data.model/StepListParams.before|{}before[0]
-        final fun <get-before>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.before.<get-before>|<get-before>(){}[0]
-    final val endDate // com.letta.mobile.data.model/StepListParams.endDate|{}endDate[0]
-        final fun <get-endDate>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.endDate.<get-endDate>|<get-endDate>(){}[0]
-    final val feedback // com.letta.mobile.data.model/StepListParams.feedback|{}feedback[0]
-        final fun <get-feedback>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.feedback.<get-feedback>|<get-feedback>(){}[0]
-    final val hasFeedback // com.letta.mobile.data.model/StepListParams.hasFeedback|{}hasFeedback[0]
-        final fun <get-hasFeedback>(): kotlin/Boolean? // com.letta.mobile.data.model/StepListParams.hasFeedback.<get-hasFeedback>|<get-hasFeedback>(){}[0]
-    final val limit // com.letta.mobile.data.model/StepListParams.limit|{}limit[0]
-        final fun <get-limit>(): kotlin/Int? // com.letta.mobile.data.model/StepListParams.limit.<get-limit>|<get-limit>(){}[0]
-    final val model // com.letta.mobile.data.model/StepListParams.model|{}model[0]
-        final fun <get-model>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.model.<get-model>|<get-model>(){}[0]
-    final val order // com.letta.mobile.data.model/StepListParams.order|{}order[0]
-        final fun <get-order>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.order.<get-order>|<get-order>(){}[0]
-    final val orderBy // com.letta.mobile.data.model/StepListParams.orderBy|{}orderBy[0]
-        final fun <get-orderBy>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.orderBy.<get-orderBy>|<get-orderBy>(){}[0]
-    final val projectId // com.letta.mobile.data.model/StepListParams.projectId|{}projectId[0]
-        final fun <get-projectId>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.projectId.<get-projectId>|<get-projectId>(){}[0]
-    final val startDate // com.letta.mobile.data.model/StepListParams.startDate|{}startDate[0]
-        final fun <get-startDate>(): kotlin/String? // com.letta.mobile.data.model/StepListParams.startDate.<get-startDate>|<get-startDate>(){}[0]
-    final val tags // com.letta.mobile.data.model/StepListParams.tags|{}tags[0]
-        final fun <get-tags>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepListParams.tags.<get-tags>|<get-tags>(){}[0]
-    final val traceIds // com.letta.mobile.data.model/StepListParams.traceIds|{}traceIds[0]
-        final fun <get-traceIds>(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepListParams.traceIds.<get-traceIds>|<get-traceIds>(){}[0]
-
-    final fun component1(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component1|component1(){}[0]
-    final fun component10(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepListParams.component10|component10(){}[0]
-    final fun component11(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component11|component11(){}[0]
-    final fun component12(): kotlin/Boolean? // com.letta.mobile.data.model/StepListParams.component12|component12(){}[0]
-    final fun component13(): kotlin.collections/List<kotlin/String>? // com.letta.mobile.data.model/StepListParams.component13|component13(){}[0]
-    final fun component14(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component14|component14(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component2|component2(){}[0]
-    final fun component3(): kotlin/Int? // com.letta.mobile.data.model/StepListParams.component3|component3(){}[0]
-    final fun component4(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component4|component4(){}[0]
-    final fun component5(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component5|component5(){}[0]
-    final fun component6(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component6|component6(){}[0]
-    final fun component7(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component7|component7(){}[0]
-    final fun component8(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component8|component8(){}[0]
-    final fun component9(): kotlin/String? // com.letta.mobile.data.model/StepListParams.component9|component9(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin.collections/List<kotlin/String>? = ..., kotlin/String? = ...): com.letta.mobile.data.model/StepListParams // com.letta.mobile.data.model/StepListParams.copy|copy(kotlin.String?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>?;kotlin.String?;kotlin.Boolean?;kotlin.collections.List<kotlin.String>?;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/StepListParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/StepListParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/StepListParams.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/StepListParams> { // com.letta.mobile.data.model/StepListParams.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/StepListParams.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/StepListParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/StepListParams.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/StepListParams // com.letta.mobile.data.model/StepListParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/StepListParams) // com.letta.mobile.data.model/StepListParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.StepListParams){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/StepListParams.Companion|null[0]
-        final val $childSerializers // com.letta.mobile.data.model/StepListParams.Companion.$childSerializers|{}$childSerializers[0]
-
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/StepListParams> // com.letta.mobile.data.model/StepListParams.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -60515,21 +60228,12 @@ final class com.letta.mobile.data.repository/SettingsBackendCacheClearResult { /
 }
 
 final class com.letta.mobile.data.repository/StepRepository : com.letta.mobile.data.repository.api/IStepRepository { // com.letta.mobile.data.repository/StepRepository|null[0]
-    constructor <init>(com.letta.mobile.data.repository.api/StepRemoteSource? = ...) // com.letta.mobile.data.repository/StepRepository.<init>|<init>(com.letta.mobile.data.repository.api.StepRemoteSource?){}[0]
+    constructor <init>() // com.letta.mobile.data.repository/StepRepository.<init>|<init>(){}[0]
 
     final val steps // com.letta.mobile.data.repository/StepRepository.steps|{}steps[0]
         final fun <get-steps>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Step>> // com.letta.mobile.data.repository/StepRepository.steps.<get-steps>|<get-steps>(){}[0]
     final val supportsStepQueries // com.letta.mobile.data.repository/StepRepository.supportsStepQueries|{}supportsStepQueries[0]
         final fun <get-supportsStepQueries>(): kotlin/Boolean // com.letta.mobile.data.repository/StepRepository.supportsStepQueries.<get-supportsStepQueries>|<get-supportsStepQueries>(){}[0]
-
-    final fun upsertStep(com.letta.mobile.data.model/Step) // com.letta.mobile.data.repository/StepRepository.upsertStep|upsertStep(com.letta.mobile.data.model.Step){}[0]
-    final suspend fun getStep(kotlin/String): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository/StepRepository.getStep|getStep(kotlin.String){}[0]
-    final suspend fun getStepMessages(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository/StepRepository.getStepMessages|getStepMessages(kotlin.String){}[0]
-    final suspend fun getStepMetrics(kotlin/String): com.letta.mobile.data.model/StepMetrics // com.letta.mobile.data.repository/StepRepository.getStepMetrics|getStepMetrics(kotlin.String){}[0]
-    final suspend fun getStepTrace(kotlin/String): com.letta.mobile.data.model/ProviderTrace? // com.letta.mobile.data.repository/StepRepository.getStepTrace|getStepTrace(kotlin.String){}[0]
-    final suspend fun listSteps(com.letta.mobile.data.model/StepListParams): kotlin.collections/List<com.letta.mobile.data.model/Step> // com.letta.mobile.data.repository/StepRepository.listSteps|listSteps(com.letta.mobile.data.model.StepListParams){}[0]
-    final suspend fun refreshSteps(com.letta.mobile.data.model/StepListParams) // com.letta.mobile.data.repository/StepRepository.refreshSteps|refreshSteps(com.letta.mobile.data.model.StepListParams){}[0]
-    final suspend fun updateStepFeedback(kotlin/String, com.letta.mobile.data.model/StepFeedbackUpdateParams): com.letta.mobile.data.model/Step // com.letta.mobile.data.repository/StepRepository.updateStepFeedback|updateStepFeedback(kotlin.String;com.letta.mobile.data.model.StepFeedbackUpdateParams){}[0]
 }
 
 final class com.letta.mobile.data.rpcwire/SecretWriteValue { // com.letta.mobile.data.rpcwire/SecretWriteValue|null[0]
@@ -76986,17 +76690,6 @@ final value class com.letta.mobile.data.projects/ProjectKey { // com.letta.mobil
     final fun toString(): kotlin/String // com.letta.mobile.data.projects/ProjectKey.toString|toString(){}[0]
 }
 
-final value class com.letta.mobile.data.repository.api/StepId { // com.letta.mobile.data.repository.api/StepId|null[0]
-    constructor <init>(kotlin/String) // com.letta.mobile.data.repository.api/StepId.<init>|<init>(kotlin.String){}[0]
-
-    final val value // com.letta.mobile.data.repository.api/StepId.value|{}value[0]
-        final fun <get-value>(): kotlin/String // com.letta.mobile.data.repository.api/StepId.value.<get-value>|<get-value>(){}[0]
-
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.repository.api/StepId.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.repository.api/StepId.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.repository.api/StepId.toString|toString(){}[0]
-}
-
 final value class com.letta.mobile.data.repository.iroh/AdminRpcBody { // com.letta.mobile.data.repository.iroh/AdminRpcBody|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.repository.iroh/AdminRpcBody.<init>|<init>(kotlin.String){}[0]
 
@@ -78424,16 +78117,8 @@ open class com.letta.mobile.data.repository/CachedMcpServerRepository : com.lett
     open val servers // com.letta.mobile.data.repository/CachedMcpServerRepository.servers|{}servers[0]
         open fun <get-servers>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/McpServer>> // com.letta.mobile.data.repository/CachedMcpServerRepository.servers.<get-servers>|<get-servers>(){}[0]
 
-    open fun getServerTools(com.letta.mobile.data.model/McpServerId): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/Tool>> // com.letta.mobile.data.repository/CachedMcpServerRepository.getServerTools|getServerTools(com.letta.mobile.data.model.McpServerId){}[0]
-    open fun getServers(): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/McpServer>> // com.letta.mobile.data.repository/CachedMcpServerRepository.getServers|getServers(){}[0]
-    open suspend fun createServer(com.letta.mobile.data.model/McpServerCreateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository/CachedMcpServerRepository.createServer|createServer(com.letta.mobile.data.model.McpServerCreateParams){}[0]
-    open suspend fun deleteServer(com.letta.mobile.data.model/McpServerId) // com.letta.mobile.data.repository/CachedMcpServerRepository.deleteServer|deleteServer(com.letta.mobile.data.model.McpServerId){}[0]
     open suspend fun fetchAllMcpTools(): kotlin.collections/List<com.letta.mobile.data.model/Tool> // com.letta.mobile.data.repository/CachedMcpServerRepository.fetchAllMcpTools|fetchAllMcpTools(){}[0]
-    open suspend fun refreshServerTools(com.letta.mobile.data.model/McpServerId) // com.letta.mobile.data.repository/CachedMcpServerRepository.refreshServerTools|refreshServerTools(com.letta.mobile.data.model.McpServerId){}[0]
     open suspend fun refreshServers() // com.letta.mobile.data.repository/CachedMcpServerRepository.refreshServers|refreshServers(){}[0]
-    open suspend fun resyncServerTools(com.letta.mobile.data.model/McpServerId): com.letta.mobile.data.model/McpServerResyncResult // com.letta.mobile.data.repository/CachedMcpServerRepository.resyncServerTools|resyncServerTools(com.letta.mobile.data.model.McpServerId){}[0]
-    open suspend fun runServerTool(com.letta.mobile.data.model/McpServerId, com.letta.mobile.data.model/ToolId, com.letta.mobile.data.model/McpToolExecuteParams): com.letta.mobile.data.model/McpToolExecutionResult // com.letta.mobile.data.repository/CachedMcpServerRepository.runServerTool|runServerTool(com.letta.mobile.data.model.McpServerId;com.letta.mobile.data.model.ToolId;com.letta.mobile.data.model.McpToolExecuteParams){}[0]
-    open suspend fun updateServer(com.letta.mobile.data.model/McpServerId, com.letta.mobile.data.model/McpServerUpdateParams): com.letta.mobile.data.model/McpServer // com.letta.mobile.data.repository/CachedMcpServerRepository.updateServer|updateServer(com.letta.mobile.data.model.McpServerId;com.letta.mobile.data.model.McpServerUpdateParams){}[0]
 }
 
 open class com.letta.mobile.data.repository/CachedModelRepository : com.letta.mobile.data.repository.api/IModelRepository { // com.letta.mobile.data.repository/CachedModelRepository|null[0]
@@ -85083,7 +84768,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [linuxX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

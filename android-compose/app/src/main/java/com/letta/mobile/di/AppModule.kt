@@ -39,7 +39,6 @@ import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.session.SessionScopedChannelTransport
@@ -276,10 +275,6 @@ abstract class AppModule {
         @Provides @Singleton
         fun provideScheduleRepository(sessions: SessionManager): IScheduleRepository =
             sessions.sessionScoped(IScheduleRepository::class) { it.scheduleRepository }
-
-        @Provides @Singleton
-        fun provideStepRepository(sessions: SessionManager): IStepRepository =
-            sessions.sessionScoped(IStepRepository::class) { it.stepRepository }
 
         /** letta-mobile-ckmub.4: the backend seam; the App Server is the only backend for now. */
         @Provides
