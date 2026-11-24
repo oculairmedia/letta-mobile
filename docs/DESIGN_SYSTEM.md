@@ -152,7 +152,7 @@ object initializers.
 3. **Material 3 systematically** — all new UI uses M3 components and tokens; avoid raw colors.
 4. **Lucide icon system** — use the centralized `Lucide` icon set; do not inline SVG paths.
 5. **HctColorHarmonizer** — status colors (error/warning/success) are automatically harmonized against the active theme primary; never hardcode these — let the harmonizer derive them.
-6. **AdaptiveDialog** — dialogs use the shared adaptive dialog component with `readableDialogMaxWidth` cap.
+6. **Adaptive dialogs** — dialogs use the shared dialog frame with `readableDialogMaxWidth` cap.
 
 ## Module map
 

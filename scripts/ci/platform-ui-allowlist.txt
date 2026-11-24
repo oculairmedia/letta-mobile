@@ -5,7 +5,6 @@
 # Each hard-cut slice deletes its lines. Shrink-only: scripts/ci/baseline-ratchet-guard.py
 # rejects a PR that adds or raises a line, and there is no override.
 android-compose/app/src/main/java/com/letta/mobile/MainActivity.kt 243 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/components/TagDrillInDialog.kt 183 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/AndroidMascotHost.kt 281 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/MascotIdentitySync.kt 33 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/ProvideMascotShell.kt 47 legacy-pending(ckmub.2)
@@ -20,7 +19,6 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScre
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/systemaccess/SystemAccessDashboardScreen.kt 630 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/Accordions.kt 91 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ActionSheet.kt 167 legacy-pending(ckmub.2)
-android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/AdaptiveDialog.kt 82 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/AmbientShaderAgentBackground.kt 346 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/CardGroup.kt 158 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/FormItem.kt 49 legacy-pending(ckmub.2)
