@@ -22,7 +22,6 @@
     <ID>LongMethod:StreamingMarkdownText.kt$@Composable fun StreamingMarkdownText( text: String, modifier: Modifier = Modifier, textColor: Color = MaterialTheme.colorScheme.onSurface, tailTransform: (String) -&gt; String = { it }, cursorText: String? = null, cursorAlpha: Float = 1f, deferUnstableMarkdown: Boolean = true, stabilizeTables: Boolean = false, isStreaming: Boolean = true, animateSettledSize: Boolean = true, fadeAppendedText: Boolean = false, onStableFloorHeightPxChanged: (Int) -&gt; Unit = {}, )</ID>
     <ID>LongMethod:StreamingMarkdownText.kt$@Composable private fun StreamingMarkdownDocumentBlocks( blocks: List&lt;StreamingMarkdownDocumentBlock&gt;, textColor: Color, stabilizeTables: Boolean, isStreaming: Boolean, tailTransform: (String) -&gt; String, cursorText: String?, cursorAlpha: Float, repairIncompleteMarkdown: Boolean, fadeAppendedText: Boolean = false, )</ID>
     <ID>LongMethod:Theme.kt$@VisibleForTesting internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors</ID>
-    <ID>LongMethod:ThinkingTextToken.kt$@Composable fun ThinkingTextToken( visible: Boolean, delayMessage: String? = null, textOverride: String? = null, reducedMotion: Boolean = false, reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(), modifier: Modifier = Modifier, /** Around the text; the default is the standalone strip's inset. Beside a mascot the caller drops the start. */ contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs), )</ID>
     <ID>LongParameterList:CardGroup.kt$CardGroupScope$( onClick: (() -&gt; Unit)? = null, modifier: Modifier = Modifier, overlineContent: (@Composable () -&gt; Unit)? = null, supportingContent: (@Composable () -&gt; Unit)? = null, leadingContent: (@Composable () -&gt; Unit)? = null, trailingContent: (@Composable () -&gt; Unit)? = null, colors: ListItemColors? = null, headlineContent: @Composable () -&gt; Unit, )</ID>
     <ID>LongParameterList:ChatTextGeometry.kt$ChatTextGeometryMeasurer$( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, maxLines: Int, maxChars: Int, )</ID>
     <ID>LongParameterList:ChatTextGeometry.kt$ChatTextGeometryMeasurer$( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, softWrap: Boolean = true, maxLines: Int = Int.MAX_VALUE, )</ID>
@@ -63,12 +62,8 @@
     <ID>TooManyFunctions:StreamingMarkdownParser.kt$com.letta.mobile.ui.components.StreamingMarkdownParser.kt</ID>
     <ID>UnusedImports:Accordions.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:ColorTest.kt$import kotlin.math.abs</ID>
-    <ID>UnusedImports:DeliveryTimeText.kt$import com.letta.mobile.ui.theme.LocalChatFontScale</ID>
-    <ID>UnusedImports:DeliveryTimeText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
     <ID>UnusedImports:FormItem.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:IconSizing.kt$import androidx.compose.ui.unit.dp</ID>
-    <ID>UnusedImports:LatencyText.kt$import com.letta.mobile.ui.theme.LocalChatFontScale</ID>
-    <ID>UnusedImports:LatencyText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
     <ID>UnusedImports:MarkdownText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
     <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocument</ID>
     <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock</ID>
@@ -85,14 +80,11 @@
     <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import org.junit.Assert.assertEquals</ID>
     <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import org.junit.Assert.assertTrue</ID>
     <ID>UnusedImports:StreamingMarkdownText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
-    <ID>UnusedImports:ThinkingTextToken.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun AccordionsPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun DateSeparatorPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun EmptyStatePreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun ErrorDialogPreview()</ID>
-    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun LatencyTextPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun LiveStatusTextPreview()</ID>
-    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageActionButtonsPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageBubblePreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageSenderPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun StatusTimelinePreview()</ID>

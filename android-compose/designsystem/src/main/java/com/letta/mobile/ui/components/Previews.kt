@@ -20,7 +20,6 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.customColors
-import com.letta.mobile.ui.icons.LettaIcons
 
 @PreviewLightDark
 @Composable
@@ -62,55 +61,6 @@ internal fun PreviewMessageBubbleContent() {
 @PreviewLightDark
 @Composable
 private fun MessageBubblePreview() = PreviewMessageBubbleContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewMessageActionButtonsContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Row(
-                modifier = Modifier.padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                MessageActionButton(
-                    label = "Copy",
-                    icon = LettaIcons.Copy,
-                    onClick = {},
-                )
-                MessageActionButton(
-                    label = "Regenerate",
-                    icon = LettaIcons.Refresh,
-                    onClick = {},
-                )
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun MessageActionButtonsPreview() = PreviewMessageActionButtonsContent()
-
-@PreviewLightDark
-@Composable
-internal fun PreviewLatencyTextContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                LatencyText(latencyMs = 123f)
-                LatencyText(latencyMs = 1234f)
-                LatencyText(latencyMs = 65000f)
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun LatencyTextPreview() = PreviewLatencyTextContent()
 
 @PreviewLightDark
 @Composable
