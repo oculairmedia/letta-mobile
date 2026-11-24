@@ -29,6 +29,7 @@ import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
+import com.letta.mobile.data.session.graph.HostAdminRepositories
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
@@ -208,14 +209,16 @@ class ShellLaneAffordancesTest {
             channelTransport = transport, capabilities = SessionCapabilities.None,
         ),
         host = HostSessionRepositories(
-            agentRepository = unavailable(SessionRoute.AGENTS), blockRepository = null,
+            agentRepository = unavailable(SessionRoute.AGENTS),
             conversationRepository = unavailable(SessionRoute.CONVERSATIONS),
-            mcpServerRepository = unavailable(SessionRoute.MCP_SERVERS), modelRepository = unavailable(SessionRoute.MODELS),
-            passageRepository = unavailable(SessionRoute.PASSAGES), projectRepository = unavailable(SessionRoute.PROJECTS),
-            projectWorkRepository = unavailable(SessionRoute.PROJECT_WORK), runRepository = unavailable(SessionRoute.RUNS),
-            providerRepository = unavailable(SessionRoute.PROVIDERS), scheduleRepository = unavailable(SessionRoute.SCHEDULES),
-            stepRepository = unavailable(SessionRoute.STEPS), toolRepository = unavailable(SessionRoute.TOOLS),
-            vibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC),
+            admin = HostAdminRepositories(
+                toolRepository = unavailable(SessionRoute.TOOLS), blockRepository = null,
+                mcpServerRepository = unavailable(SessionRoute.MCP_SERVERS), modelRepository = unavailable(SessionRoute.MODELS),
+                projectRepository = unavailable(SessionRoute.PROJECTS), providerRepository = unavailable(SessionRoute.PROVIDERS),
+                runRepository = unavailable(SessionRoute.RUNS),
+            ),
+            scheduleRepository = unavailable(SessionRoute.SCHEDULES),
+            stepRepository = unavailable(SessionRoute.STEPS),
         ),
         transportBound = SharedSessionGraph.transportBound(transport, scope),
     )

@@ -34,19 +34,15 @@ import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IProjectRepository
-import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.session.SessionScopedChannelTransport
-import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
 import com.letta.mobile.data.session.scopedAgentRepository
 import com.letta.mobile.data.session.scopedAllConversationsRepository
 import com.letta.mobile.data.session.sessionBackendScopedCaches
@@ -250,10 +246,6 @@ abstract class AppModule {
             sessions.sessionScoped(IProjectRepository::class) { it.projectRepository }
 
         @Provides @Singleton
-        fun provideProjectWorkRepository(sessions: SessionManager): IProjectWorkRepository =
-            sessions.sessionScoped(IProjectWorkRepository::class) { it.projectWorkRepository }
-
-        @Provides @Singleton
         fun provideToolRepository(sessions: SessionManager): IToolRepository =
             sessions.sessionScoped(IToolRepository::class) { it.toolRepository }
 
@@ -272,10 +264,6 @@ abstract class AppModule {
         @Provides @Singleton
         fun provideModelRepository(sessions: SessionManager): IModelRepository =
             sessions.sessionScoped(IModelRepository::class) { it.modelRepository }
-
-        @Provides @Singleton
-        fun providePassageRepository(sessions: SessionManager): IPassageRepository =
-            sessions.sessionScoped(IPassageRepository::class) { it.passageRepository }
 
         @Provides @Singleton
         fun provideProviderRepository(sessions: SessionManager): IProviderRepository =
@@ -337,13 +325,6 @@ abstract class AppModule {
 
 
 
-
-
-    @Binds
-    @Singleton
-    abstract fun bindVibesyncEventStreamRepository(
-        impl: SessionScopedVibesyncEventStreamRepository,
-    ): IVibesyncEventStreamRepository
 
 
     @Binds

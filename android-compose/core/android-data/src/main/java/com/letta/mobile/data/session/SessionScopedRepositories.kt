@@ -23,7 +23,6 @@ fun SessionManager.sessionBackendScopedCaches(): Set<BackendScopedCache> = setOf
     CurrentGraphCache("agents") { clearBackendScopedCache(current.agentRepository) },
     CurrentGraphCache("conversations") { clearBackendScopedCache(current.conversationRepository) },
     CurrentGraphCache("allConversations") { current.allConversationsRepository.clearForBackendSwitch() },
-    CurrentGraphCache("passages") { clearBackendScopedCache(current.passageRepository) },
 )
 
 internal class CurrentGraphCache(

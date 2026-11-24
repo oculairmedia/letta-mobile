@@ -61,7 +61,6 @@ object SessionRouteMatrix {
         SessionRoute.BLOCKS,
         SessionRoute.MCP_SERVERS,
         SessionRoute.MODELS,
-        SessionRoute.PASSAGES,
         SessionRoute.PROJECTS,
         SessionRoute.PROVIDERS,
         SessionRoute.RUNS,

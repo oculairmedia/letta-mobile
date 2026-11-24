@@ -1,41 +1,19 @@
 package com.letta.mobile.data.session
 
 import com.letta.mobile.data.repository.api.IScheduleRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.local.AgentDao
-import com.letta.mobile.data.local.AgentEntity
-import com.letta.mobile.data.local.ConversationDao
-import com.letta.mobile.data.local.ConversationEntity
-import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.EmbeddingModel
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
-import com.letta.mobile.testutil.FakePassageApi
-import com.letta.mobile.testutil.FakeProjectApi
-import com.letta.mobile.testutil.FakeProjectWorkApi
-import com.letta.mobile.testutil.FakeProviderApi
-import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
-import com.letta.mobile.testutil.FakeStepApi
-import com.letta.mobile.testutil.FakeToolApi
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -45,7 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class SessionScopedModelSchedulePassageRepositoryTest {
+class SessionScopedModelScheduleRepositoryTest {
 
     @Test
     fun `model repository proxy clears account scoped caches when token changes`() = runTest {
@@ -85,43 +63,6 @@ class SessionScopedModelSchedulePassageRepositoryTest {
 
         assertEquals(listOf("llm-b"), modelProxy.llmModels.value.map { it.id })
         assertEquals(listOf("embedding-b"), modelProxy.embeddingModels.value.map { it.id })
-    }
-
-    @Test
-    fun `passage repository proxy switches caches to rebuilt graph`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakePassageApi = FakePassageApi().apply {
-            setPassages("agent-1", listOf(Passage(id = "passage-a", text = "Backend A", agentId = "agent-1")))
-        }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                this.passageApi = fakePassageApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-        val passageProxy = sessionManager.sessionScoped(IPassageRepository::class) { it.passageRepository }
-        val passages = passageProxy.getPassages(AgentId("agent-1"))
-
-        passageProxy.refreshPassages(AgentId("agent-1"))
-        advanceUntilIdle()
-        assertEquals(listOf("passage-a"), passages.value.map { it.id })
-
-        fakePassageApi.setPassages(
-            "agent-1",
-            listOf(Passage(id = "passage-b", text = "Backend B", agentId = "agent-1")),
-        )
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
-        advanceUntilIdle()
-
-        assertEquals(emptyList<String>(), passages.value.map { it.id })
-
-        val rebuiltPassages = passageProxy.getPassages(AgentId("agent-1"))
-        passageProxy.refreshPassages(AgentId("agent-1"))
-        advanceUntilIdle()
-
-        assertEquals(listOf("passage-b"), rebuiltPassages.value.map { it.id })
     }
 
     @Test

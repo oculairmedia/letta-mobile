@@ -30,8 +30,7 @@ class SharedSessionRepositoryGraphTest {
         assertEquals(7L, graph.id)
         assertSame(transport, graph.channelTransport)
         assertSame(host.agentRepository, graph.agentRepository)
-        assertSame(host.toolRepository, graph.toolRepository)
-        assertSame(host.vibesyncEventStreamRepository, graph.vibesyncEventStreamRepository)
+        assertSame(host.admin.toolRepository, graph.toolRepository)
         assertSame(transportBound.cronRepository, graph.cronRepository)
         assertSame(transportBound.selfTodoRepository, graph.selfTodoRepository)
         assertSame(transportBound.subagentRepository, graph.subagentRepository)
@@ -104,18 +103,17 @@ class SharedSessionRepositoryGraphTest {
 
     private fun unavailableHost() = HostSessionRepositories(
         agentRepository = unavailable(SessionRoute.AGENTS),
-        blockRepository = null,
         conversationRepository = unavailable(SessionRoute.CONVERSATIONS),
-        mcpServerRepository = unavailable(SessionRoute.MCP_SERVERS),
-        modelRepository = unavailable(SessionRoute.MODELS),
-        passageRepository = unavailable(SessionRoute.PASSAGES),
-        projectRepository = unavailable(SessionRoute.PROJECTS),
-        projectWorkRepository = unavailable(SessionRoute.PROJECT_WORK),
-        runRepository = unavailable(SessionRoute.RUNS),
-        providerRepository = unavailable(SessionRoute.PROVIDERS),
+        admin = HostAdminRepositories(
+            toolRepository = unavailable(SessionRoute.TOOLS),
+            blockRepository = null,
+            mcpServerRepository = unavailable(SessionRoute.MCP_SERVERS),
+            modelRepository = unavailable(SessionRoute.MODELS),
+            projectRepository = unavailable(SessionRoute.PROJECTS),
+            providerRepository = unavailable(SessionRoute.PROVIDERS),
+            runRepository = unavailable(SessionRoute.RUNS),
+        ),
         scheduleRepository = unavailable(SessionRoute.SCHEDULES),
         stepRepository = unavailable(SessionRoute.STEPS),
-        toolRepository = unavailable(SessionRoute.TOOLS),
-        vibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC),
     )
 }

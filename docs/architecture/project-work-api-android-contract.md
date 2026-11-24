@@ -2,7 +2,7 @@
 
 **Status:** Historical external-service contract; production Android Project Work route is absent after the REST hard cut.
 
-The endpoints below describe the intended Vibe Sync / Beads Work service contract, not a currently wired Android HTTP client. [ProjectWorkRepository](../../android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt) defaults to `RemoteRoute.Absent(SessionRoute.PROJECT_WORK)` and states that no App Server backend serves this surface yet. Shared [CachedProjectWorkRepository](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedProjectWorkRepository.kt) retains caching/mutation logic over an injected `ProjectWorkRemoteSource`; fake-source tests exercise that seam. Existing DTOs and tests do not establish live endpoint availability.
+The endpoints below describe the intended Vibe Sync / Beads Work service contract, not a currently wired Android HTTP client. No App Server backend has ever served this surface, so the screenless repository stack (the Android `ProjectWorkRepository` binder, shared `CachedProjectWorkRepository` and its `RemoteRoute.Absent(SessionRoute.PROJECT_WORK)` seam, `ProjectWorkRemoteSource`/`IProjectWorkRepository`, and their model/fake-source tests) was deleted under letta-mobile-ckmub.6.4. `SessionRoute.PROJECT_WORK` remains reserved so a future backend can rebind it. Existing DTOs and tests never did establish live endpoint availability.
 
 The Iroh wrapper's `project.*` catalog is a separate bounded VibeSync integration; it does not wire the absent Project Work issue-mutation source. The ETag/idempotency/service guarantees below are the original external contract and were not live-verified in this audit.
 
@@ -49,8 +49,8 @@ Explicit tombstone records are not part of v1 incremental sync. Android must not
 The current Android data contract lives in:
 
 - `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Project.kt`
-- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt`
+- ~~`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt`~~ — removed with the unused project-work repository stack (letta-mobile-ckmub.6.4)
 - ~~`ProjectApi.kt`~~, ~~`ProjectWorkApi.kt`~~ — removed with the Letta REST backend in the hard cut (letta-mobile-ckmub); no REST client remains
-- `android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
+- ~~`ProjectWorkRepository.kt`~~ — removed with the unused project-work repository stack (letta-mobile-ckmub.6.4)
 
-Current focused coverage includes `ProjectWorkRepositoryTest` and `SessionScopedProjectWorkRepositoryTest` under [Android data tests](../../android-compose/core/android-data/src/test/java/com/letta/mobile/data/). The former REST API tests/classes named by the original design are removed.
+The former REST API tests/classes named by the original design are removed, as are `ProjectWorkRepositoryTest` and `SessionScopedProjectWorkRepositoryTest` (they covered only the deleted stack).

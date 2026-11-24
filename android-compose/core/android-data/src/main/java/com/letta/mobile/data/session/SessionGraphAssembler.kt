@@ -4,7 +4,7 @@ import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
-import com.letta.mobile.data.session.graph.AdminRemoteRoutes
+import com.letta.mobile.data.session.graph.HostAdminRepositories
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
@@ -19,12 +19,10 @@ import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.api.rosterForLists
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
-import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.IrohAdminRpcConversationListSource
 import com.letta.mobile.data.repository.activeBackendUsesChannel
@@ -85,19 +83,18 @@ class SessionGraphAssembler @Inject constructor(
             ),
             host = HostSessionRepositories(
                 agentRepository = agentRepository,
-                blockRepository = adminRepositories.blockRepository,
                 conversationRepository = conversationRepos.conversation,
-                mcpServerRepository = adminRepositories.mcpServerRepository,
-                modelRepository = adminRepositories.modelRepository,
-                passageRepository = adminRepositories.passageRepository,
-                projectRepository = adminRepositories.projectRepository,
-                projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
-                runRepository = adminRepositories.runRepository,
-                providerRepository = adminRepositories.providerRepository,
+                admin = HostAdminRepositories(
+                    toolRepository = adminRepositories.toolRepository,
+                    blockRepository = adminRepositories.blockRepository,
+                    mcpServerRepository = adminRepositories.mcpServerRepository,
+                    modelRepository = adminRepositories.modelRepository,
+                    projectRepository = adminRepositories.projectRepository,
+                    providerRepository = adminRepositories.providerRepository,
+                    runRepository = adminRepositories.runRepository,
+                ),
                 scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
                 stepRepository = StepRepository(remoteSources.steps.orNull()),
-                toolRepository = adminRepositories.toolRepository,
-                vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
             ),
             transportBound = transportBound,
         )
@@ -158,15 +155,7 @@ class SessionGraphAssembler @Inject constructor(
         SharedSessionGraph.adminRepositories(
             transport = request.channelTransport,
             settings = request.settingsRepository,
-            remotes = AdminRemoteRoutes(
-                mcpServers = remoteSources.mcpServers,
-                models = remoteSources.models,
-                passages = remoteSources.passages,
-                projects = remoteSources.projects,
-                providers = remoteSources.providers,
-                runs = remoteSources.runs,
-                tools = remoteSources.tools,
-            ),
+            remotes = remoteSources.admin,
         )
 
     /**

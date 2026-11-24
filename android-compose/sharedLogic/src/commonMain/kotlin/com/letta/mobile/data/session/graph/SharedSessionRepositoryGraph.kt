@@ -10,9 +10,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IProjectRepository
-import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -20,7 +18,6 @@ import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.channelLaneActivitySource
@@ -30,25 +27,45 @@ import com.letta.mobile.data.lanes.ConversationLaneProjection
 import com.letta.mobile.data.lanes.LaneActivitySource
 
 /**
+ * The Iroh-hosted admin repositories (tools, memory blocks, MCP servers, models, projects,
+ * providers, runs) one graph generation serves — the set [SharedSessionGraph.adminRepositories]
+ * builds for Android and desktop alike. It is the host's own binding of the admin half of
+ * [SessionRepositoryGraph], kept as one parameter so a host states the split once instead of
+ * threading eight repositories through [HostSessionRepositories].
+ */
+class HostAdminRepositories(
+    /** The session's tools, read and listed over the admin route. */
+    val toolRepository: IToolRepository,
+    /** The session's memory blocks; null where the host serves none. */
+    val blockRepository: IAgentBlockRepository?,
+    /** The MCP server catalog the settings screen renders. */
+    val mcpServerRepository: IMcpServerRepository,
+    /** The LLM/embedding catalog used by the model pickers. */
+    val modelRepository: IModelRepository,
+    /** The tracked projects, when the host serves a project route. */
+    val projectRepository: IProjectRepository,
+    /** The model providers the settings screen lists. */
+    val providerRepository: IProviderRepository,
+    /** A conversation's runs, read by background tasks and the active-turn session. */
+    val runRepository: IRunRepository,
+)
+
+/**
  * The repositories a host binds itself for one graph generation — its own
  * implementations, or an `unavailable(route)` stand-in where the host serves no such route. The
  * transport-bound ones come from [SharedSessionGraph.transportBound] instead.
  */
 class HostSessionRepositories(
+    /** The session's agent roster. */
     val agentRepository: IAgentRepository,
-    val blockRepository: IAgentBlockRepository?,
+    /** The session's conversations, listed and cached by the host. */
     val conversationRepository: IConversationRepository,
-    val mcpServerRepository: IMcpServerRepository,
-    val modelRepository: IModelRepository,
-    val passageRepository: IPassageRepository,
-    val projectRepository: IProjectRepository,
-    val projectWorkRepository: IProjectWorkRepository,
-    val runRepository: IRunRepository,
-    val providerRepository: IProviderRepository,
+    /** The admin half: tools, blocks, MCP servers, models, projects, providers and runs. */
+    val admin: HostAdminRepositories,
+    /** The session's schedules, over the host's own directory. */
     val scheduleRepository: IScheduleRepository,
+    /** The step queries the graph reports (none where the host serves no step route). */
     val stepRepository: IStepRepository,
-    val toolRepository: IToolRepository,
-    val vibesyncEventStreamRepository: IVibesyncEventStreamRepository,
 )
 
 /** Which generation a graph is and what it is bound to. */
@@ -84,7 +101,7 @@ class SharedSessionRepositoryGraph(
     )
 
     override val agentRepository: IAgentRepository = host.agentRepository
-    override val blockRepository: IAgentBlockRepository? = host.blockRepository
+    override val blockRepository: IAgentBlockRepository? = host.admin.blockRepository
     override val conversationRepository: IConversationRepository = object : IConversationRepository by host.conversationRepository,
         com.letta.mobile.data.session.BackendScopedCache {
         override suspend fun clearForBackendSwitch() {
@@ -98,17 +115,14 @@ class SharedSessionRepositoryGraph(
             if (host.conversationRepository.deletesPermanently) activeTurns.delete(id)
         }
     }
-    override val mcpServerRepository: IMcpServerRepository = host.mcpServerRepository
-    override val modelRepository: IModelRepository = host.modelRepository
-    override val passageRepository: IPassageRepository = host.passageRepository
-    override val projectRepository: IProjectRepository = host.projectRepository
-    override val projectWorkRepository: IProjectWorkRepository = host.projectWorkRepository
-    override val runRepository: IRunRepository = host.runRepository
-    override val providerRepository: IProviderRepository = host.providerRepository
+    override val mcpServerRepository: IMcpServerRepository = host.admin.mcpServerRepository
+    override val modelRepository: IModelRepository = host.admin.modelRepository
+    override val projectRepository: IProjectRepository = host.admin.projectRepository
+    override val runRepository: IRunRepository = host.admin.runRepository
+    override val providerRepository: IProviderRepository = host.admin.providerRepository
     override val scheduleRepository: IScheduleRepository = host.scheduleRepository
     override val stepRepository: IStepRepository = host.stepRepository
-    override val toolRepository: IToolRepository = host.toolRepository
-    override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = host.vibesyncEventStreamRepository
+    override val toolRepository: IToolRepository = host.admin.toolRepository
 
     override val slashCommands: AppServerSlashCommandApi = transportBound.slashCommands
 

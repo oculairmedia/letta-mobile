@@ -1,7 +1,6 @@
 package com.letta.mobile.data.session.graph
 
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
-import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
@@ -10,7 +9,6 @@ import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
-import com.letta.mobile.data.repository.CachedProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
@@ -138,19 +136,18 @@ class HostRepositoryAdapters(binding: HostSessionBinding) {
     /** The repositories this host binds itself; the transport-bound ones come from [transportBound]. */
     fun hostRepositories(): HostSessionRepositories = HostSessionRepositories(
         agentRepository = agentRepository,
-        blockRepository = blockRepository,
         conversationRepository = UnservedConversationRepository(),
-        mcpServerRepository = admin.mcpServerRepository,
-        modelRepository = admin.modelRepository,
-        passageRepository = admin.passageRepository,
-        projectRepository = admin.projectRepository,
-        projectWorkRepository = CachedProjectWorkRepository(RemoteRoute.Absent(SessionRoute.PROJECT_WORK)),
-        runRepository = admin.runRepository,
-        providerRepository = admin.providerRepository,
+        admin = HostAdminRepositories(
+            toolRepository = admin.toolRepository,
+            blockRepository = blockRepository,
+            mcpServerRepository = admin.mcpServerRepository,
+            modelRepository = admin.modelRepository,
+            projectRepository = admin.projectRepository,
+            providerRepository = admin.providerRepository,
+            runRepository = admin.runRepository,
+        ),
         scheduleRepository = scheduleRepository,
         stepRepository = StepRepository(),
-        toolRepository = admin.toolRepository,
-        vibesyncEventStreamRepository = UnservedVibesyncEventStreamRepository(),
     )
 }
 
