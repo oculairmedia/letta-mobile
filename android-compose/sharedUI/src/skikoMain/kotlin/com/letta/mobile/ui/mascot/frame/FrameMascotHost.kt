@@ -18,7 +18,6 @@ import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotStills
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -55,11 +54,12 @@ class FrameMascotEntry private constructor(
     }
 
     override suspend fun load() {
-        val created = withContext(renderer.dispatcher) { bringUpScene() }
-        if (created == null) {
-            failed = true
-            return
-        }
+        // This runs in a composition's LaunchedEffect, where any throw would fail the window.
+        val created = runCatching { withContext(renderer.dispatcher) { renderer.createScene() } }.getOrElse { thrown ->
+            println("[mascot] scene failed to load, this mascot falls back to its stand-in: $thrown")
+            markFailed()
+            null
+        } ?: return
         // Back on the UI thread, where every write is made: attaching replays them in order, the
         // identity first, ahead of the first advance the frame loop queues. Every write wakes a
         // settled scene: a new value is something to animate toward.
@@ -73,25 +73,15 @@ class FrameMascotEntry private constructor(
         scene = created
     }
 
-    /** The scene, or null if the renderer could not make one; a cancelled load is not a failure. */
-    private fun bringUpScene(): RiveFrameScene? =
-        try {
-            renderer.createScene()
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (@Suppress("TooGenericExceptionCaught") failure: Throwable) {
-            reportSceneFailure("loading", failure)
-            null
-        }
-
     /**
      * The scene threw while being drawn - the browser's Rive binding, a frame's pixels, an already
      * released scene - and [RiveFrameSurface] has released it. The entry is failed, so the host
      * stops offering it and every surface of this agent draws its fallback.
+     *
+     * Internal because [FrameMascotHost] binds it as the surface's `onFailure`.
      */
-    fun markFailed() {
+    internal fun markFailed() {
         if (failed) return
-        println("[mascot] scene failed while drawing, this mascot falls back to its stand-in")
         scene = null
         failed = true
     }
@@ -119,12 +109,6 @@ class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
     private var cachedStills: MascotStills? = null
 
     override val available: Boolean get() = renderer.available
-
-    /**
-     * The renderer this host draws with. [ProvideFrameMascots] brings it up ahead of the host, and a
-     * test mounts the whole layer over a renderer of its own this way.
-     */
-    val riveRenderer: RiveFrameRenderer get() = renderer
 
     /** [agentId] is the entry's key (an agent's id, or a candidate's shape key - see MascotLive). */
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =

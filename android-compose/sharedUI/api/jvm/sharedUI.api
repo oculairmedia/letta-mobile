@@ -5716,7 +5716,6 @@ public final class com/letta/mobile/ui/mascot/frame/FrameMascotEntry : com/letta
 	public fun dispose ()V
 	public final fun getFailed ()Z
 	public final fun getScene ()Lcom/letta/mobile/ui/mascot/frame/RiveFrameScene;
-	public final fun markFailed ()V
 }
 
 public final class com/letta/mobile/ui/mascot/frame/FrameMascotHost : com/letta/mobile/ui/mascot/MascotHost {
@@ -5726,15 +5725,7 @@ public final class com/letta/mobile/ui/mascot/frame/FrameMascotHost : com/letta/
 	public final fun closeAll ()V
 	public fun entry (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
 	public fun getAvailable ()Z
-	public final fun getRiveRenderer ()Lcom/letta/mobile/ui/mascot/frame/RiveFrameRenderer;
 	public fun getStills ()Lcom/letta/mobile/ui/mascot/MascotStills;
-}
-
-public abstract class com/letta/mobile/ui/mascot/frame/PreparedFrameRenderer : com/letta/mobile/ui/mascot/frame/RiveFrameRenderer {
-	public static final field $stable I
-	public fun <init> ()V
-	protected abstract fun bringUp (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun prepare (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/ui/mascot/frame/ProvideFrameMascotsKt {

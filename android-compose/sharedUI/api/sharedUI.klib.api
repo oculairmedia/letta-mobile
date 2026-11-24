@@ -1686,13 +1686,6 @@ sealed interface com.letta.mobile.ui.shell.workspace/ShellWindowChrome { // com.
     }
 }
 
-abstract class com.letta.mobile.ui.mascot.frame/PreparedFrameRenderer : com.letta.mobile.ui.mascot.frame/RiveFrameRenderer { // com.letta.mobile.ui.mascot.frame/PreparedFrameRenderer|null[0]
-    constructor <init>() // com.letta.mobile.ui.mascot.frame/PreparedFrameRenderer.<init>|<init>(){}[0]
-
-    abstract suspend fun bringUp() // com.letta.mobile.ui.mascot.frame/PreparedFrameRenderer.bringUp|bringUp(){}[0]
-    final suspend fun prepare() // com.letta.mobile.ui.mascot.frame/PreparedFrameRenderer.prepare|prepare(){}[0]
-}
-
 abstract class com.letta.mobile.ui.mascot.frame/RiveFrameScene { // com.letta.mobile.ui.mascot.frame/RiveFrameScene|null[0]
     constructor <init>() // com.letta.mobile.ui.mascot.frame/RiveFrameScene.<init>|<init>(){}[0]
 
@@ -4797,7 +4790,6 @@ final class com.letta.mobile.ui.mascot.frame/FrameMascotEntry : com.letta.mobile
         final fun <get-scene>(): com.letta.mobile.ui.mascot.frame/RiveFrameScene? // com.letta.mobile.ui.mascot.frame/FrameMascotEntry.scene.<get-scene>|<get-scene>(){}[0]
 
     final fun dispose() // com.letta.mobile.ui.mascot.frame/FrameMascotEntry.dispose|dispose(){}[0]
-    final fun markFailed() // com.letta.mobile.ui.mascot.frame/FrameMascotEntry.markFailed|markFailed(){}[0]
 }
 
 final class com.letta.mobile.ui.mascot.frame/FrameMascotHost : com.letta.mobile.ui.mascot/MascotHost { // com.letta.mobile.ui.mascot.frame/FrameMascotHost|null[0]
@@ -4805,8 +4797,6 @@ final class com.letta.mobile.ui.mascot.frame/FrameMascotHost : com.letta.mobile.
 
     final val available // com.letta.mobile.ui.mascot.frame/FrameMascotHost.available|{}available[0]
         final fun <get-available>(): kotlin/Boolean // com.letta.mobile.ui.mascot.frame/FrameMascotHost.available.<get-available>|<get-available>(){}[0]
-    final val riveRenderer // com.letta.mobile.ui.mascot.frame/FrameMascotHost.riveRenderer|{}riveRenderer[0]
-        final fun <get-riveRenderer>(): com.letta.mobile.ui.mascot.frame/RiveFrameRenderer // com.letta.mobile.ui.mascot.frame/FrameMascotHost.riveRenderer.<get-riveRenderer>|<get-riveRenderer>(){}[0]
     final val stills // com.letta.mobile.ui.mascot.frame/FrameMascotHost.stills|{}stills[0]
         final fun <get-stills>(): com.letta.mobile.ui.mascot/MascotStills? // com.letta.mobile.ui.mascot.frame/FrameMascotHost.stills.<get-stills>|<get-stills>(){}[0]
 
@@ -13665,7 +13655,6 @@ final val com.letta.mobile.ui.markdown/com_letta_mobile_ui_markdown_StreamingMar
 final val com.letta.mobile.ui.markdown/com_letta_mobile_ui_markdown_StreamingMarkdownRenderPlan$stableprop // com.letta.mobile.ui.markdown/com_letta_mobile_ui_markdown_StreamingMarkdownRenderPlan$stableprop|#static{}com_letta_mobile_ui_markdown_StreamingMarkdownRenderPlan$stableprop[0]
 final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop|#static{}com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop[0]
 final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop|#static{}com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop[0]
-final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop|#static{}com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop[0]
 final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop|#static{}com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop[0]
 final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop|#static{}com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop[0]
 final val com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop|#static{}com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop[0]
@@ -14822,7 +14811,6 @@ final fun com.letta.mobile.ui.mascot.frame/ProvideFrameMascots(com.letta.mobile.
 final fun com.letta.mobile.ui.mascot.frame/RiveFrameSurface(com.letta.mobile.ui.mascot.frame/RiveFrameScene, kotlinx.coroutines/CoroutineDispatcher, androidx.compose.ui/Modifier?, kotlin/Boolean, kotlin/Function1<kotlin/Double, kotlin/Unit>?, com.letta.mobile.ui.mascot.frame/RiveOnionSkin?, kotlin/Function0<kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.mascot.frame/RiveFrameSurface|RiveFrameSurface(com.letta.mobile.ui.mascot.frame.RiveFrameScene;kotlinx.coroutines.CoroutineDispatcher;androidx.compose.ui.Modifier?;kotlin.Boolean;kotlin.Function1<kotlin.Double,kotlin.Unit>?;com.letta.mobile.ui.mascot.frame.RiveOnionSkin?;kotlin.Function0<kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop_getter|com_letta_mobile_ui_mascot_frame_FrameMascotEntry$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop_getter|com_letta_mobile_ui_mascot_frame_FrameMascotHost$stableprop_getter(){}[0]
-final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop_getter|com_letta_mobile_ui_mascot_frame_PreparedFrameRenderer$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop_getter|com_letta_mobile_ui_mascot_frame_RiveFrameScene$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop_getter|com_letta_mobile_ui_mascot_frame_RiveOnionSkin$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter|com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter(){}[0]

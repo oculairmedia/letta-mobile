@@ -37,10 +37,10 @@ import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 
 /**
- * letta-mobile-ckmub.17.20: a runtime failure while a live mascot draws must cost that mascot, never
- * the screen. Whatever the scene throws - a JS throw out of the browser's Rive binding, a frame
- * that cannot allocate its pixels, a scene the runtime already released - the mascot is failed and
- * its seat shows the orb stand-in; composition and every other mascot keep running. A cancelled
+ * A runtime failure while a live mascot draws must cost that mascot, never the screen. Whatever the
+ * scene throws - a JS throw out of the browser's Rive binding, a frame that cannot allocate its
+ * pixels, a scene the runtime already released - the surface ends its loop without the throw
+ * reaching the composition, the mascot is failed, and its seat shows the orb stand-in. A cancelled
  * frame loop stays cancelled: a surface leaving composition is not a broken mascot.
  */
 class RiveFrameFailureTest {
@@ -108,8 +108,8 @@ class RiveFrameFailureTest {
      * the host cannot draw the agent's mascot.
      */
     @Composable
-    private fun MascotWindow(host: FrameMascotHost) {
-        ProvideFrameMascots(host.riveRenderer, MascotIdentityRegistry()) {
+    private fun MascotWindow(renderer: RiveFrameRenderer) {
+        ProvideFrameMascots(renderer, MascotIdentityRegistry()) {
             MascotSeat(AGENT_ID, MascotStage.COMPOSER_COMPANION, MASCOT_SIZE, empty = ::seatStandIn)
         }
     }
@@ -126,36 +126,30 @@ class RiveFrameFailureTest {
     @Test
     fun aFrameThatThrowsFailsTheMascotOnceAndEndsTheLoop() = runTest {
         val scene = FailingScene(IllegalStateException("a JS throw"), FailsOn.RENDER)
-        val entry = FrameMascotEntry(SceneRenderer { scene }, identity)
-        entry.ensureLoaded()
         var failures = 0
 
         val outcome = runCatching {
-            guardFrameWork(scene, "drawing", onFailure = { failures++; entry.markFailed() }) { scene.renderImage(FRAME_SIZE) }
+            guardFrameWork(scene, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
         }
 
         assertIs<SceneFailure>(outcome.exceptionOrNull(), "the loop ends as a scene failure")
         assertEquals(1, failures, "the mascot is failed exactly once")
         assertTrue(scene.closed, "and its scene released")
-        assertTrue(entry.failed, "the entry stops being offered")
     }
 
     // Leaving composition cancels the frame loop; that is not a broken mascot, so nothing falls back.
     @Test
     fun aCancelledFrameIsNotAFailure() = runTest {
         val scene = FailingScene(CancellationException("the surface left composition"), FailsOn.RENDER)
-        val entry = FrameMascotEntry(SceneRenderer { scene }, identity)
-        entry.ensureLoaded()
         var failures = 0
 
         val outcome = runCatching {
-            guardFrameWork(scene, "drawing", onFailure = { failures++; entry.markFailed() }) { scene.renderImage(FRAME_SIZE) }
+            guardFrameWork(scene, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
         }
 
         assertIs<CancellationException>(outcome.exceptionOrNull(), "the cancellation propagates")
         assertFalse(outcome.exceptionOrNull() is SceneFailure, "and is not turned into a scene failure")
         assertEquals(0, failures, "a cancelled frame fails nothing")
-        assertFalse(entry.failed, "so the mascot is still drawable")
         assertFalse(scene.closed, "and its scene is left for the next surface")
     }
 
@@ -164,7 +158,7 @@ class RiveFrameFailureTest {
     fun aRendererThatCannotComeUpDrawsTheOrbInsteadOfCrashingTheWindow() = runComposeUiTest {
         listOf(IllegalStateException("the runtime did not load"), AssertionError("the wasm runtime trapped"))
             .forEach { failure ->
-                setContent { MascotWindow(FrameMascotHost(UnbringableRenderer(failure))) }
+                setContent { MascotWindow(UnbringableRenderer(failure)) }
                 waitForIdle()
                 assertEquals(1, orbsDrawn(), "a bring-up that fails with $failure keeps the seat on its orb")
             }
@@ -177,7 +171,7 @@ class RiveFrameFailureTest {
         listOf(IllegalStateException("no runtime"), AssertionError("wasm trap"), Error("out of memory"))
             .forEach { failure ->
                 val renderer = UnbringableRenderer(failure)
-                renderer.let { bringUpSafely(it) }
+                bringUpSafely(renderer)
                 assertFalse(renderer.available, "a bring-up that fails with $failure leaves the renderer unavailable")
             }
 
@@ -186,60 +180,27 @@ class RiveFrameFailureTest {
         assertIs<CancellationException>(escaped, "cancellation propagates out of the bring-up")
     }
 
-    // The same guarantee one level down: the web's renderer extends PreparedFrameRenderer, which
-    // absorbs its own bring-up failures so nothing reaches the effect that called it.
+    // What the host binds as the surface's onFailure: the real frame loop's guard ends that loop and
+    // reports it exactly once, so nothing reaches the composition. The surface that mounts the loop
+    // is covered end to end by aRendererThatCannotComeUpDrawsTheOrbInsteadOfCrashingTheWindow.
     @Test
-    fun aPreparedRendererAbsorbsItsBringUpFailure() = runTest {
-        var broughtUp = 0
-        val trapped = object : PreparedFrameRenderer() {
-            override val available = false
-            override val assetVersion: String get() = error("never available")
-            override val dispatcher: CoroutineDispatcher = Dispatchers.Unconfined
-            override val stillStore: MascotStillStore? = null
-            override suspend fun bringUp() {
-                broughtUp++
-                throw AssertionError("wasm trap")
-            }
-            override fun createScene(): RiveFrameScene = error("never available")
-            override fun encodePng(image: Image): ByteArray? = null
-        }
-        trapped.prepare()
+    fun aFailingFrameEndsTheSurfaceLoopInsteadOfTheComposition() = runTest {
+        val broken = FailingScene(Error("a wasm trap"), FailsOn.RENDER)
+        val renderer = SceneRenderer { broken }
+        val host = FrameMascotHost(renderer)
+        val entry = assertIs<FrameMascotEntry>(host.entry(AGENT_ID, identity))
+        entry.ensureLoaded()
+        val drawing = entry.scene ?: error("the entry brought no scene up")
+        var reported = 0
 
-        assertEquals(1, broughtUp, "the platform's bring-up ran")
-        assertFalse(trapped.available, "a bring-up that throws leaves the renderer unavailable")
+        // A frame's own scene work, as RiveFrameSurface runs it: advance and draw the scene.
+        val outward = runCatching {
+            guardFrameWork(drawing, onFailure = { reported++ }) { drawing.renderImage(FRAME_SIZE) }
+        }.exceptionOrNull()?.takeUnless { it is SceneFailure }
 
-        val cancelled = object : PreparedFrameRenderer() {
-            override val available = true
-            override val assetVersion: String get() = "test"
-            override val dispatcher: CoroutineDispatcher = Dispatchers.Unconfined
-            override val stillStore: MascotStillStore? = null
-            override suspend fun bringUp() = throw CancellationException("left composition")
-            override fun createScene(): RiveFrameScene = error("not in this test")
-            override fun encodePng(image: Image): ByteArray? = null
-        }
-        assertIs<CancellationException>(runCatching { cancelled.prepare() }.exceptionOrNull(), "a cancelled bring-up propagates")
-    }
-
-    // A failed mascot is no longer offered: the next surface to ask gets a new entry (and so a new
-    // scene) rather than a dead one, which is how a mascot recovers on its next mount.
-    @Test
-    fun aFailedMascotIsNoLongerOfferedAndTheNextMountGetsAFreshEntry() = runTest {
-        val broken = FailingScene(IllegalStateException("broken"), FailsOn.RENDER)
-        val fresh = FailingScene(IllegalStateException("never thrown"), FailsOn.RENDER)
-        val scenes = ArrayDeque(listOf<RiveFrameScene>(broken, fresh))
-        val host = FrameMascotHost(SceneRenderer { scenes.removeFirst() })
-
-        val first = assertIs<FrameMascotEntry>(host.entry(AGENT_ID, identity))
-        first.ensureLoaded()
-        val ended = runCatching {
-            guardFrameWork(broken, "drawing", onFailure = first::markFailed) { broken.renderImage(FRAME_SIZE) }
-        }
-        assertIs<SceneFailure>(ended.exceptionOrNull(), "the throw ended the frame loop")
-
-        assertTrue(first.failed, "the mascot is failed")
-        assertTrue(broken.closed, "and its scene released")
-        assertNull(host.entry(AGENT_ID, identity), "the failed mascot is no longer offered to any seat")
-        assertFalse(host.available.not(), "the renderer itself is still up: only this mascot failed")
+        assertNull(outward, "the frame loop ends the failure; nothing reaches the composition: $outward")
+        assertEquals(1, reported, "the surface reports the failed mascot once")
+        assertTrue(broken.closed, "and releases the scene it cannot draw")
     }
 
     private companion object {
@@ -247,7 +208,6 @@ class RiveFrameFailureTest {
         const val TEST_COLOR = 0xFF00AA88.toInt()
         const val ORB_TAG = "mascot-fallback-orb"
         val MASCOT_SIZE: Dp = 40.dp
-        const val FRAMES = 4
         val FRAME_SIZE: IntSize = IntSize(2, 2)
 
         fun blankImage(size: IntSize): Image {

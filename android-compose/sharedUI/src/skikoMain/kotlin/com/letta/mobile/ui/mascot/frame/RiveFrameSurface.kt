@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
@@ -112,7 +113,9 @@ private class RiveRenderTarget(
     private val markFailed: () -> Unit,
 ) {
     /** One frame of the scene as it stands; whichever live surface shares it advances it. */
-    suspend fun renderStill() = guardedRender("drawing") { slots.show(withContext(dispatcher) { scene.renderImage(size) }) }
+    suspend fun renderStill() = guardFrameWork(scene, markFailed) {
+        slots.show(withContext(dispatcher) { scene.renderImage(size) })
+    }
 
     /**
      * Advance (once per frame even when several surfaces share the scene) and render on the
@@ -120,7 +123,7 @@ private class RiveRenderTarget(
      * readback never run on the UI thread; a frame that takes longer than the vsync simply delays
      * the next one.
      */
-    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean) = guardedRender("drawing") {
+    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean) = guardFrameWork(scene, markFailed) {
         val (image, ghostImage) = withContext(dispatcher) {
             scene.advanceTo(now)
             val started = TimeSource.Monotonic.markNow()
@@ -132,10 +135,6 @@ private class RiveRenderTarget(
         slots.show(image)
         ghostImage
     }
-
-    /** [block], unless a frame of it fails: then the mascot is failed, the loop ends and nothing is drawn. */
-    private suspend fun <T> guardedRender(what: String, block: suspend () -> T): T =
-        guardFrameWork(scene, what, markFailed, block)
 }
 
 /**
@@ -184,48 +183,28 @@ private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
 }
 
 /**
- * Runs one piece of frame work on [scene], and if it throws anything but a cancellation, marks the
- * mascot failed ([onFailure] - the host stops offering the entry, so the surface stops asking for
- * frames and the seat draws its fallback) and ends the frame loop. The throw never leaves the
- * surface's effect: an exception out of a [LaunchedEffect] kills composition, and one dead mascot
- * must not cost the screen. A cancelled loop rethrows, because the surface left composition.
+ * Runs one piece of frame work on [scene]; if it fails with anything but a cancellation the mascot
+ * is failed ([onFailure] - the host stops offering the entry, so the seat draws its fallback) and
+ * this throws [SceneFailure] to end the frame loop.
+ *
+ * The failure never reaches the composition: an exception out of a [LaunchedEffect] fails it, and
+ * one dead mascot must not cost the screen.
  */
-internal suspend fun <T> guardFrameWork(scene: RiveFrameScene, what: String, onFailure: () -> Unit, block: suspend () -> T): T =
-    try {
-        block()
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (@Suppress("TooGenericExceptionCaught") failure: Throwable) {
-        reportSceneFailure(what, failure)
+internal suspend fun <T> guardFrameWork(scene: RiveFrameScene, onFailure: () -> Unit, block: suspend () -> T): T =
+    runCatchingCancellable(block).getOrElse { failure ->
+        println("[mascot] Rive scene failed while drawing, drawing the fallback: $failure")
         releaseFailedScene(scene)
         onFailure()
         throw SceneFailure(failure)
     }
 
 /**
- * A renderer's bring-up failed: one console line, and every mascot keeps drawing its fallback. The
- * catch site is a platform boundary - the wasm interop reports a failed JS call, and a wasm trap, as
- * a Throwable rather than an Exception - so it takes everything, and this is where it is handled.
- */
-internal fun reportBringUpFailure(failure: Throwable) {
-    println("[mascot] Rive renderer unavailable, drawing fallbacks: $failure")
-}
-
-/** A piece of frame work on a scene failed: one console line, and the mascot falls back to its stand-in. */
-internal fun reportSceneFailure(what: String, failure: Throwable) {
-    println("[mascot] Rive scene failed while $what, drawing the fallback: $failure")
-}
-
-/**
  * Releases the scene that failed. Closing is best effort: a runtime that already trapped throws
- * again, and that must not replace the failure the caller is about to report.
+ * again, and that must not replace the failure the caller is about to handle.
  */
-private fun releaseFailedScene(scene: RiveFrameScene) {
-    try {
-        scene.close()
-    } catch (@Suppress("TooGenericExceptionCaught") cleanupFailure: Throwable) {
-        println("[mascot] releasing the failed scene also threw: $cleanupFailure")
-    }
+private suspend fun releaseFailedScene(scene: RiveFrameScene) {
+    runCatchingCancellable { scene.close() }
+        .onFailure { println("[mascot] releasing the failed scene also threw: $it") }
 }
 
 /**
@@ -317,10 +296,9 @@ fun RiveFrameSurface(
         val target = RiveRenderTarget(scene, dispatcher, pinned, slots) { currentOnFailure.value() }
         try {
             if (playing) target.play(ring, currentOnion, onFrameStats, visible) else target.renderStill()
-        } catch (sceneFailed: SceneFailure) {
-            println("[mascot] a scene this surface drew cannot be drawn any more: ${sceneFailed.failure}")
-            // The mascot is already marked failed and its scene released; this surface has nothing
-            // left to draw and simply ends. Nothing reaches the composition's exception handler.
+        } catch (_: SceneFailure) {
+            // Marked failed and released already; this surface has nothing left to draw and simply
+            // ends. Guarded here so nothing reaches the composition's exception handler.
         }
     }
 
