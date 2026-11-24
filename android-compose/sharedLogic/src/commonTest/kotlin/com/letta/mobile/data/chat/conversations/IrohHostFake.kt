@@ -28,6 +28,7 @@ internal data class HostConversation(
     val agent: String?,
     val summary: String? = null,
     val archived: Boolean = false,
+    val hidden: Boolean = false,
     val lastMessageAt: String? = null,
     val tags: List<String> = emptyList(),
 ) {
@@ -36,6 +37,7 @@ internal data class HostConversation(
         put("agent_id", agent)
         summary?.let { put("summary", it) }
         put("archived", archived)
+        if (hidden) put("hidden", true)
         lastMessageAt?.let { put("last_message_at", it) }
         if (tags.isNotEmpty()) put("tags", JsonArray(tags.map(::JsonPrimitive)))
     }
@@ -64,6 +66,12 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
     /** Methods that fail, as a host does when it cannot do them. */
     val failing = mutableSetOf<String>()
 
+    /**
+     * Whether the host serves visible recents (`conversation.list` with `visible_only`). A host without a
+     * visibility index answers the contract's `no-index` refusal instead, as `ConversationAdminHandlers` does.
+     */
+    var servesRecents = false
+
     fun chatGateway(scope: CoroutineScope): ChatGateway = IrohAdminRpcChatGateway(AppServerClientChannel(this, scope))
 
     fun stored(id: String): HostConversation? = conversations.firstOrNull { it.id == id }
@@ -74,13 +82,18 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
         val params = command.params ?: JsonObject(emptyMap())
         methods += command.method
         calls += command.method to params
+        if (isRefusedRecentsRequest(command.method, params)) return unavailableRecents(command)
         if (command.method in failing) return failed(command, "${command.method} denied")
-        if (command.method == "conversation.list" && params["visible_only"] == JsonPrimitive(true)) {
-            return unavailableRecents(command)
-        }
         val result = answer(command.method, params) ?: return failed(command, "unknown ${command.method}")
         return AppServerInboundFrame.AdminRpcResponse(command.requestId, success = true, result = result)
     }
+
+    /**
+     * A host with no visibility index refuses the recents opt-in, as `visibleRecents` does without one: a
+     * refusal of that flag alone, never of the method, so an ordinary list still answers.
+     */
+    private fun isRefusedRecentsRequest(method: String, params: JsonObject): Boolean =
+        method == "conversation.list" && params["visible_only"] == JsonPrimitive(true) && !servesRecents
 
     private fun unavailableRecents(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
         val envelope = WireContractFixture(visibleRecentsContractText).response("no-index")
@@ -102,13 +115,24 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
         else -> null
     }
 
-    /** The App Server's list: the asked agent's (every row without one), after the cursor, a page at most. */
+    /**
+     * The App Server's list: the asked agent's rows after the cursor; a visible recents page is every visible,
+     * active row (`visible_only`), which is what `ConversationAdminHandlers.visibleRecents` answers.
+     */
     private fun listed(params: JsonObject): List<HostConversation> {
-        val agent = params.text("agent_id").takeIf(String::isNotEmpty)
-        val rows = conversations.filter { agent == null || it.agent == agent }
+        val visibleOnly = params["visible_only"] == JsonPrimitive(true)
+        // A visible recents page is the visible agents' rows only: agent-free worker transcripts and archived
+        // rows are what `visibleConversationPage` drops, and a row without an agent means the host ignored the flag.
+        val rows = if (visibleOnly) {
+            conversations.filterNot { it.archived || it.agent == null || it.hidden }
+        } else {
+            val agent = params.text("agent_id").takeIf(String::isNotEmpty)
+            conversations.filter { agent == null || it.agent == agent }
+        }
         val after = params.text("after").takeIf(String::isNotEmpty)
         val from = after?.let { id -> rows.indexOfFirst { it.id == id } + 1 } ?: 0
-        val limit = params.text("limit").toIntOrNull() ?: rows.size
+        // `pageOf` cuts every answer to the request's limit; a recents page defaults to its 30 rows.
+        val limit = params.text("limit").toIntOrNull() ?: if (visibleOnly) VISIBLE_PAGE_LIMIT else rows.size
         return rows.drop(from).take(limit)
     }
 
@@ -152,4 +176,7 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
 
 /** A param the host reads as text (the gateway sends some numbers as strings, others as numbers). */
 internal fun JsonObject.text(key: String): String = (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+/** `VisibleConversationPage.VISIBLE_PAGE_DEFAULT`: a recents page that names no limit. */
+private const val VISIBLE_PAGE_LIMIT = 30
 
