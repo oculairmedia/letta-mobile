@@ -23,10 +23,14 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.ui.components.foundation.LettaButtonIcon
 import com.letta.mobile.ui.components.foundation.LettaIconButton
+import com.letta.mobile.ui.theme.lettaPageGutter
+import com.letta.mobile.ui.host.PaneWindowClass
+import com.letta.mobile.ui.host.currentPaneWindowClass
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.shell.tokens.ShellDimens
 import com.letta.mobile.ui.host.LocalHostTitlesPage
@@ -162,13 +166,15 @@ private fun HeaderSearchAffordance(search: SearchSlot?, mode: HeaderSearchMode, 
 @Composable
 private fun RowScope.HeaderContent(title: HeaderTitle, controls: HeaderControls, searchAffordance: @Composable () -> Unit) {
     HeaderNavSlot(controls.nav)
+    // After a nav control the title keeps a small gap from it; with none it starts on the page gutter.
+    val titleStart = if (controls.nav == HeaderNav.None) 0.dp else LettaDimens.Space.xs
     if (title is HeaderTitle.Custom && title.fill) {
-        HeaderTitleSlot(title)
+        HeaderTitleSlot(title, titleStart)
     } else {
         // The title at the start of the free width, so the search and actions sit at the end; on
         // desktop the free width is the window's drag lane.
         Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
-            Row(verticalAlignment = Alignment.CenterVertically) { HeaderTitleSlot(title) }
+            Row(verticalAlignment = Alignment.CenterVertically) { HeaderTitleSlot(title, titleStart) }
         }
     }
     searchAffordance()
@@ -178,7 +184,8 @@ private fun RowScope.HeaderContent(title: HeaderTitle, controls: HeaderControls,
 @Composable
 private fun RowScope.HeaderNavSlot(nav: HeaderNav) {
     when (nav) {
-        HeaderNav.None -> Box(Modifier.width(LettaDimens.Space.lg))
+        // No leading control: the title starts where the page's content does, on the shared page gutter.
+        HeaderNav.None -> Box(Modifier.width(lettaPageGutter(currentPaneWindowClass() == PaneWindowClass.Wide)))
         is HeaderNav.Back -> HeaderIconButton(LettaIcons.ArrowBack, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
         is HeaderNav.Menu -> HeaderIconButton(LettaIcons.Menu, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
         is HeaderNav.Close -> HeaderIconButton(LettaIcons.Close, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
@@ -187,10 +194,10 @@ private fun RowScope.HeaderNavSlot(nav: HeaderNav) {
 }
 
 @Composable
-private fun RowScope.HeaderTitleSlot(title: HeaderTitle) {
+private fun RowScope.HeaderTitleSlot(title: HeaderTitle, start: Dp) {
     when (title) {
         HeaderTitle.None -> Unit
-        is HeaderTitle.Text -> Column(Modifier.weight(1f, fill = false).padding(horizontal = LettaDimens.Space.xs)) {
+        is HeaderTitle.Text -> Column(Modifier.weight(1f, fill = false).padding(start = start, end = LettaDimens.Space.xs)) {
             Text(
                 text = title.title,
                 style = MaterialTheme.typography.titleLarge,

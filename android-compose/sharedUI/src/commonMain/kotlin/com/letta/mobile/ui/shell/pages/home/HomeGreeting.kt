@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
@@ -140,7 +141,12 @@ private fun GreetingText(cast: GreetingCast, options: HomeGreetingOptions) {
         cast.agents.map { GreetingStatusAgent(it.name, registry.greetingMood(AgentId(it.id)), cast.updatesToday[it.id] ?: 0) },
     )
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Text(greetingLine(hour), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag(HomeGreetingTags.LINE))
+        // The line opens the page, so it is the page's heading (Home draws no title above it).
+        Text(
+            greetingLine(hour),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() }.testTag(HomeGreetingTags.LINE),
+        )
         Text(
             status,
             style = MaterialTheme.typography.bodyMedium,

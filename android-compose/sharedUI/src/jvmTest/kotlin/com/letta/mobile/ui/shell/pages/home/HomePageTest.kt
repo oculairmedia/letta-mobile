@@ -13,6 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -209,6 +213,34 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.pin(toolsPin)).assertDoesNotExist()
         assertEquals(1, onAllNodesWithText("12").fetchSemanticsNodes().size, "the Tools figure appears once, in the strip")
         onNodeWithText("Scout · Booked the train").assertExists()
+    }
+
+    /** With its greeting Home draws no "Home" heading: the greeting line is the heading, the page keeps its name. */
+    @Test
+    fun theGreetingReplacesTheHomeHeading() = listOf(WIDE, COMPACT).forEach { width ->
+        runComposeUiTest {
+            show(baseState(), HomePageOptions(greeting = HomeGreetingOptions(hour = 9)), width)
+            onNodeWithText("Home").assertDoesNotExist()
+            onNodeWithTag(HomePageTags.SEARCH).assertExists()
+            onNodeWithTag(HomeGreetingTags.LINE).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+            onNodeWithTag(HomePageTags.PAGE).assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Home"))
+        }
+    }
+
+    /** A greeting drops the title, never the host's header actions: on a phone without search the action row still shows. */
+    @Test
+    fun theGreetingKeepsTheHostsHeaderActionsOnCompact() = runComposeUiTest {
+        show(
+            baseState(),
+            HomePageOptions(
+                greeting = HomeGreetingOptions(hour = 9),
+                showSearch = false,
+                headerActions = { androidx.compose.material3.Text("Act", Modifier.testTag("home-test-action")) },
+            ),
+            COMPACT,
+        )
+        onNodeWithText("Home").assertDoesNotExist()
+        onNodeWithTag("home-test-action").assertExists()
     }
 
     /** A window header that already names the page (the compact desktop title bar) leaves Home untitled. */

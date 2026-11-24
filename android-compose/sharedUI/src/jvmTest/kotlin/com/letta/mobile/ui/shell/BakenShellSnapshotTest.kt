@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,9 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
@@ -51,6 +57,27 @@ import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.surface.timeline.rows.RenderRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.message
 import com.letta.mobile.ui.chat.surface.timeline.rows.single
+import com.letta.mobile.data.home.FleetAgentStat
+import com.letta.mobile.data.home.FleetOverview
+import com.letta.mobile.data.home.FleetSortKey
+import com.letta.mobile.data.home.FleetSummary
+import com.letta.mobile.data.home.HomePageReducer
+import com.letta.mobile.data.home.HomeStats
+import com.letta.mobile.data.home.HomePageActions
+import com.letta.mobile.data.home.HomePageState
+import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.ui.components.LETTA_PAGE_TITLE_TAG
+import com.letta.mobile.ui.shell.header.ShellHeaderDefaults
+import com.letta.mobile.ui.shell.header.ShellHeaderTags
+import com.letta.mobile.ui.shell.pages.home.HomeGreetingOptions
+import com.letta.mobile.ui.shell.pages.home.HomeGreetingTags
+import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
+import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
+import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import com.letta.mobile.ui.shell.workspace.ShellMinimalHeader
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeader
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
@@ -62,6 +89,7 @@ import com.letta.mobile.ui.theme.SharedMaterialTheme
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -209,6 +237,46 @@ class BakenShellSnapshotTest {
     @Test
     fun shellInBothThemes() = listOf(true, false).forEach(::snapshot)
 
+    /**
+     * The phone's Home under its minimal header: no "Home" heading (the greeting opens the page and is its
+     * heading), the bar's "Baken" starts on the same edge as the greeting, and the lineup spans the page.
+     */
+    @Test
+    fun homeAtPhoneWidthLinesTheBarTitleUpWithThePage() = runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+        setContent {
+            SharedMaterialTheme(darkTheme = true) {
+                ProvideLettaHost(LettaHost.Touch) {
+                    Column(Modifier.size(PHONE_WIDTH.dp, PHONE_HEIGHT.dp).background(MaterialTheme.colorScheme.background).testTag(FRAME)) {
+                        // Bounded to the phone app bar, as every host bounds it: its free width fills its height.
+                        ShellWorkspaceHeader(
+                            ShellWorkspaceHeaderState(minimal = ShellMinimalHeader(identity = null, onOpenNavigation = {})),
+                            Modifier.height(ShellHeaderDefaults.TouchMinHeight),
+                        )
+                        HomePage(
+                            modifier = Modifier.weight(1f),
+                            state = threeAgentHome(),
+                            callbacks = HomePageCallbacks(
+                                InertSnapshotHome,
+                                HomePageNavigation(onSubmitPrompt = {}, onOpenConversation = {}, onOpenAgent = {}, onOpenShortcut = {}),
+                            ),
+                            options = HomePageOptions(showSearch = false, touch = true, greeting = HomeGreetingOptions(hour = AFTERNOON)),
+                        )
+                    }
+                }
+            }
+        }
+        waitForIdle()
+        val bar = onNodeWithTag(ShellHeaderTags.TITLE).getUnclippedBoundsInRoot().left
+        val greeting = onNodeWithTag(HomeGreetingTags.LINE).getUnclippedBoundsInRoot().left
+        assertEquals(greeting.value, bar.value, EDGE_TOLERANCE, "bar title at $bar, greeting at $greeting")
+        onNodeWithTag(LETTA_PAGE_TITLE_TAG).assertDoesNotExist()
+        onNodeWithText("Home").assertDoesNotExist()
+        onNodeWithTag(HomeGreetingTags.LINE).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val out = File("build/baken-shell-snapshots").apply { mkdirs() }.resolve("home-phone-dark.png")
+        ImageIO.write(onNodeWithTag(FRAME).captureToImage().toAwtImage(), "png", out)
+        assertTrue(out.length() > 0)
+    }
+
     @Test
     fun chatInBothThemes() = listOf(true, false).forEach(::chatSnapshot)
 
@@ -223,5 +291,31 @@ class BakenShellSnapshotTest {
         const val SHEET_HEIGHT = 660
         const val CHAT_WIDTH = 520
         const val CHAT_HEIGHT = 320
+        const val PHONE_WIDTH = 411
+        const val PHONE_HEIGHT = 640
+        const val AFTERNOON = 15
+        const val EDGE_TOLERANCE = 0.5f
+    }
+
+    /** Home with three agents: fewer than a phone's stage holds, so the lineup has width to share. */
+    private fun threeAgentHome(): HomePageState {
+        val agents = listOf("Scout", "Planner", "Archivist").mapIndexed { index, name ->
+            FleetAgentStat(
+                agentId = "a-$index", name = name, model = "openai/gpt-5", conversationCount = 3,
+                lastActivity = null, running = false, activityByDay = emptyList(),
+            )
+        }
+        val fleet = FleetOverview(summary = FleetSummary(totalAgents = agents.size), agents = agents, recent = emptyList())
+        return HomePageReducer.withStats(HomePageReducer.withFleet(HomePageState(), fleet), HomeStats(loading = false))
+    }
+
+    private object InertSnapshotHome : HomePageActions {
+        override fun refresh() = Unit
+        override fun updateSearchQuery(query: String) = Unit
+        override fun clearSearch() = Unit
+        override fun selectSort(key: FleetSortKey) = Unit
+        override fun reorderPins(keys: List<String>) = Unit
+        override fun setShortcutPinned(shortcut: HomeShortcut, pinned: Boolean) = Unit
+        override fun setAgentPinned(agentId: String, pinned: Boolean) = Unit
     }
 }

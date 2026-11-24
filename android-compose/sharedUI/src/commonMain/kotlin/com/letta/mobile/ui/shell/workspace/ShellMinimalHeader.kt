@@ -4,6 +4,7 @@ import com.letta.mobile.brand.Brand
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +17,8 @@ import com.letta.mobile.sharedui.resources.shell_open_navigation
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LocalPaneWindowClass
+import com.letta.mobile.ui.host.PaneWindowClass
 import com.letta.mobile.ui.host.ProvideLettaIdiom
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.header.HeaderAction
@@ -46,16 +49,19 @@ internal fun ShellMinimalWorkspaceHeader(
     modifier: Modifier = Modifier,
 ) {
     // The minimal header is the compact window's: hoisted into a desktop title bar it sits outside
-    // the workspace's idiom, so it resolves the same rule itself (ckmub.17.36).
-    ProvideLettaIdiom(compact = true) {
-        ShellHeader(
-            title = minimal.identity
-                ?.let { identity -> HeaderTitle.Custom { AgentIdentityPill(identity) } }
-                ?: HeaderTitle.Text(title ?: Brand.NAME),
-            modifier = modifier,
-            search = search,
-            controls = HeaderControls(actions = listOf(HeaderAction.Custom { ShellDrawerMenuButton(minimal.onOpenNavigation) })),
-        )
+    // the workspace's idiom and window class, so it resolves the same rules itself (ckmub.17.36), and
+    // its title takes the compact page's gutter even over a wide window's phone preview.
+    CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) {
+        ProvideLettaIdiom(compact = true) {
+            ShellHeader(
+                title = minimal.identity
+                    ?.let { identity -> HeaderTitle.Custom { AgentIdentityPill(identity) } }
+                    ?: HeaderTitle.Text(title ?: Brand.NAME),
+                modifier = modifier,
+                search = search,
+                controls = HeaderControls(actions = listOf(HeaderAction.Custom { ShellDrawerMenuButton(minimal.onOpenNavigation) })),
+            )
+        }
     }
 }
 

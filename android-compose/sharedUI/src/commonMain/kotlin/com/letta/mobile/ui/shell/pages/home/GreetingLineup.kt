@@ -23,31 +23,52 @@ internal data class LineupSpot(
 )
 
 /**
- * The greeting's lineup: the members in order, bodies almost shoulder to shoulder (a step of overlap
- * to a step of gap), each its own size, height and tilt, all read from its id so the crew stands the
- * same way every visit. A busy member stands a size bigger, a little lower and in front. As many as
- * fit in [stageWidth] are placed, from the stage's start; [huddled] closes every gap by two steps.
+ * The greeting's lineup: the members in order, each its own size, height, tilt and step of gap (a
+ * step of overlap to a step of gap), all read from its id so the crew stands the same way every
+ * visit. A busy member stands a size bigger, a little lower and in front. As many as fit in
+ * [stageWidth] packed shoulder to shoulder are placed; the width they leave is then shared evenly
+ * between them, so the first body stands at the stage's start and the last at its end (a lone member
+ * stays at the start). [huddled] closes every gap by two steps and draws the row in to the middle.
  */
 internal fun greetingLineup(members: List<LineupMember>, stageWidth: Dp, huddled: Boolean = false): List<LineupSpot> {
-    val spots = mutableListOf<LineupSpot>()
-    var bodyRight = 0.dp
-    for (member in members) {
-        val trait = LineupTrait.of(member)
-        val body = trait.size * ShellDimens.homeLineupBodyShare
-        val bodyLeft = if (spots.isEmpty()) 0.dp else bodyRight + trait.gap - if (huddled) ShellDimens.homeLineupNudge * 2 else 0.dp
-        if (bodyLeft + body > stageWidth) break
-        spots += LineupSpot(
-            id = member.id,
-            x = bodyLeft - (trait.size - body) / 2,
+    val packed = packLineup(members, stageWidth)
+    if (packed.isEmpty()) return emptyList()
+    val joins = packed.size - 1
+    val spread = if (joins == 0) 0.dp else (stageWidth - packed.last().bodyRight) / joins
+    val huddle = if (huddled) ShellDimens.homeLineupNudge * 2 else 0.dp
+    // The huddle takes the same amount off every gap, then centres the shorter row on the stage.
+    val inset = huddle * joins / 2
+    return packed.mapIndexed { index, placed ->
+        val bodyLeft = placed.bodyLeft + (spread - huddle) * index + inset
+        val trait = placed.trait
+        LineupSpot(
+            id = placed.member.id,
+            x = bodyLeft - (trait.size - placed.body) / 2,
             lift = trait.lift,
             size = trait.size,
             tilt = trait.tilt,
-            front = member.busy,
-            mark = member.mark,
+            front = placed.member.busy,
+            mark = placed.member.mark,
         )
-        bodyRight = bodyLeft + body
     }
-    return spots
+}
+
+/** One member packed shoulder to shoulder from the stage's start: its body's left edge and width. */
+private class PackedMember(val member: LineupMember, val trait: LineupTrait, val bodyLeft: Dp, val body: Dp) {
+    val bodyRight: Dp get() = bodyLeft + body
+}
+
+/** The members, each at its own step of gap from the last, as many as fit in [stageWidth]. */
+private fun packLineup(members: List<LineupMember>, stageWidth: Dp): List<PackedMember> {
+    val packed = mutableListOf<PackedMember>()
+    for (member in members) {
+        val trait = LineupTrait.of(member)
+        val body = trait.size * ShellDimens.homeLineupBodyShare
+        val bodyLeft = packed.lastOrNull()?.let { it.bodyRight + trait.gap } ?: 0.dp
+        if (bodyLeft + body > stageWidth) break
+        packed += PackedMember(member, trait, bodyLeft, body)
+    }
+    return packed
 }
 
 /** The stage's height: the largest tile, with room for the lift either way. */

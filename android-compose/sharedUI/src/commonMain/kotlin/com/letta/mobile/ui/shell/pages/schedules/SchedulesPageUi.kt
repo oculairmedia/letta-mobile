@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
-import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.theme.lettaPageGutter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
