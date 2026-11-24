@@ -125,7 +125,6 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/PairingVie
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/PendingPairLink.kt 23
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/plugins/AndroidPluginPackagePicker.kt 69
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/systemaccess/SystemAccessDashboardViewModel.kt 116
-android-compose/app/src/main/java/com/letta/mobile/ui/tags/TagDrillInViewModel.kt 176
 android-compose/app/src/release/java/com/letta/mobile/ProfileCaptureKeyguardHelper.kt 29
 android-compose/app/src/release/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt 85
 android-compose/app/src/release/java/com/letta/mobile/performance/DebugPerformanceMonitor.kt 7

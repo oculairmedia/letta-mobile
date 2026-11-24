@@ -84,13 +84,6 @@
     <string name="common_hide">Hide</string>
     <string name="common_created">Created</string>
     <string name="common_unknown">Unknown</string>
-    <string name="screen_tag_drill_in_title">Tagged “%1$s”</string>
-    <string name="screen_tag_drill_in_loading">Loading tagged items…</string>
-    <string name="screen_tag_drill_in_empty">No other tagged items found.</string>
-    <string name="screen_tag_drill_in_agents_section">Agents</string>
-    <string name="screen_tag_drill_in_tools_section">Tools</string>
-    <string name="screen_tag_drill_in_templates_section">Starter agents</string>
-    <string name="screen_tag_drill_in_steps_section">Run steps</string>
     <string name="screen_chat_title">Agent Chat</string>
     <string name="screen_project_chat_path_label">Path</string>
     <string name="screen_project_chat_git_url_label">Git URL</string>

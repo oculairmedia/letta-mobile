@@ -34,9 +34,6 @@ val VoiceWavePalette: List<Color> = listOf(
  */
 const val GLOW_EDGE_ALPHA: Float = 0f
 
-/** AdaptiveDialog: widest the floating dialog grows on a large screen. */
-val AdaptiveDialogMaxWidth: Dp = 900.dp
-
 /** MathBlock: minimum height of a display-mode equation while KaTeX lays it out. */
 val MathDisplayMinHeight: Dp = 60.dp
 

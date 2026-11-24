@@ -25,7 +25,6 @@
     <ID>LongMethod:MobileActionRegistry.kt$AndroidMobileActionCapabilityProvider$override fun capabilities(): List&lt;MobileActionCapability&gt;</ID>
     <ID>LongMethod:MobileIntentActionTool.kt$MobileIntentActionTool$private fun handleIntent( toolName: String, dryRun: Boolean, userActionRequired: Boolean, buildIntent: () -&gt; Intent, ): MobileIntentActionResponse</ID>
     <ID>LongMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
-    <ID>LongMethod:TagDrillInDialog.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun TagDrillInItemCard(item: TagDrillInItem)</ID>
     <ID>LongMethod:TelemetryScreen.kt$@Composable private fun TelemetryEventRow(ev: Telemetry.Event)</ID>
     <ID>MatchingDeclarationName:AgentEditorScreen.kt$AgentEditorNavigation</ID>
     <ID>MatchingDeclarationName:AppStartDestination.kt$AppStartInputs</ID>
@@ -213,7 +212,6 @@
     <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertNotNull</ID>
     <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertTrue</ID>
     <ID>UnusedImports:ScheduleListViewModelTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
-    <ID>UnusedImports:TagDrillInDialog.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:TelemetryScreen.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:TelemetryScreen.kt$import androidx.compose.ui.unit.sp</ID>
     <ID>UnusedPrivateMember:AboutScreen.kt$@PreviewLightDark @Composable private fun AboutHeaderPreview()</ID>
