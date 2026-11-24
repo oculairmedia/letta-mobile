@@ -7,7 +7,6 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.SessionRouteMatrix
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.RunListParams
@@ -99,14 +98,13 @@ class AndroidSessionRouteMatrixTest {
         settings: FakeSettingsRepository,
     ): Any? = when (route) {
         SessionRoute.AGENTS -> graph.agentRepository.listAgentSummaries()
-        SessionRoute.BLOCKS, SessionRoute.CONVERSATION_RECOMPILE, SessionRoute.STEPS, SessionRoute.VIBESYNC ->
+        SessionRoute.BLOCKS, SessionRoute.CONVERSATION_RECOMPILE, SessionRoute.PASSAGES, SessionRoute.PROJECT_WORK,
+        SessionRoute.STEPS, SessionRoute.VIBESYNC ->
             probeOptional(route, graph)
         SessionRoute.CONVERSATIONS -> graph.allConversationsRepository.refresh()
         SessionRoute.MCP_SERVERS -> graph.mcpServerRepository.refreshServers()
         SessionRoute.MODELS -> graph.modelRepository.refreshLlmModels()
-        SessionRoute.PASSAGES -> graph.passageRepository.refreshPassages(AgentId(AGENT))
         SessionRoute.PROJECTS -> graph.projectRepository.refreshProjects()
-        SessionRoute.PROJECT_WORK -> graph.projectWorkRepository.refreshReadyWork("project-1")
         SessionRoute.PROVIDERS -> graph.providerRepository.refreshProviders()
         SessionRoute.RUNS -> graph.runRepository.refreshRuns(RunListParams())
         SessionRoute.SCHEDULES -> graph.scheduleRepository.refreshSchedules(AGENT)
@@ -121,8 +119,11 @@ class AndroidSessionRouteMatrixTest {
         SessionRoute.CONVERSATION_RECOMPILE ->
             graph.conversationRepository.canRecompileConversations().takeIf { it } ?: unserved(route)
         SessionRoute.STEPS -> graph.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
-        // No backend carries the VibeSync stream: the graph binds a source that always says so.
-        else -> unserved(route)
+        // letta-mobile-ckmub.6.4: the archival-passage, project-work and VibeSync event-stream
+        // repositories were deleted (no screen or controller read them), so these routes stay unbound
+        // on every backend kind and this probe keeps them in the exhaustive `when`.
+        SessionRoute.PASSAGES, SessionRoute.PROJECT_WORK, SessionRoute.VIBESYNC -> unserved(route)
+        else -> error("$route is probed by probe()")
     }
 
     private fun unserved(route: SessionRoute): Nothing = throw AppServerRouteUnavailable(route, "probe")

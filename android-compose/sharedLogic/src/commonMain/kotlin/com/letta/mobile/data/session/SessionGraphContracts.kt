@@ -11,9 +11,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IProjectRepository
-import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -21,7 +19,6 @@ import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,9 +54,7 @@ interface SessionRepositoryGraph {
     val cronRepository: ICronRepository
     val mcpServerRepository: IMcpServerRepository
     val modelRepository: IModelRepository
-    val passageRepository: IPassageRepository
     val projectRepository: IProjectRepository
-    val projectWorkRepository: IProjectWorkRepository
     val runRepository: IRunRepository
     val providerRepository: IProviderRepository
     val scheduleRepository: IScheduleRepository
@@ -67,7 +62,6 @@ interface SessionRepositoryGraph {
     val stepRepository: IStepRepository
     val subagentRepository: ISubagentRepository
     val toolRepository: IToolRepository
-    val vibesyncEventStreamRepository: IVibesyncEventStreamRepository
 
     /**
      * Which optional routes this graph serves. A repository for a route it

@@ -64,10 +64,7 @@ class SessionManagerTest {
         val secondGraph = sessionManager.current
         assertNotEquals(System.identityHashCode(firstGraph.channelTransport), System.identityHashCode(secondGraph.channelTransport))
         assertNotEquals(System.identityHashCode(firstGraph.cronRepository), System.identityHashCode(secondGraph.cronRepository))
-        assertNotEquals(
-            System.identityHashCode(firstGraph.vibesyncEventStreamRepository),
-            System.identityHashCode(secondGraph.vibesyncEventStreamRepository),
-        )
+        assertNotEquals(System.identityHashCode(firstGraph.stepRepository), System.identityHashCode(secondGraph.stepRepository))
     }
 
     @Test

@@ -10,9 +10,7 @@ import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
-import com.letta.mobile.testutil.FakePassageApi
 import com.letta.mobile.testutil.FakeProjectApi
-import com.letta.mobile.testutil.FakeProjectWorkApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
@@ -108,9 +106,7 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var conversationDao: dagger.Lazy<ConversationDao> = lazyOf(FakeConversationDao()),
     var mcpServerApi: FakeMcpServerApi = FakeMcpServerApi(),
     var modelApi: FakeModelApi = FakeModelApi(),
-    var passageApi: FakePassageApi = FakePassageApi(),
     var projectApi: FakeProjectApi = FakeProjectApi(),
-    var projectWorkApi: FakeProjectWorkApi = FakeProjectWorkApi(),
     var runApi: FakeRunApi = FakeRunApi(),
     var providerApi: FakeProviderApi = FakeProviderApi(),
     var scheduleApi: FakeScheduleApi = FakeScheduleApi(),
@@ -132,16 +128,16 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     private fun remoteSources() = SessionRemoteSources(
         agents = agentApi.bound(),
         conversations = conversationApi.bound(),
-        mcpServers = mcpServerApi.bound(),
-        models = modelApi.bound(),
-        passages = passageApi.bound(),
-        projects = projectApi.bound(),
-        projectWork = projectWorkApi.bound(),
-        providers = providerApi.bound(),
-        runs = runApi.bound(),
+        admin = SessionAdminRemoteSources(
+            mcpServers = mcpServerApi.bound(),
+            models = modelApi.bound(),
+            projects = projectApi.bound(),
+            providers = providerApi.bound(),
+            runs = runApi.bound(),
+            tools = toolApi.bound(),
+        ),
         schedules = scheduleApi.bound(),
         steps = stepApi.bound(),
-        tools = toolApi.bound(),
     )
 
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(

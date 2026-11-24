@@ -11,9 +11,7 @@ import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
-import com.letta.mobile.testutil.FakePassageApi
 import com.letta.mobile.testutil.FakeProjectApi
-import com.letta.mobile.testutil.FakeProjectWorkApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi

@@ -29,9 +29,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IProjectRepository
-import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -39,7 +37,6 @@ import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.FakeIrohAdminTransport
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
@@ -252,15 +249,12 @@ class SessionHomePageSourceTest {
         override val cronRepository: ICronRepository get() = unused()
         override val mcpServerRepository: IMcpServerRepository get() = unused()
         override val modelRepository: IModelRepository get() = unused()
-        override val passageRepository: IPassageRepository get() = unused()
         override val projectRepository: IProjectRepository get() = unused()
-        override val projectWorkRepository: IProjectWorkRepository get() = unused()
         override val providerRepository: IProviderRepository get() = unused()
         override val scheduleRepository: IScheduleRepository get() = unused()
         override val selfTodoRepository: ISelfTodoRepository get() = unused()
         override val stepRepository: IStepRepository get() = unused()
         override val subagentRepository: ISubagentRepository get() = unused()
-        override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository get() = unused()
 
         override fun close() = Unit
 

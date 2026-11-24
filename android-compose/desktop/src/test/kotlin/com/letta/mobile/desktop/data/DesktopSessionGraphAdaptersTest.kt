@@ -7,7 +7,6 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.chat.runtime.BackendConfigStore
 import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.ServerHealthState
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.CachedBlockRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -125,7 +124,6 @@ class DesktopSessionGraphAdaptersTest {
         )
 
         assertIs<com.letta.mobile.data.repository.CronRepository>(graph.cronRepository)
-        assertUnserved(SessionRoute.PASSAGES) { graph.passageRepository.searchArchival(AgentId("agent-1"), "query") }
         graph.close()
     }
 

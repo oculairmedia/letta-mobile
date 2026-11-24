@@ -37,7 +37,6 @@ android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Le
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/LlmConfig.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Model.kt 11
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Message.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Message.kt 1117
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Message.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/MessageBatch.kt 7
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt 23
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Provider.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Provider.kt 6
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Step.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Step.kt 6
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/provider/ProviderManagementDomain.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/provider/wire/ProviderMutationWireModels.kt 6

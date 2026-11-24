@@ -149,7 +149,7 @@ class SessionScopedBackendSwitchCharacterizationTest {
         advanceUntilIdle()
 
         assertTrue(result.failures.toString(), result.allSucceeded)
-        assertEquals(4, result.successes)
+        assertEquals(3, result.successes)
         assertTrue(h.bound.agents.agents.value.isEmpty())
         assertTrue(h.bound.conversations.getCachedConversations(AgentId("agent-1")).isEmpty())
         assertTrue(h.bound.allConversations.conversations.value.isEmpty())

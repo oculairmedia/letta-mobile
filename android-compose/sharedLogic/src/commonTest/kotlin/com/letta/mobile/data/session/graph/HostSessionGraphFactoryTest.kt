@@ -99,29 +99,27 @@ class HostSessionGraphFactoryTest {
         val host = adapters.hostRepositories()
         return when (route) {
             SessionRoute.AGENTS -> host.agentRepository.refreshAgents()
-            SessionRoute.BLOCKS -> host.blockRepository?.getBlocks(AGENT) ?: unserved(route)
+            SessionRoute.BLOCKS -> host.admin.blockRepository?.getBlocks(AGENT) ?: unserved(route)
             SessionRoute.CONVERSATIONS -> host.conversationRepository.getCachedConversations(AgentId(AGENT))
             SessionRoute.CONVERSATION_RECOMPILE ->
                 host.conversationRepository.canRecompileConversations().takeIf { it } ?: unserved(route)
             SessionRoute.SKILLS -> adapters.servesIrohRelays.takeIf { it } ?: unserved(route)
             SessionRoute.STEPS -> host.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
-            SessionRoute.VIBESYNC -> host.vibesyncEventStreamRepository.start()
+            SessionRoute.PASSAGES, SessionRoute.PROJECT_WORK, SessionRoute.VIBESYNC -> unserved(route)
             else -> probeAdmin(route, host)
         }
     }
 
-    /** The admin, schedule and project-work routes: one refresh each. */
+    /** The admin and schedule routes: one refresh each. */
     private suspend fun probeAdmin(route: SessionRoute, host: HostSessionRepositories): Any? {
         return when (route) {
-            SessionRoute.MCP_SERVERS -> host.mcpServerRepository.refreshServers()
-            SessionRoute.MODELS -> host.modelRepository.refreshLlmModels()
-            SessionRoute.PASSAGES -> host.passageRepository.refreshPassages(AgentId(AGENT))
-            SessionRoute.PROJECTS -> host.projectRepository.refreshProjects()
-            SessionRoute.PROJECT_WORK -> host.projectWorkRepository.refreshReadyWork("project-1")
-            SessionRoute.PROVIDERS -> host.providerRepository.refreshProviders()
-            SessionRoute.RUNS -> host.runRepository.refreshRuns(RunListParams())
+            SessionRoute.MCP_SERVERS -> host.admin.mcpServerRepository.refreshServers()
+            SessionRoute.MODELS -> host.admin.modelRepository.refreshLlmModels()
+            SessionRoute.PROJECTS -> host.admin.projectRepository.refreshProjects()
+            SessionRoute.PROVIDERS -> host.admin.providerRepository.refreshProviders()
+            SessionRoute.RUNS -> host.admin.runRepository.refreshRuns(RunListParams())
             SessionRoute.SCHEDULES -> host.scheduleRepository.refreshSchedules(AGENT)
-            SessionRoute.TOOLS -> host.toolRepository.refreshTools()
+            SessionRoute.TOOLS -> host.admin.toolRepository.refreshTools()
             else -> error("$route is probed by probe()")
         }
     }
