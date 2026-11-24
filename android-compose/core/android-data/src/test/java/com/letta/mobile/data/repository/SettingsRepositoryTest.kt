@@ -411,6 +411,21 @@ class SettingsRepositoryTest {
         assertEquals(false, dynamicColor)
     }
 
+    /**
+     * The Baken palette is the default on every Android version: the default is not gated on the SDK level, so
+     * wallpaper colours (Material You) never switch on by themselves. Read from the source, since a plain JVM test
+     * cannot change Build.VERSION.SDK_INT.
+     */
+    @Test
+    fun `dynamic color default does not depend on the Android version`() {
+        val source = java.io.File(
+            requireNotNull(System.getProperty("user.dir")),
+            "src/main/java/com/letta/mobile/data/repository/SettingsRepository.kt",
+        ).readText()
+        val line = source.lineSequence().single { "defaultDynamicColorWhenPresetUnset" in it }
+        assertEquals("defaultDynamicColorWhenPresetUnset = false,", line.trim())
+    }
+
     @Test
     fun `setDynamicColor persists selection`() = runTest {
         val onHost = repositoryOnARealHost()

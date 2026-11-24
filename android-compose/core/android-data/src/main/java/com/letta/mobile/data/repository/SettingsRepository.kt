@@ -1,6 +1,5 @@
 package com.letta.mobile.data.repository
 
-import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.letta.mobile.core.BuildConfig
@@ -35,7 +34,9 @@ class SettingsRepository private constructor(
     hostAppearance = hostAppearance,
     platformDefaults = SettingsPlatformDefaults(
         defaultResumeRecentConversation = BuildConfig.DEBUG,
-        defaultDynamicColorWhenPresetUnset = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+        // The Baken palette is the default on every platform; wallpaper colours (Material You) are opt-in in
+        // Settings, so Android draws the same brand colours (and ambient glow) as desktop and the web.
+        defaultDynamicColorWhenPresetUnset = false,
     ),
     clearBackendScopedCaches = SettingsBackendCacheClearer {
         backendSwitchInvalidator.get().clearAll().toSettingsResult()
