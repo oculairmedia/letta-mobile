@@ -25,11 +25,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -47,7 +49,7 @@ class RiveFrameFailureTest {
     private val identity = MascotIdentity(MascotShape.entries.first(), TEST_COLOR)
 
     /** Which scene call fails. */
-    private enum class FailsOn { ADVANCE, RENDER }
+    private enum class FailsOn { ADVANCE, RENDER, NEVER }
 
     /** A scene whose frame work fails the way a broken Rive runtime does. */
     private class FailingScene(
@@ -102,11 +104,9 @@ class RiveFrameFailureTest {
         override fun encodePng(image: Image): ByteArray? = null
     }
 
-    /**
-     * The window as the web and desktop hosts mount it: the mascot layer at the root (which brings
-     * the renderer up and provides the host), then a seat that shows the real orb stand-in whenever
-     * the host cannot draw the agent's mascot.
-     */
+    // The window as the web and desktop hosts mount it: the mascot layer at the root (which brings
+    // the renderer up and provides the host), then a seat that shows the real orb stand-in whenever
+    // the host cannot draw the agent's mascot.
     @Composable
     private fun MascotWindow(renderer: RiveFrameRenderer) {
         ProvideFrameMascots(renderer, MascotIdentityRegistry()) {
@@ -173,6 +173,79 @@ class RiveFrameFailureTest {
 
         assertIs<CancellationException>(escaped, "the cancellation propagates out of the load")
         assertFalse(entry.failed, "and leaves the mascot drawable for the next surface")
+    }
+
+    // ...and the next surface still gets its scene: the cancelled attempt must not stand as "loaded".
+    @Test
+    fun aCancelledLoadStillLoadsForTheNextSurface() = runTest {
+        var attempts = 0
+        val flaky = object : RiveFrameRenderer {
+            override val available = true
+            override val assetVersion = "test"
+            override val dispatcher: CoroutineDispatcher = Dispatchers.Unconfined
+            override val stillStore: MascotStillStore? = null
+
+            override fun createScene(): RiveFrameScene {
+                attempts++
+                if (attempts == 1) throw CancellationException("the surface left")
+                return FailingScene(IllegalStateException("never drawn"), FailsOn.RENDER)
+            }
+
+            override fun encodePng(image: Image): ByteArray? = null
+        }
+        val entry = FrameMascotEntry(flaky, identity)
+
+        assertIs<CancellationException>(runCatching { entry.ensureLoaded() }.exceptionOrNull())
+        entry.ensureLoaded()
+
+        assertEquals(2, attempts, "the cancelled attempt does not stand as the entry's load")
+        assertTrue(entry.scene != null, "so the next surface brings its scene up")
+    }
+
+    // A failed mascot costs one view, not the agent: the next view of that agent brings its own scene
+    // up, so a broken scene is replaced rather than kept.
+    @Test
+    fun aFailedMascotIsReplacedByTheNextViewOfThatAgent() = runTest {
+        val broken = FailingScene(IllegalStateException("the scene never comes up"), FailsOn.RENDER)
+        val first = assertIs<FrameMascotEntry>(
+            FrameMascotHost(SceneRenderer { broken }).entry(AGENT_ID, identity),
+            "the first view is offered a mascot",
+        )
+        first.ensureLoaded()
+        first.markFailed()
+        assertTrue(first.failed, "the first view's scene broke")
+
+        val scenes = mutableListOf<FailingScene>()
+        val working = SceneRenderer {
+            FailingScene(IllegalStateException("never drawn"), FailsOn.NEVER).also { scenes += it }
+        }
+        val fresh = assertIs<FrameMascotEntry>(
+            FrameMascotHost(working).entry(AGENT_ID, identity),
+            "a later view is offered a mascot",
+        )
+        fresh.ensureLoaded()
+
+        assertNotNull(fresh.scene, "and brings its own scene up")
+        assertEquals(1, scenes.size, "without touching the broken one")
+    }
+
+    // A failed mascot costs one view, not the agent: the seat that lost it shows the orb stand-in.
+    @Test
+    fun aFailedMascotLeavesItsSeatOnTheOrb() = runComposeUiTest {
+        val scenes = mutableListOf<FailingScene>()
+        val renderer = SceneRenderer {
+            FailingScene(IllegalStateException("the scene never draws"), FailsOn.NEVER).also { scenes += it }
+        }
+        runBlocking {
+            val first = assertIs<FrameMascotEntry>(FrameMascotHost(renderer).entry(AGENT_ID, identity))
+            first.ensureLoaded()
+            first.markFailed()
+            assertTrue(first.failed, "one view's scene broke")
+        }
+        setContent { MascotWindow(renderer) }
+        waitForIdle()
+
+        assertEquals(1, orbsDrawn(), "another view of the same agent draws its scene, not the orb")
     }
 
     // prepare() is the browser's bring-up: a renderer that cannot come up leaves every seat on its orb.
