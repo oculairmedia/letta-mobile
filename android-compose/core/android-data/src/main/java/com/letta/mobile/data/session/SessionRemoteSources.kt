@@ -4,38 +4,12 @@ import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
-import com.letta.mobile.data.repository.api.McpServerRemoteSource
-import com.letta.mobile.data.repository.api.ModelRemoteSource
-import com.letta.mobile.data.repository.api.ProjectRemoteSource
-import com.letta.mobile.data.repository.api.ProviderRemoteSource
-import com.letta.mobile.data.repository.api.RunRemoteSource
 import com.letta.mobile.data.repository.api.ScheduleRemoteSource
 import com.letta.mobile.data.repository.api.StepRemoteSource
-import com.letta.mobile.data.repository.api.ToolRemoteSource
+import com.letta.mobile.data.session.graph.AdminRemoteRoutes
 
 /**
- * The admin-half remote sources of a [SessionRemoteSources] family: the MCP catalog, the model
- * catalog, tracked projects, model providers, a conversation's runs and the session's tools — the
- * routes an Iroh host relays over `admin_rpc`. Every one is [RemoteRoute.Absent] until a backend
- * family binds it, exactly as the whole family's routes are.
- */
-class SessionAdminRemoteSources(
-    /** The MCP server catalog, listed by the MCP settings screen. */
-    val mcpServers: RemoteRoute<McpServerRemoteSource> = RemoteRoute.Absent(SessionRoute.MCP_SERVERS),
-    /** The LLM/embedding catalogs the model pickers list. */
-    val models: RemoteRoute<ModelRemoteSource> = RemoteRoute.Absent(SessionRoute.MODELS),
-    /** The tracked projects. */
-    val projects: RemoteRoute<ProjectRemoteSource> = RemoteRoute.Absent(SessionRoute.PROJECTS),
-    /** The model providers the settings screen lists. */
-    val providers: RemoteRoute<ProviderRemoteSource> = RemoteRoute.Absent(SessionRoute.PROVIDERS),
-    /** A conversation's runs. */
-    val runs: RemoteRoute<RunRemoteSource> = RemoteRoute.Absent(SessionRoute.RUNS),
-    /** The session's tools. */
-    val tools: RemoteRoute<ToolRemoteSource> = RemoteRoute.Absent(SessionRoute.TOOLS),
-)
-
-/**
- * letta-mobile-ckmub.4 — the Android backend seam.
+ * The Android backend seam.
  *
  * The app has one backend: a letta-code App Server, on this device (the embedded runtime) or on a
  * host reached over Iroh. Every session graph serves what that backend offers through its on-device
@@ -43,15 +17,15 @@ class SessionAdminRemoteSources(
  * a cloud backend, not offered for now): bind its sources here and the repositories, the shared
  * shell and every page pick it up unchanged.
  *
- * letta-mobile-by4vm.13: each source is a [RemoteRoute]. Production binds [None], where every route
- * is [RemoteRoute.Absent]: no reflection proxy stands in for a missing source, a repository falls
+ * Each source is a [RemoteRoute]. Production binds [None], where every route is
+ * [RemoteRoute.Absent]: no reflection proxy stands in for a missing source, a repository falls
  * through to [RemoteRoute.source] only as the backstop, and [boundRoutes] tells the session's
  * [com.letta.mobile.data.backend.SessionCapabilities] what a bound family adds. Tests bind fakes.
  */
 class SessionRemoteSources(
     val agents: RemoteRoute<AgentRemoteSource> = RemoteRoute.Absent(SessionRoute.AGENTS),
     val conversations: RemoteRoute<ConversationCrudRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
-    val admin: SessionAdminRemoteSources = SessionAdminRemoteSources(),
+    val admin: AdminRemoteRoutes = AdminRemoteRoutes(),
     val schedules: RemoteRoute<ScheduleRemoteSource> = RemoteRoute.Absent(SessionRoute.SCHEDULES),
     /** Absent: no backend answers step queries, so the step repository reports none. */
     val steps: RemoteRoute<StepRemoteSource> = RemoteRoute.Absent(SessionRoute.STEPS),
@@ -60,6 +34,7 @@ class SessionRemoteSources(
     fun boundRoutes(): Set<SessionRoute> = mapOf(
         SessionRoute.AGENTS to agents,
         SessionRoute.CONVERSATIONS to conversations,
+        SessionRoute.BLOCKS to admin.blocks,
         SessionRoute.MCP_SERVERS to admin.mcpServers,
         SessionRoute.MODELS to admin.models,
         SessionRoute.PROJECTS to admin.projects,

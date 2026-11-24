@@ -1,5 +1,7 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.session.graph.AdminRemoteRoutes
+
 import com.letta.mobile.data.chat.conversations.listing.repositoryConversationListingFactory
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.local.AgentDao
@@ -128,7 +130,7 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     private fun remoteSources() = SessionRemoteSources(
         agents = agentApi.bound(),
         conversations = conversationApi.bound(),
-        admin = SessionAdminRemoteSources(
+        admin = AdminRemoteRoutes(
             mcpServers = mcpServerApi.bound(),
             models = modelApi.bound(),
             projects = projectApi.bound(),

@@ -4,7 +4,6 @@ import com.letta.mobile.data.backend.ConversationListingFactory
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
-import com.letta.mobile.data.session.graph.AdminRemoteRoutes
 import com.letta.mobile.data.session.graph.HostAdminRepositories
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
@@ -156,14 +155,7 @@ class SessionGraphAssembler @Inject constructor(
         SharedSessionGraph.adminRepositories(
             transport = request.channelTransport,
             settings = request.settingsRepository,
-            remotes = AdminRemoteRoutes(
-                mcpServers = remoteSources.admin.mcpServers,
-                models = remoteSources.admin.models,
-                projects = remoteSources.admin.projects,
-                providers = remoteSources.admin.providers,
-                runs = remoteSources.admin.runs,
-                tools = remoteSources.admin.tools,
-            ),
+            remotes = remoteSources.admin,
         )
 
     /**
