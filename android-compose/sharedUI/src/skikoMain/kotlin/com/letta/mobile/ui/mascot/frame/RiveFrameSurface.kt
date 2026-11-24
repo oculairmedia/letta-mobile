@@ -113,7 +113,7 @@ private class RiveRenderTarget(
     private val markFailed: () -> Unit,
 ) {
     /** One frame of the scene as it stands; whichever live surface shares it advances it. */
-    suspend fun renderStill() = guardFrameWork(scene, markFailed) {
+    suspend fun renderStill() = guardFrameWork(scene, dispatcher, markFailed) {
         slots.show(withContext(dispatcher) { scene.renderImage(size) })
     }
 
@@ -123,18 +123,19 @@ private class RiveRenderTarget(
      * readback never run on the UI thread; a frame that takes longer than the vsync simply delays
      * the next one.
      */
-    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean) = guardFrameWork(scene, markFailed) {
-        val (image, ghostImage) = withContext(dispatcher) {
-            scene.advanceTo(now)
-            val started = TimeSource.Monotonic.markNow()
-            val frame = scene.renderImage(size)
-            onFrameStats?.invoke(started.elapsedNow().inWholeNanoseconds / 1e6)
-            // A ghost gets its own image - the two-slot rotation closes its images a frame later.
-            frame to (if (ghost) scene.renderImage(size) else null)
+    suspend fun renderFrame(now: Long, onFrameStats: ((nativeMs: Double) -> Unit)?, ghost: Boolean) =
+        guardFrameWork(scene, dispatcher, markFailed) {
+            val (image, ghostImage) = withContext(dispatcher) {
+                scene.advanceTo(now)
+                val started = TimeSource.Monotonic.markNow()
+                val frame = scene.renderImage(size)
+                onFrameStats?.invoke(started.elapsedNow().inWholeNanoseconds / 1e6)
+                // A ghost gets its own image - the two-slot rotation closes its images a frame later.
+                frame to (if (ghost) scene.renderImage(size) else null)
+            }
+            slots.show(image)
+            ghostImage
         }
-        slots.show(image)
-        ghostImage
-    }
 }
 
 /**
@@ -176,27 +177,34 @@ private suspend fun RiveRenderTarget.play(
 }
 
 /**
- * Runs one piece of frame work on [scene]; if it fails with anything but a cancellation the mascot
- * is failed ([onFailure] - the host stops offering the entry, so the seat draws its fallback) and
- * this throws [SceneFailure] to end the frame loop.
+ * Runs one piece of frame work on [scene], whose every call but a pointer event belongs on
+ * [dispatcher]; if it fails with anything but a cancellation the mascot is failed ([onFailure] -
+ * the host stops offering the entry, so the seat draws its fallback) and this throws [SceneFailure]
+ * to end the frame loop.
  *
  * The failure never reaches the composition: an exception out of a [LaunchedEffect] fails it, and
  * one dead mascot must not cost the screen.
  */
-internal suspend fun <T> guardFrameWork(scene: RiveFrameScene, onFailure: () -> Unit, block: suspend () -> T): T =
+internal suspend fun <T> guardFrameWork(
+    scene: RiveFrameScene,
+    dispatcher: CoroutineDispatcher,
+    onFailure: () -> Unit,
+    block: suspend () -> T,
+): T =
     runCatchingCancellable(block).getOrElse { failure ->
         println("[mascot] Rive scene failed while drawing, drawing the fallback: $failure")
-        releaseFailedScene(scene)
+        releaseFailedScene(scene, dispatcher)
         onFailure()
         throw SceneFailure(failure)
     }
 
 /**
- * Releases the scene that failed. Closing is best effort: a runtime that already trapped throws
- * again, and that must not replace the failure the caller is about to handle.
+ * Releases the scene that failed, on the thread that owns it ([RiveFrameScene] contract). Closing
+ * is best effort: a runtime that already trapped throws again, and that must not replace the
+ * failure the caller is about to handle.
  */
-private suspend fun releaseFailedScene(scene: RiveFrameScene) {
-    runCatchingCancellable { scene.close() }
+private suspend fun releaseFailedScene(scene: RiveFrameScene, dispatcher: CoroutineDispatcher) {
+    runCatchingCancellable { withContext(dispatcher) { scene.close() } }
         .onFailure { println("[mascot] releasing the failed scene also threw: $it") }
 }
 

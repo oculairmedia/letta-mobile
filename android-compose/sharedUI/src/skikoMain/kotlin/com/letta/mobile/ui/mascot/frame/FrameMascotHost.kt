@@ -18,6 +18,7 @@ import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotStills
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -54,8 +55,9 @@ class FrameMascotEntry private constructor(
     }
 
     override suspend fun load() {
-        // This runs in a composition's LaunchedEffect, where any throw would fail the window.
-        val created = runCatching { withContext(renderer.dispatcher) { renderer.createScene() } }.getOrElse { thrown ->
+        // This runs in a composition's LaunchedEffect, where any throw would fail the window - but a
+        // cancelled load only means the surface that asked left, so it must not fail the entry.
+        val created = runCatchingCancellable { withContext(renderer.dispatcher) { renderer.createScene() } }.getOrElse { thrown ->
             println("[mascot] scene failed to load, this mascot falls back to its stand-in: $thrown")
             markFailed()
             null

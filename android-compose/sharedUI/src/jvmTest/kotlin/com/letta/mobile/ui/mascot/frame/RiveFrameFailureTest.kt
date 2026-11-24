@@ -129,7 +129,7 @@ class RiveFrameFailureTest {
         var failures = 0
 
         val outcome = runCatching {
-            guardFrameWork(scene, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
+            guardFrameWork(scene, Dispatchers.Unconfined, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
         }
 
         assertIs<SceneFailure>(outcome.exceptionOrNull(), "the loop ends as a scene failure")
@@ -144,13 +144,35 @@ class RiveFrameFailureTest {
         var failures = 0
 
         val outcome = runCatching {
-            guardFrameWork(scene, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
+            guardFrameWork(scene, Dispatchers.Unconfined, onFailure = { failures++ }) { scene.renderImage(FRAME_SIZE) }
         }
 
         assertIs<CancellationException>(outcome.exceptionOrNull(), "the cancellation propagates")
         assertFalse(outcome.exceptionOrNull() is SceneFailure, "and is not turned into a scene failure")
         assertEquals(0, failures, "a cancelled frame fails nothing")
         assertFalse(scene.closed, "and its scene is left for the next surface")
+    }
+
+    // A surface that leaves composition cancels the load that was creating its scene. That is not a
+    // broken mascot: the entry stays drawable for the next surface instead of being marked failed.
+    @Test
+    fun aCancelledLoadDoesNotFailTheEntry() = runTest {
+        val cancelling = object : RiveFrameRenderer {
+            override val available = true
+            override val assetVersion = "test"
+            override val dispatcher: CoroutineDispatcher = Dispatchers.Unconfined
+            override val stillStore: MascotStillStore? = null
+
+            override fun createScene(): RiveFrameScene = throw CancellationException("the surface left")
+
+            override fun encodePng(image: Image): ByteArray? = null
+        }
+        val entry = FrameMascotEntry(cancelling, identity)
+
+        val escaped = runCatching { entry.ensureLoaded() }.exceptionOrNull()
+
+        assertIs<CancellationException>(escaped, "the cancellation propagates out of the load")
+        assertFalse(entry.failed, "and leaves the mascot drawable for the next surface")
     }
 
     // prepare() is the browser's bring-up: a renderer that cannot come up leaves every seat on its orb.
@@ -195,7 +217,7 @@ class RiveFrameFailureTest {
 
         // A frame's own scene work, as RiveFrameSurface runs it: advance and draw the scene.
         val outward = runCatching {
-            guardFrameWork(drawing, onFailure = { reported++ }) { drawing.renderImage(FRAME_SIZE) }
+            guardFrameWork(drawing, renderer.dispatcher, onFailure = { reported++ }) { drawing.renderImage(FRAME_SIZE) }
         }.exceptionOrNull()?.takeUnless { it is SceneFailure }
 
         assertNull(outward, "the frame loop ends the failure; nothing reaches the composition: $outward")
