@@ -58,18 +58,12 @@ class ChatRouteOpenedByShellTest {
     }
 
     /**
-     * The projection over the opening the shell's verb produced. It applies the same agent,
-     * conversation, freshness and first-message arguments the page's route does, so a project that
-     * reaches the page must reach this list first.
+     * The production projection over the opening the shell's verb produced: the very `toRoute()` the
+     * chat page opens, so a project that reaches the page must reach this list first.
      */
     private fun openedRoute(): AgentChatRoute {
         val opening = requireNotNull(port.opening) { "the verb opened nothing" }
-        return AgentChatRoute(
-            agentId = opening.agent.value,
-            conversationId = opening.conversation?.value,
-            freshRouteKey = opening.fresh,
-            initialMessage = opening.firstMessage,
-        )
+        return opening.toRoute()
     }
 
     private fun assertNoProject(route: AgentChatRoute) {
