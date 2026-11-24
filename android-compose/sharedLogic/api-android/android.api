@@ -60572,6 +60572,19 @@ public final class com/letta/mobile/data/timeline/headless/TimelineAssertionRepo
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/timeline/session/CanonicalTimelineChatSession : com/letta/mobile/ui/chat/session/TimelineChatSession {
+	public fun <init> (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator;Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/session/CanonicalTimelineSend;Lkotlinx/coroutines/CoroutineScope;)V
+	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun getTimeline ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun hydrate (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun send (Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/timeline/session/CanonicalTimelineSend {
+	public abstract fun send (Ljava/lang/String;Lcom/letta/mobile/ui/chat/session/TimelineSend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public abstract interface class com/letta/mobile/data/timeline/snapshot/ConfirmedTimelineImageBodies {
 	public abstract fun persistImage (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun resolveImage (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
