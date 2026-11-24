@@ -100,6 +100,10 @@ internal class RecentConversationListing(
     var legacyMode: Boolean = false
         private set
 
+    /** Whether the last [refresh] published a bounded visible recents page, which is not the whole row set. */
+    var recentPagePublished: Boolean = false
+        private set
+
     val conversations: List<Conversation>
         get() = if (legacyMode) legacy.conversations else (recents + fleet.conversations)
             .distinctBy { it.id }.sortedWith(ConversationRecency.newestFirst)
@@ -135,6 +139,9 @@ internal class RecentConversationListing(
         if (legacyMode) {
             legacy.refresh(roster)
         } else {
+            // Reported before the pins read, so the bounded page stands on its own: the pin read below can fail
+            // and publish nothing else.
+            recentPagePublished = true
             publish(conversations)
             val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
             fleet.refreshAgents((fleet.loadedAgents + pins).intersect(visible))
@@ -180,7 +187,6 @@ internal class RecentConversationListing(
         }
         conversations
     }
-
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
         val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }

@@ -117,11 +117,19 @@ class TimelineConversationLists internal constructor(
         }
     }
 
+    /** Publishes [rows]; a bounded visible recents page among them ends any earlier whole-set claim. */
     private fun publishRows(rows: List<Conversation>) {
+        // Read before the update: a page holds one bounded window of the host's rows, so a consumer must not prune
+        // conversations outside it — not even after the reads that follow it fail and this becomes the last word.
+        val bounded = listing.recentPagePublished
         state.update { current ->
             val selected = current.conversations.filter { it.id == current.selected }
             val merged = (rows + selected).distinctBy { it.id }.sortedWith(ConversationRecency.newestFirst)
-            current.copy(conversations = merged, authoritativeAgents = listing.authoritativeAgents)
+            current.copy(
+                conversations = merged,
+                authoritative = !bounded && current.authoritative,
+                authoritativeAgents = listing.authoritativeAgents,
+            )
         }
         val count = state.value.conversations.size
         if (count > 0 && !firstRowsPublished) {

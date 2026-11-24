@@ -238,10 +238,11 @@ class RecentBootstrapTest {
             assertEquals(1, host.recentsReads)
             assertTrue(owner.state.value.loaded)
             assertTrue(owner.state.value.authoritative)
+            // One more read than before the refresh: each refresh asks once whether the host serves recents now.
             host.calls.clear()
             owner.refresh()
-            assertEquals(0, host.recentsReads, "fallback must be remembered for this session")
-            assertEquals(roster.size, host.agentReads.size)
+            assertEquals(1, host.recentsReads, "each refresh asks once whether the host serves recents now")
+            assertEquals(roster.size, host.agentReads.size, "a host that still refuses keeps its eager per-agent read")
         }
     }
 
@@ -283,7 +284,7 @@ class RecentBootstrapTest {
     }
 
     @Test
-    fun bootstrapTelemetryPublishesOrderedMonotonicMeasurementsAndFallbackOnlyOnce() = runTest {
+    fun bootstrapTelemetryPublishesOrderedMonotonicMeasurementsAndARefreshFallback() = runTest {
         val telemetry = com.letta.mobile.util.Telemetry
         telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
             val host = VisibleHost()
@@ -304,8 +305,33 @@ class RecentBootstrapTest {
             val oldOwner = owner(oldHost)
             runCurrent()
             oldOwner.refresh()
-            assertEquals(1, telemetry.snapshot().count { it.name == "list.legacy_fallback" })
+            assertEquals(
+                // One refusal at bootstrap plus one per refresh: the fallback is re-taken, never remembered.
+                2, telemetry.snapshot().count { it.name == "list.legacy_fallback" },
+                "the fallback is re-taken on each refresh that a host still refuses",
+            )
         }
+    }
+
+    @Test
+    fun aRefreshThatSwitchesToRecentsWhileItsPinsFailStopsClaimingTheRowsAreComplete() = runTest {
+        // A legacy host lists every agent, so once it has answered the rows really are the whole set.
+        val host = VisibleHost("legacy").apply { extras += HostConversation("extra-0", a.value, archived = true).json() }
+        val owner = owner(host, pins = setOf(a))
+        runCurrent()
+        assertTrue(owner.state.value.authoritative, "a legacy host lists its agents, so the rows were the whole set")
+        // It starts serving recents, so the agent reads that follow this refresh's recents read fail.
+        host.mode = "visible"
+        host.failingAgents += a.value
+        owner.refresh()
+        assertTrue(
+            owner.state.value.conversations.any { it.id.value == "recent" },
+            "the recents read before the failed agent read published the page: ${owner.state.value.error}",
+        )
+        assertFalse(
+            owner.state.value.authoritative,
+            "the page that was published is bounded by its recents limit, so a consumer must not prune outside it",
+        )
     }
 
     @Test
@@ -442,7 +468,10 @@ class RecentBootstrapTest {
 }
 
 /** Fixture responses are shared with real-handler conformance; other reads have strict identity and page checks. */
-private class VisibleHost(private val mode: String = "visible") : AppServerClient by IrohHost() {
+private class VisibleHost(
+    /** Which `conversation.list` answers this host gives; reassignable for a host that gains recents. */
+    var mode: String = "visible",
+) : AppServerClient by IrohHost() {
     private val root = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
         .first { File(it, "scripts/ci/check-wire-contracts.py").isFile }
     private val fixture = WireContractFixture(
