@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.mascot.frame
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
 import kotlin.jvm.JvmInline
@@ -56,6 +57,14 @@ interface RiveFrameRenderer {
 
 /** Pointer events a scene hit-tests, in render pixels. */
 enum class RivePointer { MOVE, DOWN, UP, EXIT }
+
+/** The scene's pointer kind for a Compose pointer type; a hover and a move are both [RivePointer.MOVE]. */
+internal fun PointerEventType.rivePointer(): RivePointer = when (this) {
+    PointerEventType.Press -> RivePointer.DOWN
+    PointerEventType.Release -> RivePointer.UP
+    PointerEventType.Exit -> RivePointer.EXIT
+    else -> RivePointer.MOVE
+}
 
 /** One pointer event for a scene: what happened, and where in render pixels. */
 data class RivePointerEvent(val kind: RivePointer, val position: Offset)

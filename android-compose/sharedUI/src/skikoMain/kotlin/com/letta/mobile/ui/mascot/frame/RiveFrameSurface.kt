@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -178,15 +177,6 @@ private suspend fun RiveRenderTarget.play(
     }
 }
 
-/** The scene's pointer kind for a Compose pointer type; a hover or a move is both [RivePointer.MOVE]. */
-private val POINTER_KINDS = mapOf(
-    PointerEventType.Press to RivePointer.DOWN,
-    PointerEventType.Release to RivePointer.UP,
-    PointerEventType.Exit to RivePointer.EXIT,
-)
-
-private fun rivePointerKind(type: PointerEventType): RivePointer = POINTER_KINDS[type] ?: RivePointer.MOVE
-
 /**
  * Runs one piece of frame work on [scene]; if it fails with anything but a cancellation the mascot
  * is failed ([onFailure] - the host stops offering the entry, so the seat draws its fallback) and
@@ -229,7 +219,7 @@ private fun Modifier.rivePointerInput(scene: RiveFrameScene, renderSize: () -> I
                 val render = renderSize()
                 val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
                 val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
-                scene.pointer(RivePointerEvent(rivePointerKind(event.type), Offset(p.x * sx, p.y * sy)))
+                scene.pointer(RivePointerEvent(event.type.rivePointer(), Offset(p.x * sx, p.y * sy)))
                 // A hover or a press can start a listener's animation in a settled scene.
                 scene.wake()
             }
