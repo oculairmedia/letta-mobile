@@ -705,6 +705,10 @@ Timeline reducers, synchronization and bounded canonical storage/presentation. G
 
 Canonical pending prompts retain their send-time position in paged history. Reconnect and history recovery preserve unconfirmed prompts as Not sent; only a persisted user echo with the same OTID confirms one. `CanonicalTimelinePresentation.retry(MessageId)` routes a failed prompt through its agent's captured send coordinator, preserving its conversation, OTID, text and attachments. `CanonicalTimelinePresentation.dismiss(MessageId)` explicitly removes only that conversation's failed prompt through `CanonicalPendingLocalStore.discardFailed`. Retry and Dismiss are available on both live and paged failed rows. Active streaming rows retain their established order while pending records are positioned by send time. A fresh send never implicitly discards an earlier failure.
 
+
+# Package com.letta.mobile.data.timeline.session
+
+Adapters that expose the canonical paged timeline presentation through the shared `TimelineChatSession` contract without introducing a second timeline writer or duplicating projection logic.
 # Package com.letta.mobile.data.timeline.api
 
 The narrow external-transport timeline writer contract and internal outbound stream lifecycle/scoped-persistence dependency contracts. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. `TimelineExternalTransportWriter` inherits `TimelinePendingRetryTarget.queuedRetries`, the outbox's queued retries that the agent's send coordinator subscribes to and dispatches, so a retry queued before any sender subscribes still goes out; `TimelinePendingRetryBinding` merges the queued retries of every conversation writer a captured writer resolves, including ones resolved after subscription. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).
