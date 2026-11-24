@@ -14,9 +14,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * letta-mobile-bglj6.1.12: one conversation's real coordinator and presentation, presented the way
@@ -228,17 +230,22 @@ internal class TimelineFrameRecorder private constructor(
      * The Paging mediator's own recent-page refresh also begins a reconcile when the presenter first
      * collects, and a newer begin supersedes the older request, so under load (Kover instrumentation
      * in the Codecov run) this explicit reconcile can lose that race and answer Stale. Stale carries
-     * no data and is safe to retry; any outcome other than Applied still fails the test.
+     * no data and the winner applies the page, so the number of attempts it takes depends only on
+     * whichever actor the scheduler runs next, not on this code: a fixed retry count inherits the
+     * runner's scheduling (and with it, suite neighbour order) into this test's outcome. Retrying to
+     * [RECONCILE_DEADLINE_MILLIS] makes that independent of scheduling; any outcome other than
+     * Applied still fails the test.
      */
-    private suspend fun reconcileUntilApplied() {
+    private suspend fun reconcileUntilApplied() = withTimeoutOrNull(RECONCILE_DEADLINE_MILLIS) {
         var outcome = coordinator.reconcileRecent(owner)
-        var retries = 0
-        while (outcome == TimelineEnginePageOutcome.Stale && retries++ < STALE_RETRIES) {
+        while (outcome == TimelineEnginePageOutcome.Stale) {
             yield()
             outcome = coordinator.reconcileRecent(owner)
         }
+        outcome
+    }?.let { outcome ->
         assertEquals(TimelineEnginePageOutcome.Applied, outcome)
-    }
+    } ?: fail("the recent reconcile was superseded for ${RECONCILE_DEADLINE_MILLIS} ms: ${transport.durable.size} records never applied")
 
     private suspend fun settleUi() {
         repeat(SETTLE_YIELDS) { yield(); kotlinx.coroutines.delay(1) }
@@ -278,6 +285,13 @@ internal class TimelineFrameRecorder private constructor(
     companion object {
         private const val SETTLE_YIELDS = 20
         private const val STALE_RETRIES = 5
+
+        /**
+         * How long the explicit recent reconcile may keep losing the engine's single reconcile slot
+         * to the Paging mediator's own refresh. A loser's Stale answer means the winner applies the
+         * page, so losing longer only says the runner is loaded, never that the data went missing.
+         */
+        private const val RECONCILE_DEADLINE_MILLIS = 10_000L
 
         /** [store] defaults to the shared in-memory ledger; a test may wrap it to read like another store. */
         suspend fun open(scope: TimelineScope, store: TimelineBoundedStore = InMemoryTimelineStore()): TimelineFrameRecorder {

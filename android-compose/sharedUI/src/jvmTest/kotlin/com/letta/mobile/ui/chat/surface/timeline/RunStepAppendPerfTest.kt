@@ -3,9 +3,10 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,7 +26,6 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
-import com.letta.mobile.ui.chat.surface.timeline.rows.LocalRowComposed
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderProbe
 import com.letta.mobile.ui.chat.surface.timeline.rows.TimelineRenderSink
 import kotlinx.collections.immutable.toPersistentList
@@ -37,19 +37,21 @@ import kotlin.test.assertTrue
 /**
  * A live run's steps append without restructuring its row: when a run's first step is followed by
  * its second (the lone first message becoming a run block), the row keeps its composition (no
- * dispose and remount of the run's row), and the frame that lands the second step stays within 1.5x
- * the median of the later steps' frames plus a few milliseconds of runner jitter: for a run of bare tool
- * calls, and for a run that opens with prose (whose message was drawn through a separate lone-message
- * branch and rebuilt when the second step landed). A run that opens with prose or reasoning keeps that
- * message's own composition too, checked by layout-node identity (deterministic on any runner).
+ * dispose and remount of the run's row, and the row still held under the key its first step gave it,
+ * so each step appends into it): for a run of bare tool calls, and for a run that opens with prose or
+ * reasoning (whose message was drawn through a separate lone-message branch and rebuilt when the
+ * second step landed). Each is deterministic on any runner, so CI never flakes on frame time.
+ *
+ * The step-2 frame time is printed for whoever reads a run, and only asserted when explicitly
+ * requested: `LETTA_PERF_ASSERTIONS=1 ./gradlew :sharedUI:jvmTest --tests '*RunStepAppendPerfTest'`
+ * (see [TIMED_ASSERTION_ENV]).
  */
 class RunStepAppendPerfTest {
     private val events = mutableListOf<String>()
-    private val composed = mutableMapOf<String, Int>()
-    private var messages by mutableStateOf(history())
 
-    /** One counter for the whole test: a new lambda per composition would itself recompose every row. */
-    private val countComposition: (String) -> Unit = { key -> composed[key] = (composed[key] ?: 0) + 1 }
+    /** The list's own state, hoisted so a landing can read the row keys it actually holds. */
+    private lateinit var listState: LazyListState
+    private var messages by mutableStateOf(history())
 
     @AfterTest
     fun clearProbe() {
@@ -128,24 +130,25 @@ class RunStepAppendPerfTest {
 
     /**
      * Plays the run once to warm the JIT and class loading (a first use of the live run's code would
-     * otherwise be measured), then again in a fresh composition, measured.
+     * otherwise be measured), then again in [PASSES] fresh compositions.
+     *
+     * The rebuild guard is deterministic and always runs: at its second step the run's row is neither
+     * disposed nor mounted again (the probe), and the list still keys it by its run, never by a message
+     * inside it. The step-2 frame time is only asserted when [timed] and the environment ask for it.
      */
     private fun appendSteps(timed: Boolean = true, firstStep: (RunStepId) -> UiMessage) {
         landSteps(firstStep)
         val passes = List(PASSES) { landSteps(firstStep) }
         passes.forEachIndexed { pass, landed ->
             landed.forEach { (index, landing) ->
-                println("pass $pass step $index: ${landing.frameMillis} ms, events=${landing.events}, composed=${landing.composed}")
+                println("pass $pass step $index: ${landing.frameMillis} ms, events=${landing.events}, keys=${landing.keys}")
             }
-            val second = landed.getValue(2)
-            assertTrue(second.events.none { it == "dispose $RUN_KEY" }, "the run's row was torn down at its second step: ${second.events}")
-            assertTrue(second.events.none { it == "mount $RUN_KEY" }, "the run's row was built again at its second step: ${second.events}")
+            assertNoRebuildAtSecondStep(landed)
         }
-        // Each step's frame as the median over the passes, so one noisy frame on the runner cannot decide.
         val frame = (2..LAST_STEP).associateWith { index -> median(passes.map { it.getValue(index).frameMillis }) }
         val later = median((3..LAST_STEP).map { frame.getValue(it) })
         println("medians: $frame, later steps: $later ms")
-        if (!timed) return
+        if (!timed || !assertTimings()) return
         // A shared runner's frames jitter by a few milliseconds whatever the code does: the bound is the
         // later steps' median with relative headroom plus a small absolute slack, so only a real rebuild
         // (a step-2 frame several times the others) can exceed it.
@@ -155,9 +158,33 @@ class RunStepAppendPerfTest {
         )
     }
 
+    /**
+     * [landed]'s second step left the run's row alone: no dispose, no remount, and the row still held
+     * under the key its first step gave it. The key is checked at every landing, because a block named by
+     * its newest message ([RUN_KEY]-<newest id>) or one echo compaction drops went on re-keying the row at
+     * every later step too, disposing and rebuilding it each time.
+     */
+    private fun assertNoRebuildAtSecondStep(landed: Map<Int, StepLanding>) {
+        val second = landed.getValue(2)
+        assertTrue(second.events.none { it == "dispose $RUN_KEY" }, "the run's row was torn down at its second step: ${second.events}")
+        assertTrue(second.events.none { it == "mount $RUN_KEY" }, "the run's row was built again at its second step: ${second.events}")
+        landed.forEach { (index, landing) ->
+            // The list holds the run's row under its first step's key, so each step appends into that row
+            // instead of handing the list a new key to build a row under. This is the measured cause of the
+            // hitch the frame time used to bound, and it reads the same on every runner.
+            assertTrue(
+                landing.keys[RUN_KEY] == 1,
+                "the run's row was not held under $RUN_KEY when its step $index landed: rows keyed ${landing.keys}",
+            )
+        }
+    }
+
     private fun median(values: List<Double>): Double = values.sorted()[values.size / 2]
 
-    /** One run, its steps landing one frame at a time: each landing's frame time, probe events and row compositions. */
+    /**
+     * One run, its steps landing one frame at a time: each landing's frame time, its probe events and
+     * the keys the list held when it landed.
+     */
     private fun landSteps(firstStep: (RunStepId) -> UiMessage): Map<Int, StepLanding> {
         var landed: Map<Int, StepLanding> = emptyMap()
         messages = history()
@@ -172,12 +199,11 @@ class RunStepAppendPerfTest {
             settle()
             landed = (2..LAST_STEP).associateWith { index ->
                 events.clear()
-                composed.clear()
                 messages = messages + step(RunStepId(RUN_ID, index))
                 val start = System.nanoTime()
                 mainClock.advanceTimeByFrame()
                 val frameMillis = (System.nanoTime() - start) / NANOS_PER_MILLI
-                val result = StepLanding(frameMillis, events.toList(), composed.toMap())
+                val result = StepLanding(frameMillis, events.toList(), listKeys().groupingBy { it }.eachCount())
                 settle()
                 result
             }
@@ -186,27 +212,35 @@ class RunStepAppendPerfTest {
         return landed
     }
 
-    private class StepLanding(val frameMillis: Double, val events: List<String>, val composed: Map<String, Int>)
+    /** One step's landing: its frame time, the probe events it raised, and how many of the list's rows hold each key. */
+    private class StepLanding(
+        val frameMillis: Double,
+        val events: List<String>,
+        val keys: Map<String, Int>,
+    )
+
+    /** The keys of the rows the list holds at this instant (its laid-out slots; the list fills the page). */
+    private fun listKeys(): List<String> = listState.layoutInfo.visibleItemsInfo.map { it.key as String }
 
     private fun ComposeUiTest.show() {
         setContent {
+            listState = rememberLazyListState()
             MaterialTheme {
-                CompositionLocalProvider(LocalRowComposed provides countComposition) {
-                    Box(Modifier.size(width = 900.dp, height = 1400.dp)) {
-                        ChatTimeline(
-                            state = ChatUiState(
-                                conversationState = ConversationState.Ready("c1"),
-                                isLoadingMessages = false,
-                                messages = messages.toPersistentList(),
-                                isStreaming = true,
-                            ),
-                            pagedTimeline = null,
-                            actions = RecordingChatActions(),
-                            capabilities = ChatSurfaceCapabilities.Default,
-                            host = ChatSurfaceHost(),
-                            appearance = ChatSurfaceAppearance(),
-                        )
-                    }
+                Box(Modifier.size(width = 900.dp, height = 1400.dp)) {
+                    ChatTimeline(
+                        state = ChatUiState(
+                            conversationState = ConversationState.Ready("c1"),
+                            isLoadingMessages = false,
+                            messages = messages.toPersistentList(),
+                            isStreaming = true,
+                        ),
+                        pagedTimeline = null,
+                        actions = RecordingChatActions(),
+                        capabilities = ChatSurfaceCapabilities.Default,
+                        host = ChatSurfaceHost(),
+                        appearance = ChatSurfaceAppearance(),
+                        listState = listState,
+                    )
                 }
             }
         }
@@ -268,9 +302,21 @@ class RunStepAppendPerfTest {
         const val LAST_STEP = 5
         const val SETTLE_FRAMES = 30
         const val NANOS_PER_MILLI = 1_000_000.0
+
+        /**
+         * The frame-time assertion is opt-in, the way this module's other opt-in probes are (an
+         * environment variable, since Gradle cannot pass a `-D` to the forked test JVM): run
+         * `LETTA_PERF_ASSERTIONS=1 ./gradlew :sharedUI:jvmTest --tests '*RunStepAppendPerfTest'` and the
+         * step-2 frame must stay within this budget of the later steps. CI's shared runners cannot hold
+         * a wall-clock bound, so they never set it.
+         */
+        const val TIMED_ASSERTION_ENV = "LETTA_PERF_ASSERTIONS"
         const val RELATIVE_BUDGET = 1.5
         const val JITTER_SLACK_MILLIS = 5.0
         const val PASSES = 5
         val PROSE = (1..12).joinToString("\n\n") { "Paragraph $it of the earlier reply, with **bold** and `code`." }
+
+        /** Whether this run asked for the frame-time assertion ([TIMED_ASSERTION_ENV]). */
+        fun assertTimings(): Boolean = System.getenv(TIMED_ASSERTION_ENV) == "1"
     }
 }
