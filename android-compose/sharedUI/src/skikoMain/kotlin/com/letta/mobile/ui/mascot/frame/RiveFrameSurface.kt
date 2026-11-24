@@ -21,14 +21,15 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import com.letta.mobile.util.runCatchingCancellable
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
-import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
@@ -60,18 +61,15 @@ private class RiveGhostRing {
     }
 }
 
-/** How a ghost frame fades: onion.py's `ramp` and its tint, both strongest on the oldest frame. */
-private object OnionFade {
-    /** onion.py's `ramp`: [lo] at the oldest frame, [hi] at the newest. */
-    fun ramp(index: Int, count: Int, lo: Float, hi: Float): Float =
-        if (count < 2) hi else lo + (hi - lo) * (index / (count - 1f))
+/** onion.py's `ramp`: [lo] at the oldest frame, [hi] at the newest. */
+private fun onionRamp(index: Int, count: Int, lo: Float, hi: Float): Float =
+    if (count < 2) hi else lo + (hi - lo) * (index / (count - 1f))
 
-    /** onion.py's tint: pull the frame toward the ramp colour, strongest on the oldest frame. */
-    fun tint(index: Int, count: Int): ColorFilter {
-        val t = if (count < 2) 1f else index / (count - 1f)
-        val hue = lerp(ONION_COOL, ONION_WARM, t)
-        return ColorFilter.tint(hue.copy(alpha = 0.6f - 0.5f * t), BlendMode.SrcAtop)
-    }
+/** onion.py's tint: pull the frame toward the ramp colour, strongest on the oldest frame. */
+private fun onionTint(index: Int, count: Int): ColorFilter {
+    val t = if (count < 2) 1f else index / (count - 1f)
+    val hue = lerp(ONION_COOL, ONION_WARM, t)
+    return ColorFilter.tint(hue.copy(alpha = 0.6f - 0.5f * t), BlendMode.SrcAtop)
 }
 
 /**
@@ -209,6 +207,13 @@ private suspend fun releaseFailedScene(scene: RiveFrameScene) {
  */
 internal class SceneFailure(val failure: Throwable) : CancellationException("this Rive scene cannot be drawn: $failure")
 
+private fun rivePointerKind(type: PointerEventType): RivePointer = when (type) {
+    PointerEventType.Press -> RivePointer.DOWN
+    PointerEventType.Release -> RivePointer.UP
+    PointerEventType.Exit -> RivePointer.EXIT
+    else -> RivePointer.MOVE
+}
+
 /** Pointer events arrive in node pixels; the scene hit-tests in render pixels, so they are scaled by the cap. */
 private fun Modifier.rivePointerInput(scene: RiveFrameScene, renderSize: () -> IntSize): Modifier {
     return pointerInput(scene) {
@@ -219,7 +224,7 @@ private fun Modifier.rivePointerInput(scene: RiveFrameScene, renderSize: () -> I
                 val render = renderSize()
                 val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
                 val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
-                scene.pointer(RivePointerEvent(event.type.rivePointer(), Offset(p.x * sx, p.y * sy)))
+                scene.pointer(RivePointerEvent(rivePointerKind(event.type), Offset(p.x * sx, p.y * sy)))
                 // A hover or a press can start a listener's animation in a settled scene.
                 scene.wake()
             }
@@ -234,8 +239,8 @@ private fun DrawScope.drawOnionGhosts(ghosts: List<ImageBitmap>, onion: RiveOnio
         drawImage(
             image = ghost,
             topLeft = Offset.Zero,
-            alpha = OnionFade.ramp(i, ghosts.size, onion.minAlpha, onion.maxAlpha),
-            colorFilter = if (onion.tint) OnionFade.tint(i, ghosts.size) else null,
+            alpha = onionRamp(i, ghosts.size, onion.minAlpha, onion.maxAlpha),
+            colorFilter = if (onion.tint) onionTint(i, ghosts.size) else null,
         )
     }
 }
