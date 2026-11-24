@@ -221,10 +221,16 @@ class TimelinePageProjectionTest {
             prepare(single).projectionInput.envelope)
     }
 
+    /**
+     * Test change reason (letta-mobile-032ia): the per-row inline limit moved from 16 KiB to
+     * [TimelineBoundedReader.MAX_INLINE_ROW_BYTES], so a body that is deferred needs to be over the
+     * new limit; the behaviour under test - an unrecognisable neighbour leaves the run Unknown - is
+     * unchanged.
+     */
     @Test fun deferredBoundaryIsUnknownAndDoesNotMerge() = runTest {
         val store = fixture()
-        seed(store, 1, content = "x".repeat(20_000))
-        seed(store, 3, content = "x".repeat(20_000))
+        seed(store, 1, content = OVER_INLINE_ROW)
+        seed(store, 3, content = OVER_INLINE_ROW)
         assertUnknown(prepare(store))
         assertEquals(1, store.bodyReads)
         val exhausted = fixture()
@@ -280,7 +286,7 @@ class TimelinePageProjectionTest {
 
     @Test fun unavailableResidentEvidenceIsUnknownAndReleaseDoesNotWrite() = runTest {
         val store = fixture()
-        seed(store, 2, content = "x".repeat(20_000))
+        seed(store, 2, content = OVER_INLINE_ROW)
         val engine = engine(store)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val page = engine.preparePage(selection, TimelineReadPosition.Around(key(2)), 1, null,
@@ -357,6 +363,11 @@ class TimelinePageProjectionTest {
     }
     private fun engine(store: TimelineBoundedStore, budget: TimelinePageBudget = TimelinePageBudget(1, 64 * 1024)) =
         CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 64 * 1024), budget, enabled = true)
+
+    private companion object {
+        /** A body over the per-row inline limit, so it is deferred rather than decoded. */
+        val OVER_INLINE_ROW = "x".repeat((TimelineBoundedReader.MAX_INLINE_ROW_BYTES + 1).toInt())
+    }
 
     private suspend fun prepare(
         store: TimelineBoundedStore,

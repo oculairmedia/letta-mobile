@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -153,8 +154,10 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
+            // letta-mobile-032ia: a tool call names what ran, so a deferred row is never a card that
+            // only says it is too large.
             Text(
-                text = "Message too large to show inline",
+                text = deferredNotice(rememberDeferredTool(rowKey, read)),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -162,6 +165,24 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
         }
     }
 }
+
+/**
+ * letta-mobile-032ia: the tool [rowKey]'s held-back body is a call to, read once from the body's
+ * own `toolCalls[0].name`; null for a plain message, and until the read lands.
+ */
+@Composable
+private fun rememberDeferredTool(rowKey: String, read: DeferredBodyRead): String? {
+    var tool by remember(rowKey) { mutableStateOf<String?>(null) }
+    LaunchedEffect(rowKey) {
+        tool = (read(TimelineSemanticField.toolName(), 0) as? TimelineSemanticWindowResult.Text)?.value
+            ?.takeIf { it.isNotBlank() }
+    }
+    return tool
+}
+
+/** "Ran <tool> · output too large to show inline" for a call, else the plain notice every held-back body has. */
+internal fun deferredNotice(tool: String?): String =
+    tool?.let { "Ran $it · output too large to show inline" } ?: "Message too large to show inline"
 
 /**
  * A stored body read on demand, a page at a time: one [openLabel] action until asked, then the page

@@ -740,11 +740,18 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(2, store.evidence.size)
     }
 
+    /**
+     * Test change reason (letta-mobile-032ia): the per-row inline limit moved from 16 KiB to
+     * [TimelineBoundedReader.MAX_INLINE_ROW_BYTES], so the body here is one over the new limit; the
+     * behaviour under test - a preview resolves through a fresh revision and reads only its body -
+     * is unchanged.
+     */
     @Test fun previewResolutionChecksRevisionAndReadsOnlySelectedBody() = runTest {
+        val large = (TimelineBoundedReader.MAX_INLINE_ROW_BYTES + 1).toInt()
         val store = InMemoryTimelineStore()
-        val writer = TimelineExactCanonicalWriter(scope, 200_000)
+        val writer = TimelineExactCanonicalWriter(scope, large + 100_000)
         store.transaction(scope) {
-            writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(100_000)), 0))
+            writer.merge(this, TimelineRemoteRecord(TimelineMessageId("id"), message("x".repeat(large)), 0))
             nextRevision()
         }
         val engine = CanonicalTimelineEngine(store, writer, enabled = true)
@@ -757,7 +764,7 @@ class TimelineExactCanonicalWriterTest {
         val resolved = engine.resolveBody(selection, preview)
         assertFalse(resolved.isPreview)
         val item = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.Single>(resolved.toRenderItem())
-        assertEquals("x".repeat(100_000), item.message.content)
+        assertEquals("x".repeat(large), item.message.content)
         assertEquals(row.body.encodedBytes, resolved.body.size.toLong())
         store.transaction(scope) { nextRevision() }
         kotlin.test.assertFailsWith<IllegalStateException> { engine.resolveBody(selection, preview) }

@@ -268,4 +268,9 @@ internal suspend fun TimelineStoreReader.runEnvelope(
     )
 }
 
-internal const val MAX_BOUNDARY_BODY_BYTES: Long = 16L * 1024
+/**
+ * letta-mobile-032ia: a run boundary decodes its neighbouring row whole or not at all, so it shares
+ * the per-row inline limit; at a fixed 16 KiB it could not recognise the run either side of a
+ * deferred row, and the page claimed no evidence of a split or a join.
+ */
+internal const val MAX_BOUNDARY_BODY_BYTES: Long = TimelineBoundedReader.MAX_INLINE_ROW_BYTES
