@@ -90,11 +90,11 @@ class TimelineBoundedReader(private val store: TimelineBoundedStore) {
         const val MAX_CHUNK_BYTES: Int = 64 * 1024
 
         /**
-         * The most one row may decode inline. a row over this reads on screen as
+         * The most one row may decode inline. A row over this reads on screen as
          * a held-back card, so at 16 KiB an ordinary tool call ("Ran python3 - <<'PY'" with a few KB
          * of output) was deferred and lost the line saying what ran. A row is decoded in one page
          * and lives no longer than that page, and [MAX_PAGE_BODY_BYTES] still bounds the page: this
-         * is a quarter of it, so several ordinary rows fit alongside it and only a genuinely huge
+         * is an eighth of it, so several ordinary rows fit alongside it and only a genuinely huge
          * row (a whole file read, a full image) is held back.
          */
         const val MAX_INLINE_ROW_BYTES: Long = 256L * 1024

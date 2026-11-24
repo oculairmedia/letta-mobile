@@ -154,30 +154,21 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
-            // a tool call names what ran, so a deferred row is never a card that
-            // only says it is too large.
+            // Read the tool name once per row from toolCalls[0].name so a deferred tool call
+            // never renders as a context-free "too large" card.
+            var tool by remember(rowKey) { mutableStateOf<String?>(null) }
+            LaunchedEffect(rowKey) {
+                tool = (read(TimelineSemanticField.toolName(), 0) as? TimelineSemanticWindowResult.Text)?.value
+                    ?.takeIf { it.isNotBlank() }
+            }
             Text(
-                text = deferredNotice(rememberDeferredTool(rowKey, read)),
+                text = deferredNotice(tool),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             DeferredBodyPages(rowKey, read)
         }
     }
-}
-
-/**
- * the tool [rowKey]'s held-back body is a call to, read once from the body's
- * own `toolCalls[0].name`; null for a plain message, and until the read lands.
- */
-@Composable
-private fun rememberDeferredTool(rowKey: String, read: DeferredBodyRead): String? {
-    var tool by remember(rowKey) { mutableStateOf<String?>(null) }
-    LaunchedEffect(rowKey) {
-        tool = (read(TimelineSemanticField.toolName(), 0) as? TimelineSemanticWindowResult.Text)?.value
-            ?.takeIf { it.isNotBlank() }
-    }
-    return tool
 }
 
 /** "Ran <tool> · output too large to show inline" for a call, else the plain notice every held-back body has. */
