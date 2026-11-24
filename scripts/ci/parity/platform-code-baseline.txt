@@ -261,7 +261,6 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordin
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSearchController.kt 61
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSearchCoordinator.kt 107
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSessionResolver.kt 66
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt 47
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/InitialRouteMessageDeliveryGuard.kt 40
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ProjectChatCoordinator.kt 285
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/RecentMessagesReconcileRequest.kt 72

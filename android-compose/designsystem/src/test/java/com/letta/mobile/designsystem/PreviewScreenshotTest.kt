@@ -3,8 +3,6 @@ package com.letta.mobile.designsystem
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.letta.mobile.ui.components.PreviewAccordionsContent
-import com.letta.mobile.ui.components.PreviewLatencyTextContent
-import com.letta.mobile.ui.components.PreviewMessageActionButtonsContent
 import com.letta.mobile.ui.components.PreviewMessageBubbleContent
 import org.junit.Ignore
 import org.junit.Rule
@@ -23,16 +21,6 @@ class PreviewScreenshotTest {
     @Test
     fun messageBubble() {
         paparazzi.snapshot { PreviewMessageBubbleContent() }
-    }
-
-    @Test
-    fun messageActionButtons() {
-        paparazzi.snapshot { PreviewMessageActionButtonsContent() }
-    }
-
-    @Test
-    fun latencyText() {
-        paparazzi.snapshot { PreviewLatencyTextContent() }
     }
 
     @Test
