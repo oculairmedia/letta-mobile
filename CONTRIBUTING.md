@@ -139,10 +139,10 @@ export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-26"
 
 ### Optional Kotlin LSP setup
 
-The OpenCode/OMP LSP config in `.omp/lsp.json` expects the official JetBrains
-Kotlin language server executable to be available as `kotlin-lsp` on `PATH` and
-started with `--stdio`. Use the `Kotlin/kotlin-lsp` release binary rather than
-the deprecated `fwcd/kotlin-language-server` project.
+Editor and agent LSP integrations expect the official JetBrains Kotlin language
+server executable to be available as `kotlin-lsp` on `PATH` and started with
+`--stdio`. Use the `Kotlin/kotlin-lsp` release binary rather than the deprecated
+`fwcd/kotlin-language-server` project.
 
 Install/update by downloading the latest `kotlin-lsp` archive for your platform
 from `https://github.com/Kotlin/kotlin-lsp/releases`, extracting it outside the
@@ -153,10 +153,12 @@ is discoverable before opening the workspace:
 kotlin-lsp --version
 ```
 
-The configured root markers are `android-compose/settings.gradle.kts` and
-`android-compose/build.gradle.kts` because the Kotlin/Gradle workspace lives in
-the `android-compose/` subproject; the repository root intentionally does not
-contain Gradle marker files.
+The Kotlin/Gradle workspace is the `android-compose/` subproject; the repository root
+intentionally has no Gradle marker files. Configure your LSP client so `android-compose/` is the
+workspace root: use the bare file name `settings.gradle.kts` as the root marker (a client such as
+nvim-lspconfig's `root_pattern` resolves it from the open file upward to `android-compose/`), or set
+`android-compose/` as the root explicitly. A repository-prefixed marker such as
+`android-compose/settings.gradle.kts` resolves to the repository root instead.
 
 ## Recommended build checks
 
