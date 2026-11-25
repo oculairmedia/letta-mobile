@@ -14,8 +14,14 @@ from git_ref import resolve_commit
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "scripts/ci/tree-hygiene-baseline.txt"
 ALWAYS_DOT_DIRS = {".github", ".githooks", ".beads"}
-ROOT_MARKDOWN = {"README.md", "CONTRIBUTING.md", "AGENTS.md"}
-MODULE_MARKDOWN = {"README.md", "Module.md"}
+# New Markdown is banned: plans, handoffs, evidence, PRDs and status belong in beads, and prose
+# docs drift from the code they describe. Existing files may be edited or deleted; a NEW .md path
+# is allowed only where a tool requires it: a wire-contract spec paired with its fixture
+# (check-wire-contracts.py reads docs/reference/contracts/<method>/<name>-vN.md) or a module's
+# Dokka overview (Module.md, read by ApiDocumentationPlugin). Everything else goes in a bead,
+# in KDoc next to the code, or in an existing doc.
+CONTRACT_SPEC = re.compile(r"^docs/reference/contracts/[^/]+/[^/]+-v\d+\.md$")
+DOKKA_MODULE_DOC = "Module.md"
 SCRIPT_SUFFIXES = (".sh", ".py")
 ROOT_VARIABLE = r"(?:\$\{[^}\n]+\}|\$[A-Za-z_]\w*)/"
 
@@ -72,17 +78,12 @@ def is_new_dot_dir(path: str, current: set[str]) -> bool:
     return f"dot {directory}" not in current
 
 
-def is_misplaced_markdown(path: str, current: set[str]) -> bool:
+def is_new_markdown(path: str) -> bool:
     if not path.endswith(".md"):
         return False
-    if path.startswith("docs/"):
+    if CONTRACT_SPEC.match(path):
         return False
-    if path in ROOT_MARKDOWN:
-        return False
-    if path.startswith("android-compose/"):
-        if path.split("/")[-1] in MODULE_MARKDOWN:
-            return False
-    return f"md {path}" not in current
+    return posixpath.basename(path) != DOKKA_MODULE_DOC
 
 
 def is_unreferenced_script(path: str, current: set[str], sources: dict[str, str]) -> bool:
@@ -130,7 +131,7 @@ def is_readable_source(root: Path, path: str) -> bool:
 def path_problems(path: str, current: set[str], sources: dict[str, str]) -> list[str]:
     rules = (
         (is_new_dot_dir(path, current), "new top-level dot-directory"),
-        (is_misplaced_markdown(path, current), "misplaced Markdown"),
+        (is_new_markdown(path), "new Markdown file (put it in a bead, KDoc or an existing doc)"),
         (is_unreferenced_script(path, current, sources), "unreferenced script outside scripts/ and tools/"),
     )
     return [f"{message}: {path}" for matches, message in rules if matches]

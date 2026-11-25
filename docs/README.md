@@ -22,8 +22,9 @@ Live paths can be checked explicitly with a `live-path:` HTML comment containing
 The existing `scripts/ci/docs-freshness-check.py` gate validates those paths and
 architecture status headers in addition to module, gate and root-link consistency.
 
-Use `evidence/` for captured observations, `testing/` for validation procedures,
-`handoff/` for dated session handoffs, and `architecture/` for designs/contracts.
+**No new Markdown files.** New plans, handoffs, evidence and status notes go in a bead, not here; the tree-hygiene
+gate rejects any new `.md` path except wire-contract specs paired with a fixture and Dokka `Module.md`. The existing
+folders (`evidence/`, `testing/`, `handoff/`, `architecture/`) are being moved into beads or deleted.
 [plan/](../plan/) holds historical planning; [poc/](../poc/) holds experimental code,
 not production modules. Existing historical filenames are retained unless misleading.
 

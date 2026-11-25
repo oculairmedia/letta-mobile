@@ -310,3 +310,8 @@ Before this change, every release required editing two lines in `build.gradle.kt
 ## Issue tracking
 
 This repo uses **bd (beads)** for issue tracking. Run `bd prime` for the full reference. Don't use markdown TODO lists or in-repo task files for tracking work — those fragment across machines.
+
+**No new Markdown files.** Plans, handoffs, evidence, PRDs and status notes go in a bead; explanations of code go
+in KDoc beside it. The required `test` job's tree-hygiene gate rejects any new `.md` path except a wire-contract
+spec paired with its fixture (`docs/reference/contracts/<method>/<name>-vN.md`) and a module's Dokka `Module.md`.
+Existing docs may be edited or deleted.

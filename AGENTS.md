@@ -76,7 +76,9 @@ A green task with no analysed files or no selected tests is not verification.
 
 **Runs nowhere in CI:** `:sharedLogic:allTests` / hostNativeTest, and the 7 files under `app/src/androidTest` (device tests: mascot still, LiteRT-LM engine, embedded-runtime loop, image request capture, live Iroh receive, Automerge JNI). Run those by hand on a device when you touch their area.
 
-Documentation ownership and lifecycle conventions: [docs/README.md](docs/README.md).
+Documentation ownership and lifecycle conventions: [docs/README.md](docs/README.md). **No new `.md` files**: write plans,
+handoffs, evidence and status into a bead and explain code in KDoc; the tree-hygiene gate in `test` rejects new Markdown
+except wire-contract specs (`docs/reference/contracts/<method>/<name>-vN.md`) and Dokka `Module.md`. Edit or delete existing docs freely.
 
 ## Module map (where work belongs)
 
