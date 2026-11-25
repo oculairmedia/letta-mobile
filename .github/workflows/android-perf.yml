@@ -10,7 +10,10 @@ name: Android Perf Gate
 #     with `[perf:rebaseline]` in its title.
 # Every PR still runs the cheap `perf-scripts` job (perf script unit tests +
 # Baseline Profile freshness, ~1 min, no emulator). A failed nightly/main run
-# opens or updates the single "perf-gate regression" issue.
+# appends a regression report to the run's job summary for triage into a bead;
+# no workflow here reports through GitHub Issues — issues are disabled on this
+# repo on purpose (all work is tracked in beads), so an issue-based reporter
+# can only add a second red job next to the real gate failure.
 on:
   push:
     branches: [main]
@@ -127,6 +130,11 @@ jobs:
     needs: perf-scripts
     if: needs.perf-scripts.outputs.run_benchmark == 'true'
     runs-on: ubuntu-latest
+    # Healthy runs take 36-47 min. The 2026-11-25 main run f460c90f hung for
+    # ~53 min with no cap (GitHub's default job limit is 360) until a human
+    # killed it. 60 ends the next hang as a clear job timeout instead; it
+    # retries nothing (reruns stay a human decision, letta-mobile-by4vm.32).
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: android-compose
@@ -141,30 +149,42 @@ jobs:
       WORKFLOW_REBASELINE: ${{ inputs.rebaseline || false }}
 
     steps:
+      # Step ids below exist so the report step at the end of the job can
+      # name whichever step failed or timed out; they change no behavior.
       - uses: actions/checkout@v4
+        id: checkout
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Java 26
+        id: java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
+        id: gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           # Optional benchmarks read required-job caches without adding copies.
           cache-read-only: true
 
       - name: Enable KVM group perms
+        id: kvm
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # The 2026-11-25 hang lived in this exact step (run 45664445540 never
+      # finished it). 50 covers the healthy worst case (47) and ends a hang as
+      # a clear step timeout while the job keeps room (60) to still publish
+      # its summaries and the regression report below.
       - name: Run macrobenchmarks on API 33 emulator
+        id: macrobenchmark
+        timeout-minutes: 50
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -198,6 +218,7 @@ jobs:
             --summary-md "$PERF_SUMMARY_DIR/perf-summary.md"
 
       - name: Publish perf summary
+        id: publish
         if: always()
         run: |
           if [[ -f "$PERF_SUMMARY_DIR/perf-summary.md" ]]; then
@@ -205,6 +226,7 @@ jobs:
           fi
 
       - name: Show the control (last 5 main runs) on a breach
+        id: control
         if: failure() && steps.check_perf.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -231,6 +253,7 @@ jobs:
       # Small, separate artifact so a later breach's control step can fetch
       # five summaries without pulling five sets of traces.
       - name: Upload perf summary
+        id: upload_summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -239,6 +262,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload perf benchmark results
+        id: upload_results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -251,6 +275,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload rebaselined perf baselines
+        id: upload_baselines
         if: always() && (inputs.rebaseline || contains(github.event.pull_request.title || '', '[perf:rebaseline]'))
         uses: actions/upload-artifact@v4
         with:
@@ -258,47 +283,93 @@ jobs:
           path: android-compose/perf/baselines.json
           if-no-files-found: error
 
-  # A red nightly/main run must not sit unnoticed in the Actions tab: open (or
-  # comment on) one tracking issue, de-duplicated by its exact title.
-  report-regression:
-    name: report perf regression
-    needs: [perf-scripts, perf-gate]
-    if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: write
-    steps:
-      - name: Open or update the "perf-gate regression" issue
+      # Regression reporting, in the run's job summary. Issues are disabled on
+      # this repo on purpose (all work is tracked in beads, AGENTS.md), so the
+      # old `report-regression` job — which opened or commented on the
+      # "perf-gate regression" issue — could only fail and add a second red
+      # job next to the gate's real result. This step reports instead.
+      - name: Report perf regression in the run summary
+        id: report_regression
+        if: failure()
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TITLE: perf-gate regression
+          STEPS: ${{ toJSON(steps) }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          EVENT_NAME: ${{ github.event_name }}
           SHA: ${{ github.sha }}
-          SCRIPTS_RESULT: ${{ needs.perf-scripts.result }}
-          GATE_RESULT: ${{ needs.perf-gate.result }}
         run: |
           set -euo pipefail
-          body="$(cat <<EOF
-          The \`Android Perf Gate\` ${EVENT_NAME} run on main failed.
+          failed_steps="$(jq -r '[to_entries[]
+              | select(.value.outcome == "failure" or .value.outcome == "cancelled")
+              | .key] | join(", ")' <<<"$STEPS")"
+          {
+            echo "## perf-gate regression"
+            echo
+            echo "The Android Perf Gate failed."
+            echo
+            echo "- Run: ${RUN_URL}"
+            echo "- Commit: ${SHA}"
+            echo "- Failed or timed-out step(s): ${failed_steps:-none recorded — open the run log}"
+            echo
+            echo "Triage with docs/performance/perf-gate.md and file or update a bead."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          - Run: ${RUN_URL}
-          - Commit: ${SHA}
-          - perf-scripts: ${SCRIPTS_RESULT}; perf-gate: ${GATE_RESULT}
-
-          The run's job summary has the perf summary and, on a breach, the control
-          (last 5 main runs). Triage with docs/performance/perf-gate.md and
-          docs/performance/playbook.md; close this issue once main is green again.
-          EOF
-          )"
-          number="$(gh issue list --state open --search "\"$TITLE\" in:title" \
-            --json number,title --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")"
-          if [[ -n "$number" ]]; then
-            gh issue comment "$number" --body "$body"
-            echo "Commented on #$number" >> "$GITHUB_STEP_SUMMARY"
+  # Safety net for the one failure the step above cannot report: a job killed
+  # by its `timeout-minutes: 60` runs no further steps, so nothing left in
+  # perf-gate can append to the summary. This tiny job runs on every
+  # perf-gate failure, reads this run's own job data (workflow permissions:
+  # contents/actions read only — no write scope of any kind) and stays silent
+  # when the step above already wrote the report, so the summary carries it
+  # exactly once. A hung gate is never unreported.
+  report-timeout-regression:
+    name: report perf regression
+    needs: perf-gate
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write a summary report for a timed-out or otherwise unreported gate failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Must match the in-job step name in `perf-gate` above, which is
+          # looked up in this run's own job data to see whether it succeeded.
+          report_step="Report perf regression in the run summary"
+          jobs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs?per_page=100" 2>/dev/null || true)"
+          already_reported=0
+          failed_steps=""
+          if [[ -n "$jobs" ]] && jq -e . >/dev/null 2>&1 <<< "$jobs"; then
+            already_reported="$(jq -r --arg s "$report_step" '
+              ([.jobs[] | select(.name == "perf-gate")][0].steps // [])
+              | [.[] | select(.name == $s and .conclusion == "success")] | length' <<< "$jobs")"
+            if [[ "${already_reported:-0}" == 0 ]]; then
+              failed_steps="$(jq -r --arg s "$report_step" '
+                [.jobs[] | select(.name == "perf-gate")][0]
+                | [(.steps // [])[]
+                   | select(.name != $s)
+                   | select(.conclusion == "failure"
+                         or .conclusion == "cancelled"
+                         or ((.conclusion == null) and .status == "in_progress"))
+                   | .name] | join(", ")' <<< "$jobs")"
+            fi
           else
-            gh issue create --title "$TITLE" --body "$body"
-            echo "Opened a new \"$TITLE\" issue" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::could not read this run's job data; writing a generic report."
           fi
+          if [[ "${already_reported:-0}" != 0 ]]; then
+            echo "perf-gate already reported the regression in its job summary; nothing to add."
+            exit 0
+          fi
+          {
+            echo "## perf-gate regression"
+            echo
+            echo "The Android Perf Gate failed and its own job could not write this"
+            echo "report — most likely the job's \`timeout-minutes: 60\` killed it"
+            echo "mid-step."
+            echo
+            echo "- Run: ${RUN_URL}"
+            echo "- Commit: ${SHA}"
+            echo "- Failed or timed-out step(s): ${failed_steps:-the one perf-gate was in when it was killed — see the run log}"
+            echo
+            echo "Triage with docs/performance/perf-gate.md and file or update a bead."
+          } >> "$GITHUB_STEP_SUMMARY"

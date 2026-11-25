@@ -67,7 +67,7 @@ A green task with no analysed files or no selected tests is not verification.
 
 | Check | Workflow | Runs on | What it runs |
 |---|---|---|---|
-| `perf-gate` | `android-perf.yml` | **nightly (07:00 UTC) + main pushes** (+ dispatch); on a PR only when it edits `android-perf.yml`, `android-compose/perf/**` or `android-compose/macrobenchmark/**`, or has `[perf:rebaseline]` in its title | **one** cold/warm startup macrobenchmark on the API 33 emulator (~30 min). No automatic rerun: on a breach the job summary shows the last 5 main runs as a control and a human decides (`docs/performance/perf-gate.md`). A red nightly/main run opens or comments on the single `perf-gate regression` issue. |
+| `perf-gate` | `android-perf.yml` | **nightly (07:00 UTC) + main pushes** (+ dispatch); on a PR only when it edits `android-perf.yml`, `android-compose/perf/**` or `android-compose/macrobenchmark/**`, or has `[perf:rebaseline]` in its title | **one** cold/warm startup macrobenchmark on the API 33 emulator (~30 min). No automatic rerun: on a breach the job summary shows the last 5 main runs as a control and a human decides (`docs/performance/perf-gate.md`). Bounded timeouts (job 60 min, emulator step 50) end a hang instead of letting the runner burn; a red nightly/main run appends a regression report to the run's job summary — run URL, commit, and the failed or timed-out step — for triage into a bead; never a GitHub issue (issues are disabled on this repo on purpose). |
 | `perf-scripts` | `android-perf.yml` | every PR + main pushes + nightly | perf script unit tests and the Baseline Profile freshness check (warns, never fails); ~1 min, no emulator. |
 | `embedded-runtime-node18` | `embedded-runtime-node18.yml` | PRs touching `letta-code-runtime/`, the embedded staging task, `scripts/embedded-runtime/`, `appserver-cli/` or the `LocalAppServerHost` package; every main push | stages the APK's letta-code tree with `:app:prepareEmbeddedLettaCodeAssets`, enforces the 28 MiB gzip budget, then boots it on Node 18.20.4 (the device's nodejs-mobile) behind an android-platform emulation preload: a headless Bash turn and a `LocalAppServerHost` + `app-server-smoke` turn against a fake LLM. A red run names the first missing API (`docs/architecture/embed-letta-code-integration.md`). ~3 min (Gradle staging ~1.5 min, the Node 18 run ~10 s). |
 | `windows-installer` / `desktop-installer-pass`, `iroh-probe-gate`, `appserver-contract-baseline`, `build-iroh-wrapper-pass` | `desktop.yml`, `iroh-probe.yml`, `appserver-contract.yml`, `android.yml` | path-filtered PRs / pushes | their own builds and probes; not in branch protection. |
@@ -235,7 +235,8 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt
 #    Required (any red = merge blocked):
 #      `test`, `build-apk-pass`, `shared-multiplatform`
 #    Not a PR gate: `perf-gate` (emulator macrobenchmark) runs nightly +
-#    on main; a red run files the `perf-gate regression` issue.
+#    on main; a red run's job summary carries the regression report for
+#    triage into a bead.
 #    Not required but honest (red means a NEW problem in your diff; fix it):
 #    - `detekt` — fails only on findings outside detekt-baseline.xml.
 #    - `Platform UI gate` — new platform @Composable file / allowlist change.
