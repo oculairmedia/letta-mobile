@@ -54,8 +54,18 @@ class TelemetryLifecycleAfterAbandonedTransportTest {
         }
         // The owner's lifecycle ends; the test never calls disconnect()/close().
         owner.coroutineContext[Job]!!.cancel()
-        val deadline = System.nanoTime() + 2_000_000_000L
-        while (transport.isLivenessProbeArmed && System.nanoTime() < deadline) delay(5)
+        // Disarm is not quiescence: [IrohLivenessProbe.isArmed] turns false the instant
+        // cancel() bites the job, but the loop's already-running tail still executes its
+        // non-suspending remainder on its IO thread (up to one last probe classification
+        // writing a Telemetry event into whichever recorder is installed by then). That
+        // straggler write landing inside the scenario's `first` ring below was the
+        // intermittent CI flake asserting at TelemetryLifecycleTest.kt:83 — the
+        // disarm-only gate passed while the write was still in flight. Join the
+        // transport's own job instead: when join() returns, every transport coroutine —
+        // the liveness loop included — has finished executing, so no late write can land
+        // in any history the scenario installs. The assertFalse keeps the #2631 contract
+        // that the loop cannot outlive the transport's owner.
+        transport.transportJob.join()
         assertFalse(transport.isLivenessProbeArmed, "the liveness loop outlived the transport's owner")
     }
 
