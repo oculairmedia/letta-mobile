@@ -52937,7 +52937,14 @@ public final class com/letta/mobile/data/shell/ShellRoute {
 
 public final class com/letta/mobile/data/shell/ShellSettingsSection : java/lang/Enum {
 	public static final field About Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Appearance Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Backend Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Chat Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Danger Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Developer Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Notifications Lcom/letta/mobile/data/shell/ShellSettingsSection;
 	public static final field Pairing Lcom/letta/mobile/data/shell/ShellSettingsSection;
+	public static final field Providers Lcom/letta/mobile/data/shell/ShellSettingsSection;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shell/ShellSettingsSection;
 	public static fun values ()[Lcom/letta/mobile/data/shell/ShellSettingsSection;

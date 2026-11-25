@@ -71,8 +71,25 @@ enum class UnifiedSearchKind(val id: String, val label: String) {
  * to go to. Both find conversations, the text of their messages, agents, and settings options.
  */
 enum class UnifiedSearchSurface(val kinds: List<UnifiedSearchKind>) {
-    Header(listOf(UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages, UnifiedSearchKind.Agents, UnifiedSearchKind.Canvases, UnifiedSearchKind.Settings)),
-    Palette(listOf(UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages, UnifiedSearchKind.Agents, UnifiedSearchKind.Destinations, UnifiedSearchKind.Settings)),
+    Header(
+        listOf(
+            UnifiedSearchKind.Conversations,
+            UnifiedSearchKind.Messages,
+            UnifiedSearchKind.Agents,
+            UnifiedSearchKind.Canvases,
+            UnifiedSearchKind.Settings,
+        ),
+    ),
+
+    Palette(
+        listOf(
+            UnifiedSearchKind.Conversations,
+            UnifiedSearchKind.Messages,
+            UnifiedSearchKind.Agents,
+            UnifiedSearchKind.Destinations,
+            UnifiedSearchKind.Settings,
+        ),
+    ),
 }
 
 /**

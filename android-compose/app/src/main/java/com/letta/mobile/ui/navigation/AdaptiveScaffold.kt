@@ -36,7 +36,6 @@ import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
-import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
@@ -147,15 +146,7 @@ private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(
-                shell.controllers.home,
-                fleetSearchSources(
-                    agents,
-                    fleet,
-                    shell.workspace.focusedAgentId,
-                    settings = defaultUnifiedSearchOptions(shell.config, notifications = true, providers = true),
-                ),
-            ),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)),
             tabFor = fleetTabFor(fleet),
         ),
     )

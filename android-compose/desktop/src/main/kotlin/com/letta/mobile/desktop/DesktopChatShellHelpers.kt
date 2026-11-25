@@ -280,8 +280,7 @@ private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDe
 
 /**
  * The window's one unified search, shared by the header, the command palette and the quick-query bar:
- * what the shell holds, plus message text from a host-side index over App Server reads, and the
- * Settings rows of the saved backend's own sections.
+ * what the shell holds (its Settings options included), plus message text from a host-side index.
  */
 @Composable
 internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversations: List<DesktopConversationSummary>, focus: DesktopAgentFocus): UnifiedSearchSources {
@@ -292,8 +291,7 @@ internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversa
     val workPlayMode = context.navigator.workPlayMode
     val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }
     val config = context.core.bootstrap.activeConfig
-    val settings = remember(config) { defaultUnifiedSearchOptions(config, notifications = true, providers = true) }
-    return remember(conversations, focus, canvases, destinations, messages, settings) {
+    return remember(conversations, focus, canvases, destinations, messages, config) {
         UnifiedSearchSources(
             conversations,
             focus.rosterAgents,
@@ -302,7 +300,7 @@ internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversa
             focus.selectedAgentId,
             destinations,
             messageSearch = messages,
-            settings = settings,
+            settings = defaultUnifiedSearchOptions(config, notifications = true, providers = true),
         )
     }
 }

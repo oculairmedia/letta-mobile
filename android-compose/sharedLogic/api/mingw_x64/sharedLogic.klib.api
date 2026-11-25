@@ -3602,7 +3602,14 @@ final enum class com.letta.mobile.data.shell/ShellPageKind : kotlin/Enum<com.let
 
 final enum class com.letta.mobile.data.shell/ShellSettingsSection : kotlin/Enum<com.letta.mobile.data.shell/ShellSettingsSection> { // com.letta.mobile.data.shell/ShellSettingsSection|null[0]
     enum entry About // com.letta.mobile.data.shell/ShellSettingsSection.About|null[0]
+    enum entry Appearance // com.letta.mobile.data.shell/ShellSettingsSection.Appearance|null[0]
+    enum entry Backend // com.letta.mobile.data.shell/ShellSettingsSection.Backend|null[0]
+    enum entry Chat // com.letta.mobile.data.shell/ShellSettingsSection.Chat|null[0]
+    enum entry Danger // com.letta.mobile.data.shell/ShellSettingsSection.Danger|null[0]
+    enum entry Developer // com.letta.mobile.data.shell/ShellSettingsSection.Developer|null[0]
+    enum entry Notifications // com.letta.mobile.data.shell/ShellSettingsSection.Notifications|null[0]
     enum entry Pairing // com.letta.mobile.data.shell/ShellSettingsSection.Pairing|null[0]
+    enum entry Providers // com.letta.mobile.data.shell/ShellSettingsSection.Providers|null[0]
 
     final val entries // com.letta.mobile.data.shell/ShellSettingsSection.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shell/ShellSettingsSection> // com.letta.mobile.data.shell/ShellSettingsSection.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -84573,7 +84580,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSock
 final suspend fun com.letta.mobile.ui.chat.render/chatSearchRemoteHits(com.letta.mobile.data.model/AgentId, kotlin/String, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/MessageSearchRequest, kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage>>): kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage> // com.letta.mobile.ui.chat.render/chatSearchRemoteHits|chatSearchRemoteHits(com.letta.mobile.data.model.AgentId;kotlin.String;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.MessageSearchRequest,kotlin.collections.List<com.letta.mobile.data.model.ParsedSearchMessage>>){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [linuxX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

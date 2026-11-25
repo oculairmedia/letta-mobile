@@ -51,16 +51,23 @@ internal fun SettingsPageServices.searchEntries(mode: LettaConfig.Mode, hasSaved
  * binds (the page leaves their rows out where no port exists); a null [config] (nothing saved yet)
  * leaves the backend form and the danger zone out.
  */
-fun defaultUnifiedSearchOptions(config: LettaConfig?, notifications: Boolean = false, providers: Boolean = false): List<UnifiedSettingsOption> =
-    defaultSettingsSearchEntries(config, notifications, providers).map { entry ->
-        UnifiedSettingsOption(group = entry.group.name, section = entry.section, title = entry.title, helper = entry.helper)
-    }
+fun defaultUnifiedSearchOptions(
+    config: LettaConfig?,
+    notifications: Boolean = false,
+    providers: Boolean = false,
+): List<UnifiedSettingsOption> = defaultSettingsSearchEntries(config, notifications, providers).map { entry ->
+    UnifiedSettingsOption(group = entry.group.name, section = entry.section, title = entry.title, helper = entry.helper)
+}
 
 /**
  * The settings behind [defaultUnifiedSearchOptions]: the same rows, as the Settings page's own
  * entries. Kept internal; the page's search and the options above read the same copy.
  */
-internal fun defaultSettingsSearchEntries(config: LettaConfig?, notifications: Boolean = false, providers: Boolean = false): List<SettingsSearchEntry> =
+internal fun defaultSettingsSearchEntries(
+    config: LettaConfig?,
+    notifications: Boolean = false,
+    providers: Boolean = false,
+): List<SettingsSearchEntry> =
     backendCatalogEntries(config) +
         accessibilityEntries() +
         appearanceCatalogEntries() +

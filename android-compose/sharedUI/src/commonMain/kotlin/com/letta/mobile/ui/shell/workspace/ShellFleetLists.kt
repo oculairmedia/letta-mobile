@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
-import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.Agent
@@ -14,16 +14,24 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.UnifiedSettingsOption
 
-/** The search over a host holding a conversation fleet and its roster; [settings] adds the Settings rows. */
+/**
+ * The search over a host holding a conversation fleet and its roster: the header covers the
+ * [settings] rows and canvases too, and the palette's "Go to" pages default to this fleet's own
+ * ([fleetPaletteDestinations] of the lens's sections) unless the host has its own.
+ */
 fun fleetSearchSources(
     agents: List<Agent>,
     fleet: List<Conversation>,
     focusedAgentId: AgentId?,
     settings: List<UnifiedSettingsOption> = emptyList(),
+    canvases: List<CanvasDocument> = emptyList(),
+    destinations: List<UnifiedSearchDestination> = fleetPaletteDestinations(WorkPlayMode.Work),
 ) = UnifiedSearchSources(
     conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
     agents = agents,
     agentId = focusedAgentId?.value,
+    canvases = canvases,
+    destinations = destinations,
     settings = settings,
 )
 

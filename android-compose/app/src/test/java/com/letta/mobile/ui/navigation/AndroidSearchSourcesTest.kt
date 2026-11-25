@@ -7,15 +7,17 @@ import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
+import com.letta.mobile.ui.shell.workspace.fleetSearchSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
 /**
- * Pins what the shell's overlays (the command palette) search: the live fleet conversations, the
- * canvas library and the Settings entries — not only the agents — plus the palette's own
- * destinations and the standard rows the Settings search catalogs for this host.
+ * Pins what Android's command palette searches (ConversationsGraph wires its overlay's sources
+ * from these very calls): the live fleet conversations, the canvas library, the palette's own
+ * pages and the Settings options — not only the agents, as the older palette did.
  */
 @Tag("unit")
 class AndroidSearchSourcesTest {
@@ -24,13 +26,9 @@ class AndroidSearchSourcesTest {
     private val canvases = listOf(CanvasDocument(id = CanvasId("board-1"), agentId = agent.id.value, title = "Release board"))
     private val config = LettaConfig(id = "config", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://letta.example")
 
-    private val sources = androidSearchSources(
-        agents = listOf(agent),
-        fleet = fleet,
-        canvases = canvases,
-        config = config,
-        focusedAgentId = agent.id,
-    )
+    /** The palette's sources, exactly as ConversationsGraph builds them for its overlays. */
+    private val sources = fleetSearchSources(agents = listOf(agent), fleet = fleet, focusedAgentId = agent.id, canvases = canvases)
+        .copy(settings = defaultUnifiedSearchOptions(config, notifications = true, providers = true))
 
     @Test
     fun `the palette searches live conversations`() {
