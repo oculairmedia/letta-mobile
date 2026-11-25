@@ -22,7 +22,7 @@ class GateFixtures(unittest.TestCase):
         self.git("init", "-q")
         self.git("config", "user.email", "fixture@example.com")
         self.git("config", "user.name", "Fixture")
-        self.write(BASELINE, "dot .legacy\nmd plan/old.md\nscript old/legacy.py\n")
+        self.write(BASELINE, "dot .legacy\nscript old/legacy.py\n")
         self.write(BUDGET, json.dumps({"groups": {"app": {"ceiling_gzip_bytes": 100}}}))
         self.write(".legacy/existing.txt", "old")
         self.write("plan/old.md", "old")
@@ -55,14 +55,24 @@ class GateFixtures(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("new top-level dot-directory: .new/new.txt", result.stderr)
 
-    def test_markdown_locations_and_existing_exception(self):
-        for path in ("docs/new.md", "android-compose/app/Module.md", "android-compose/app/README.md", "README.md"):
+    def test_new_markdown_is_banned_except_tool_required_paths(self):
+        # Allowed: a wire-contract spec paired with its fixture, and a module's Dokka overview.
+        for path in ("docs/reference/contracts/agent.list/slim-list-v2.md", "android-compose/app/Module.md"):
             self.write(path, "ok")
         self.assertEqual(self.run_gate(TREE_GATE).returncode, 0)
-        self.write("plan/new.md", "bad")
-        result = self.run_gate(TREE_GATE)
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("misplaced Markdown: plan/new.md", result.stderr)
+        # Banned everywhere else, including docs/, module READMEs and prose contracts at the spec root.
+        for path in ("docs/new.md", "android-compose/app/README.md", "docs/reference/contracts/prose-v1.md", "notes/todo.md"):
+            self.write(path, "bad")
+            result = self.run_gate(TREE_GATE)
+            self.assertEqual(result.returncode, 1, path)
+            self.assertIn(f"new Markdown file (put it in a bead, KDoc or an existing doc): {path}", result.stderr)
+            (self.root / path).unlink()
+
+    def test_existing_markdown_may_be_edited_moved_or_deleted(self):
+        self.write("plan/old.md", "edited")
+        self.assertEqual(self.run_gate(TREE_GATE).returncode, 0)
+        (self.root / "plan/old.md").unlink()
+        self.assertEqual(self.run_gate(TREE_GATE).returncode, 0)
 
     def test_scripts_require_a_real_reference(self):
         self.write("scripts/ok.py", "ok")
@@ -104,7 +114,7 @@ class GateFixtures(unittest.TestCase):
 
     def test_renames_are_checked_as_additions(self):
         self.git("mv", "plan/old.md", "plan/new.md")
-        self.assertIn("misplaced Markdown: plan/new.md", self.run_gate(TREE_GATE).stderr)
+        self.assertIn("new Markdown file (put it in a bead, KDoc or an existing doc): plan/new.md", self.run_gate(TREE_GATE).stderr)
 
     def budget(self, value, name="app"):
         self.write(BUDGET, json.dumps({"groups": {name: {"ceiling_gzip_bytes": value}}}))
