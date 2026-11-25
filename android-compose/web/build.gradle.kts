@@ -77,6 +77,9 @@ kotlin {
         compilerOptions {
             // A missing graphics symbol must fail linking rather than become a runtime stub.
             freeCompilerArgs.add("-Xpartial-linkage-loglevel=error")
+            // Cold-load (letta-mobile-qeoad): link out the KClass FQN tables - no web-reachable
+            // code reads qualifiedName (simpleName is unaffected) and the tables cost 95.8 KB gzip.
+            freeCompilerArgs.add("-Xwasm-kclass-fqn=false")
         }
         browser {
             commonWebpackConfig {
