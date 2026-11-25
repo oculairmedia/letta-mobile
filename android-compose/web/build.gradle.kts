@@ -146,7 +146,7 @@ tasks.named<ProcessResources>("wasmJsProcessResources") {
     val buildId = gitSha.zip(gitDirty) { sha, dirty ->
         when {
             sha.isNotEmpty() && !dirty -> sha
-            else -> "${sha.ifEmpty { "nogit" }}-${java.time.Instant.now().epochSecond}"
+            else -> "${sha.ifEmpty { "nogit" }}-${System.currentTimeMillis() / 1000L}"
         }
     }
     inputs.property("brandName", identity.name)
