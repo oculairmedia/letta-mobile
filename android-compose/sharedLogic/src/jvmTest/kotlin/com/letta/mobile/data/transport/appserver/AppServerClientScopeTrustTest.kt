@@ -86,7 +86,7 @@ class AppServerClientScopeTrustTest {
             .filter { OWNER_ARGUMENT.containsMatchIn(it.readText()) }
             .map { it.name }
             .toSortedSet()
-        assertEquals(sortedSetOf("AppServerServeIrohCommand.kt"), owners)
+        assertEquals(sortedSetOf("NodeAppServerConnector.kt"), owners)
     }
 
     private fun owner(): AppServerClient = DefaultAppServerClient(SilentTransport(), vouchesForRuntimeScope = true)

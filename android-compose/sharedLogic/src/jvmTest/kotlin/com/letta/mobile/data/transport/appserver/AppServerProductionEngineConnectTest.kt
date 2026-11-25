@@ -187,8 +187,9 @@ class AppServerProductionEngineConnectTest {
     // -------------------------------------------- mirrored production configs
 
     /**
-     * SOURCE: `iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/
-     * AppServerServeIrohCommand.kt` — `createLiveController`. This is the client
+     * SOURCE: `sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/node/
+     * JvmAppServerHttpClients.kt` with a request timeout, which the node's live
+     * controller (and so the iroh wrapper) dials through. This is the client
      * that went dark in production on 2026-07-31.
      */
     private fun irohWrapperLiveControllerClient(): HttpClient = HttpClient(ClientCIO) {
@@ -201,7 +202,7 @@ class AppServerProductionEngineConnectTest {
     }
 
     /**
-     * SOURCE: `AppServerServeIrohCommand.kt` — `createStubController`.
+     * SOURCE: `JvmAppServerHttpClients.kt` without a request timeout (the node's stub controller).
      */
     private fun irohWrapperStubControllerClient(): HttpClient = HttpClient(ClientCIO) {
         install(ClientWebSockets) { applyAppServerFrameLimits() }

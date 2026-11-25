@@ -1,79 +1,60 @@
 package com.letta.mobile.cli.commands
 
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
+import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.cli.commands.mounts.CanvasMountOptions
 import com.letta.mobile.cli.commands.mounts.CanvasMountWiring
 import com.letta.mobile.cli.commands.mounts.HostCanvasRecords
 import com.letta.mobile.cli.commands.mounts.upgradePairedDevicesForCanvasMounts
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
-import com.letta.mobile.cli.process.LinuxAppServerProcessIdentity
-
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.groups.provideDelegate
-import com.github.ajalt.clikt.parameters.types.choice
-import com.github.ajalt.clikt.parameters.types.int
+import com.letta.mobile.cli.commands.records.WrapperStoreOptions
 import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
 import com.letta.mobile.cli.meridian.MeridianToolsOptions
 import com.letta.mobile.cli.meridian.servesCli
-import com.letta.mobile.cli.commands.records.WrapperStoreOptions
-import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.cli.process.linuxNodePorts
+import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
-import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
 import com.letta.mobile.data.controller.extras.AgentDiscoveryTool
+import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
+import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
+import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
+import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAgentDiscoverySource
-import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
-import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
-import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
-import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
-import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
+import com.letta.mobile.data.node.NodeAdminConfig
+import com.letta.mobile.data.node.NodeAdminExtras
+import com.letta.mobile.data.node.NodeComposition
+import com.letta.mobile.data.node.NodeConfig
+import com.letta.mobile.data.node.NodeEndpointConfig
+import com.letta.mobile.data.node.NodeEndpointParts
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.runtime.host.ownedLocalAppServerHost
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
-import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
-import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
-import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
-import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
-import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
-import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
-import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
-import com.letta.mobile.data.canvas.NotebookLocalStore
-import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
-import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
-import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
-import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
-import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
-import com.letta.mobile.util.Telemetry
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.websocket.WebSockets
+import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
+import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlin.system.exitProcess
-
-import kotlin.time.Duration.Companion.seconds
-import com.letta.mobile.data.controller.node.iroh.IrohEndpointBinding
 
 /**
  * CLI command to serve the Letta App Server over Iroh transport.
@@ -346,15 +327,6 @@ class AppServerServeIrohCommand : CliktCommand(
             "the tool. Default: empty (no Iroh agent-to-agent tool advertised).",
     ).default("")
 
-    /**
-     * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
-     * every reconnect can re-wire channel ingress in its first round trip instead
-     * of after a full enumeration. Held here (not in the coordinator) because a
-     * fresh coordinator is built per App Server generation.
-     */
-    private val channelAccountCache =
-        com.letta.mobile.data.controller.channels.InMemoryChannelAccountCache()
-
     /** letta-mobile-jna0o.4: the local `meridian/tools/1` endpoint; off unless --agent-tools-mode cli. */
     private val meridianTools by MeridianToolsOptions()
 
@@ -390,8 +362,11 @@ class AppServerServeIrohCommand : CliktCommand(
             },
         ) {
             val authPolicy = resolveAuthPolicy()
-            val identityRows = com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows()
-            val turnIdentity = newTurnIdentityLedger(identityRows)
+            val node = NodeComposition(
+                config = nodeConfig(),
+                ports = nodePorts(),
+                scope = scope,
+            )
 
             val pairingService = access.pairingService(::println, canvasMountsEnabled = enableCanvasMounts)
 
@@ -413,9 +388,8 @@ class AppServerServeIrohCommand : CliktCommand(
             val backendDir = effectiveA2aBackendDir(localBackendDir, ownAppServer, System.getProperty("user.home"))
             val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget, backendDir)
 
-            val endpoint = newIrohEndpoint(
-                scope, authPolicy, pairingService, canvasRelay,
-                listOfNotNull(notebookProtocol, a2a?.receiver), turnIdentity,
+            val endpoint = node.endpoint(
+                NodeEndpointParts(authPolicy, pairingService, canvasRelay, listOfNotNull(notebookProtocol, a2a?.receiver)),
             )
             irohEndpoint = endpoint
             endpoint.attachAppToolRelay(appToolRelay)
@@ -431,49 +405,31 @@ class AppServerServeIrohCommand : CliktCommand(
             // Create the controller. With --own-app-server this connects the WS
             // transport to the owned loopback child with its token; otherwise to the
             // external URL (null = Iroh-only/stub mode).
-            val appServerEndpoint = ownedLease?.let { AppServerEndpoint.fromWebSocketUrl(it.serverUrl, it.bearerToken) }
-                ?: appServerUrl?.let(AppServerEndpoint::fromWebSocketUrl)
-            val (controller, nativeAdminClient) = createController(appServerEndpoint, requestTimeout.toLong(), scope)
-            a2aClient.set(nativeAdminClient)
+            val connection = ownedLease?.let { node.connect(it, productionToolRegistry) }
+                ?: node.connect(appServerUrl?.let(AppServerEndpoint::fromWebSocketUrl), productionToolRegistry)
+            a2aClient.set(connection.client)
 
-            canvasMountRoutes = canvasMounts?.routes(authPolicy, nativeAdminClient, endpoint.conversationViewers())
-            setupAdminRpc(
+            canvasMountRoutes = canvasMounts?.routes(authPolicy, connection.client, endpoint.conversationViewers())
+            node.installAdminRpc(
                 endpoint = endpoint,
-                admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows, voiceMemoryDir(backendDir)),
-                scope = scope,
-                pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
-                pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
-                notebooks = notebookStore,
+                connection = connection,
+                extras = NodeAdminExtras(
+                    pairingService = pairingService,
+                    pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
+                    pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
+                    canvasMountRoutes = canvasMountRoutes,
+                    voiceMemoryDir = voiceMemoryDir(backendDir),
+                    hostRoutes = listOfNotNull(notebookGrantRoutes(notebookStore)),
+                ),
             )
 
-            startMeridianTools(scope, nativeAdminClient)
-
-            // Start accepting connections
-            endpoint.start(controller)
+            // Start the tools socket, then accept connections
+            node.start(endpoint, connection)
             println("[iroh-app-server] Listening on Iroh... (Ctrl+C to stop)")
 
             awaitServerLoop()
         }
     }
-
-    /** The host's Iroh endpoint with every protocol handler registered up front (ALPNs fix at bind). */
-    private fun newIrohEndpoint(
-        scope: CoroutineScope,
-        authPolicy: com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy,
-        pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService?,
-        canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay?,
-        protocolHandlers: List<com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler>,
-        turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger,
-    ): IrohNodeEndpoint = IrohNodeEndpoint(
-        scope = scope,
-        binding = IrohEndpointBinding(bindAddr = "0.0.0.0:${irohPort}", secretKeyPath = irohSecretKeyPath),
-        authPolicy = authPolicy,
-        pairingService = pairingService,
-        canvasRelay = canvasRelay,
-        protocolHandlers = protocolHandlers,
-        turnIdentity = turnIdentity,
-        turnJournal = feedJournal,
-    )
 
     /**
      * letta-mobile-jna0o.4: serve the router over the registry the controller advertises, binding
@@ -570,126 +526,40 @@ class AppServerServeIrohCommand : CliktCommand(
         return store to protocol
     }
 
-    private class AdminContext(
-        val controller: DefaultAppServerController,
-        val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient?,
-        val pairingService: IrohPairingService?,
-        val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger,
-        val identityRows: com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows,
-        /** Where the agents' memory lives for the voice cores ([voiceMemoryDir]); null reads none. */
-        val memoryDir: java.io.File?,
-    )
-
-    /**
-     * letta-mobile-r1xkl: the host's stream-to-stored identity ledger, persisted under
-     * `turn-identity/` in the directory that already holds the model-exposure file. Its rows source
-     * is bound to the App Server client once [setupAdminRpc] has it.
-     */
-    private fun newTurnIdentityLedger(
-        rows: com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows,
-    ) = com.letta.mobile.data.runtime.TurnIdentityLedger(
-        store = com.letta.mobile.data.controller.node.iroh.FileTurnIdentityStore.inHostState(
-            java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile,
-        ),
-        rows = rows,
-        clock = System::currentTimeMillis,
-    )
-
-    private fun setupAdminRpc(
-        endpoint: IrohNodeEndpoint,
-        admin: AdminContext,
-        scope: CoroutineScope,
-        pairingQr: PairingQrConfig?,
-        pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
-        notebooks: NotebookLocalStore?,
-    ) {
-        admin.nativeClient?.let(admin.identityRows::bind)
-        val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
-        val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
-        // letta-mobile-fxoew.2: the registry pushes its snapshot to conversation viewers.
-        var subagentPublisher: com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher? = null
-        // letta-mobile-a4tm7: a confirmed permission_mode.set reaches every viewer's chip.
-        val permissionModes = com.letta.mobile.data.controller.node.iroh.PermissionModePublisher(scope)
-        // The pinned agents every device shares; each accepted change is pushed to all of them.
-        val pinsPublisher = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsPublisher(scope)
-        // The shell state document every device shares; each accepted change is pushed to all of them.
-        val shellStatePublisher = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher(scope)
-        val hostStateDirectory = java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath()
-        val adminRpcRouter = buildProductionAdminRouter(
-            controller = admin.controller,
-            pairingService = admin.pairingService,
-            nativeClient = admin.nativeClient,
+    /** The node's configuration from this command's options. */
+    private fun nodeConfig() = NodeConfig(
+        modelExposureFile = resolvedModelExposureFile(),
+        requestTimeoutMs = requestTimeout.toLong(),
+        endpoint = NodeEndpointConfig(bindAddr = "0.0.0.0:${irohPort}", secretKeyPath = irohSecretKeyPath),
+        admin = NodeAdminConfig(
             vibesyncBaseUrl = vibesyncBaseUrl,
             beadsBaseUrl = beadsBaseUrl,
             beadsTokenFile = beadsTokenFile,
             subagentRegistryFile = subagentRegistryFile,
-            appServerProcessIdentity = LinuxAppServerProcessIdentity(
-                appServerUrl.takeUnless { ownAppServer }, appServerPidFile?.let(java.nio.file.Path::of),
-            ),
             skillsDir = skillsDir,
             localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
-            eventScope = scope,
-            agentChanges = agentChanges,
-            conversationChanges = conversationChanges,
-            modelExposureFile = resolvedModelExposureFile(),
             runRecordsFile = wrapperStores.runRecordsFile,
-            turnIdentity = admin.turnIdentity,
-            pairingQr = pairingQr,
-            subagentPublisher = { source ->
-                com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher(scope, source)
-                    .also { subagentPublisher = it }
-            },
-            permissionModes = permissionModes,
-            pluginRoutes = pluginRoutes,
-            canvasMountRoutes = canvasMountRoutes,
-            // The shared speech setup lives beside the model exposure decisions; its key in an owner-only file.
-            // Each agent's voice core is read from its own `voice` memory block in the local backend.
-            voiceRoutes = com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes.forHost(hostStateDirectory, admin.memoryDir),
-            pinsRoutes = com.letta.mobile.data.controller.node.iroh.pins.AgentPinsRoutes.forHost(hostStateDirectory, pinsPublisher),
-            shellStateRoutes = com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes.forHost(
-                hostStateDirectory, shellStatePublisher,
-            ),
-            // Non-LLM service credentials live beside them too; the secrets in an owner-only file.
-            serviceCredentialRoutes = com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCredentialRoutes.forHost(
-                hostStateDirectory,
-            ),
-            feedRoutes = com.letta.mobile.data.controller.node.iroh.feed.FeedRoutes.forHost(feedJournal, pushes = true),
-        )
-        notebookGrantsFile?.let { file ->
+        ),
+    )
+
+    /** The Linux node ports: the external App Server's MainPID identity and the meridian tools socket. */
+    private fun nodePorts() = linuxNodePorts(
+        externalServerUrl = appServerUrl.takeUnless { ownAppServer },
+        pidFile = appServerPidFile?.let(java.nio.file.Path::of),
+    ) { scope, client -> startMeridianTools(scope, client) }
+
+    /** The notebook grant methods over [notebooks], or null without `--notebook-grants-file`. */
+    private fun notebookGrantRoutes(notebooks: NotebookLocalStore?): AdminRpcRoutes? = notebookGrantsFile?.let { file ->
+        AdminRpcRoutes { router ->
             val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
             val requestedGrantPath = java.nio.file.Path.of(file).toAbsolutePath().normalize()
             val grantPath = requireNotNull(requestedGrantPath.parent).toRealPath().resolve(requestedGrantPath.fileName)
             val notebookPath = java.nio.file.Path.of(notebookAuthorityDir ?: requireNotNull(notebookDir)).toRealPath()
             require(!grantPath.startsWith(notebookPath)) { "Notebook grants must be outside notebook storage" }
             com.letta.mobile.wrapper.notebook.registerNotebookAdminRoutes(
-                adminRpcRouter, store, com.letta.mobile.data.canvas.authority.FileNotebookGrantStore(grantPath),
+                router, store, com.letta.mobile.data.canvas.authority.FileNotebookGrantStore(grantPath),
             )
         }
-        admin.nativeClient?.let(endpoint::attachToolsetStatuses)
-        endpoint.attachPermissionModePublisher(permissionModes)
-        endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
-        subagentPublisher?.let(endpoint::attachSubagentPublisher)
-        // letta-mobile-bzvro.40: parked approvals (rules, blocked path, diffs) reach the viewers.
-        endpoint.attachPendingApprovalsPublisher(
-            com.letta.mobile.data.controller.node.iroh.PendingApprovalsPublisher(scope, admin.controller.pendingApprovals),
-        )
-        agentChanges.attach(endpoint.agentChangeTarget())
-        conversationChanges.attach(endpoint.conversationChangeTarget())
-        pinsPublisher.attach(endpoint::broadcastPinsUpdated)
-        shellStatePublisher.attach(endpoint::broadcastShellStateUpdated)
-        // The journal's writes reach the connections viewing their conversation, as feed_delta frames; it registers itself on the journal.
-        com.letta.mobile.data.controller.node.iroh.feed.FeedPusher(
-            scope, feedJournal, endpoint.conversationViewers(), endpoint::isConversationViewed,
-        )
-        println(
-            "[iroh-app-server] admin_rpc handlers registered " +
-                "(methods: ${adminRpcRouter.methodCount}, " +
-                "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
-        )
-        println(
-            "[iroh-app-server] local_backend_store: " +
-                (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR") ?: "UNSET (block.list/agent.context fail closed)"),
-        )
     }
 
     internal suspend fun <T> runWithLifecycleCleanup(
@@ -771,73 +641,6 @@ class AppServerServeIrohCommand : CliktCommand(
         return lease
     }
 
-    private fun createController(
-        endpoint: AppServerEndpoint?,
-        requestTimeoutMs: Long,
-        scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, AppServerClient?> {
-        return if (endpoint != null) {
-            createLiveController(endpoint, requestTimeoutMs, scope)
-        } else {
-            createStubController(requestTimeoutMs, scope)
-        }
-    }
-
-    private fun createLiveController(
-        endpoint: AppServerEndpoint,
-        requestTimeoutMs: Long,
-        scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, AppServerClient> {
-        val httpClient = HttpClient(CIO) {
-            install(WebSockets) { applyAppServerDefaults() }
-            install(HttpTimeout) {
-                this.requestTimeoutMillis = requestTimeoutMs
-                this.connectTimeoutMillis = 30_000
-                this.socketTimeoutMillis = requestTimeoutMs
-            }
-        }
-        val runtimeRegistry = InMemoryRuntimeRegistry()
-        var controllerRef: DefaultAppServerController? = null
-        var coordinatorRef: ReconnectCoordinator? = null
-        val adminClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, endpoint, requestTimeoutMs, scope) },
-            telemetryComponent = "AppServerAdminReconnect",
-        )
-        val runtimeClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, endpoint, requestTimeoutMs, scope) },
-            listener = recoveryListener(
-                controller = { controllerRef },
-                coordinator = { coordinatorRef },
-                adminState = adminClient.state,
-            ),
-        )
-        val routedClient = DualLaneAppServerClient(
-            runtime = runtimeClient,
-            admin = adminClient,
-        )
-        val controller = DefaultAppServerController(
-            client = routedClient,
-            runtimeRegistry = runtimeRegistry,
-            // letta-mobile-bn008-phase2-custom-tool (1vuec): wire the Iroh
-            // agent-message CLI as an external tool, gated by --meridian-binary.
-            // When unset the registry advertises no extras, preserving the
-            // previous (factoryDefault) behavior. When set, every agent's
-            // runtime_start includes the `agent_message_send` tool in
-            // external_tools so the model sees it without operator
-            // intervention. The CLI binary is the same `meridian agent-message
-            // send` the operator flow already uses; this is purely additive.
-            externalToolRegistry = productionToolRegistry,
-            // letta-mobile-by4vm.55: an upstream socket blip no longer fails the turns the App
-            // Server keeps running; they wait out the reconnect grace window instead.
-            turnsSurviveReconnect = true,
-        )
-        controllerRef = controller
-        coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
-        adminClient.start(scope)
-        runtimeClient.start(scope)
-        return controller to routedClient
-    }
-
     /**
      * letta-mobile-bn008-phase2-custom-tool (1vuec): build the production
      * [ExternalToolRegistry] for the wrapper.
@@ -915,16 +718,6 @@ class AppServerServeIrohCommand : CliktCommand(
         return canvasRelay
     }
 
-    /**
-     * The host's durable turn journal, beside its other state so a wrapper restart keeps finished turns. One per process:
-     * the endpoint's turns write to it and `feed.subscribe` reads it.
-     */
-    private val feedJournal: com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore by lazy {
-        com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore(
-            java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile.toPath().resolve("conversation-feed"),
-        )
-    }
-
     private fun resolvedModelExposureFile(): String =
         com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(wrapperStores.modelExposureFile, canvasOpsDir)
 
@@ -945,82 +738,6 @@ class AppServerServeIrohCommand : CliktCommand(
 
     /** The host's canvas_* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()
-
-    /**
-     * Mint one connection generation: a fresh WS transport + client on a job
-     * child of [scope], closable independently of its successors.
-     */
-    @Suppress("NoDetachedCoroutineLifecycle")
-    private fun mintGeneration(
-        httpClient: HttpClient,
-        endpoint: AppServerEndpoint,
-        requestTimeoutMs: Long,
-        scope: CoroutineScope,
-    ): AppServerClientGeneration {
-        val generationJob = Job(scope.coroutineContext.job)
-        val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-        val transport = KtorAppServerWebSocketTransport(
-            httpClient = httpClient,
-            baseUrl = endpoint.address,
-            scope = generationScope,
-            bearerToken = endpoint.bearerToken,
-        )
-        return AppServerClientGeneration(
-            client = DefaultAppServerClient(
-                transport,
-                requestTimeoutMs = requestTimeoutMs,
-                parentScope = generationScope,
-                // This host's own socket to its local App Server, which stamps the runtime scopes.
-                vouchesForRuntimeScope = true,
-            ),
-            connectionState = transport.connectionState,
-            close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
-        )
-    }
-
-    /**
-     * Post-connect recovery sequence, run on every generation-ready: reattach
-     * runtimes, then restore channel accounts (lgns8.23), then mark connected.
-     *
-     * The controller and coordinator are read through suppliers because both are
-     * constructed AFTER the reconnecting client they are wired into.
-     */
-    private fun recoveryListener(
-        controller: () -> DefaultAppServerController?,
-        coordinator: () -> ReconnectCoordinator?,
-        adminState: Flow<ReconnectingClientState>,
-    ): ReconnectingClientListener = object : ReconnectingClientListener {
-        override suspend fun onDisconnected(reason: String?) {
-            println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
-            controller()?.onTransportDisconnected(reason)
-        }
-
-        override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
-            awaitManagementLaneReady(adminState)
-            val result = coordinator()?.reconnect()
-            result?.errors?.forEach {
-                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
-            }
-            // lgns8.23: restore channel accounts on THIS generation's client.
-            // Must run on every generation-ready (not just the first): a repeat
-            // channel_start re-wires ingress to the live socket, which a reconnect
-            // otherwise leaves pointed at the dead one.
-            restoreChannels(client)
-            // Recovery work can take long enough for the independent management
-            // lane to roll generations. Re-check at the readiness boundary so
-            // the runtime supervisor never advertises a half-usable startup.
-            awaitManagementLaneReady(adminState)
-            controller()?.markConnected()
-            println(
-                "[iroh-app-server] App Server connection recovered " +
-                    "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-            )
-        }
-
-        override suspend fun onGaveUp(reason: String?) {
-            System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
-        }
-    }
 
     /**
      * Print the dialable NodeID/ticket, plus the short `iroh://<node-id>@<host:port>`
@@ -1052,52 +769,6 @@ class AppServerServeIrohCommand : CliktCommand(
     } catch (_: Exception) {
         emptyList()
     }
-
-    /**
-     * lgns8.23: this controller is the channels host. Restores enabled channel
-     * accounts on every App Server connect/reconnect. Never fails recovery — a
-     * channel outage must not block runtime reattach.
-     */
-    private suspend fun restoreChannels(client: AppServerClient) {
-        val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
-            client = client,
-            log = { System.err.println("[iroh-app-server] $it") },
-            // o5bqk: ONE cache for the whole process. The coordinator is rebuilt
-            // per generation (it binds to that generation's client), so this is
-            // what lets a reconnect re-wire ingress in the first round trip
-            // instead of after a full channels/accounts enumeration.
-            accountCache = channelAccountCache,
-        ).restore()
-        // Identifiers + counts only: channel account config carries cleartext
-        // plugin credentials and must never reach a log sink (lgns8.23 landmine 2).
-        println(
-            "[iroh-app-server] channels-host restore: channels=${result.channelIds.size} " +
-                "started=${result.startedAccounts} failed=${result.failures.size}",
-        )
-        result.failures.forEach {
-            System.err.println(
-                "[iroh-app-server] channel restore failed: " +
-                    "${it.channelId ?: "-"}/${it.accountId ?: "-"} phase=${it.phase} reason=${it.reason}",
-            )
-        }
-    }
-
-    private fun createStubController(
-        requestTimeoutMs: Long,
-        scope: CoroutineScope,
-    ): Pair<DefaultAppServerController, AppServerClient?> {
-        val httpClient = HttpClient(CIO) {
-            install(WebSockets) { applyAppServerDefaults() }
-        }
-        val transport = KtorAppServerWebSocketTransport(
-            httpClient = httpClient,
-            baseUrl = "ws://127.0.0.1:0",
-            scope = scope,
-            bearerToken = null,
-        )
-        val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-        return DefaultAppServerController(client) to null
-    }
 }
 
 /**
@@ -1106,17 +777,8 @@ class AppServerServeIrohCommand : CliktCommand(
  * supervisor emits `generation.ready`; later admin disconnects do not cancel
  * the already-ready runtime generation.
  */
-internal suspend fun awaitManagementLaneReady(state: Flow<ReconnectingClientState>) {
-    when (val settled = state.first {
-        it is ReconnectingClientState.Ready || it is ReconnectingClientState.GaveUp
-    }) {
-        is ReconnectingClientState.Ready -> Unit
-        is ReconnectingClientState.GaveUp -> error(
-            "App Server management lane gave up before runtime readiness: ${settled.reason ?: "unknown"}",
-        )
-        else -> error("unreachable management lane state: $settled")
-    }
-}
+internal suspend fun awaitManagementLaneReady(state: Flow<ReconnectingClientState>) =
+    com.letta.mobile.data.node.awaitManagementLaneReady(state)
 
 /**
  * Helper to determine if a network interface is a real physical/routable interface
