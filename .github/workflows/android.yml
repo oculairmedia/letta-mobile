@@ -63,25 +63,69 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # ci-speedup-pr1: the single-threaded Windows apiCheck costs 21m44s per run.
+      # It re-verifies what Linux apiCheck (required `shared-multiplatform`) already
+      # proves, host-independently, so PRs that touch no public-API surface skip it
+      # and required-test's `WINDOWS_API_RESULT` turns green in ~1m instead of 22.
+      # The Linux jobs that always run keep a moved or stale mingw_x64 dump caught
+      # by scripts/ci/api-dump-mirror-check.sh in the required `test` workload.
+      - name: Resolve whether the Windows API contract must run
+        id: win_api
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Windows apiCheck: full run (this is not a pull request)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" 2>/dev/null \
+              || git fetch --no-tags origin "${{ github.base_ref }}"
+            base="origin/${{ github.base_ref }}"
+          fi
+          if ! changed="$(git diff --name-only --diff-filter=ACMRD "${base}...HEAD")"; then
+            echo "Windows apiCheck: failed to diff ${base}...HEAD" >&2
+            exit 1
+          fi
+          if grep -Eq '^android-compose/(sharedLogic|sharedUI|core/ids|core/runtime|plugin-api|gradle|build-logic)/|\.api$|^\.github/workflows/android\.yml$' <<<"$changed"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Windows apiCheck: public-API/gradle/workflow paths changed vs the PR base; running." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "Windows apiCheck: skipped on this PR."
+              echo "No file vs the PR base touches a public-API module (\`sharedLogic\`, \`sharedUI\`, \`core/ids\`, \`core/runtime\`, \`plugin-api\`), an \`*.api\` dump, \`android-compose/gradle/**\`, \`android-compose/build-logic/**\` or this workflow. Linux apiCheck still runs in required \`shared-multiplatform\`; main pushes always run this job in full."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Windows apiCheck: skipped (no public-API path changed vs ${base})"
+          fi
       - uses: actions/setup-java@v4
+        if: steps.win_api.outputs.run == 'true'
         with:
           distribution: temurin
           java-version: 21
       - uses: actions/setup-java@v4
+        if: steps.win_api.outputs.run == 'true'
         with:
           distribution: temurin
           java-version: 26
       - name: Expose JDK 21 to Gradle's daemon resolver
+        if: steps.win_api.outputs.run == 'true'
         shell: bash
         run: |
           mkdir -p "$HOME/.gradle"
           echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        if: steps.win_api.outputs.run == 'true'
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
           cache-cleanup: on-success
       - name: Restore Konan toolchain
         id: konan
+        if: steps.win_api.outputs.run == 'true'
         # The K/N toolchain version is the catalog's kotlin version, so the key
         # is the catalog hash (letta-mobile-uwvx1). Saved only from main pushes
         # by the per-OS saver job below; PR-scoped entries would eat the quota.
@@ -92,12 +136,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
       - name: Check Windows public API contracts
+        if: steps.win_api.outputs.run == 'true'
         run: ./gradlew.bat --no-daemon --no-parallel --max-workers=1 "-Pkotlin.compiler.execution.strategy=in-process" apiCheck
       - name: Save Konan (Kotlin/Native) toolchain
         # Windows saver: klib apiCheck pulls the full Windows K/N toolchain.
         # success(), not always(): a failed or cancelled build must not save a
-        # partial toolchain. An exact restore hit means nothing new to save.
-        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.konan.outputs.cache-hit != 'true'
+        # partial toolchain. An exact restore hit means nothing new to save, and
+        # a run that skipped the apiCheck leaves the toolchain unverified.
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.konan.outputs.cache-hit != 'true' && steps.win_api.outputs.run == 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.konan
@@ -330,6 +376,10 @@ jobs:
       # edges into :app, feature->feature, shell->shell, library->feature and
       # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
       # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
+      # apiCheck moved to required `shared-multiplatform` (ci-speedup-pr1): here it
+      # dragged :sharedLogic:compileKotlinWasmJs/compileKotlinHostNative (+3m09s)
+      # onto the Android test runner; the shared job compiles those targets anyway
+      # and pushes the same abi dumps (api-contract artifact).
       - name: Install Linux hotkey build prerequisites for desktop tests
         if: contains(steps.additive_modules.outputs.tasks, ':desktop:')
         run: |
@@ -350,7 +400,6 @@ jobs:
             :app:testScreenshot
             :build-logic:test
             checkArchitectureBoundaries
-            apiCheck
             :architecture-tests:test
             :architecture-tests:architectureTest
             :architecture-tests:structureReport
@@ -370,20 +419,6 @@ jobs:
           path: ${{ runner.temp }}/gradle-hang/diagnostics.txt
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Upload actual API signatures for review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-contract-${{ github.sha }}
-          path: |
-            android-compose/**/build/kotlin/abi/**
-            android-compose/**/build/api-contract/**
-          # A missing dump is an error only when the job otherwise succeeded; after an earlier
-          # failure the API step never ran, and a second "no files" error just hides the real one.
-          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
-          retention-days: 7
-
 
       - name: Enforce structural documentation limits
         working-directory: ${{ github.workspace }}
@@ -564,12 +599,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 21
-        # Paparazzi + KMP native targets need JDK 21; Java 26 breaks them.
+      - name: Setup Java 26
+        # Same JDK as test-workload / api-docs / web-wasm / build-apk (ci-speedup-pr1)
+        # so Gradle build-cache entries are produced and consumed under one JVM:
+        # test-workload already compiles this job's wasmJs/hostNative targets on
+        # Java 26. detekt keeps JDK 21 (detekt 1.23.8 requires it).
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 26
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
@@ -632,10 +670,31 @@ jobs:
         # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
         # :core:runtime owns its contract tests (letta-mobile-by4vm.58): JVM run
         # plus native/wasm test compiles, in the same invocation.
+        # apiCheck moved here from test-workload (ci-speedup-pr1): this job already
+        # compiles the shared wasmJs/hostNative targets the ABI comparison depends
+        # on, so the Android test runner no longer pays +3m09s of KMP compiles it
+        # has no other use for. The comparison itself is the required
+        # `shared-multiplatform` check, so API drift still blocks every merge.
         run: |
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs apiCheck
           node sharedLogic/karma.config.test.cjs
+
+      # Moved with apiCheck from test-workload (ci-speedup-pr1): only apiCheck's
+      # abi/android dump tasks write build/kotlin/abi and build/api-contract, so
+      # this artifact uploads from the job that runs the check.
+      - name: Upload actual API signatures for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-contract-${{ github.sha }}
+          path: |
+            android-compose/**/build/kotlin/abi/**
+            android-compose/**/build/api-contract/**
+          # A missing dump is an error only when the job otherwise succeeded; after an earlier
+          # failure the API step never ran, and a second "no files" error just hides the real one.
+          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
+          retention-days: 7
 
       - name: Save Konan (Kotlin/Native) toolchain
         # Linux saver: the hostNative compiles pull the full Linux K/N toolchain.
@@ -712,25 +771,45 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 26
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
-          cache-cleanup: on-success
-      - name: Restore Konan (Kotlin/Native) toolchain
-        id: konan
-        # Dokka configures :plugin-api:kotlinNativeBundleConfiguration and downloaded
-        # kotlin-native-prebuilt live from Maven Central (HTTP 429, PR #2573). Restore
-        # only: android.yml shared-multiplatform owns the main-push save of this key.
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.konan
-          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-konan-
+
+      # ci-speedup-pr1: the Dokka HTML graph costs 18m31s per run. The tooling
+      # checks below (service worker, KDoc hygiene, API package coverage, KDoc
+      # baseline self-tests, wire contracts) stay on every PR and main push;
+      # only the Gradle build + the checks that read its output are path-gated.
+      # assemble-web-pages consumes the kotlin-api-docs artifact only on main,
+      # where this gate is always open, so Pages never misses an upload.
+      - name: Resolve whether the Dokka HTML build must run
+        id: dokka_gate
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Dokka HTML: full run (this is not a pull request)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" 2>/dev/null \
+              || git fetch --no-tags origin "${{ github.base_ref }}"
+            base="origin/${{ github.base_ref }}"
+          fi
+          if ! changed="$(git diff --name-only --diff-filter=ACMRD "${base}...HEAD")"; then
+            echo "Dokka HTML: failed to diff ${base}...HEAD" >&2
+            exit 1
+          fi
+          if grep -Eq '^android-compose/(sharedLogic|sharedUI|core/ids|core/runtime|plugin-api)/|^docs/|(^|/)Module\.md$|^scripts/ci/api-doc-undocumented-baseline\.txt$|^\.github/workflows/android\.yml$' <<<"$changed"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Dokka HTML: public-API/docs paths changed vs the PR base; running." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "Dokka HTML: skipped on this PR; the fast KDoc-hygiene, API-package-coverage and wire-contract checks all ran."
+              echo "No file vs the PR base touches a public-API module (\`sharedLogic\`, \`sharedUI\`, \`core/ids\`, \`core/runtime\`, \`plugin-api\`), \`docs/**\`, a \`Module.md\` overview, the KDoc baseline, or this workflow. Main pushes always build the full reference."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Dokka HTML: skipped (no public-API/docs path changed vs ${base})"
+          fi
+
       - name: Verify documentation tooling
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -744,27 +823,54 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_api_doc_progress.py -v
           python3 -m unittest discover -s scripts/tests -p test_wire_contracts.py -v
           python3 scripts/ci/check-wire-contracts.py --check --diff-base "$DOCS_DIFF_BASE"
+      - name: Setup Java 26
+        if: steps.dokka_gate.outputs.run == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.dokka_gate.outputs.run == 'true'
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
+      - name: Restore Konan (Kotlin/Native) toolchain
+        id: konan
+        if: steps.dokka_gate.outputs.run == 'true'
+        # Dokka configures :plugin-api:kotlinNativeBundleConfiguration and downloaded
+        # kotlin-native-prebuilt live from Maven Central (HTTP 429, PR #2573). Restore
+        # only: android.yml shared-multiplatform owns the main-push save of this key.
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
       # Finish the Android compiler's single-use JVM before starting the documentation graph.
       - name: Precompile shared Android API dependency
+        if: steps.dokka_gate.outputs.run == 'true'
         working-directory: android-compose
         run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process --console=plain :sharedLogic:compileAndroidMain
       - name: Generate shared API reference
+        if: steps.dokka_gate.outputs.run == 'true'
         working-directory: android-compose
         shell: bash
         run: |
           set -o pipefail
           ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} --console=plain :dokkaGeneratePublicationHtml 2>&1 | tee dokka-diagnostics.log
       - name: Report documentation progress (advisory)
+        if: steps.dokka_gate.outputs.run == 'true'
         continue-on-error: true
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: python3 scripts/ci/api-doc-progress.py android-compose/dokka-diagnostics.log --diff-base "$DOCS_DIFF_BASE" --summary "$GITHUB_STEP_SUMMARY" --details android-compose/dokka-changed-file-gaps.txt
       - name: Enforce the shrinking KDoc baseline
+        if: steps.dokka_gate.outputs.run == 'true'
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --diff-base "$DOCS_DIFF_BASE"
       - name: Preserve Dokka diagnostics
-        if: always()
+        if: always() && steps.dokka_gate.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dokka-diagnostics
@@ -774,13 +880,16 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Check aggregate and module entry points
+        if: steps.dokka_gate.outputs.run == 'true'
         run: |
           for module in . sharedLogic sharedUI core/ids core/runtime plugin-api; do
             test -s "android-compose/build/dokka/html/$module/index.html"
           done
       - name: Check authored links into the generated reference
+        if: steps.dokka_gate.outputs.run == 'true'
         run: python3 scripts/ci/check-api-doc-links.py
       - uses: actions/upload-artifact@v4
+        if: steps.dokka_gate.outputs.run == 'true'
         with:
           name: kotlin-api-docs
           path: android-compose/build/dokka/html/
@@ -803,27 +912,112 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # ci-speedup-pr1: two scopes. The Rust checks (cargo fmt/test/clippy on
+      # native/iroh-wasm) run on main pushes and PRs that touch the crate; the
+      # heavy browser build (:web:wasmJsBrowserDistribution + wasmJsBrowserTest,
+      # wasm-opt, 8m10s of it) plus the bundle-budget check run on main pushes and
+      # PRs that touch the surface it compiles. App/feature/designsystem-only PRs
+      # skip both and still report a green web-wasm to required-test; main always
+      # runs everything.
+      - name: Resolve WASM verification scope
+        id: wasm_gates
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            echo "heavy=true" >> "$GITHUB_OUTPUT"
+            echo "web-wasm: full verification (this is not a pull request)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" 2>/dev/null \
+              || git fetch --no-tags origin "${{ github.base_ref }}"
+            base="origin/${{ github.base_ref }}"
+          fi
+          if ! changed="$(git diff --name-only --diff-filter=ACMRD "${base}...HEAD")"; then
+            echo "web-wasm: failed to diff ${base}...HEAD" >&2
+            exit 1
+          fi
+          rust=false
+          heavy=false
+          if grep -q '^android-compose/native/iroh-wasm/' <<<"$changed"; then
+            rust=true
+          fi
+          if grep -Eq '^android-compose/(web|sharedUI|sharedLogic|plugin-api|core/runtime|gradle|build-logic|native/iroh-wasm)/|^\.github/workflows/android\.yml$' <<<"$changed"; then
+            heavy=true
+          fi
+          echo "rust=${rust}" >> "$GITHUB_OUTPUT"
+          echo "heavy=${heavy}" >> "$GITHUB_OUTPUT"
+          if [ "$rust" = false ] && [ "$heavy" = false ]; then
+            {
+              echo "web-wasm: skipped on this PR."
+              echo "No file vs the PR base touches \`native/iroh-wasm\`, the web client, the shared modules it compiles (\`sharedUI\`, \`sharedLogic\`, \`plugin-api\`, \`core/runtime\`), \`android-compose/gradle/**\`, \`build-logic/**\` or this workflow. Main pushes always run the full browser build."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "web-wasm: skipped (no wasm/web path changed vs ${base})"
+          else
+            echo "web-wasm scope (vs PR base): rust=${rust} heavy=${heavy}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Setup Java 26
+        if: steps.wasm_gates.outputs.heavy == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
+        if: steps.wasm_gates.outputs.heavy == 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
           cache-cleanup: on-success
 
       - name: Setup Rust with WASM target
+        if: steps.wasm_gates.outputs.rust == 'true' || steps.wasm_gates.outputs.heavy == 'true'
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249  # stable
         with:
           targets: wasm32-unknown-unknown
 
+      # Cargo registry/git sources and the iroh-wasm target dir were rebuilt from
+      # scratch every run (and thrown away). Key on Cargo.lock so a dependency bump
+      # misses exactly once; saved at job success by the cache action's post step.
+      - name: Restore Cargo build state
+        if: steps.wasm_gates.outputs.rust == 'true' || steps.wasm_gates.outputs.heavy == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            android-compose/native/iroh-wasm/target
+          key: ${{ runner.os }}-cargo-iroh-wasm-v1-${{ hashFiles('android-compose/native/iroh-wasm/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-iroh-wasm-v1-
+
       - name: Install pinned wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
+        if: steps.wasm_gates.outputs.heavy == 'true'
+        # cargo install compiles the CLI from source (~111s every run); the official
+        # 0.2.127 release tarball ships the same pinned binaries prebuilt (~3s).
+        # If the release download fails, fall back to cargo install rather than
+        # failing the job.
+        run: |
+          set -euo pipefail
+          bindgen_dir="$RUNNER_TEMP/wasm-bindgen-0.2.127"
+          mkdir -p "$bindgen_dir"
+          url="https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.127/wasm-bindgen-0.2.127-x86_64-unknown-linux-musl.tar.gz"
+          if curl -sSfL --retry 3 -o "$RUNNER_TEMP/wasm-bindgen.tar.gz" "$url"; then
+            tar -xzf "$RUNNER_TEMP/wasm-bindgen.tar.gz" -C "$bindgen_dir" --strip-components=1
+            rm -f "$RUNNER_TEMP/wasm-bindgen.tar.gz"
+            "$bindgen_dir/wasm-bindgen" --version
+            echo "$bindgen_dir" >> "$GITHUB_PATH"
+          else
+            echo "prebuilt wasm-bindgen download failed; falling back to cargo install" >&2
+            cargo install wasm-bindgen-cli --version 0.2.127 --locked
+          fi
 
       - name: Verify Iroh WASM transport
+        if: steps.wasm_gates.outputs.rust == 'true'
         working-directory: android-compose/native/iroh-wasm
         run: |
           cargo fmt --check
@@ -838,6 +1032,7 @@ jobs:
       - name: Build and test Compose web client
         # The wasm test executable links all of sharedUI; at the repo-wide
         # 4 GiB Kotlin daemon heap it thrashes GC for ~50 min, then OOMs.
+        if: steps.wasm_gates.outputs.heavy == 'true'
         timeout-minutes: 25
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/gradle-hang-watchdog.sh" 1320 "$RUNNER_TEMP/gradle-hang/diagnostics.txt" &
@@ -857,7 +1052,9 @@ jobs:
 
       # letta-mobile-hv54v: what a visitor downloads, per group, against
       # android-compose/web/bundle-budget.json (ceilings only come down).
+      # Reads the :web:wasmJsBrowserDistribution output, so it runs only with it.
       - name: Check web bundle budget
+        if: steps.wasm_gates.outputs.heavy == 'true'
         run: |
           set -euo pipefail
           python3 -m unittest discover -s ../scripts/ci -p 'test_web_bundle_budget.py'
@@ -1071,11 +1268,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 21
+      - name: Setup Java 26
+        # Same JDK as test-workload / api-docs / web-wasm / build-apk (ci-speedup-pr1)
+        # so Gradle build-cache entries are produced and consumed under one JVM.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 26
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
