@@ -31,7 +31,9 @@ Code map (paths relative to android-compose/sharedLogic/src):
 commonMain/kotlin/com/letta/mobile/data/subagents/DurableSubagentRegistry.kt:
   Dispatch / Receipt / RunningSnapshot: observeLocked:255, insertLocked:290;
   terminal guard:268; mergedWith:331 updates lastSeen on accepted sightings.
-  Restart: retirePreviousProcess:109; Sweep: expireStaleLocked:143 and
+  Restart: retirePreviousProcess:109/116, assuming a known changed process
+  identity, uses CANCELLED (not ORPHANED);
+  confirmed snapshot absence below uses ORPHANED. Sweep: expireStaleLocked:143 and
   SubagentStaleSweep.kt staleRunningChips:22 (lastSeen TTL, NOT lastActivity);
   ReconcileAbsent: reconcileLocked:476 (snapshot absence confirmation abstracted
   as one already-confirmed absence; reconcileSnapshot:446 has a grace window).
@@ -126,7 +128,7 @@ Terminalize(s) == /\ chip = "RUNNING" /\ chip' = s /\ disk' = s
                        evicted, dismissed, resurrected, leaked, childSent,
                        childReturned, parentSent, parentReturned, failed, reconnected>>
 Lifecycle == \E s \in {"COMPLETED", "FAILED", "CANCELLED"}: Terminalize(s)
-Restart == Terminalize("ORPHANED")
+Restart == Terminalize("CANCELLED")
 ReconcileAbsent == Terminalize("ORPHANED")
 Sweep == /\ age = 2 /\ "skipExpiry" \notin Break /\ Terminalize("CANCELLED")
 Tick == /\ age < 2 /\ age' = age + 1
