@@ -465,6 +465,10 @@ contribution metadata and typed invocation outcomes. The compatibility projectio
 unsupported kinds, versions and verbs. The core provider and session binding live in child packages; trusted hosts retain source resolution and permission checks.
 The review contract is `docs/reference/contracts/object-verbs-v1.md` (letta-mobile-i5jdm.9).
 
+# Package com.letta.mobile.data.node
+
+One Baken node composed from configuration and ports: the runtime controller over its App Server, the admin_rpc router and its publishers, the durable turn journal and feed, and the Iroh endpoint that serves them. Hosts (the Linux service, the desktop) differ only in the ports they bind: App Server HTTP clients, the node log, App Server process identity and the local tools socket. Keep command-line parsing and platform process handling in the host's binding, not here.
+
 # Package com.letta.mobile.data.pairing
 
 Pair-invite parsing, flow state, device access and paired-host storage ports. Scanned data moves through explicit invite/session states before becoming a stored connection. Keep scanners, QR drawing and platform storage outside pairing state; provide effects through [PairingRedeemer](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-pairing-redeemer/index.html), [PairedHostStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-paired-host-store/index.html), [QrEncoder](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) and [BackendConfigSink](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-backend-config-sink/index.html).

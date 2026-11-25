@@ -22,6 +22,7 @@ interface NodeLog {
  * Started once the node has its App Server client, which is null when the node runs without one.
  */
 fun interface NodeToolsSocket {
+    /** Starts the socket on [scope], relaying through [client]; a null client may leave it off. */
     suspend fun start(scope: CoroutineScope, client: AppServerClient?)
 
     companion object {

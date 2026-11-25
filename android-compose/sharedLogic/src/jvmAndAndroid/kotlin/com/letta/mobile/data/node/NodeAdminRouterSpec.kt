@@ -38,16 +38,25 @@ import java.nio.file.Path
  * The inputs of a node's admin_rpc router. [build] assembles the router; every null input leaves
  * its methods unregistered or failing closed.
  *
+ * @property controller the runtime controller the router's runtime and agent methods act through.
  * @property subagentRegistrySource replaces the controller-native subagent registry when set.
  * @property subagentRegistryFile backs the controller-native registry with this JSON file, so chips
  *   survive a restart and are reconciled against live state on the next authoritative snapshot.
  * @property appServerProcessIdentity host-local App Server process proof; unknown for remote hosts.
+ * @property pairingService the paired-peer and invite stores for `pair.*`; null when pairing is off.
+ * @property nativeClient the App Server client native reads and the event-driven catalogs use;
+ *   null when the node has no App Server.
+ * @property vibesyncBaseUrl the VibeSync service `project.*` methods call.
+ * @property beadsBaseUrl the `bd serve` URL for `beads.*` methods; blank or null registers none.
+ * @property beadsTokenFile the bearer token file for [beadsBaseUrl].
  * @property localBackendDir the letta-code on-disk backend root. Admin reads the App Server has no
  *   command for (run/step history, agent context, memory blocks) are served read-only from it.
  * @property skillsDir the letta-code skills root. letta-code advertises no skill enumeration on the
  *   wire, so `skill.list` is answered from this directory, else `LETTA_SKILLS_DIR`, else
  *   `<LETTA_HOME>/skills`.
+ * @property eventScope where the catalogs and the subagent registry follow App Server events.
  * @property agentChanges pushes `agent_updated` to connected clients after agent writes.
+ * @property conversationChanges pushes conversation changes to connected clients after writes.
  * @property modelExposureFile persisted model exposure decisions; null keeps them in memory.
  * @property runRecordsFile run/lease JSON file; defaults beside [modelExposureFile], else memory-only.
  * @property turnIdentity serves stream-joined ids on `message.list`; null serves rows as stored.
@@ -56,6 +65,7 @@ import java.nio.file.Path
  * @property pairingQr QR minting identity for `pair.invite.create`; null mints no QR.
  * @property permissionModes pushes confirmed permission-mode changes to conversation viewers.
  * @property pluginRoutes the plugin host's `plugins.*` handlers; null when plugins are off.
+ * @property canvasMountRoutes the canvas mount methods; null keeps them unregistered.
  * @property voiceRoutes the voice endpoint routes; null registers none.
  * @property pinsRoutes the pinned-agents routes; null registers none.
  * @property shellStateRoutes the shared shell-state document routes; null registers none.
@@ -92,6 +102,7 @@ class NodeAdminRouterSpec(
     val serviceCredentialRoutes: AdminRpcRoutes? = null,
     val feedRoutes: AdminRpcRoutes? = null,
 ) {
+    /** Assembles the router, starting the catalogs and registry on [eventScope] when there is an App Server. */
     fun build(): AdminRpcRouter {
         val skillsCatalog = hydratedSkillsCatalog()
         val nativeSource = if (subagentRegistrySource == null) nativeSubagentSource() else null
