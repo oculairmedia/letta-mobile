@@ -5,13 +5,13 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 jar="${TLA2TOOLS:-/opt/tools/tla/tla2tools-1.7.4.jar}"
-java="${JAVA:-$(if [ -x /usr/lib/jvm/jdk-26/bin/java ]; then echo /usr/lib/jvm/jdk-26/bin/java; else echo java; fi)}"
-[ -f "$jar" ] || { echo "TLC jar not found: $jar" >&2; exit 2; }
+java="${JAVA:-$(if [[ -x /usr/lib/jvm/jdk-26/bin/java ]]; then echo /usr/lib/jvm/jdk-26/bin/java; else echo java; fi)}"
+[[ -f "$jar" ]] || { echo "TLC jar not found: $jar" >&2; exit 2; }
 jar="$(cd "$(dirname "$jar")" && pwd)/$(basename "$jar")"
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 cp "$here"/*.tla "$work/"
 out="${OUT:-$here/out}"; mkdir -p "$out"; out="$(cd "$out" && pwd)"
-cfgs=("$@"); [ ${#cfgs[@]} -gt 0 ] || cfgs=(main fixed fixed-disciplined)
+cfgs=("$@"); [[ ${#cfgs[@]} -gt 0 ]] || cfgs=(main fixed fixed-disciplined)
 status=0
 for cfg in "${cfgs[@]}"; do
   for prop in ${PROPS:-EventuallyTerminal NoResurrection RetainedTerminalNeverRuns ParentIsolation NoPendingRow NoPendingChildRow}; do
@@ -22,23 +22,23 @@ for cfg in "${cfgs[@]}"; do
     (cd "$work" && "$java" -XX:+UseParallelGC -cp "$jar" tlc2.TLC -seed 1 -fp 0 -lncheck final -workers "${WORKERS:-1}" -deadlock \
       -metadir "$work/states" -config run.cfg MC > "$log" 2>&1) || rc=$?
     expected=PASS
-    if [ "${RAW:-0}" != 1 ]; then
+    if [[ "${RAW:-0}" != 1 ]]; then
       case "$cfg:$prop" in
         main:EventuallyTerminal|fixed:EventuallyTerminal|main:NoResurrection|fixed:NoResurrection|main:ParentIsolation|main:NoPendingRow|fixed:NoPendingRow|main:NoPendingChildRow) expected=FAIL ;;
       esac
     fi
     actual=ERROR
-    if [ "$rc" = 0 ] && grep -q 'No error has been found' "$log"; then actual=PASS
+    if [[ "$rc" = 0 ]] && grep -q 'No error has been found' "$log"; then actual=PASS
     elif grep -qE "Temporal properties were violated|(Property|Invariant|Action property) $prop is violated" "$log" && ! grep -q 'Invariant TypeOK is violated' "$log"; then actual=FAIL
     fi
     stats="$( { grep -E 'distinct states found|Finished in' "$log" || true; } | tr '\n' ' ')"
-    if [ "$actual" = "$expected" ]; then
+    if [[ "$actual" = "$expected" ]]; then
       printf '%-20s %-26s %s (expected %s) %s\n' "$cfg" "$prop" "$actual" "$expected" "$stats"
-      if [ "$actual" = PASS ] && [ "${KEEP:-0}" != 1 ]; then rm -f "$log"; fi
+      if [[ "$actual" = PASS ]] && [[ "${KEEP:-0}" != 1 ]]; then rm -f "$log"; fi
     else
       printf '%-20s %-26s %s (expected %s; log: %s)\n' "$cfg" "$prop" "$actual" "$expected" "$log"
       status=1
-      [ "$actual" != ERROR ] || status=2
+      [[ "$actual" != ERROR ]] || status=2
     fi
     rm -rf "$work/states"
   done

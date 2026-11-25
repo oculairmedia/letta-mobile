@@ -6,7 +6,12 @@ import sys
 
 if len(sys.argv) != 2:
     sys.exit("usage: trace.py tools/subagent-lifecycle/out/<config>.<property>.out")
-text = pathlib.Path(sys.argv[1]).read_text()
+# Only read TLC output this tool wrote: resolve and confine the argument to its out/ directory.
+out_dir = (pathlib.Path(__file__).resolve().parent / "out").resolve()
+trace_file = pathlib.Path(sys.argv[1]).resolve()
+if not trace_file.is_relative_to(out_dir) or trace_file.suffix != ".out":
+    sys.exit(f"trace.py only reads .out files under {out_dir}")
+text = trace_file.read_text()
 if "State 1:" not in text:
     sys.exit("no counterexample in TLC output")
 previous = {}

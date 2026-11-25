@@ -12,7 +12,7 @@ while read -r prop brk; do
   rc=0
   RAW=1 KEEP=1 OUT="$work/out" PROPS="$prop" "$here/check.sh" "$cfg" > "$work/result" 2>&1 || rc=$?
   # check.sh fails closed on parse/type errors; require a genuine named violation.
-  if [ "$rc" = 1 ] && grep -q "$prop.*FAIL (expected PASS" "$work/result"; then
+  if [[ "$rc" = 1 ]] && grep -q "$prop.*FAIL (expected PASS" "$work/result"; then
     printf '%-26s Break=%-14s caught\n' "$prop" "$brk"
   else
     printf '%-26s Break=%-14s NOT CAUGHT\n' "$prop" "$brk"
