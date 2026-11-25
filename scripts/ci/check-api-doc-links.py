@@ -10,7 +10,7 @@ import re
 import subprocess
 from urllib.parse import unquote, urlsplit
 
-API_URL = "https://oculairmedia.github.io/letta-mobile/api/"
+API_URL = "https://oculairmedia.github.io/baken/api/"
 URL_PATTERN = re.compile(re.escape(API_URL.rstrip("/")) + r"(?:/[^\s<>\)\"`]*|(?=[\s<>\)\"`]|$))")
 
 

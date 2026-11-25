@@ -17,7 +17,7 @@
 #   REPO=other/fork ./scripts/bootstrap-repo-settings.sh
 set -euo pipefail
 
-REPO="${REPO:-oculairmedia/letta-mobile}"
+REPO="${REPO:-oculairmedia/baken}"
 
 printf 'Applying repo-level settings to %s\n' "$REPO"
 

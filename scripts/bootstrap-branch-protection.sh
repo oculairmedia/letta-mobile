@@ -38,7 +38,7 @@
 #     100 chars and change shape if the matrix definition is edited.
 set -euo pipefail
 
-REPO="${REPO:-oculairmedia/letta-mobile}"
+REPO="${REPO:-oculairmedia/baken}"
 BRANCH="${BRANCH:-main}"
 CHECKS=(test build-apk-pass shared-multiplatform detekt)
 

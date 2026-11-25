@@ -1,63 +1,14 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/baken-mark-dark.svg">
-    <img src="docs/brand/baken-mark-light.svg" alt="Baken" width="96" height="96">
-  </picture>
-</p>
+# Letta Mobile
 
-<h1 align="center">Baken</h1>
+Android, Compose Desktop and browser client for [Letta AI](https://github.com/letta-ai/letta) — manage
+agents, chat with them, review their work, and sync across your devices. Built as a Kotlin
+Multiplatform project: one shared domain module (`sharedLogic`) and one shared Compose UI module
+(`sharedUI`) power all three clients, and each platform module is a thin host binding.
 
-<p align="center"><strong>Agents that run on your own machine.</strong></p>
+<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/oculairmedia/baken/releases" target="_blank"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
 
-<p align="center">
-  <a href="https://baken.ca">baken.ca</a> ·
-  <a href="https://baken.ca/docs/">Docs</a> ·
-  <a href="https://github.com/oculairmedia/letta-mobile/releases/latest">Download</a>
-</p>
+Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/baken/
 
-Baken is a native client for stateful AI agents. It pairs with an agent host you run yourself, so
-the agent, its memory and its tools stay on your hardware, and you can reach the same agent from
-your phone, your desktop or a browser. There is no account, no subscription and no Baken-operated
-server.
-
-- **Your own host.** Agents run on a machine you control. Their memory is a set of plain text files
-  there, which you can open and edit; it carries across every device.
-- **Direct phone pairing.** Pair by scanning a QR code. The connection is encrypted end to end and
-  goes direct when it can; when it can't, it falls back to a relay that cannot read the traffic.
-- **Real work.** Agents use the host's files, terminal, browser and local apps under one of four
-  permission modes, run long tasks in the background while the chat stays usable, hand work to
-  each other, and talk to you in voice mode.
-
-## Download
-
-Every release is on [GitHub Releases](https://github.com/oculairmedia/letta-mobile/releases/latest):
-
-| Platform | Package |
-|---|---|
-| Android 8.0+ | `full` APK (includes an on-device runtime) or `lite` APK |
-| Windows x64 | `.exe` or `.msi` installer |
-| Linux x64 | AppImage |
-| Agent host (Linux x64) | `meridian-iroh-wrapper` |
-
-<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/oculairmedia/letta-mobile/releases" target="_blank"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
-
-A browser client runs on [GitHub Pages](https://oculairmedia.github.io/letta-mobile/).
-
-Baken is built on [Letta](https://github.com/letta-ai/letta) agents and the Letta Code App Server.
-The source here is currently **source available**: you can read, build and run it for your own
-use; all other rights are reserved until a licence is published
-([baken.ca/licenses](https://baken.ca/licenses/)). "Baken" and the Baken mark are covered by the
-[brand guidelines](https://baken.ca/brand/); if you distribute a fork, give it a different name.
-
-## For contributors
-
-This repository holds all three Baken clients, the agent-host wrapper and their shared code.
-Baken is a Kotlin Multiplatform project: one shared domain module (`sharedLogic`) and one shared
-Compose UI module (`sharedUI`) power Android, desktop and the browser, and each platform module is
-a thin host binding. Internal identifiers (the `com.letta.mobile` package, the `letta-mobile`
-repository and module paths, the `meridian` CLI and wrapper names, the `meridian://` link scheme)
-are unchanged on purpose: renaming them would orphan existing installs and break update paths.
-The display name and icons come from one source, [`android-compose/branding/`](android-compose/branding/brand.properties).
 
 Documentation index and lifecycle conventions: [docs/README.md](docs/README.md).
 Historical planning and experiments live in [plan/](plan/) and [poc/](poc/).
@@ -168,13 +119,13 @@ Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/k
 | Canvas plugin platform | [plan](docs/design/canvas-plugin-platform-plan.md), [LCP wire v1](docs/reference/canvas-plugin-wire-v1.md), [view bridge v1](docs/reference/plugin-view-bridge-v1.md) |
 | Live external tools | [`docs/architecture/live-external-tools.md`](docs/architecture/live-external-tools.md) |
 | KMP module map | [`docs/architecture/kmp-module-map.md`](docs/architecture/kmp-module-map.md) |
-| Generated Kotlin API reference | [Published API docs](https://oculairmedia.github.io/letta-mobile/api/) (after the next successful main deployment); [generation guide](docs/development/api-documentation.md) |
+| Generated Kotlin API reference | [Published API docs](https://oculairmedia.github.io/baken/api/) (after the next successful main deployment); [generation guide](docs/development/api-documentation.md) |
 | Releasing | [`docs/RELEASE.md`](docs/RELEASE.md) |
 
 ## Quick start
 
 ```bash
-git clone https://github.com/oculairmedia/letta-mobile.git
+git clone https://github.com/oculairmedia/baken.git
 cd letta-mobile
 ./scripts/install-hooks.sh          # activate .githooks/ via core.hooksPath
 

@@ -66,7 +66,7 @@ def changed_paths(root, diff_base):
 
 def source_path(href):
     parts = urlsplit(href)
-    prefix = "/oculairmedia/letta-mobile/"
+    prefix = "/oculairmedia/baken/"
     if parts.netloc != "github.com" or not parts.path.startswith(prefix):
         return None
     location = parts.path[len(prefix):].split("/", 2)

@@ -195,7 +195,7 @@ jobs:
           PY
 
       - name: Rename APK with tag
-        # letta-mobile-<tag>-full.apk / -lite.apk: same package and signature, so a phone
+        # baken-<tag>-full.apk / -lite.apk: same package and signature, so a phone
         # can move between them by installing the other one over it.
         id: artifact
         working-directory: android-compose/app/build/outputs/apk/play/release
@@ -203,7 +203,7 @@ jobs:
           set -euo pipefail
           tag="${{ github.event.inputs.tag || github.ref_name }}"
           src=$(ls *.apk | head -n 1)
-          dest="letta-mobile-${tag}-${{ matrix.variant }}.apk"
+          dest="baken-${tag}-${{ matrix.variant }}.apk"
           cp -f "$src" "$dest"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "${{ matrix.variant }} APK: $(du -h "$dest" | cut -f1) ($(stat --printf='%s' "$dest") bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -212,7 +212,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk-${{ matrix.variant }}
-          path: android-compose/app/build/outputs/apk/play/release/letta-mobile-*-${{ matrix.variant }}.apk
+          path: android-compose/app/build/outputs/apk/play/release/baken-*-${{ matrix.variant }}.apk
           if-no-files-found: error
 
   # ── Desktop: Windows EXE + MSI installers ───────────────────────────────

@@ -13,7 +13,7 @@ use the design policy to decide intended behavior.
 ### Base palette
 
 Current palette constants and their values are in the
-[generated `LettaColorTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-color-tokens/index.html).
+[generated `LettaColorTokens` API](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-color-tokens/index.html).
 The [source](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/ThemeTokens.kt)
 uses hexadecimal ARGB; Dokka emits numeric constant values. This replaces the
 older grey-palette copy, which had drifted from the implemented cool-slate
@@ -35,7 +35,7 @@ User can swap themes via the `ThemePreset` enum at runtime (theme picker UI exis
 
 ### Semantic color roles
 
-The [generated `CustomColors` API](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme/-custom-colors/index.html) owns the
+The [generated `CustomColors` API](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.theme/-custom-colors/index.html) owns the
 property inventory. Read [the implementation](../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/CustomColors.kt)
 for derived values. Keep status colors harmonized with the active theme rather
 than hardcoding replacements; fresh/unread accents and selection colors express
@@ -43,7 +43,7 @@ separate states from errors, warnings and connectivity.
 
 ## 2. Spacing Scale
 
-The [generated `LettaSpacingTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-spacing-tokens/index.html) lists
+The [generated `LettaSpacingTokens` API](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-spacing-tokens/index.html) lists
 scale members and literal values in density-independent pixels. Its
 [source](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/DesignTokens.kt)
 also shows aliases; Dokka omits initializer values for aliases. The tables below
@@ -124,9 +124,9 @@ Dokka does not resolve to numbers are:
 
 The generated references own these constant inventories and literal values:
 
-- [Elevation](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-elevation-tokens/index.html).
-- [Motion durations](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-motion-tokens/index.html).
-- [Sizing and breakpoints](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-sizing-tokens/index.html).
+- [Elevation](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-elevation-tokens/index.html).
+- [Motion durations](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-motion-tokens/index.html).
+- [Sizing and breakpoints](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-sizing-tokens/index.html).
 
 All three come from [DesignTokens.kt](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/DesignTokens.kt).
 Motion intent and easing choices remain design decisions; a duration declaration
@@ -134,7 +134,7 @@ does not replace the geometry and navigation rules in [DESIGN.md](../DESIGN.md).
 
 ## 6. Chat tokens
 
-[Generated `LettaChatTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-chat-tokens/index.html) lists the holders;
+[Generated `LettaChatTokens` API](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.ui.theme/-letta-chat-tokens/index.html) lists the holders;
 the resolved values below are retained because Dokka does not expand their
 object initializers.
 

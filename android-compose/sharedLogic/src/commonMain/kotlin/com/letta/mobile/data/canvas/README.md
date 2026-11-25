@@ -21,7 +21,7 @@ DrawBox acts exclusively as a local view/editor in `:sharedUI`. In-memory state,
 
 ## Operation Model
 All scene mutations are typed operations. The generated
-[CanvasOp API reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-op/index.html)
+[CanvasOp API reference](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-op/index.html)
 contains the operation variants, serial names, fields and inherited identity/clock contract.
 
 ### Operation behavior

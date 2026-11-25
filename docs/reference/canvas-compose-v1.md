@@ -8,7 +8,7 @@ For how compose is built (pipeline, ids, receipt, placement, auto-fit) and how t
 
 ## The guide (`canvas_compose_guide`)
 
-Kotlin declarations and validation constants: [CanvasComposeContract](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-contract/index.html).
+Kotlin declarations and validation constants: [CanvasComposeContract](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-contract/index.html).
 The agent-facing guide below is generated from
 [CanvasComposeGuide.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeGuide.kt)
 and test-locked by `CanvasComposeGuideDocTest`; its wire examples and behavioral

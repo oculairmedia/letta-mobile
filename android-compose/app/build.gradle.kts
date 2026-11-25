@@ -72,7 +72,7 @@ sentry {
     // push symbols. Without them, the upload tasks abort with
     // "An organization ID or slug is required" and fail the build. Gating
     // lets local builds (no secrets) and fork PRs succeed, while main-branch
-    // CI on the oculairmedia/letta-mobile repo (which has the secrets) still
+    // CI on the oculairmedia/baken repo (which has the secrets) still
     // ships mapping files so stack traces stay deobfuscated.
     val hasSentryAuth = providers.environmentVariable("SENTRY_AUTH_TOKEN").orNull?.isNotBlank() == true
     includeProguardMapping.set(hasSentryAuth)

@@ -36,7 +36,7 @@ class ApiDocumentationPlugin : Plugin<Project> {
             sourceLink {
                 localDirectory.set(project.rootProject.projectDir.parentFile)
                 val ref = project.providers.gradleProperty("dokkaSourceRef").orElse("main")
-                remoteUrl.set(ref.map { URI("https://github.com/oculairmedia/letta-mobile/tree/$it") })
+                remoteUrl.set(ref.map { URI("https://github.com/oculairmedia/baken/tree/$it") })
                 remoteLineSuffix.set("#L")
             }
         }

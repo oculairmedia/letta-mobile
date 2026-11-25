@@ -689,7 +689,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   remote's migrated schema **v53**). If missing on a fresh VM, reinstall from the GitHub release
   (`steveyegge/beads` → `beads_1.1.0_linux_amd64.tar.gz`) into `/usr/local/bin`.
 - On a fresh clone/VM, sync the embedded Dolt DB once with `bd bootstrap --yes` (pulls from the git
-  remote `git+https://github.com/oculairmedia/letta-mobile.git`; no separate `dolt` binary needed).
+  remote `git+https://github.com/oculairmedia/baken.git`; no separate `dolt` binary needed).
   Verify with `bd ping`. `bd dolt pull` / `bd dolt push` work against the DoltHub federation remote
   (`doltremoteapi.dolthub.com/oulair/letta_mobile`) using the existing GitHub/Dolt credentials.
 - Claude Code cloud sessions do this automatically: `.claude/hooks/session-start.sh` installs bd

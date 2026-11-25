@@ -38,8 +38,8 @@ Authoritative implementation files (sharedLogic `commonMain`, package
 ## Architecture
 
 Compose is not a second canvas. It is a compiler in front of the existing one.
-The generated [compose API reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-service/compose.html)
-provides the current signature; [ComposeTarget](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-compose-target/index.html)
+The generated [compose API reference](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-service/compose.html)
+provides the current signature; [ComposeTarget](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.canvas.compose/-compose-target/index.html)
 groups the destination canvas, scene/revision and originating tool call.
 
 ```

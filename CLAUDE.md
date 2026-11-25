@@ -12,7 +12,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 
 **Location:** use the current checkout root; `/opt/stacks/letta-mobile` is the historical Linux host path.
 **Build root:** `android-compose/` (the Gradle workspace)
-**GitHub:** `oculairmedia/letta-mobile`
+**GitHub:** `oculairmedia/baken`
 
 **Tech stack:**
 - Kotlin / Jetpack Compose / Compose Desktop

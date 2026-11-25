@@ -46,7 +46,7 @@ Internal CanvasWorkspace session-load state and retry action. The workspace owns
 
 # Package com.letta.mobile.ui.canvas.notes
 
-The shared [NotebookNoteEditor](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.canvas.notes/-notebook-note-editor.html) renders an existing note session using the shared page scaffold, Markdown field and explicit save/refresh/discard/persistence-retry actions. Draft, conflict, indeterminate-write and pending-durability status come from sharedLogic; no UI timer or storage policy is introduced. Embedded owners can supply their operation scope so a hidden presentation does not cancel an explicit save; the standalone editor retains its keyed scope. Persistence retry also reconciles interrupted writes. Owners await prepare-close before replacing or removing the document session and retain it on failure; changing presentation can hide the editor. The component compiles for all shared UI targets; only JVM/Android currently has the local JNI store adapter. The opt-in `shell.note` module uses the host's registered note viewer over the same canvas id as `shell.canvas`. Both mounts acquire one retained note session from the window-owned viewer, with independent holds; closing one cannot fork the other. The last clean holder releases the session, dirty drafts remain in the existing quit guard, and every remount refreshes authority before exposing retained content. Desktop inherits the window registry; Android provides its existing trusted local registry at the activity root. No default layout changes, and local ownership is not remote grant authority.
+The shared [NotebookNoteEditor](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.canvas.notes/-notebook-note-editor.html) renders an existing note session using the shared page scaffold, Markdown field and explicit save/refresh/discard/persistence-retry actions. Draft, conflict, indeterminate-write and pending-durability status come from sharedLogic; no UI timer or storage policy is introduced. Embedded owners can supply their operation scope so a hidden presentation does not cancel an explicit save; the standalone editor retains its keyed scope. Persistence retry also reconciles interrupted writes. Owners await prepare-close before replacing or removing the document session and retain it on failure; changing presentation can hide the editor. The component compiles for all shared UI targets; only JVM/Android currently has the local JNI store adapter. The opt-in `shell.note` module uses the host's registered note viewer over the same canvas id as `shell.canvas`. Both mounts acquire one retained note session from the window-owned viewer, with independent holds; closing one cannot fork the other. The last clean holder releases the session, dirty drafts remain in the existing quit guard, and every remount refreshes authority before exposing retained content. Desktop inherits the window registry; Android provides its existing trusted local registry at the activity root. No default layout changes, and local ownership is not remote grant authority.
 
 # Package com.letta.mobile.ui.canvas.references
 
@@ -134,11 +134,11 @@ User/assistant, tool-step, approval, reasoning, error and canvas-receipt rendere
 
 # Package com.letta.mobile.ui.chat.voice
 
-What the chat page's voice mode shares with the rest of the app, kept free of page and theme imports: the voice setup ([VoiceSetupAccess](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-setup-access/index.html), provided by the shell to the chat and the Settings page), the page's [VoiceModeHandle](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-mode-handle/index.html) read by the chat bar, the slot for the Voice settings pane, failure wording and test tags. The platform pieces (audio, the recording permission, the HTTP engine) are expect/actual here; the web offers no voice mode. The chat surface builds the controller and the composer draws the button and the status strip.
+What the chat page's voice mode shares with the rest of the app, kept free of page and theme imports: the voice setup ([VoiceSetupAccess](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-setup-access/index.html), provided by the shell to the chat and the Settings page), the page's [VoiceModeHandle](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-mode-handle/index.html) read by the chat bar, the slot for the Voice settings pane, failure wording and test tags. The platform pieces (audio, the recording permission, the HTTP engine) are expect/actual here; the web offers no voice mode. The chat surface builds the controller and the composer draws the button and the status strip.
 
 # Package com.letta.mobile.ui.components
 
-Reusable list parts, errors, refresh, page headers and pane primitives, and the chat timeline's disclosure and notice lines. Menus are [LettaPopupMenu](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html) over [LettaMenuItem](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components.foundation/-letta-menu-item/index.html); chips, pills, spinners and section labels live in `ui.components.foundation`, the disclosure chevron and its controls in `ui.components.disclosure`. Supply content through composable slots and modifiers; business workflows and repository access belong to callers.
+Reusable list parts, errors, refresh, page headers and pane primitives, and the chat timeline's disclosure and notice lines. Menus are [LettaPopupMenu](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html) over [LettaMenuItem](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.components.foundation/-letta-menu-item/index.html); chips, pills, spinners and section labels live in `ui.components.foundation`, the disclosure chevron and its controls in `ui.components.disclosure`. Supply content through composable slots and modifiers; business workflows and repository access belong to callers.
 
 
 # Package com.letta.mobile.ui.components.attached
@@ -235,19 +235,19 @@ Centralized Lucide icon selection for product components. Consume LettaIcons dir
 
 # Package com.letta.mobile.ui.image
 
-Image-byte to Compose bitmap decoding contracts and actual implementations. Call [decodeImageBitmap](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.image/decode-image-bitmap.html) through its shared contract and platform actuals; network loading, asset persistence and cache policy belong to the caller.
+Image-byte to Compose bitmap decoding contracts and actual implementations. Call [decodeImageBitmap](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.image/decode-image-bitmap.html) through its shared contract and platform actuals; network loading, asset persistence and cache policy belong to the caller.
 
 # Package com.letta.mobile.ui.markdown
 
-Markdown rendering and streaming document/parser state. [LocalSharedRichMarkdownRenderer](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.markdown/-local-shared-rich-markdown-renderer.html) and [LocalMermaidDiagramRenderer](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.markdown/-local-mermaid-diagram-renderer.html) are optional rendering seams; message persistence, transport parsing and untrusted-code execution do not belong in markdown presentation.
+Markdown rendering and streaming document/parser state. [LocalSharedRichMarkdownRenderer](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.markdown/-local-shared-rich-markdown-renderer.html) and [LocalMermaidDiagramRenderer](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.markdown/-local-mermaid-diagram-renderer.html) are optional rendering seams; message persistence, transport parsing and untrusted-code execution do not belong in markdown presentation.
 
 # Package com.letta.mobile.ui.mascot
 
-Agent avatars/mascots, identity, presence, gaze and seat coordination. Supply [MascotHost](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.mascot/-mascot-host/index.html), registry/transport locals and still-store bindings; native renderer creation and authoritative agent metadata persistence remain host/data responsibilities.
+Agent avatars/mascots, identity, presence, gaze and seat coordination. Supply [MascotHost](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.mascot/-mascot-host/index.html), registry/transport locals and still-store bindings; native renderer creation and authoritative agent metadata persistence remain host/data responsibilities.
 
 # Package com.letta.mobile.ui.mascot.frame
 
-Skia frame-pipeline binding for live Rive mascots. [ProvideFrameMascots](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.mascot.frame/-provide-frame-mascots.html) accepts the frame renderer and its host dependencies; native renderer implementation and resource ownership must remain behind [RiveFrameRenderer](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.mascot.frame/-rive-frame-renderer/index.html) rather than enter common avatar components.
+Skia frame-pipeline binding for live Rive mascots. [ProvideFrameMascots](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.mascot.frame/-provide-frame-mascots.html) accepts the frame renderer and its host dependencies; native renderer implementation and resource ownership must remain behind [RiveFrameRenderer](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.mascot.frame/-rive-frame-renderer/index.html) rather than enter common avatar components.
 
 # Package com.letta.mobile.ui.memory
 
@@ -259,23 +259,23 @@ Model/provider pickers, settings and sign-in/connection panes, and the Services 
 
 # Package com.letta.mobile.ui.notify
 
-Per-agent notification preference controls. Provide [AttentionPrefsRepository](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.notify/-attention-prefs-repository/index.html) explicitly or through [LocalAttentionPrefs](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.notify/-local-attention-prefs.html); notification permission requests and operating-system delivery do not belong in these preference controls.
+Per-agent notification preference controls. Provide [AttentionPrefsRepository](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.notify/-attention-prefs-repository/index.html) explicitly or through [LocalAttentionPrefs](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.notify/-local-attention-prefs.html); notification permission requests and operating-system delivery do not belong in these preference controls.
 
 # Package com.letta.mobile.ui.pairing
 
-Install/pair, invite, scanner and paired-device components. [PairDeviceBinding](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing/-pair-device-binding/index.html), scan inputs and action callbacks connect host services; invite verification, identity storage and trust decisions stay outside the displayed cards.
+Install/pair, invite, scanner and paired-device components. [PairDeviceBinding](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.pairing/-pair-device-binding/index.html), scan inputs and action callbacks connect host services; invite verification, identity storage and trust decisions stay outside the displayed cards.
 
 # Package com.letta.mobile.ui.pairing.composition
 
-Builds the install-and-pair card's bindings the same way on every client. A platform implements the pairing ports and [PairingShellPorts](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing.composition/-pairing-shell-ports/index.html) (roster, pending deep link, chat navigation, share target) and calls [installAndPairBindings](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing.composition/install-and-pair-bindings.html); it never constructs the card's flow or bindings itself.
+Builds the install-and-pair card's bindings the same way on every client. A platform implements the pairing ports and [PairingShellPorts](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.pairing.composition/-pairing-shell-ports/index.html) (roster, pending deep link, chat navigation, share target) and calls [installAndPairBindings](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.pairing.composition/install-and-pair-bindings.html); it never constructs the card's flow or bindings itself.
 
 # Package com.letta.mobile.ui.providers.icons
 
-Provider-brand renderers and icon lookup. Consume [ProviderIcon](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.providers.icons/-provider-icon.html) and its lookup catalog directly; authentication and provider capability discovery stay outside brand artwork.
+Provider-brand renderers and icon lookup. Consume [ProviderIcon](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.providers.icons/-provider-icon.html) and its lookup catalog directly; authentication and provider capability discovery stay outside brand artwork.
 
 # Package com.letta.mobile.ui.runtime
 
-Composition-local access to host-supplied per-agent defaults. Provide [LocalAgentDefaults](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.runtime/-local-agent-defaults.html) from the host repository graph; this package must not implement a second defaults store or runtime launcher.
+Composition-local access to host-supplied per-agent defaults. Provide [LocalAgentDefaults](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.runtime/-local-agent-defaults.html) from the host repository graph; this package must not implement a second defaults store or runtime launcher.
 
 # Package com.letta.mobile.ui.schedules
 
@@ -287,11 +287,11 @@ Reusable search scaffold, models and anchored/inline wrappers. Supply search mod
 
 # Package com.letta.mobile.ui.settings
 
-Settings sections, search, rows and backend-connection presentation. Extend through [SettingsContribution](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.settings/-settings-contribution/index.html) and supplied settings models/actions; secure storage, connection establishment and platform permission effects remain behind those bindings.
+Settings sections, search, rows and backend-connection presentation. Extend through [SettingsContribution](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.settings/-settings-contribution/index.html) and supplied settings models/actions; secure storage, connection establishment and platform permission effects remain behind those bindings.
 
 # Package com.letta.mobile.ui.shell
 
-Navigation drawer, page selection and contextual row/undo controls. ObjectVerbMenus renders core.pin descriptors for rows, the rail, Home and projects; workspace hosts supply one PinBinding and never supply pin policy. [ShellPageDeps](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell/-shell-page-deps/index.html), workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
+Navigation drawer, page selection and contextual row/undo controls. ObjectVerbMenus renders core.pin descriptors for rows, the rail, Home and projects; workspace hosts supply one PinBinding and never supply pin policy. [ShellPageDeps](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell/-shell-page-deps/index.html), workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
 
 # Package com.letta.mobile.ui.shell.conversations
 
@@ -299,7 +299,7 @@ A TimelineConversations owner bound to the shared shell: its list in the navigat
 
 # Package com.letta.mobile.ui.shell.header
 
-Shell header, search slot and unified results. Supply [UnifiedSearchSources](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header. An optional conversation-preparation callback turns a nonblank query that includes the Conversations scope into explicit demand loading, so recents-first sessions preserve title matches outside the initial window without a connect-time fleet read. Partial preparation keeps successful matches visible with a warning and retries failed reads with bounded backoff while that query remains open.
+Shell header, search slot and unified results. Supply [UnifiedSearchSources](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header. An optional conversation-preparation callback turns a nonblank query that includes the Conversations scope into explicit demand loading, so recents-first sessions preserve title matches outside the initial window without a connect-time fleet read. Partial preparation keeps successful matches visible with a warning and retries failed reads with bounded backoff while that query remains open.
 
 # Package com.letta.mobile.ui.shell.modules
 
@@ -307,7 +307,7 @@ The shell's unit of composition: a slot drawn by its view at whatever size its p
 
 # Package com.letta.mobile.ui.shell.nowactive
 
-The now-active conversation indicator. Supply [NowActiveBarState](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-state/index.html) and [NowActiveBarActions](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-actions/index.html) directly; active-run authority and conversation selection policy stay outside the indicator.
+The now-active conversation indicator. Supply [NowActiveBarState](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-state/index.html) and [NowActiveBarActions](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-actions/index.html) directly; active-run authority and conversation selection policy stay outside the indicator.
 
 # Package com.letta.mobile.ui.shell.pages
 
@@ -315,7 +315,7 @@ Bindings between page controllers and shell destinations. Supply the session rep
 
 # Package com.letta.mobile.ui.shell.pages.agents
 
-The agents library page. Supply agent page state and actions to [AgentsPage](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.agents/-agents-page.html); agent fetching, mutation policy and navigation effects stay with the controller/caller.
+The agents library page. Supply agent page state and actions to [AgentsPage](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.agents/-agents-page.html); agent fetching, mutation policy and navigation effects stay with the controller/caller.
 
 # Package com.letta.mobile.ui.shell.pages.channels
 
@@ -323,15 +323,15 @@ The channels page and status/filter parts. Supply channel state and action bindi
 
 # Package com.letta.mobile.ui.shell.pages.conversations
 
-Conversation library presentation and its UI model. [ConversationsPageState](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.conversations/-conversations-page-state/index.html) and [ConversationsPageActions](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.conversations/-conversations-page-actions/index.html) are the consumption seam; conversation storage and filtering authority stay with their upstream owner.
+Conversation library presentation and its UI model. [ConversationsPageState](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.conversations/-conversations-page-state/index.html) and [ConversationsPageActions](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.conversations/-conversations-page-actions/index.html) are the consumption seam; conversation storage and filtering authority stay with their upstream owner.
 
 # Package com.letta.mobile.ui.shell.pages.home
 
-Home dashboard and compact/expanded content sections. [HomePage](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-home-page.html) inputs and callbacks bind dashboard sections; fleet collection, backend connection effects and pin persistence remain outside the layout.
+Home dashboard and compact/expanded content sections. [HomePage](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-home-page.html) inputs and callbacks bind dashboard sections; fleet collection, backend connection effects and pin persistence remain outside the layout.
 
 The shared page requests fresh backend figures when entered, without repeating on ordinary recomposition. It offers Retry in its error banner and pull-to-refresh on touch hosts; there is no permanent header refresh button. Reconnection refresh belongs to the shared session source.
 
-The page can lead with a greeting (a short line, the Baken mark through [BrandMarkHost](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-brand-mark-host/index.html) and a few agent mascots). Its behaviour is the shared greeting reducer's intents played through each mascot's director; no scripted sequences live here.
+The page can lead with a greeting (a short line, the Baken mark through [BrandMarkHost](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-brand-mark-host/index.html) and a few agent mascots). Its behaviour is the shared greeting reducer's intents played through each mascot's director; no scripted sequences live here.
 
 # Package com.letta.mobile.ui.shell.pages.memfs
 
@@ -339,23 +339,23 @@ MemFS file browser, editor and history/diff views. Supply MemFS editor/list/hist
 
 # Package com.letta.mobile.ui.shell.pages.memory
 
-The Memory destination's block/file-oriented views of an agent. Supply [MemoryWorkspaceBinding](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.memory/-memory-workspace-binding/index.html) and its navigation actions; block/file persistence remains with the bound memory sources.
+The Memory destination's block/file-oriented views of an agent. Supply [MemoryWorkspaceBinding](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.memory/-memory-workspace-binding/index.html) and its navigation actions; block/file persistence remains with the bound memory sources.
 
 # Package com.letta.mobile.ui.shell.pages.plugins
 
-Plugin management, inspection and consent UI. Supply [PluginViewsModel](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-plugin-views-model/index.html) and consent/management actions; loading executable plugins and enforcing granted capabilities remain runtime responsibilities.
+Plugin management, inspection and consent UI. Supply [PluginViewsModel](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.plugin.view/-plugin-views-model/index.html) and consent/management actions; loading executable plugins and enforcing granted capabilities remain runtime responsibilities.
 
 # Package com.letta.mobile.ui.shell.pages.projects
 
-Projects list and detail surfaces driven by controller state. Bind [ProjectsPageController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-projects-page-controller/index.html) through project actions and optional chat-opening callbacks; project persistence and issue-work support remain backend/controller concerns.
+Projects list and detail surfaces driven by controller state. Bind [ProjectsPageController](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.projects/-projects-page-controller/index.html) through project actions and optional chat-opening callbacks; project persistence and issue-work support remain backend/controller concerns.
 
 # Package com.letta.mobile.ui.shell.pages.runs
 
-Run list/detail presentation in the shell. Bind [RunMonitorController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runs/-run-monitor-controller/index.html) through run-page actions; execution control and run/step retrieval remain controller operations rather than page-local polling.
+Run list/detail presentation in the shell. Bind [RunMonitorController](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.runs/-run-monitor-controller/index.html) through run-page actions; execution control and run/step retrieval remain controller operations rather than page-local polling.
 
 # Package com.letta.mobile.ui.shell.pages.schedules
 
-Schedule library and edit panes. Supply schedule state/actions to [SchedulesPage](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.schedules/-schedules-page.html) and its form panes; submission, execution and persistence stay in the shared controller.
+Schedule library and edit panes. Supply schedule state/actions to [SchedulesPage](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.schedules/-schedules-page.html) and its form panes; submission, execution and persistence stay in the shared controller.
 
 # Package com.letta.mobile.ui.shell.pages.skills
 
@@ -363,7 +363,7 @@ Skills catalog rows and tool detail. Supply skill/tool state and supported actio
 
 # Package com.letta.mobile.ui.shell.pages.templates
 
-Starter-agent template selection. Supply [AgentTemplatesState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.templates/-agent-templates-state/index.html) and [TemplatesPageActions](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.templates/-templates-page-actions/index.html), optionally using [AgentTemplatesController.templatesPageActions(...)](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.templates/templates-page-actions.html); agent creation and template retrieval stay outside rendering.
+Starter-agent template selection. Supply [AgentTemplatesState](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.templates/-agent-templates-state/index.html) and [TemplatesPageActions](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.templates/-templates-page-actions/index.html), optionally using [AgentTemplatesController.templatesPageActions(...)](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.pages.templates/templates-page-actions.html); agent creation and template retrieval stay outside rendering.
 
 # Package com.letta.mobile.ui.shell.pages.vault
 
@@ -375,7 +375,7 @@ Workspace file viewers/links and working-directory picker. Provide LocalWorkspac
 
 # Package com.letta.mobile.ui.shell.palette
 
-Command palette, new-conversation picker and quick-query panes. Supply [UnifiedSearchSources](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and new-conversation/quick-query actions; command execution and conversation creation stay with the supplied handlers.
+Command palette, new-conversation picker and quick-query panes. Supply [UnifiedSearchSources](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and new-conversation/quick-query actions; command execution and conversation creation stay with the supplied handlers.
 
 # Package com.letta.mobile.ui.shell.rail
 
@@ -383,7 +383,7 @@ Agent rail and expanded library. Supply rail/library models and ShellAgentRailAc
 
 # Package com.letta.mobile.ui.shell.scaffold
 
-Page framing and adaptive list/detail structure. Supply [LettaPageScaffold](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.scaffold/-letta-page-scaffold.html) content slots and [ShellListDetail](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.scaffold/-shell-list-detail.html) list/detail callbacks; child business workflows and navigation state must remain caller-owned.
+Page framing and adaptive list/detail structure. Supply [LettaPageScaffold](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.scaffold/-letta-page-scaffold.html) content slots and [ShellListDetail](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.shell.scaffold/-shell-list-detail.html) list/detail callbacks; child business workflows and navigation state must remain caller-owned.
 
 # Package com.letta.mobile.ui.shell.shortcuts
 
@@ -420,7 +420,7 @@ Desktop-only (JVM) design values for what the desktop host draws itself rather t
 
 # Package com.letta.mobile.ui.theme.pill
 
-[LettaPillColors](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.components.foundation.
+[LettaPillColors](https://oculairmedia.github.io/baken/api/sharedUI/com.letta.mobile.ui.theme.pill/-letta-pill-colors/index.html), the container / on-container pair a tonal pill draws with. The package imports nothing of the app's, so any page can name it without an import cycle; the pills themselves are LettaTonalPill and its family in ui.components.foundation.
 
 # Package com.letta.mobile.ui.theme.graph
 

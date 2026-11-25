@@ -7,7 +7,7 @@ is a usage reference with retained historical values, not a competing policy spe
 
 ## Generated API reference
 
-Use the [Dokka API reference](https://oculairmedia.github.io/letta-mobile/api/)
+Use the [Dokka API reference](https://oculairmedia.github.io/baken/api/)
 for shared Kotlin declarations, signatures and KDoc. It is generated from the
 module overviews and source comments by the documentation CI build.
 Keep design intent, behavioral contracts, procedures and dated evidence here.
