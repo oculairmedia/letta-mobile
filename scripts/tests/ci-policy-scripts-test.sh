@@ -152,6 +152,42 @@ test_job="$(
 )"
 assert_contains "$test_job" 'Run Android verification task graph'
 assert_contains "$test_job" 'name: test-workload'
+shared_ui_job="$(
+  awk '
+    /^  shared-ui-desktop-tests:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+# ci-speedup-pr2: the additive :sharedUI:jvmTest / :desktop:test suites run in a
+# parallel job, not serially on the Android test runner. It is part of required
+# `test`: green-skip semantics only, never a job-level `if:`.
+assert_contains "$shared_ui_job" 'name: shared-ui-desktop-tests'
+assert_not_contains "$shared_ui_job" $'\n    if:'
+assert_contains "$shared_ui_job" $'\n    timeout-minutes: '
+assert_contains "$shared_ui_job" 'java-version: 26'
+# Every heavy step rides the resolve step's output; a PR that touches neither
+# sharedUI nor desktop skips them with a step summary and still reports green.
+assert_contains "$shared_ui_job" '- name: Resolve shared UI and desktop tests'
+assert_contains "$shared_ui_job" "if: contains(steps.jvm_ui_scope.outputs.tasks, ':desktop:')"
+assert_contains "$shared_ui_job" "if: steps.jvm_ui_scope.outputs.tasks != ''"
+assert_contains "$shared_ui_job" 'changed-gradle-modules.sh --all --group jvm-ui'
+assert_contains "$shared_ui_job" 'changed-gradle-modules.sh --group jvm-ui "$base"'
+assert_contains "$shared_ui_job" 'Shared UI + desktop JVM tests: skipped on this PR.'
+# The desktop suite pulls the Rust pen bridge (native/tablet_input) and the
+# Mermaid renderer through processResources; their cargo state is cached.
+assert_contains "$shared_ui_job" 'android-compose/native/tablet_input/target'
+assert_contains "$shared_ui_job" "hashFiles('android-compose/native/tablet_input/Cargo.lock'"
+# The reports moved with the suites: the sharedUI upload must not be in test-workload.
+assert_contains "$shared_ui_job" 'Upload sharedUI JVM test reports'
+assert_contains "$shared_ui_job" 'sharedui-jvmtest-reports-${{ github.run_id }}'
+assert_contains "$shared_ui_job" 'Upload desktop JVM test reports'
+assert_not_contains "$test_job" 'Upload sharedUI JVM test reports'
+# The desktop prerequisites install moved along with :desktop:test.
+assert_contains "$shared_ui_job" 'bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
+assert_not_contains "$test_job" 'Install Linux hotkey build prerequisites'
+shared_gradle_ui_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_ui_job")"
+assert_eq "$shared_gradle_ui_invocations" '1'
 required_test_job="$(
   awk '/^  required-test:$/ { active=1; next }
        active && /^  [[:alnum:]_-]+:$/ { exit }
@@ -160,12 +196,14 @@ required_test_job="$(
 assert_contains "$required_test_job" 'name: test'
 # letta-mobile-l8lcn: web tests are part of the required set too.
 # PR-description checks (pr-body-gate) are part of the same aggregate: a missing body line blocks merge.
-assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate]'
+# ci-speedup-pr2: so is the parallel sharedUI/desktop suite job.
+assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate, shared-ui-desktop-tests]'
 assert_contains "$required_test_job" 'if: always()'
 assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
+assert_contains "$required_test_job" 'SHARED_UI_DESKTOP_RESULT: ${{ needs.shared-ui-desktop-tests.result }}'
 assert_contains "$required_test_job" 'BODY_RESULT: ${{ needs.pr-body-gate.result }}'
 assert_contains "$required_test_job" 'EVENT_NAME: ${{ github.event_name }}'
 api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
@@ -211,6 +249,10 @@ for invalid_docs_job in \
   fi
 done
 required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
+# The required-test script is a flat conjunction: each conjunct reads exactly one
+# result variable. The cross-product below holds the shared-ui result at success
+# while covering every verdict of the other variables; the compact loop after it
+# covers every verdict of the shared-ui result with the others held at success.
 for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
     for windows_api_result in success failure cancelled skipped; do
@@ -224,7 +266,8 @@ for test_result in success failure cancelled skipped; do
               body_ok=yes
             fi
             if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result" \
-              WEB_RESULT="$web_result" EVENT_NAME="$event_name" BODY_RESULT="$body_result" bash -e -c "$required_test_script"; then
+              WEB_RESULT="$web_result" SHARED_UI_DESKTOP_RESULT=success \
+              EVENT_NAME="$event_name" BODY_RESULT="$body_result" bash -e -c "$required_test_script"; then
               [[ "$test_result/$docs_result/$windows_api_result/$web_result/$body_ok" == success/success/success/success/yes ]] \
                 || fail "required test accepted $combo"
             else
@@ -236,6 +279,19 @@ for test_result in success failure cancelled skipped; do
       done
     done
   done
+done
+# ci-speedup-pr2: the parallel sharedUI/desktop job gates like any other needs
+# dependency — anything but success must redden the required `test` aggregate.
+for shared_ui_desktop_result in success failure cancelled skipped; do
+  if TEST_RESULT=success DOCS_RESULT=success WINDOWS_API_RESULT=success WEB_RESULT=success \
+    SHARED_UI_DESKTOP_RESULT="$shared_ui_desktop_result" EVENT_NAME=pull_request BODY_RESULT=success \
+    bash -e -c "$required_test_script"; then
+    [[ "$shared_ui_desktop_result" == success ]] \
+      || fail "required test accepted shared-ui-desktop-tests result $shared_ui_desktop_result"
+  else
+    [[ "$shared_ui_desktop_result" != success ]] \
+      || fail "required test rejected a successful shared-ui-desktop-tests job"
+  fi
 done
 # letta-mobile-ewtaq: the parity guardrails run in the REQUIRED test job, never advisory.
 assert_contains "$test_job" 'python3 scripts/ci/parity_gates.py'
@@ -359,7 +415,7 @@ assert_contains "$test_job" 'scripts/tests/apt-install-retry-test.sh'
 assert_contains "$test_job" 'bash scripts/ci/api-dump-mirror-check.sh'
 # Workspace-rooted: these jobs default to working-directory android-compose, where a relative
 # scripts/ path does not exist (the first version of this step failed with "No such file").
-assert_contains "$test_job" 'bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
+# The desktop-prerequisite install itself moved to shared-ui-desktop-tests with :desktop:test.
 for workflow in .github/workflows/android.yml .github/workflows/desktop.yml .github/workflows/release.yml; do
   [ -f "$SOURCE_ROOT/$workflow" ] || { echo "FAIL: missing $workflow" >&2; exit 1; }
   if grep -n 'apt-install-retry.sh' "$SOURCE_ROOT/$workflow" | grep -v 'apt-install-retry-test' | grep -qv 'GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh'; then
@@ -370,11 +426,19 @@ done
 assert_not_contains "$test_job" 'sudo apt-get install'
 assert_not_contains "$test_job" 'continue-on-error'
 # letta-mobile-l8lcn: every push to main runs the full additive test set.
-assert_contains "$test_job" 'changed-gradle-modules.sh --all'
+# ci-speedup-pr2: the additive set splits at the group boundary — test-workload
+# resolves the android half, shared-ui-desktop-tests the jvm-ui half.
+assert_contains "$test_job" 'changed-gradle-modules.sh --all --group android'
+assert_contains "$test_job" 'changed-gradle-modules.sh --group android "$base"'
 
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+# ci-speedup-pr2: :app:testScreenshot left the verification graph. It selects zero
+# test classes (PR #2661: app/src/test has no *ScreenshotTest); the real screenshot
+# suites (:designsystem, :feature-chat) still run. Line-precise in the task array.
+assert_not_contains "$test_job" $'\n            :app:testScreenshot\n'
+assert_not_contains "$shared_ui_job" ':app:testScreenshot'
 # letta-mobile-o4ygk.1: the module-boundary gate and its synthetic-graph tests
 # run inside the REQUIRED test job, not only in the advisory graph workflow.
 assert_contains "$test_job" ':build-logic:test'
@@ -495,14 +559,24 @@ done < <(awk '/uses: gradle\/actions\/setup-gradle@/ { block=$0; active=1; next 
   active { block=block "\n" $0 }
   END { if (active) { gsub(/\n/, "|", block); print block } }' "$android_workflow")
 
-for optional_workflow in desktop android-perf iroh-probe pagination-replay-fuzz; do
+for optional_workflow in desktop android-perf iroh-probe pagination-replay-fuzz architecture-graph codecov api-contract-capture release iroh-mdns-binding; do
   optional_text="$(<"$SOURCE_ROOT/.github/workflows/$optional_workflow.yml")"
   setup_count="$(grep -c 'uses: gradle/actions/setup-gradle@' <<<"$optional_text")"
   readonly_count="$(grep -c 'cache-read-only: true' <<<"$optional_text")"
   assert_eq "$readonly_count" "$setup_count"
+  # ci-speedup-pr2: one Gradle cache family repo-wide. Without the gh-v3 key
+  # prefix (android.yml's), each workflow restored AND wrote its own parallel
+  # default-prefix gradle-home tree (200-400 MB) under GitHub's 10 GB budget.
+  [[ "$setup_count" -ge 1 ]] || fail "$optional_workflow.yml lacks setup-gradle"
+  assert_contains "$optional_text" 'GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3'
 done
 embedded_workflow="$(<"$SOURCE_ROOT/.github/workflows/embedded-runtime-node18.yml")"
 assert_contains "$embedded_workflow" 'cache-read-only: ${{ github.event_name == '\''pull_request'\'' || github.ref != '\''refs/heads/main'\'' }}'
+# The embedded runtime job writes Gradle caches on main pushes, so it must be on
+# the same key prefix as android.yml and ask for stale-entry cleanup
+# (`cache-cleanup` is the v4 input; `gradle-home-cache-cleanup` is the v3 alias).
+assert_contains "$embedded_workflow" 'GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3'
+assert_contains "$embedded_workflow" 'cache-cleanup: on-success'
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
@@ -549,8 +623,10 @@ assert_contains "$shared_job" 'Upload sharedLogic JVM test diagnostics'
 assert_contains "$shared_job" 'sharedlogic-jvmtest-diagnostics-${{ github.run_id }}'
 assert_contains "$shared_job" 'Fail when bounded sharedLogic JVM tests fail or hang'
 assert_contains "$shared_job" 'Run remaining shared multiplatform verification task graph'
-# allTests / hostNativeTest hang; :desktop:test also hung on follow-up PRs
-# even before Konan. JVM + CLI tests first; native compile second.
+# allTests / hostNativeTest hang; :desktop:test belongs to shared-ui-desktop-tests,
+# never here. ci-speedup-pr2: the two sequential invocations became one — the two
+# task batches have no ordering requirement, so Gradle fuses them into one DAG and
+# the job drops one startup + configuration round (~4m43s job before).
 assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
 # letta-mobile-o4ygk.2: wasmJs compiles stay in the REQUIRED shared job.
@@ -558,12 +634,12 @@ assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:com
 # letta-mobile-o4ygk.4: the shared Compose UI compiles for wasm in the same required job.
 assert_contains "$shared_job" ':sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
-assert_eq "$shared_gradle_invocations" '2'
+assert_eq "$shared_gradle_invocations" '1'
 # ci-speedup-pr1: apiCheck moved here from test-workload. This job already compiles
 # the shared wasmJs/hostNative targets the ABI comparison needs, and it is the
 # required `shared-multiplatform` check, so API drift still blocks every merge.
-# Pin it onto the shared-target invocation, the one that already compiles what
-# the comparison drags in.
+# Pin it onto the single shared-target invocation, which ends with the comparison,
+# exactly as the bounded :sharedLogic:jvmTest phase stays its own invocation.
 assert_contains "$shared_job" ':sharedUI:compileTestKotlinWasmJs apiCheck'
 
 detekt_job="$(
@@ -623,6 +699,20 @@ touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/de
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
 assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:test"
+# ci-speedup-pr2: the additive set partitions at the group boundary. The parallel
+# shared-ui-desktop-tests job resolves the jvm-ui half (always both suites on
+# --all); test-workload resolves every other task under --group android.
+assert_eq "$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --group jvm-ui "$base")" ":sharedUI:jvmTest :desktop:test"
+assert_eq "$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --group android "$base")" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :cli:test"
+assert_eq "$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --all --group jvm-ui)" ":sharedUI:jvmTest :desktop:test"
+all_android="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --all --group android)"
+assert_not_contains "$all_android" ':sharedUI:jvmTest'
+assert_not_contains "$all_android" ':desktop:test'
+assert_contains "$all_android" ':core:android-data:testDebugUnitTest'
+assert_contains "$all_android" ':plugin-api-testkit:jvmTest'
+if bash "$repo/scripts/ci/changed-gradle-modules.sh" --group bogus "$base" >/dev/null 2>&1; then
+  fail "module resolver accepted an unknown --group"
+fi
 
 # Stacked PR: designsystem landed on the lower branch; this commit only
 # touches app/. Diff vs the stack base must not schedule designsystem.
@@ -632,6 +722,9 @@ touch "$repo/android-compose/app/src/Conversations.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm stacked-app-only
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$stack_base")"
 assert_eq "$actual" ""
+# An app-only diff selects nothing in the jvm-ui half either: the split job must
+# skip its Gradle steps and still report green.
+assert_eq "$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --group jvm-ui "$stack_base")" ""
 git -C "$repo" reset --hard "$stack_base" -q
 
 mkdir -p "$repo/android-compose/designsystem/src"

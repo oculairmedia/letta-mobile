@@ -26,6 +26,10 @@ concurrency:
 
 env:
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+  # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
+  # the prefix this optional workflow restored its own parallel default-prefix
+  # gradle-home tree instead of the warm gh-v3 one the required workflows wrote.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
 
 jobs:
   changes:

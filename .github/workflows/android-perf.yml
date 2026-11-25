@@ -49,6 +49,12 @@ permissions:
   # The breach control lists and downloads earlier main runs' perf summaries.
   actions: read
 
+env:
+  # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
+  # the prefix this optional workflow restored its own parallel default-prefix
+  # gradle-home tree instead of the warm gh-v3 one the required workflows wrote.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
+
 jobs:
   # Cheap, emulator-free self-test of the gate. Runs on every event, PRs
   # included, and decides whether a PR opted into the macrobenchmark.

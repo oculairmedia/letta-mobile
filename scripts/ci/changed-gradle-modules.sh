@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Map git changes vs a base ref to the additive Gradle unit-test tasks they need.
 #
-# Usage: changed-gradle-modules.sh [BASE_REF]
-#        changed-gradle-modules.sh --all
+# Usage: changed-gradle-modules.sh [--all] [--group {android,jvm-ui}] [BASE_REF]
 #   BASE_REF defaults to origin/main. CI PRs pass github.event.pull_request.base.sha
 #   so stacked reviews only schedule modules that changed vs their GitHub base.
 #   --all prints every additive task (every push to main runs the full set).
+#   --group splits one selected task set between the two parallel required jobs
+#   (ci-speedup-pr2): `jvm-ui` keeps only the additive suites that run in the
+#   `shared-ui-desktop-tests` job (:sharedUI:jvmTest, :desktop:test); `android`
+#   keeps every other task for the `test-workload` job. Intended to verify the two
+#   groups partition the workload: a task appears in exactly one group.
 #
 # Dependency-aware (letta-mobile-l8lcn): a changed module schedules its own tests AND the tests of
 # every module that depends on it, transitively, read from the `project(":x")` edges in the build
@@ -18,11 +22,24 @@
 set -euo pipefail
 
 ALL=0
-if [[ "${1:-}" == "--all" ]]; then
-  ALL=1
+GROUP=all
+BASE_REF=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all) ALL=1 ;;
+    --group) [[ "${2:-}" != "" ]] || { echo "changed-gradle-modules: --group needs a value" >&2; exit 1; }
+      GROUP="$2"; shift ;;
+    --group=*) GROUP="${1#--group=}" ;;
+    --*) echo "changed-gradle-modules: unknown flag '$1'" >&2; exit 1 ;;
+    *) BASE_REF="$1" ;;
+  esac
   shift
-fi
-BASE_REF="${1:-origin/main}"
+done
+BASE_REF="${BASE_REF:-origin/main}"
+case "$GROUP" in
+  all|android|jvm-ui) ;;
+  *) echo "changed-gradle-modules: unknown --group '$GROUP' (want android or jvm-ui)" >&2; exit 1 ;;
+esac
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
@@ -77,13 +94,36 @@ declare -A EXTRA_DEPENDENTS=(
   [":appserver-testkit"]=":cli :appserver-cli"
 )
 
-print_tasks() { # task... -> ORDERED subset on one line
+# The additive suites the parallel `shared-ui-desktop-tests` job owns (ci-speedup-pr2)
+# run there instead of on the Android test runner; `--group` selects the halves.
+JVM_UI_TASKS=(
+  ":sharedUI:jvmTest"
+  ":desktop:test"
+)
+is_jvm_ui_task() { # task -> 0 (own group) / 1
+  local task
+  for task in "${JVM_UI_TASKS[@]}"; do
+    [[ "$1" == "$task" ]] && return 0
+  done
+  return 1
+}
+in_group() { # task -> 0 (keep under $GROUP) / 1 (filtered out)
+  [[ "$GROUP" == all ]] && return 0
+  case "$GROUP" in
+    jvm-ui) is_jvm_ui_task "$1" ;;
+    android) ! is_jvm_ui_task "$1" ;;
+  esac
+}
+
+print_tasks() { # task... -> ORDERED subset on one line, filtered by $GROUP
   declare -A want=()
   local task
   for task in "$@"; do want["$task"]=1; done
   local out=()
   for task in "${ORDERED[@]}"; do
-    [[ -n "${want[$task]+x}" ]] && out+=("$task")
+    [[ -n "${want[$task]+x}" ]] || continue
+    in_group "$task" || continue
+    out+=("$task")
   done
   if ((${#out[@]})); then
     printf '%s\n' "${out[*]}"

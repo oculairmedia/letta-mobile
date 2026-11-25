@@ -39,6 +39,12 @@ on:
       - ".serena/**"
   workflow_dispatch:
 
+env:
+  # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
+  # the prefix this advisory workflow restored AND wrote a parallel default-prefix
+  # gradle-home tree (200-400 MB) that GitHub's 10 GB budget had to evict.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
+
 permissions:
   contents: read
 
@@ -74,9 +80,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
         with:
-          # This advisory workflow consumes PR caches without racing the
-          # required Android test job's cache upload.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Advisory: consume main's Gradle User Home without racing (or adding to)
+          # the required Android jobs' cache uploads. Only main pushes write caches;
+          # this workflow runs on main pushes too (ci-speedup-pr2), so plain `true`.
+          cache-read-only: true
       - name: Test exporter and write authoritative graph
         run: ./gradlew :build-logic:test exportArchitectureGraph --configuration-cache
       - name: Export and check source structure

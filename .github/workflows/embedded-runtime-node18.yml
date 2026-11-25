@@ -71,6 +71,11 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          # One of the two non-android.yml writers (main pushes only). Ask for
+          # stale-entry cleanup before the save explicitly (ci-speedup-pr2): the
+          # v4 input is `cache-cleanup: on-success`; `gradle-home-cache-cleanup`
+          # is the deprecated v3 alias for the same thing.
+          cache-cleanup: on-success
 
       - name: Cache npm downloads
         uses: actions/cache@v4

@@ -46,7 +46,8 @@ assert_contains scripts/scip/scip-java-pilot.sh 'sha256sum --check --status'
 assert_contains scripts/scip/scip-java-pilot.sh 'ulimit -u "$SCIP_PROCESS_LIMIT"'
 assert_contains .gitignore '.local/'
 assert_contains docs/tooling/serena-scip-pilot.md 'Android Gradle integration as unsupported'
-assert_contains .github/workflows/architecture-graph.yml "cache-read-only: \${{ github.event_name == 'pull_request' }}"
+assert_contains .github/workflows/architecture-graph.yml 'cache-read-only: true'
+assert_contains .github/workflows/architecture-graph.yml 'GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3'
 assert_not_contains .github/workflows/architecture-graph.yml 'Run advisory architecture gates'
 assert_not_contains .github/workflows/architecture-graph.yml 'advisoryDetekt'
 assert_contains .github/workflows/codecov.yml 'Classify coverage scope'
@@ -132,9 +133,13 @@ fi
 # misclassified as a code-intelligence stack change.
 # ci-policy-scripts-test.sh pins which architecture gates run in required CI
 # (letta-mobile-o4ygk), so a gate change may update it alongside the stack.
+# So may the CI module resolver (scripts/ci/changed-gradle-modules.sh, it decides
+# which test tasks report into required checks — ci-speedup-pr2) and the two docs
+# that describe the required gates (AGENTS.md, CLAUDE.md; docs-freshness checks
+# their gate claims) — a cache/gate workflow edit otherwise stays blocked.
 # Source-structure reporting shares the architecture scope and owns its API docs guide.
 stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/src/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*|tools/structure_report/.*)$'
-stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*|tools/structure_report/.*|docs/development/api-documentation\.md)$'
+stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|AGENTS\.md|CLAUDE\.md|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/ci/changed-gradle-modules\.sh|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*|tools/structure_report/.*|docs/development/api-documentation\.md)$'
 # Module-boundary *IsolationTest.kt files pin each module's allowed edges; adding
 # a module needs its isolation test in the same PR, so they never count as a
 # stack touch. Nor do the duplicate-code ratchet and its fixture (letta-mobile-ewtaq):

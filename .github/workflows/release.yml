@@ -39,6 +39,12 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
+  # the prefix this workflow restored AND wrote parallel default-prefix gradle-home
+  # trees on every tag push. With cache-read-only it now only reads main's caches.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v3
+
 jobs:
   # ── Android: signed play-release APKs, one per variant ──────────────────
   android-apk:
@@ -75,6 +81,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # Tag/workflow-dispatch release build: read main's Gradle User Home,
+          # never write a competing snapshot (ci-speedup-pr2).
+          cache-read-only: true
 
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
@@ -240,6 +250,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # Tag/workflow-dispatch release build: read main's Gradle User Home,
+          # never write a competing snapshot (ci-speedup-pr2).
+          cache-read-only: true
 
       - name: Restore Konan (Kotlin/Native) toolchain
         id: konan
@@ -342,7 +356,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Release builds never write Gradle caches (ci-speedup-pr2): the
+          # pull_request-only expression evalated to read-write here because
+          # release.yml only runs on tag pushes and workflow_dispatch.
+          cache-read-only: true
 
       - name: Install Linux packaging and X11 smoke dependencies
         run: |
@@ -431,6 +448,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # Tag/workflow-dispatch release build: read main's Gradle User Home,
+          # never write a competing snapshot (ci-speedup-pr2).
+          cache-read-only: true
 
       - name: Build wrapper distribution
         # The application plugin's distTar produces a self-contained tar with
