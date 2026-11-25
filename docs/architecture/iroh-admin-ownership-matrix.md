@@ -42,8 +42,7 @@ enforced by `IrohAdminOwnershipMatrixTest`, which:
   `shim_routes`) to carry a `disposition` from `enums.unrouted_dispositions`,
   caller `evidence`, and a `successor` — lgns8.25 dispositioned
   `work_activity_ingest`, `worker_events`, `usage_summary`,
-  `permissions_preview`, and `pool_introspection`; see
-  `lgns8-shim-retirement-snapshot-2026-07-31.md` for the evidence;
+  `permissions_preview`, and `pool_introspection` (evidence on bead `letta-mobile-lgns8.25`);
 - forbids any direct-Letta-storage data store.
 
 ## Ownership summary
@@ -191,5 +190,4 @@ Authorization: MemFS reads `memory.read`, MemFS writes `memory.write`, files
 `admin.full` (they read any host path), secrets `admin.full` (`IrohPeerCapabilities.forWorkspaceMethod`). The
 host advertises `workspace_relay_v1` on auth. Secret values cross the encrypted
 Iroh connection but never telemetry or error text. Clients need a host built with
-this change: redeploy `meridian-iroh-wrapper`. Details:
-`docs/handoff/letta-desktop-parity-pr6-memory-workspace.md`.
+this change: redeploy `meridian-iroh-wrapper`.

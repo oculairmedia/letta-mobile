@@ -60,14 +60,12 @@ cutover has been performed. **Production runs `dist 93908d8ec`** from
 `/opt/meridian/iroh-wrapper/releases/` behind the `current` symlink, with a
 wrapper-only environment file and the NodeId and pairing store verified
 unchanged. Deploy, incident, rollback option and verified redeploy are all on
-record — see `docs/testing/lgns8-acceptance-evidence-ledger.md` §6.
+record on bead `letta-mobile-lgns8.10`.
 
 **All operational rows are now EXECUTED.** Rows 2, 3 and 4 were performed in
 production during the night of 2026-08-01; row 1 remains and needs a human at a
 device, not a maintenance window. `letta-mobile-lgns8.11` is **CLOSED** against
-that state — see the "lgns8.11 close-out — 2026-08-01" section of
-`docs/architecture/lgns8-shim-retirement-snapshot-2026-07-31.md` for the
-role-by-role retirement record, the rollback inventory, and why the lettashim
+that state (role-by-role retirement record and rollback inventory on the bead); the lettashim
 **service-stop** belongs to `letta-mobile-lgns8.25.1` rather than to `.11`.
 `letta-mobile-lgns8.10` stays open on row 1. None of these rows is
 implementation.

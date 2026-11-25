@@ -120,5 +120,4 @@ To confirm the dashboard actually works against a live app:
    capped at `STREAM_BACKOFF_MAX_MS`.
 
 If step 4 shows nothing but step 5 shows idle ticks, the subscriber is
-connecting but the server's resume-stream multiplexing is broken (see the
-historical `verify-stream` gate in the [April release ledger](../RELEASE-GATE-LEDGER.md) for the same failure mode; that executable gate has been removed).
+connecting but the server's resume-stream multiplexing is broken (the historical `verify-stream` gate caught the same failure mode; it has been removed).

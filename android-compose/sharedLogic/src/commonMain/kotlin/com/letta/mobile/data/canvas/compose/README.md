@@ -7,8 +7,7 @@ subset, placement, the receipt, or before adding a kind.
 
 The agent-facing reference is the guide `canvas_compose_guide` answers (`CanvasComposeGuide.kt`,
 copied in `docs/reference/canvas-compose-v1.md`). The plan, its decisions and what changed while
-building it are in `docs/design/canvas-compose-plan.md` ("As built"); the prior art it draws on is
-`docs/design/canvas-compose-prior-art.md`.
+building it are in `docs/design/canvas-compose-plan.md` ("As built").
 
 Authoritative implementation files (sharedLogic `commonMain`, package
 `com.letta.mobile.data.canvas.compose` unless named otherwise):

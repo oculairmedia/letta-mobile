@@ -25,7 +25,6 @@ kotzilla.json
 .claude/worktrees/
 
 # Stale submodule references (committed as gitlinks without .gitmodules entries)
-.compose-performance-skills-source
 .skills
 
 # Beads / Dolt

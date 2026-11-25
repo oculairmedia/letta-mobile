@@ -151,8 +151,7 @@ Packaging implementation and acceptance:
 `gates.yaml` and `scripts/release/verify-release.sh` were removed on 2026-10-19.
 They had no workflow callers and exercised retired REST/SSE endpoints. Commands,
 telemetry names, task names, issue states and dashboard recommendations in the
-original record below are not current instructions. The [April run ledger](RELEASE-GATE-LEDGER.md)
-is preserved as evidence. Debug device bootstrap remains available separately
+original record below are not current instructions. Debug device bootstrap remains available separately
 through `make verify-device-ready` and [its procedure](RELEASE-AUTOMATION.md).
 
 ## Original record
@@ -281,8 +280,6 @@ make verify-release \
 
 - `make verify-release VERIFY_RELEASE_ARGS=--json ...` prints structured JSON
   to stdout for CI consumers while still writing the markdown report locally.
-- The orchestrator keeps the current gate policy and recent runs in
-  `docs/RELEASE-GATE-LEDGER.md`.
 
 ## 5. Post-release monitoring
 
