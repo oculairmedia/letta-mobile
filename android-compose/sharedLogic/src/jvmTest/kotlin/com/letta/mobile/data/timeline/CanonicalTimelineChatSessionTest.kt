@@ -181,7 +181,11 @@ class CanonicalTimelineChatSessionTest {
             assertEquals(1, writer.markedPrompts,
                 "the session hands the failure to the writer's family, never to a path of its own")
 
-            val timeline = surfaces.session.awaitTimeline { it.events.isNotEmpty() }
+            // The store says Failed before the session has projected it: wait for the session's own
+            // row to read FAILED rather than for any frame, which can still be the SENDING one.
+            val timeline = surfaces.session.awaitTimeline {
+                it.events.locals().singleOrNull()?.deliveryState == DeliveryState.FAILED
+            }
             assertEquals(DeliveryState.FAILED, timeline.events.locals().single().deliveryState,
                 "the optimistic row must read as failed in the session, as in the writer's store")
             assertTrue(relayed.filterIsInstance<TimelineSyncEvent.StreamError>().isNotEmpty(),
