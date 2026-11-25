@@ -24,7 +24,7 @@ fun fleetSearchSources(
     fleet: List<Conversation>,
     focusedAgentId: AgentId?,
     options: UnifiedSearchSources = UnifiedSearchSources(
-        destinations = fleetPaletteDestinations(agentId = focusedAgentId?.value),
+        destinations = fleetPaletteDestinations(agentId = focusedAgentId),
     ),
 ): UnifiedSearchSources = options.copy(
     conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
@@ -39,11 +39,12 @@ fun fleetSearchSources(
  */
 fun fleetPaletteDestinations(
     mode: WorkPlayMode = WorkPlayMode.Work,
-    agentId: String? = null,
+    agentId: AgentId? = null,
 ): List<UnifiedSearchDestination> = WorkPlayLens.navDestinations(mode)
     .map { section ->
         UnifiedSearchDestination(
-            id = ShellRoute.encode(section.toShellDestination(agentId)),
+            // The route is the one string that carries the agent's id (the shell's route model).
+            id = ShellRoute.encode(section.toShellDestination(agentId?.value)),
             label = WorkPlayLens.destinationLabel(mode, section),
         )
     }

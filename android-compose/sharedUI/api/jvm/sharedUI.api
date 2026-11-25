@@ -12090,8 +12090,8 @@ public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellFleetListsKt {
-	public static final fun fleetPaletteDestinations (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;)Ljava/util/List;
-	public static synthetic fun fleetPaletteDestinations$default (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun fleetPaletteDestinations-UMmLIKU (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun fleetPaletteDestinations-UMmLIKU$default (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun fleetSearchSources-ts9AeiI (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public static synthetic fun fleetSearchSources-ts9AeiI$default (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public static final fun fleetTabFor (Ljava/util/List;)Lkotlin/jvm/functions/Function1;
