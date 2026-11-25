@@ -78804,6 +78804,12 @@ public final class com/letta/mobile/ui/chat/render/ChatRenderStrings {
 	public final fun truncated (I)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/chat/render/ChatSearchKt {
+	public static final fun chatSearchLocalResults-Bhp5Npc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lkotlinx/collections/immutable/ImmutableList;
+	public static final fun chatSearchRemoteHits-VjJ7TUg (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun mergeChatSearchHits (Ljava/util/List;Ljava/util/List;)Lkotlinx/collections/immutable/ImmutableList;
+}
+
 public final class com/letta/mobile/ui/chat/render/ChatSnackbarDuration : java/lang/Enum {
 	public static final field Companion Lcom/letta/mobile/ui/chat/render/ChatSnackbarDuration$Companion;
 	public static final field Indefinite Lcom/letta/mobile/ui/chat/render/ChatSnackbarDuration;
@@ -80398,7 +80404,8 @@ public abstract interface class com/letta/mobile/ui/chat/session/TimelineChatSes
 
 public final class com/letta/mobile/ui/chat/session/TimelineChatSessionMappingKt {
 	public static final fun message (Lcom/letta/mobile/data/chat/runtime/ChatComposerError;Lcom/letta/mobile/data/attachment/AttachmentLimits;)Ljava/lang/String;
-	public static final fun timelineCapabilities (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceCapabilities;
+	public static final fun timelineCapabilities (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;ZZ)Lcom/letta/mobile/ui/chat/session/ChatSurfaceCapabilities;
+	public static synthetic fun timelineCapabilities$default (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;ZZILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceCapabilities;
 	public static final fun timelineChatUiState (Lcom/letta/mobile/ui/chat/session/TimelineChatTarget;Lcom/letta/mobile/ui/chat/render/ChatPresentation;Lcom/letta/mobile/ui/chat/session/TimelineRunState;Lcom/letta/mobile/ui/chat/session/TimelineLocalState;)Lcom/letta/mobile/ui/chat/render/ChatUiState;
 	public static final fun timelineComposerUiState (Lcom/letta/mobile/ui/chat/session/TimelineComposerDraft;Lcom/letta/mobile/ui/chat/session/TimelineSendGate;Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;)Lcom/letta/mobile/ui/chat/session/ChatComposerUiState;
 	public static final fun withHostApprovals (Lcom/letta/mobile/ui/chat/render/ChatUiState;Lcom/letta/mobile/ui/chat/session/TimelineHostApprovals;Ljava/util/Set;)Lcom/letta/mobile/ui/chat/render/ChatUiState;
@@ -80407,14 +80414,16 @@ public final class com/letta/mobile/ui/chat/session/TimelineChatSessionMappingKt
 
 public final class com/letta/mobile/ui/chat/session/TimelineChatSessionOptions {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;
 	public final fun component10 ()Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;
 	public final fun component11 ()Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;
 	public final fun component12 ()Lkotlinx/coroutines/flow/Flow;
 	public final fun component13 ()Lcom/letta/mobile/data/attachment/AttachmentLimits;
 	public final fun component14 ()Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
+	public final fun component15 ()Lkotlin/jvm/functions/Function2;
+	public final fun component16 ()Lkotlin/jvm/functions/Function1;
 	public final fun component2 ()Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;
 	public final fun component3 ()Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;
 	public final fun component4 ()Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;
@@ -80423,8 +80432,8 @@ public final class com/letta/mobile/ui/chat/session/TimelineChatSessionOptions {
 	public final fun component7 ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun component8 ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun component9 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
+	public final fun copy (Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;Lcom/letta/mobile/ui/chat/session/ChatModelSource;Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/attachment/AttachmentLimits;Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActiveTurnCoordinator ()Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
 	public final fun getApprovals ()Lcom/letta/mobile/ui/chat/session/ChatApprovalStateSource;
@@ -80433,11 +80442,13 @@ public final class com/letta/mobile/ui/chat/session/TimelineChatSessionOptions {
 	public final fun getBranching ()Lcom/letta/mobile/ui/chat/session/ChatBranchingSource;
 	public final fun getComposerHost ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getControls ()Lcom/letta/mobile/ui/chat/session/TimelineChatRunControls;
+	public final fun getGoalStatus ()Lkotlin/jvm/functions/Function1;
 	public final fun getLiveStatus ()Lkotlinx/coroutines/flow/Flow;
 	public final fun getModels ()Lcom/letta/mobile/ui/chat/session/ChatModelSource;
 	public final fun getOnA2uiAction ()Lkotlin/jvm/functions/Function1;
 	public final fun getPermissionModes ()Lcom/letta/mobile/ui/chat/session/ChatPermissionModeSource;
 	public final fun getRecompile ()Lcom/letta/mobile/data/chat/recompile/ConversationRecompileController;
+	public final fun getSearch ()Lkotlin/jvm/functions/Function2;
 	public final fun getSendQueue ()Lcom/letta/mobile/ui/chat/session/ChatSendQueueSource;
 	public final fun getWorkingDirectory ()Lcom/letta/mobile/ui/chat/session/ChatWorkingDirectorySource;
 	public fun hashCode ()I

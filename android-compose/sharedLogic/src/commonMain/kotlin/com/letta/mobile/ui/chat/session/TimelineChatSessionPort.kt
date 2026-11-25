@@ -12,15 +12,25 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.presence.ActiveTurnCoordinator
 import com.letta.mobile.data.presence.ActiveTurnIdentity
 import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.MessageSearchRequest
+import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.GoalStatusUi
+import com.letta.mobile.ui.chat.render.chatSearchLocalResults
+import com.letta.mobile.ui.chat.render.chatSearchRemoteHits
+import com.letta.mobile.ui.chat.render.mergeChatSearchHits
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -104,6 +114,21 @@ data class TimelineChatSessionOptions(
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     /** Trusted owner for this exact target; null retains the legacy timeline stop lifecycle. */
     val activeTurnCoordinator: ActiveTurnCoordinator? = null,
+    /**
+     * Letta's message search for the conversation's agent: what the host's message repository
+     * answers for [MessageSearchRequest], parsed ([] when it finds nothing). The port keeps the
+     * chat-search state itself - the timeline's own matches answer the query immediately, these
+     * hits merge in after the same short debounce Android's chat ran. Null keeps
+     * [ChatSurfaceCapabilities.search] off, so the page hides its search bar.
+     */
+    val search: (suspend (MessageSearchRequest) -> List<ParsedSearchMessage>)? = null,
+    /**
+     * Reads the conversation's goal status as the page shows it ([GoalStatusUi]; null when the
+     * target has no active goal), re-read by [ChatActions.refreshGoalStatus]. The port owns the
+     * loading flag; a push-driven host re-reads by calling refresh again. Null keeps
+     * [ChatSurfaceCapabilities.goals] off, so the page hides the goal card.
+     */
+    val goalStatus: (suspend () -> GoalStatusUi?)? = null,
 )
 
 /**
@@ -116,7 +141,9 @@ data class TimelineChatSessionOptions(
  * [TimelineChatSession] and the run controls its transport has; the web client is the first host
  * that has no conversation owner of its own.
  *
- * Capabilities it does not have yet (search, paged history, goals, re-run) are reported off, so the page hides them; a host adds the rest through [TimelineChatSessionOptions].
+ * Capabilities it does not have yet (paged history, re-run) are reported off, so the page hides
+ * them; search and goal status come from the same options' hooks
+ * ([TimelineChatSessionOptions.search], [TimelineChatSessionOptions.goalStatus]).
  */
 class TimelineChatSessionPort(
     private val session: TimelineChatSession,
@@ -135,18 +162,27 @@ class TimelineChatSessionPort(
         .map { it ?: initialUiState() }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
+    /** The port's page-local fields (chat search and the goal status), laid over each presentation. */
+    private val page = MutableStateFlow(ChatUiState())
+
+    /** The local run clear with the page's own fields, so the projection below stays five slots. */
+    private val pageOverlay = combine(
+        run.map { it.clearedLocally }.distinctUntilChanged(),
+        page,
+    ) { cleared, fields -> cleared to fields }
+
     override val uiState: StateFlow<ChatUiState> = combine(
         presented,
-        run.map { it.clearedLocally }.distinctUntilChanged(),
+        pageOverlay,
         options.sendQueue?.queue ?: flowOf(ConversationSendQueue()),
         options.activeTurnCoordinator?.state ?: flowOf(null),
         options.activeTurnCoordinator?.outcome ?: flowOf(null),
-    ) { ui, cleared, queue, turn, outcome ->
+    ) { ui, overlay, queue, turn, outcome ->
         val projected = when (turn) {
-            null -> ui.withRunClearedLocally(cleared)
+            null -> ui.withRunClearedLocally(overlay.first)
             else -> ui.withActiveTurn(turn, outcome)
         }
-        projected.copy(sendQueue = queue)
+        projected.copy(sendQueue = queue).withPageFields(overlay.second)
     }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
@@ -178,7 +214,11 @@ class TimelineChatSessionPort(
         .map(::currentCapabilities)
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities(extensions.facts.value))
 
-    private fun currentCapabilities(facts: ChatExtensionFacts) = timelineCapabilities(options.controls).withExtensions(facts)
+    private fun currentCapabilities(facts: ChatExtensionFacts) = timelineCapabilities(
+        controls = options.controls,
+        search = options.search != null,
+        goals = options.goalStatus != null,
+    ).withExtensions(facts)
 
     override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
 
@@ -203,6 +243,7 @@ class TimelineChatSessionPort(
         }
         scope.launch { session.events.collect(::onSyncEvent) }
         scope.launch { load() }
+        refreshGoalStatus()
     }
 
     private suspend fun load() {
@@ -374,6 +415,87 @@ class TimelineChatSessionPort(
         scope.launch { load() }
     }
 
+    /**
+     * The page's search: the timeline's own visible matches answer immediately, the host's
+     * [TimelineChatSessionOptions.search] merges in after a short debounce. A newer query or a
+     * clear always wins over a slower answer, as the chat search does on every client.
+     */
+    internal fun updateSearchQuery(query: String) {
+        val search = options.search ?: return
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            clearSearch()
+            return
+        }
+        val localNow = chatSearchLocalResults(
+            AgentId(target.agentId), ConversationId(target.conversationId), query, uiState.value.messages,
+        )
+        page.update {
+            it.copy(
+                searchQuery = query,
+                isSearchActive = true,
+                isSearching = true,
+                searchResults = localNow,
+            )
+        }
+        searchJob = scope.launch {
+            delay(SEARCH_REMOTE_DEBOUNCE_MS)
+            try {
+                val remote = chatSearchRemoteHits(AgentId(target.agentId), query) { request -> search(request) }
+                if (page.value.searchQuery != query) return@launch
+                val localNow = chatSearchLocalResults(
+                    AgentId(target.agentId), ConversationId(target.conversationId), query, uiState.value.messages,
+                )
+                page.update { current ->
+                    current.copy(searchResults = mergeChatSearchHits(localNow, remote), isSearching = false)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The page keeps the local matches and simply stops looking, as Android's chat does.
+                page.update { current ->
+                    if (current.searchQuery == query) current.copy(isSearching = false) else current
+                }
+            }
+        }
+    }
+
+    /** The search closed: nothing is looking and no result stays on the page. */
+    internal fun clearSearch() {
+        searchJob?.cancel()
+        searchJob = null
+        page.update {
+            it.copy(searchQuery = "", isSearchActive = false, isSearching = false, searchResults = persistentListOf())
+        }
+    }
+
+    /** The conversation's goal, read as the port opens and every time the page asks again. */
+    internal fun refreshGoalStatus() {
+        val read = options.goalStatus ?: return
+        goalJob?.cancel()
+        goalJob = scope.launch {
+            page.update { it.copy(isGoalStatusLoading = true) }
+            try {
+                val status = read()
+                page.update { it.copy(goalStatus = status, isGoalStatusLoading = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // A failed read hides the card's spinner and shows the last status, as Android's chat does.
+                page.update { it.copy(isGoalStatusLoading = false) }
+            }
+        }
+    }
+
+    /** Asks the agent to keep working on its active goal; the prompt Android's chat composes. */
+    internal fun continueGoal() {
+        val objective = uiState.value.goalStatus?.objective?.takeIf { it.isNotBlank() } ?: return
+        sendDirect(TimelineSend(continueGoalPrompt(objective), emptyList()))
+    }
+
+    private var searchJob: Job? = null
+    private var goalJob: Job? = null
+
     private suspend fun runControl(block: suspend () -> Unit) {
         try {
             block()
@@ -401,5 +523,22 @@ class TimelineChatSessionPort(
 
         /** The page's flows run only while it collects them, as desktop's port does. */
         const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long a query waits before it asks the host's remote search, as Android's chat does. */
+        const val SEARCH_REMOTE_DEBOUNCE_MS = 180L
     }
 }
+
+/** [this] state with the port's own page fields of [fields]; the rest of [fields] stays unused. */
+private fun ChatUiState.withPageFields(fields: ChatUiState): ChatUiState = copy(
+    searchQuery = fields.searchQuery,
+    isSearchActive = fields.isSearchActive,
+    isSearching = fields.isSearching,
+    searchResults = fields.searchResults,
+    goalStatus = fields.goalStatus,
+    isGoalStatusLoading = fields.isGoalStatusLoading,
+)
+
+private fun continueGoalPrompt(objective: String): String =
+    "Continue working on the active goal: $objective. Take the next concrete step, and " +
+        "update or complete the goal when appropriate."
