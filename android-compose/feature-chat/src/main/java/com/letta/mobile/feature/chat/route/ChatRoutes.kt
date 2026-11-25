@@ -1,3 +1,9 @@
+// This file keeps its baselined name: platform-code-baseline.txt only shrinks,
+// so "AgentChatRoute.kt" can never be given its own cap, and with the dead
+// project-chat branch (ProjectChatStartAction) deleted, the single remaining
+// declaration is AgentChatRoute — hence this targeted suppress.
+@file:Suppress("MatchingDeclarationName")
+
 package com.letta.mobile.feature.chat.route
 
 import kotlinx.serialization.Serializable
@@ -15,18 +21,4 @@ data class AgentChatRoute(
     // own conversation opens with full tool/turn detail rather than simple.
     val initialChatMode: String? = null,
     val scrollToMessageId: String? = null,
-    val projectIdentifier: String? = null,
-    val projectName: String? = null,
-    val projectLettaFolderId: String? = null,
-    val projectFilesystemPath: String? = null,
-    val projectGitUrl: String? = null,
-    val projectLastSyncAt: String? = null,
-    val projectActiveCodingAgents: String? = null,
-    val projectStartAction: String? = null,
 )
-
-object ProjectChatStartAction {
-    const val ACTIVE_AGENTS = "active_agents"
-    const val PROJECT_BRIEF = "project_brief"
-    const val BUG_REPORT = "bug_report"
-}

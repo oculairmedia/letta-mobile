@@ -101,5 +101,4 @@ internal class ChatRouteArgs @Inject constructor(private val savedStateHandle: S
         if (!complete(request, conversation)) throw kotlinx.coroutines.CancellationException("Chat focus superseded")
     }
     internal fun savedStateHandle(): SavedStateHandle = savedStateHandle
-    val projectContext = savedStateHandle.projectChatContext()
 }

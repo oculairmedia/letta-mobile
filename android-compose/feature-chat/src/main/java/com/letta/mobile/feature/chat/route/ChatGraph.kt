@@ -3,14 +3,12 @@ package com.letta.mobile.feature.chat.route
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.IdFormats
-import androidx.lifecycle.SavedStateHandle
-import com.letta.mobile.ui.chat.render.ProjectChatContext
 import android.os.Bundle
 import androidx.core.os.bundleOf
 
-/** One chat view model per route: its agent, conversation, freshness and project. */
+/** One chat view model per route: its agent, conversation and freshness. */
 fun AgentChatRoute.toViewModelKey(): String =
-    listOf(agentId, conversationId.orEmpty(), freshRouteKey?.toString().orEmpty(), projectIdentifier.orEmpty()).joinToString(":")
+    listOf(agentId, conversationId.orEmpty(), freshRouteKey?.toString().orEmpty()).joinToString(":")
 
 /**
  * letta-mobile-aw0dv: a subagent's registry conversation is almost always the bare "default", which the
@@ -30,27 +28,7 @@ fun AgentChatRoute.toArgs(): Bundle = bundleOf(
     "initialMessage" to initialMessage,
     "initialChatMode" to initialChatMode,
     "scrollToMessageId" to scrollToMessageId,
-    "projectIdentifier" to projectIdentifier,
-    "projectName" to projectName,
-    "projectLettaFolderId" to projectLettaFolderId,
-    "projectFilesystemPath" to projectFilesystemPath,
-    "projectGitUrl" to projectGitUrl,
-    "projectLastSyncAt" to projectLastSyncAt,
-    "projectActiveCodingAgents" to projectActiveCodingAgents,
 )
-
-/** Project metadata is a route payload, independent of current focus. */
-internal fun SavedStateHandle.projectChatContext(): ProjectChatContext? = get<String>("projectIdentifier")?.let { identifier ->
-    ProjectChatContext(
-        identifier = identifier,
-        name = get<String>("projectName") ?: identifier,
-        lettaFolderId = get<String>("projectLettaFolderId"),
-        filesystemPath = get<String>("projectFilesystemPath"),
-        gitUrl = get<String>("projectGitUrl"),
-        lastSyncAt = get<String>("projectLastSyncAt"),
-        activeCodingAgents = get<String>("projectActiveCodingAgents"),
-    )
-}
 
 /** Bind repository creation to the Android owner's request before suspending. */
 internal fun ChatRouteArgs.focusedCreation(

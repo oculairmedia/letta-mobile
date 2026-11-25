@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -22,35 +20,8 @@ internal fun AgentScaffoldMainContent(
     // The page draws under the workspace's floating header (compact) and rests its content below it.
     val topPadding = maxOf(paddingValues.calculateTopPadding(), LocalShellFloatingChromeInset.current)
     Column(modifier = Modifier.fillMaxSize()) {
-        AgentScaffoldProjectInfoSection(state, topPadding)
         AgentScaffoldChatSection(state, topPadding)
     }
-}
-
-@Composable
-private fun AgentScaffoldProjectInfoSection(
-    state: AgentScaffoldRuntimeState,
-    topPadding: androidx.compose.ui.unit.Dp,
-) {
-    val project = state.projectContext ?: return
-    val params = state.params
-    ProjectInfoTray(
-        project = project,
-        agentsState = state.uiState.projectAgents,
-        brief = state.uiState.projectBrief,
-        bugReports = state.uiState.bugReports,
-        expanded = params.projectUi.isProjectInfoExpanded,
-        onExpandedChange = params.projectUi.onProjectInfoExpandedChange,
-        onRetryAgents = state.projectBindings::loadProjectAgents,
-        onRetryBrief = state.projectBindings::loadProjectBrief,
-        onSaveBriefSection = state.projectBindings::saveProjectBriefSection,
-        onCreateBugReport = { params.sheetVisibility.onShowBugReportSheetChange(true) },
-        modifier = Modifier
-            .padding(top = topPadding)
-            // With the header hidden nothing pads for the status bar; the tray does.
-            .then(if (topPadding == 0.dp) Modifier.statusBarsPadding() else Modifier)
-            .testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
-    )
 }
 
 @Composable
@@ -62,11 +33,10 @@ private fun ColumnScope.AgentScaffoldChatSection(
         .fillMaxWidth()
         .weight(1f)
         .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT)
-    val contentTopPadding = if (state.projectContext == null) topPadding else 0.dp
     AgentScaffoldChatScreenPane(
         state = state,
         chatModifier = chatModifier,
-        contentTopPadding = contentTopPadding,
+        contentTopPadding = topPadding,
     )
 }
 
@@ -97,7 +67,6 @@ private fun AgentScaffoldChatScreen(
         contentPadding = PaddingValues(top = contentTopPadding, bottom = 0.dp),
         chatBackground = state.chatBackground,
         chatMode = params.chatMode,
-        onBugCommand = { params.sheetVisibility.onShowBugReportSheetChange(true) },
         // The companion mascot opens the workspace's agent panel, as the header's menu does.
         onOpenAgentPane = params.workspace.openAgentPane,
         // The agent switcher, for the phone canvas mode's board menu.

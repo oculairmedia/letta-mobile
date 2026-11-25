@@ -40,27 +40,6 @@ class ChatSessionInitializerTest {
     }
 
     @Test
-    fun `project context bootstraps project data and resolves conversation`() = runTest {
-        val projectContext = ProjectChatContext(
-            identifier = "project-1",
-            name = "Project 1",
-            filesystemPath = "/workspace/project-1",
-        )
-        val harness = Harness(
-            scope = this,
-            projectContext = projectContext,
-        )
-
-        harness.initializer.run()
-        advanceUntilIdle()
-
-        assertEquals(1, harness.resolveRequests)
-        assertEquals(1, harness.loadProjectAgentsCount)
-        assertEquals(1, harness.loadProjectBriefCount)
-        assertEquals(1, harness.loadRecentBugReportsCount)
-    }
-
-    @Test
     fun `initializer cannot clear visibility or independently resume a conversation`() = runTest {
         val harness = Harness(
             scope = this,
@@ -85,7 +64,6 @@ class ChatSessionInitializerTest {
     private class Harness(
         scope: kotlinx.coroutines.CoroutineScope,
         val agentId: String = "agent-1",
-        val projectContext: ProjectChatContext? = null,
         resumeRecentEnabled: Boolean? = null,
     ) {
         val settingsRepository: SettingsRepository = mockk(relaxed = true)
@@ -98,9 +76,6 @@ class ChatSessionInitializerTest {
         var refreshedAgentsCount = 0
         var seededAgentName = false
         var observedAgentName = false
-        var loadProjectAgentsCount = 0
-        var loadProjectBriefCount = 0
-        var loadRecentBugReportsCount = 0
         var resolveRequests = 0
 
         val initializer = ChatSessionInitializer(
@@ -113,13 +88,6 @@ class ChatSessionInitializerTest {
             prepareChat = {
                 seededAgentName = true
                 observedAgentName = true
-            },
-            loadProject = {
-                if (projectContext != null) {
-                    loadProjectAgentsCount++
-                    loadProjectBriefCount++
-                    loadRecentBugReportsCount++
-                }
             },
             openConversation = { conversationCoordinator.recordOpenRequested(); resolveRequests++ },
         )

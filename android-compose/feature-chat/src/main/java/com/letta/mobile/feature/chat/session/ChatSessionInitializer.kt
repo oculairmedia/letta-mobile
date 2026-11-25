@@ -14,7 +14,6 @@ internal class ChatSessionInitializer(
     private val runExpansionState: ChatRunExpansionState,
     private val refreshAvailableAgents: () -> Unit,
     private val prepareChat: () -> Unit,
-    private val loadProject: () -> Unit,
     private val openConversation: () -> Unit,
 ) {
     fun run() {
@@ -26,7 +25,6 @@ internal class ChatSessionInitializer(
 
         prepareChat()
         runExpansionState.hydrateUiState()
-        loadProject()
         openConversation()
     }
 

@@ -158,32 +158,6 @@ class ChatRouteArgsTest {
     }
 
     @Test
-    fun `restores project context with identifier fallback name`() {
-        val args = ChatRouteArgs(
-            SavedStateHandle(
-                mapOf(
-                    "agentId" to "agent-1",
-                    "projectIdentifier" to "letta-mobile",
-                    "projectFilesystemPath" to "/workspace/letta-mobile",
-                    "projectGitUrl" to "https://github.com/oculairmedia/letta-mobile",
-                    "projectLastSyncAt" to "2026-05-15T12:00:00Z",
-                    "projectActiveCodingAgents" to "android",
-                    "projectLettaFolderId" to "folder-1",
-                )
-            )
-        )
-
-        val project = args.projectContext
-        assertEquals("letta-mobile", project?.identifier)
-        assertEquals("letta-mobile", project?.name)
-        assertEquals("/workspace/letta-mobile", project?.filesystemPath)
-        assertEquals("https://github.com/oculairmedia/letta-mobile", project?.gitUrl)
-        assertEquals("2026-05-15T12:00:00Z", project?.lastSyncAt)
-        assertEquals("android", project?.activeCodingAgents)
-        assertEquals("folder-1", project?.lettaFolderId)
-    }
-
-    @Test
     fun `resolution never persists a competing conversation selection in the route handle`() {
         val savedState = SavedStateHandle(mapOf("agentId" to "agent-1"))
         val args = ChatRouteArgs(savedState)

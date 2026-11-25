@@ -67,8 +67,6 @@ internal fun openedChatViewModel(
     ),
     messageRepository = mockk(relaxed = true),
     agentRepository = stubAgentRepository(agent),
-    blockRepository = mockk(relaxed = true),
-    bugReportRepository = mockk(relaxed = true),
     conversationRepository = mockk(relaxed = true),
     settingsRepository = session.settings,
     sessionManager = stubSessionManager(session, agent),

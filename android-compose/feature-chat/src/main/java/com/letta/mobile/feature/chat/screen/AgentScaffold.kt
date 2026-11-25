@@ -15,19 +15,12 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.subagentConversation
-import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsActions
 import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
 
 internal object AgentScaffoldTestTags {
     const val AGENT_PICKER_SHEET = "agent_scaffold_agent_picker_sheet"
-    const val PROJECT_BUG_FAB = "agent_scaffold_project_bug_fab"
-    const val PROJECT_BUG_REPORT_SHEET = "agent_scaffold_project_bug_report_sheet"
     const val CHAT_SCREEN_CONTENT = "agent_scaffold_chat_screen_content"
-    const val PROJECT_CONTEXT_CARD = "agent_scaffold_project_context_card"
-    const val PROJECT_AGENTS_CARD = "agent_scaffold_project_agents_card"
-    const val PROJECT_BRIEF_CARD = "agent_scaffold_project_brief_card"
-    const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
 }
 
@@ -84,7 +77,6 @@ fun WorkspaceAgentChat(route: AgentChatRoute, host: WorkspaceChatHost) {
     )
     CompositionLocalProvider(LocalSharedNavDrawer provides host.drawer) {
         AgentScaffoldContent(
-            initialProjectStartAction = route.projectStartAction,
             navigation = navigation,
             viewModel = hiltViewModel<AdminChatViewModel>(chatOwner).also(chatOwner::bind),
             workspace = host,
@@ -95,17 +87,11 @@ fun WorkspaceAgentChat(route: AgentChatRoute, host: WorkspaceChatHost) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun AgentScaffoldContent(
-    initialProjectStartAction: String? = null,
     navigation: AgentScaffoldNavigationCallbacks,
     viewModel: AdminChatViewModel,
     workspace: WorkspaceChatHost,
 ) {
-    var showBugReportSheet by rememberSaveable {
-        mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT)
-    }
     var showAgentSwitcher by remember { mutableStateOf(false) }
-    val projectContext = viewModel.projectContext
-    var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
     var chatMode by rememberSaveable { mutableStateOf(viewModel.initialChatMode ?: "simple") }
 
     AgentScaffoldBody(
@@ -115,14 +101,8 @@ internal fun AgentScaffoldContent(
             chatMode = chatMode,
             onChatModeChange = { chatMode = it },
             sheetVisibility = AgentScaffoldSheetVisibility(
-                showBugReportSheet = showBugReportSheet,
-                onShowBugReportSheetChange = { showBugReportSheet = it },
                 showAgentSwitcher = showAgentSwitcher,
                 onShowAgentSwitcherChange = { showAgentSwitcher = it },
-            ),
-            projectUi = AgentScaffoldProjectUiState(
-                isProjectInfoExpanded = isProjectInfoExpanded,
-                onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
             ),
             modelPicker = remember(viewModel) { viewModel.modelPicker(navigation.onNavigateToProviders) },
             workspace = workspace,

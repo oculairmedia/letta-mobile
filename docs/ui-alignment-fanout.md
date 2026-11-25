@@ -159,7 +159,6 @@ Worst files first; they are also the ones a person looks at most.
  39  app           screens/runs/RunMonitorScreen.kt
  39  desktop       DesktopQuickQuery.kt
  39  desktop       schedules/DesktopScheduleRail.kt
- 38  feature-chat  screen/AgentScaffoldDrawer.kt
  36  desktop       chat/DesktopChatSurface.kt
 ```
 
