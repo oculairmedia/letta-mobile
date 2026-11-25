@@ -20,6 +20,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="@BRAND_NAME@">
+    <!-- letta-mobile-ckmub.17.19: cold-start parallelism. The two downloads the page could
+         otherwise serialize start here, during the head parse, instead of after the module below
+         runs: the Iroh transport wasm (preloaded as a CORS fetch to match the module's init())
+         and the Compose app bundle. -->
+    <link rel="preload" href="./iroh/letta_iroh_wasm_bg.wasm" as="fetch" type="application/wasm" crossorigin>
+    <link rel="preload" href="letta-web.js" as="script">
     <style>
         html, body {
             box-sizing: border-box;
@@ -57,6 +63,13 @@
             initialization ??= init('./iroh/letta_iroh_wasm_bg.wasm');
             return initialization;
         };
+
+        // letta-mobile-ckmub.17.19: the 1.07 MB transport wasm starts downloading and compiling
+        // here, in parallel with letta-web.js and Skiko, instead of only when a connected view
+        // first asks for it. Not config-dependent; on an unconfigured or offline page it must
+        // never surface as an unhandled rejection — any later explicit call still reports its own
+        // error through its own caller — so the failure is swallowed here.
+        initialize().catch(() => {});
 
         const drain = async (session, stream, queue, maxQueuedFrames) => {
             try {
@@ -209,5 +222,30 @@
     </script>
 </head>
 <body>
+    <!-- letta-mobile-ckmub.17.19: first-paint loader, removed by the script below once the
+         ComposeViewport canvas joins this body (fixed-positioned, so Compose still sizes the
+         canvas from an uncluttered body). -->
+    <style>
+        #letta-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+        #letta-boot::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #6E8290;
+            animation: letta-boot-pulse 1.2s ease-in-out infinite; }
+        @keyframes letta-boot-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+        @media (prefers-reduced-motion: reduce) { #letta-boot::before { animation: none; } }
+    </style>
+    <div id="letta-boot" role="status" aria-label="Loading"></div>
+    <script>
+        // letta-mobile-ckmub.17.19: letta-boot leaves the moment Compose appends its canvas here.
+        (() => {
+            const boot = document.getElementById('letta-boot');
+            const canvas = () => document.body.querySelector('canvas');
+            if (canvas()) { boot.remove(); return; }
+            const observer = new MutationObserver(() => {
+                if (!canvas()) return;
+                observer.disconnect();
+                boot.remove();
+            });
+            observer.observe(document.body, { childList: true });
+        })();
+    </script>
 </body>
 </html>
