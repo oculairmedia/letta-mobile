@@ -18,6 +18,7 @@ import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.await
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Bitmap
@@ -53,6 +54,8 @@ internal class RiveCanvasRenderer : RiveFrameRenderer {
     /** [JsException] is the interop's own throw; [RiveFrameRenderer.prepare] says what a failure costs. */
     override suspend fun prepare() = preparing.withLock {
         if (loaded != null) return@withLock
+        // Cold-load (letta-mobile-qeoad): the shell paints on its fallback orb first; rive.wasm (804 KB) starts after this idle yield.
+        delay(1_500L)
         val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
         val bytes = riveFetchBytes(MASCOT_PATH).await<JsAny>()
         // rive.load answers null for a file it cannot read; a null here is not a loaded runtime.
@@ -167,9 +170,7 @@ private class RiveCanvasFrame(val size: IntSize) {
 
     fun close() = bitmap.close()
 
-    private companion object {
-        const val BYTES_PER_PIXEL = 4
-    }
+    private companion object { const val BYTES_PER_PIXEL = 4 }
 }
 
 /** The byte-by-byte copy (a Kotlin-to-JS call per byte, per frame, per mascot) has been reported. */
