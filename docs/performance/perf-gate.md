@@ -20,12 +20,16 @@ throttled merge throughput while its noise band sat on the ceiling. Since
 `perf-scripts` job (perf script unit tests + Baseline Profile freshness, about
 a minute, no emulator).
 
-A failed nightly or main run fails the workflow and the `report perf
-regression` job opens a GitHub issue titled **`perf-gate regression`**, or
-comments on the open one (de-duplicated by that exact title). Triage it with
-the control table below and the playbook; close the issue once main is green.
-A regression is therefore caught after merge, within a day, and bisected over
-the main commits since the last green nightly.
+A failed nightly or main run fails the workflow and is reported in the run's
+job summary, never a GitHub issue: issues are disabled on this repository on
+purpose — all work is tracked in beads — so no workflow may create, list or
+comment on a GitHub issue. The `perf-gate` job's report step appends a short
+regression report (run URL, commit, and the step that failed or timed out);
+if the job itself is killed by its 60-minute timeout before the step can run,
+the tiny `report-timeout-regression` job writes the same report. Triage it
+with the control table below and the playbook, and file or update a bead for
+the regression. A regression is therefore caught after merge, within a day,
+and bisected over the main commits since the last green nightly.
 
 ## Canonical benchmark device
 
@@ -125,8 +129,8 @@ Now:
    a one-line reading per breached metric.
 3. The job fails. A **human** decides:
    - the control shows main at or over the same ceiling: the runner moved.
-     Rerun the job once and say so on the `perf-gate regression` issue (or
-     the PR, for an opted-in PR run), quoting the control line;
+     Rerun the job once and say so on the bead (or the PR, for an opted-in
+     PR run), quoting the control line;
    - main sits comfortably under it: the change is the suspect. Profile it
      (see the playbook) before any rerun. If the slowdown is real and
      accepted, rebaseline deliberately (below), never by widening a ceiling
@@ -212,6 +216,15 @@ on main pushes (see "When it runs"). The required set is `test`,
 
 ## Known quirks
 
+- **A hang ends in a bounded timeout, never an endless runner.** The
+  `perf-gate` job is capped at `timeout-minutes: 60` and the emulator step at
+  `timeout-minutes: 50`; healthy runs take 36-47 min. The 2026-11-25 main run
+  f460c90f hung for ~53 min in the emulator step with no cap until a human
+  killed it. Neither cap retries anything (`letta-mobile-by4vm.32`): a human
+  decides whether to rerun, exactly once. A step timeout leaves the job alive
+  so its reports, summaries and artifacts still upload and the regression
+  report lands in the job summary; a job timeout kills the runner and the
+  `report-timeout-regression` job writes the report instead.
 - **Shell line continuations in workflow `script:` blocks** can be passed
   through literally and break Gradle invocation. Keep the benchmark command
   simple and shell-safe.

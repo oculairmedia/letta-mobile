@@ -582,13 +582,38 @@ assert_contains "$perf_workflow" 'Classify performance impact'
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
 # The ~30 min emulator macrobenchmark is nightly + main, not a PR gate. PRs run
 # only the cheap perf-scripts self-test unless they edit the gate itself or ask
-# for [perf:rebaseline]; a red nightly/main run files "perf-gate regression".
+# for [perf:rebaseline]. A red nightly/main run appends a regression report to
+# the run's job summary for triage into a bead: issues are disabled on this
+# repo on purpose (all work is tracked in beads), so no workflow may create,
+# list or comment on a GitHub issue — an issue-based reporter could only fail
+# and add a second red job that hid the gate's real result.
 assert_contains "$perf_workflow" '  perf-scripts:'
 assert_contains "$perf_workflow" '    - cron: '
 assert_contains "$perf_workflow" "if: needs.perf-scripts.outputs.run_benchmark == 'true'"
 assert_contains "$perf_workflow" 'run_benchmark=false'
-assert_contains "$perf_workflow" 'TITLE: perf-gate regression'
-assert_contains "$perf_workflow" 'issues: write'
+# A hung gate ends in a bounded timeout and retries nothing (healthy runs take
+# 36-47 min; the 2026-11-25 main run f460c90f hung ~53 min with no cap until a
+# human killed it; reruns stay a human decision, letta-mobile-by4vm.32).
+assert_contains "$perf_workflow" '    timeout-minutes: 60'
+assert_contains "$perf_workflow" '        timeout-minutes: 50'
+# The in-job step reports normal step failures and step timeouts; the tiny
+# safety-net job reports the one failure that can run no step — the job's own
+# timeout — so a hung gate is never unreported.
+assert_contains "$perf_workflow" 'Report perf regression in the run summary'
+assert_contains "$perf_workflow" 'Triage with docs/performance/perf-gate.md and file or update a bead.'
+assert_contains "$perf_workflow" '  report-timeout-regression:'
+assert_not_contains "$perf_workflow" 'TITLE: perf-gate regression'
+assert_not_contains "$perf_workflow" 'gh issue'
+assert_not_contains "$perf_workflow" 'issues: write'
+# Emmanuel's rule, repo-wide: all issues are tracked in beads, never GitHub
+# Issues (issues are disabled on oculairmedia/baken on purpose), so no
+# workflow may create, list or comment on a GitHub issue.
+for wf_path in "$SOURCE_ROOT"/.github/workflows/*.yml; do
+  [[ -f "$wf_path" ]] || fail "missing workflow file: $wf_path"
+  wf_text="$(<"$wf_path")"
+  assert_not_contains "$wf_text" 'gh issue'
+  assert_not_contains "$wf_text" 'issues: write'
+done
 
 # The pre-push PR readiness checklist (AGENTS.md) names exactly which checks are
 # required (block merge) versus advisory (never block). Lock the truth into CI
