@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.runtime.admitsParentStreamDelta
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
@@ -319,6 +321,8 @@ internal class ConversationTurnFanout(
      * semantics match what the synthesized `writeStreamDelta` produced.
      */
     private suspend fun emitRawFrameBody(body: String): Boolean {
+        val candidate = innerDeltaOf(body)
+        if (candidate != null && !admitsParentStreamDelta(candidate, runtime)) return false
         openToolCalls.observe(body)
         identity?.noteFrame(body)
         val delta = innerDeltaOf(body) ?: run {

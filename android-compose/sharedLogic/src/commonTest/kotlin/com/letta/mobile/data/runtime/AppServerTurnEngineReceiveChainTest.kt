@@ -136,6 +136,28 @@ class AppServerTurnEngineReceiveChainTest {
         }
     }
 
+    @Test
+    fun childIdentityWithoutSubagentIdIsDroppedBeforeRunBinding() = runTest {
+        val client = FakeReceiveClient()
+        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "runtime-start-1" })
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            listOf("agent_id", "session_id", "conversation_id").forEach { field ->
+                val frame = assistantStreamDelta("child-$field", "must not project")
+                client.emit(frame.copy(delta = buildJsonObject {
+                    frame.delta.jsonObject.forEach { (key, value) -> put(key, value) }
+                    put(field, "foreign-child")
+                }))
+            }
+            client.emit(assistantStreamDelta("parent-no-identity", ASSISTANT_TEXT))
+            assertEquals("parent-no-identity", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageId)
+            client.emit(stopReasonDelta("run-1"))
+            assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+    }
+
     companion object {
         const val ASSISTANT_TEXT = "Ack: live iroh receive chain works."
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")

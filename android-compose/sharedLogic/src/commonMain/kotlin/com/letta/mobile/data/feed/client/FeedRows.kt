@@ -10,6 +10,8 @@ import com.letta.mobile.data.feed.wire.FeedDelta
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.runtime.admitsParentStreamDelta
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineReducerState
@@ -50,6 +52,7 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
             pointerEntries += 1
             return emptyList()
         }
+        if (!admitsParentStreamDelta(payload, AppServerRuntimeScope(agent.value, conversationId))) return emptyList()
         return messagesOf(entry, payload).also { messages ->
             messages.forEach { reduction = reduction.reduceLive(it, agent.value) }
         }

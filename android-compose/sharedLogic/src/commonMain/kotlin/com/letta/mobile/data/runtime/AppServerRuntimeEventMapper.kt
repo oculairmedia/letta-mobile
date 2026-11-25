@@ -164,6 +164,7 @@ open class AppServerRuntimeEventMapper {
         // observable without deciding the terminal.
         val deltaObject = delta as? JsonObject
             ?: return unprojectableDelta(command, raw)
+        if (!admitsParentStreamDelta(deltaObject, runtime)) return emptyList()
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         val ref = StreamDeltaRef(frameId = idempotencyKey, runId = runId, delta = deltaObject, raw = raw)

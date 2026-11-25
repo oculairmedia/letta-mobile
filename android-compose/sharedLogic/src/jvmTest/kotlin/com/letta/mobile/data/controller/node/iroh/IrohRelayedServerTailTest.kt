@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -29,6 +30,18 @@ import kotlin.test.assertTrue
  * re-synthesized error_message, and the conversation's queue updates keep coming after it.
  */
 class IrohRelayedServerTailTest {
+
+    @Test
+    fun rawServerTailDoesNotBypassChildIdentityAdmission() = runTest {
+        val entries = requireNotNull(javaClass.getResource("/appserver/child-tail.jsonl"))
+            .readText().lineSequence().filter { it.isNotBlank() }
+            .map { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonObject }.toList()
+        val server = entries.dropLast(1).map { entry ->
+            frame("stream_delta") { put("delta", entry.getValue("p")) }
+        } + listOf(idle(), turnFinished("end_turn"))
+        val stream = relay(server, listOf(lifecycle(RuntimeRunStatus.Completed, "end_turn")))
+        assertEquals(listOf("stop_reason", "update_loop_status", "turn_finished"), stream.map { it.kind })
+    }
 
     @Test
     fun failedTurnRelaysTheServersErrorStopReasonIdleAndTurnFinishedInOrder() = runTest {

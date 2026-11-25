@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -35,6 +36,21 @@ class IrohRelayedTurnLateTailTest {
         val lastAssistant = kinds.lastIndexOf("assistant_message")
         assertTrue(lastAssistant in 0 until finished, "late deltas are relayed before the terminal: $kinds")
         assertEquals(3, kinds.count { it == "assistant_message" }, "no late delta is dropped: $kinds")
+    }
+
+    @Test
+    fun childTailWithoutSubagentIdNeverReachesParentAfterStopReason() = runTest {
+        val entries = requireNotNull(javaClass.getResource("/appserver/child-tail.jsonl"))
+            .readText().lineSequence().filter { it.isNotBlank() }
+            .map { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonObject }.toList()
+        val drafts = entries.dropLast(1).map { entry ->
+            draft(RuntimeEventPayload.RemoteStreamFrame(frameId = entry.getValue("s").toString(), body = buildJsonObject {
+                put("type", "stream_delta")
+                put("delta", entry.getValue("p"))
+            }.toString()))
+        } + completed()
+        val kinds = relayedKinds(drafts)
+        assertEquals(listOf("user_message", "stop_reason", "update_loop_status", "turn_finished"), kinds)
     }
 
     @Test
