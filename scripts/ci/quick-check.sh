@@ -8,6 +8,7 @@
 #   parity        scripts/ci/parity_gates.py (parity, platform-code, mirror-names)
 #   platform-ui   scripts/ci/platform-ui-gate.sh --enforce
 #   kdoc          scripts/ci/check-kdoc-hygiene.py
+#   kmp-common    scripts/ci/check-kmp-common-leaks.py (JVM-only APIs in commonMain/commonTest)
 #   api-packages  scripts/ci/check-api-package-coverage.py
 #   wire-contracts scripts/ci/check-wire-contracts.py (pairs, index, shrinking baseline)
 #   ratchet       scripts/ci/baseline-ratchet-guard.py against the merge base with --base
@@ -50,11 +51,12 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 cd "$ROOT" || exit 2
 
-GATES=(parity platform-ui kdoc api-packages wire-contracts ratchet structure docs-index api-mirror invisible)
+GATES=(parity platform-ui kdoc kmp-common api-packages wire-contracts ratchet structure docs-index api-mirror invisible)
 declare -A HINT=(
   [parity]="bind the shared contract on every platform, implement the shared type, or move the logic into sharedLogic/sharedUI; never add a scripts/ci/parity/ line (AGENTS.md 'No unshared frontend or logic')"
   [platform-ui]="build the @Composable in sharedUI and keep the platform file a container (PUI001), or shrink it below its cap (PUI002); delete stale allowlist lines (PUI003)"
   [kdoc]="move bead ids / CodeScene numbers out of /** KDoc */ into // comments or the commit message"
+  [kmp-common]="write the multiplatform call instead (kotlinx.coroutines delay, kotlin.time clocks, encodeToByteArray/decodeToString) or move the JVM import/call into a jvmMain/androidMain actual; commonMain/commonTest must also compile for hostNative and wasmJs"
   [api-packages]="add an overview for each new production package to its module's Module.md (see the message above)"
   [wire-contracts]="add matching versioned specs/fixtures, regenerate the index, and only shrink the uncovered baseline; run :sharedLogic:jvmTest for real registry/conformance"
   [ratchet]="baselines only shrink: fix the code instead of adding or raising a baseline line"
@@ -69,6 +71,7 @@ run_gate() {
     parity) "$PY" scripts/ci/parity_gates.py ;;
     platform-ui) bash scripts/ci/platform-ui-gate.sh --enforce ;;
     kdoc) "$PY" scripts/ci/check-kdoc-hygiene.py ;;
+    kmp-common) "$PY" scripts/ci/check-kmp-common-leaks.py ;;
     api-packages) "$PY" scripts/ci/check-api-package-coverage.py ;;
     wire-contracts) "$PY" scripts/ci/check-wire-contracts.py --check --diff-base "$MERGE_BASE" ;;
     ratchet) "$PY" scripts/ci/baseline-ratchet-guard.py --diff-base "$MERGE_BASE" ;;

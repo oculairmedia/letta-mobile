@@ -876,18 +876,23 @@ printf '\nThe restart-replay evidence stays at 0.0.1 until re-captured live.\n' 
 output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
 assert_contains "$output" 'restart-replay claim 0.0.1 differs from captured evidence'
 
-# The pre-push hook runs the two fast CI checks when the push changes their inputs
-# (.kt for KDoc hygiene, *.api for the mingw dump mirror), skips them otherwise,
-# and blocks the push on failure: each fix takes seconds, the CI runs they burn
-# take half an hour. Behavioural: the real hook, the real check scripts, a fixture
-# repo whose push ranges are faked on stdin.
+# The pre-push hook runs the fast CI checks when the push changes their inputs (.kt
+# for KDoc hygiene, KMP common leaks, API package coverage and package headroom;
+# *.api for the mingw dump mirror), skips them otherwise, and blocks the push on
+# failure: each fix takes seconds, the CI runs they burn take half an hour.
+# Behavioural: the real hook, the real check scripts, a fixture repo whose push
+# ranges are faked on stdin.
 pre_push="$(<"$SOURCE_ROOT/.githooks/pre-push")"
 assert_contains "$pre_push" 'scripts/ci/check-kdoc-hygiene.py'
+assert_contains "$pre_push" 'scripts/ci/check-kmp-common-leaks.py'
+assert_contains "$pre_push" 'scripts/ci/check-api-package-coverage.py'
+assert_contains "$pre_push" 'run_guard headroom "package_headroom.py" --changed --base'
 assert_contains "$pre_push" 'scripts/ci/api-dump-mirror-check.sh'
 
 repo="$TMP/pre-push"
 new_repo "$repo"
 cp "$SOURCE_ROOT/scripts/ci/check-kdoc-hygiene.py" "$repo/scripts/ci/"
+cp "$SOURCE_ROOT/scripts/ci/check-kmp-common-leaks.py" "$repo/scripts/ci/"
 cp "$SOURCE_ROOT/scripts/ci/check-api-package-coverage.py" "$repo/scripts/ci/"
 cp "$SOURCE_ROOT/scripts/ci/api-dump-mirror-check.sh" "$repo/scripts/ci/"
 mkdir -p "$repo/scripts/codescene" "$repo/.githooks"
@@ -917,13 +922,18 @@ run_pre_push() { # $1 = local_sha, $2 = remote_sha; prints combined hook output
   )
 }
 
-# A clean .kt change runs the hygiene check (and passes); the mirror check is skipped.
+# A clean .kt change runs the four hygiene/leak/coverage/headroom checks (and passes);
+# the fixture has no structure-baseline.json, so headroom skips rather than failing.
+# The mirror check is skipped because no *.api file changed.
 printf 'package com.example.fake\n\nval other = 7\n' >"$repo/android-compose/fake/src/main/kotlin/Fake.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm clean-kt
 base="$(git -C "$repo" rev-parse HEAD~1)"
 clean_kt_sha="$(git -C "$repo" rev-parse HEAD)"
 out="$(run_pre_push "$clean_kt_sha" "$base")" || fail "pre-push rejected a clean .kt push: $out"
 assert_contains "$out" 'check-kdoc-hygiene.py: clean'
+assert_contains "$out" 'check-kmp-common-leaks.py: clean'
+assert_contains "$out" 'check-api-package-coverage.py: clean'
+assert_contains "$out" 'skipping scripts/ci/package_headroom.py --changed'
 assert_contains "$out" 'skipping scripts/ci/api-dump-mirror-check.sh'
 
 # A bead id in a pushed .kt file's KDoc blocks the push outright.
@@ -936,13 +946,14 @@ if out="$(run_pre_push "$bead_kt_sha" "$clean_kt_sha")"; then
 fi
 assert_contains "$out" 'describe intent instead of abcde.1'
 
-# A push with no .kt and no .api change runs neither check.
+# A push with no .kt and no .api change runs none of the four checks.
 git -C "$repo" checkout -q -b notes "$base"
 printf 'notes\n' >"$repo/NOTES.md"
 git -C "$repo" add . && git -C "$repo" commit -qm notes
 notes_sha="$(git -C "$repo" rev-parse HEAD)"
 out="$(run_pre_push "$notes_sha" "$base")" || fail "pre-push rejected a non-Kotlin push: $out"
 assert_contains "$out" 'skipping scripts/ci/check-kdoc-hygiene.py'
+assert_contains "$out" 'skipping scripts/ci/check-kmp-common-leaks.py'
 assert_contains "$out" 'skipping scripts/ci/api-dump-mirror-check.sh'
 
 # An .api change with a stale mingw mirror blocks the push, while a KDoc-free push
@@ -969,6 +980,45 @@ if out="$(run_pre_push "$new_branch_sha" "$zero_sha")"; then
   fail "pre-push allowed a first push of a branch with a KDoc bead id"
 fi
 assert_contains "$out" 'describe intent instead of abcde.1'
+
+# A JVM-only import in commonMain is the exact leak that breaks the required
+# hostNative/wasmJs compiles of shared-multiplatform: the hook blocks the push.
+git -C "$repo" checkout -q -b kmp "$base"
+mkdir -p "$repo/android-compose/fake/src/commonMain/kotlin"
+printf 'package com.example.fake\n\nimport java.io.File\n\nval leak = File("x")\n' \
+  >"$repo/android-compose/fake/src/commonMain/kotlin/Leak.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm jvm-leak
+kmp_sha="$(git -C "$repo" rev-parse HEAD)"
+if out="$(run_pre_push "$kmp_sha" "$base")"; then
+  fail "pre-push allowed a JVM-only import java.io.File in commonMain"
+fi
+assert_contains "$out" 'Leak.kt:3: import java.io.File is JVM-only'
+assert_contains "$out" 'KMP leak check failed'
+
+# The same import is legal in a platform source set: jvmMain only compiles on the
+# JVM, so its push passes the leak gate (and the other three).
+git -C "$repo" checkout -q -b jvm "$base"
+mkdir -p "$repo/android-compose/fake/src/jvmMain/kotlin"
+printf 'package com.example.fake\n\nimport java.io.File\n\nval useJdk = File("x")\n' \
+  >"$repo/android-compose/fake/src/jvmMain/kotlin/Jvm.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm jvm-api
+jvm_sha="$(git -C "$repo" rev-parse HEAD)"
+out="$(run_pre_push "$jvm_sha" "$base")" || fail "pre-push rejected a jvmMain file using a JVM API: $out"
+assert_contains "$out" 'check-kmp-common-leaks.py: clean'
+
+# A new production package missing from its module's Module.md (the Slice 2 #2656
+# class of failure) blocks the push in seconds instead of a full CI run.
+git -C "$repo" checkout -q -b pkg "$base"
+mkdir -p "$repo/android-compose/fake/src/main/kotlin/other"
+printf 'package com.example.other\n\nval text = 1\n' \
+  >"$repo/android-compose/fake/src/main/kotlin/other/Other.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm undocumented-package
+pkg_sha="$(git -C "$repo" rev-parse HEAD)"
+if out="$(run_pre_push "$pkg_sha" "$base")"; then
+  fail "pre-push allowed a new package with no Module.md overview"
+fi
+assert_contains "$out" 'missing # Package com.example.other'
+assert_contains "$out" 'API package coverage failed'
 
 # Delete-only pushes exit before any check, as before.
 out="$(run_pre_push "$zero_sha" "$base")" || fail "pre-push rejected a delete-only push: $out"
