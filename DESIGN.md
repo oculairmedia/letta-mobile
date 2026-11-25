@@ -1,4 +1,4 @@
-# Letta Mobile Design System
+# Baken Design System
 
 This is the design direction and policy reference, together with the UI rules in
 [AGENTS.md](AGENTS.md). [The token reference](docs/DESIGN_SYSTEM.md) records an older
@@ -6,7 +6,7 @@ implementation snapshot; current theme code defines actual token values.
 
 ## 1. Atmosphere & Identity
 
-Letta Mobile is a calm operational workspace for managing agents and following their work. Its signature is stable, information-dense chrome around readable content surfaces: connection state, agent identity, and the active conversation remain clear without decorative distraction.
+Baken is a calm operational workspace for managing agents and following their work. Its signature is stable, information-dense chrome around readable content surfaces: connection state, agent identity, and the active conversation remain clear without decorative distraction.
 
 ## 2. Color
 
