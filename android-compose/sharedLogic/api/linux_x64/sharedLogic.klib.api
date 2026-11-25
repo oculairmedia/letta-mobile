@@ -5491,6 +5491,10 @@ abstract fun interface com.letta.mobile.data.subagents/AppServerProcessIdentity 
     abstract fun current(): kotlin/String? // com.letta.mobile.data.subagents/AppServerProcessIdentity.current|current(){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.timeline.session/CanonicalTimelineSend { // com.letta.mobile.data.timeline.session/CanonicalTimelineSend|null[0]
+    abstract suspend fun send(kotlin/String, com.letta.mobile.ui.chat.session/TimelineSend) // com.letta.mobile.data.timeline.session/CanonicalTimelineSend.send|send(kotlin.String;com.letta.mobile.ui.chat.session.TimelineSend){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.timeline/AcquisitionIdGenerator { // com.letta.mobile.data.timeline/AcquisitionIdGenerator|null[0]
     abstract fun next(): kotlin/String // com.letta.mobile.data.timeline/AcquisitionIdGenerator.next|next(){}[0]
 }
@@ -66748,6 +66752,19 @@ final class com.letta.mobile.data.timeline.headless/TimelineAssertionReport { //
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.timeline.headless/TimelineAssertionReport.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.timeline.headless/TimelineAssertionReport.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.timeline.headless/TimelineAssertionReport.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession : com.letta.mobile.ui.chat.session/TimelineChatSession { // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession|null[0]
+    constructor <init>(com.letta.mobile.data.timeline/CanonicalTimelineCoordinator, com.letta.mobile.data.timeline/CanonicalTimelineCoordinator.Owner, com.letta.mobile.data.timeline.api/TimelineExternalTransportWriter, com.letta.mobile.data.timeline.session/CanonicalTimelineSend, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.<init>|<init>(com.letta.mobile.data.timeline.CanonicalTimelineCoordinator;com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner;com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter;com.letta.mobile.data.timeline.session.CanonicalTimelineSend;kotlinx.coroutines.CoroutineScope){}[0]
+
+    final val events // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.events|{}events[0]
+        final fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.timeline/TimelineSyncEvent> // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.events.<get-events>|<get-events>(){}[0]
+    final val timeline // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.timeline|{}timeline[0]
+        final fun <get-timeline>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.timeline/Timeline> // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.timeline.<get-timeline>|<get-timeline>(){}[0]
+
+    final suspend fun close() // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.close|close(){}[0]
+    final suspend fun hydrate() // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.hydrate|hydrate(){}[0]
+    final suspend fun send(kotlin/String, kotlin.collections/List<com.letta.mobile.data.model/MessageContentPart.Image>) // com.letta.mobile.data.timeline.session/CanonicalTimelineChatSession.send|send(kotlin.String;kotlin.collections.List<com.letta.mobile.data.model.MessageContentPart.Image>){}[0]
 }
 
 final class com.letta.mobile.data.timeline.snapshot/InMemoryConfirmedTimelineStore : com.letta.mobile.data.timeline.snapshot/ConfirmedTimelineStore { // com.letta.mobile.data.timeline.snapshot/InMemoryConfirmedTimelineStore|null[0]

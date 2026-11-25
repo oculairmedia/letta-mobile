@@ -10,8 +10,21 @@ import kotlinx.collections.immutable.toPersistentList
 
 /** Use the existing semantic mapper for optimistic attachments and delivery flags on every host. */
 fun CanonicalPendingLocalStore.Record.toRenderItem(ownAgentId: String? = null): ChatRenderItem.Single {
-    val event = TimelineEvent.Local(
-        position = 0.0, otid = otid, content = content, sentAt = parseTimelineInstant(sentAt),
+    val message = requireNotNull(com.letta.mobile.data.chat.projection.timelineEventToUiMessage(toPendingTimelineEvent(), ownAgentId))
+    return ChatRenderItem.Single(message, com.letta.mobile.ui.common.GroupPosition.None)
+}
+
+/**
+ * The prompt record as one optimistic local event, before any projection places it in a list. The one
+ * mapping of a pending send onto [TimelineEvent.Local]; every surface (this overlay included)
+ * projects the same event, so an optimistic prompt cannot render differently per surface.
+ */
+internal fun CanonicalPendingLocalStore.Record.toPendingTimelineEvent(): TimelineEvent.Local =
+    TimelineEvent.Local(
+        position = 0.0,
+        otid = otid,
+        content = content,
+        sentAt = parseTimelineInstant(sentAt),
         deliveryState = when (delivery) {
             CanonicalPendingLocalStore.Delivery.Sending -> DeliveryState.SENDING
             CanonicalPendingLocalStore.Delivery.Sent -> DeliveryState.SENT
@@ -19,9 +32,6 @@ fun CanonicalPendingLocalStore.Record.toRenderItem(ownAgentId: String? = null): 
         },
         attachments = attachments.toPersistentList(),
     )
-    val message = requireNotNull(com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId))
-    return ChatRenderItem.Single(message, com.letta.mobile.ui.common.GroupPosition.None)
-}
 
 /** Immutable bounded projection supplied by the shared live reducer, separate from settled Paging. */
 data class TimelineLiveBlock(

@@ -19,12 +19,16 @@ import kotlin.test.assertTrue
  * App Server `message.list` returns, and both renders compared.
  */
 internal class CanonicalTurnHarness private constructor(
-    private val coordinator: CanonicalTimelineCoordinator,
-    private val owner: CanonicalTimelineCoordinator.Owner,
+    /** The conversation's one coordinator: both surfaces under test read or write through it. */
+    val coordinator: CanonicalTimelineCoordinator,
+    /** The conversation's owner; its session is the single writer behind every projection. */
+    val owner: CanonicalTimelineCoordinator.Owner,
     private val ui: CoroutineScope,
     private val presentation: CanonicalTimelinePresentation,
 ) {
     companion object {
+        const val DEFAULT_SETTLED_ROWS = 2
+
         suspend fun open(scope: TimelineScope, durable: List<LettaMessage>): CanonicalTurnHarness {
             val coordinator = CanonicalTimelineCoordinator(InMemoryTimelineStore(), DurableTransport(durable))
             val owner = coordinator.acquire(scope)
@@ -55,12 +59,13 @@ internal class CanonicalTurnHarness private constructor(
         return presentation.live.value
     }
 
-    suspend fun settle() {
+    /** [expectedRows] names the settled rows the durable fixture gives this conversation. */
+    suspend fun settle(expectedRows: Int = DEFAULT_SETTLED_ROWS) {
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         ui.launch {
             presentation.settled.collectLatest { generations.incrementAndGet(); presenter.collectFrom(it) }
         }
-        presenter.awaitRows(2) { "settled turn never arrived" }
+        presenter.awaitRows(expectedRows) { "settled turn never arrived" }
         presenter.awaitIdle()
     }
 
@@ -74,6 +79,9 @@ internal class CanonicalTurnHarness private constructor(
     }
 
     fun rows(): List<ChatRenderItem> = presenter.snapshot().items.map { it.item }
+
+    /** The live overlay right now, for a test comparing a second surface against this projection. */
+    fun liveOverlay(): List<ChatRenderItem> = presentation.live.value
 
     suspend fun close() {
         presentation.close()
