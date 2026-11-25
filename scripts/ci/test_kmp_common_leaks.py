@@ -125,6 +125,17 @@ class KmpCommonLeakTest(unittest.TestCase):
         self.assertEqual(["android-compose/fake/src/commonTest/kotlin/FakeTest.kt:1: "
                           "Thread.sleep( is JVM-only: use kotlinx.coroutines delay()"], errors)
 
+    def test_common_kotlin_trees_recursively_and_prune_module_build_output(self):
+        deep = "android-compose/fake/src/commonMain/kotlin/com/example/deep/Deep.kt"
+        self.write(deep, "import java.util.UUID\n")
+        self.write("android-compose/fake/build/src/commonMain/kotlin/Built.kt",
+                   "val built = Thread.sleep(1)\n")
+        scanned, errors = leaks.check(self.root, list(leaks.common_files(self.root)))
+        self.assertEqual(2, scanned)  # the setUp fixture file plus the deep package file
+        self.assertEqual([f"{deep}:1: import java.util.UUID is JVM-only: "
+                         "use a multiplatform API or move the code to a platform source set"],
+                         errors)
+
     def test_platform_and_non_common_source_sets_are_ignored(self):
         for source in ("jvmMain", "androidMain", "wasmJsMain", "hostMain", "main", "test"):
             with self.subTest(source=source):

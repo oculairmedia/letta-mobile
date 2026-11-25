@@ -25,8 +25,10 @@ SPEC = importlib.util.spec_from_file_location("package_coverage", Path(__file__)
 coverage = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(coverage)
 
-SOURCE_SETS = ("commonMain", "commonTest")
 PRUNED_DIRS = {"build", "generated", "ksp", ".gradle", ".git", "node_modules"}
+# A common kotlin tree ends in src/common{Main,Test}/kotlin; the kotlin files of that
+# tree (at any depth, directly in kotlin/ included) are exactly what this gate scans.
+COMMON_TREES = {("src", source_set, "kotlin") for source_set in ("commonMain", "commonTest")}
 
 TOKEN = re.compile(r'/\*|//[^\n]*|"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'')
 # The multiplatform way to turn a String into bytes is encodeToByteArray(); String's
@@ -35,6 +37,8 @@ TOKEN = re.compile(r'/\*|//[^\n]*|"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^
 STRING_RECEIVER = re.compile(r"(?:\bto(?:Plain)?String\s*\(\s*\)|\bdecodeToString\s*\(\s*\))[ \t]*$")
 TO_BYTE_ARRAY = re.compile(r"\.[ \t]*toByteArray[ \t]*\(")
 CHARSET_ARGUMENT = re.compile(r"\bCharsets\b|\bcharset\b")
+LITERAL_LEAK = "String.toByteArray( is JVM-only: use encodeToByteArray()"
+CHARSET_LEAK = "toByteArray(charset) is the JVM-only String overload: use encodeToByteArray()"
 LEAKS = (
     (re.compile(r"(?m)^[ \t]*import[ \t]+((?:java|javax)\.[\w.]+)"),
      "import {0} is JVM-only: use a multiplatform API or move the code to a platform source set"),
@@ -53,89 +57,127 @@ MAYBE = re.compile(
 )
 
 
+def blank(value):
+    """[value] with each non-newline character a space, keeping offsets and line numbers."""
+    return re.sub(r"[^\n]", " ", value)
+
+
+def masked_piece(value):
+    """One comment or literal of [value] with its body blanked; literal quotes survive."""
+    if not value.startswith("/"):
+        return value[0] + blank(value[1:-1]) + value[-1]
+    return blank(value)
+
+
 def masked(text):
-    """Blank comment and string-literal bodies (keeping delimiters), preserving offsets."""
-    output, offset = [], 0
+    """[text] with comment bodies and string-literal contents blanked, offsets kept."""
+    pieces, offset = [], 0
     while match := TOKEN.search(text, offset):
         start, end = match.span()
-        output.append(text[offset:start])
-        value = match[0]
-        if value.startswith("//") or value == "/*":
-            if value == "/*":
-                end = coverage.block_comment_end(text, end)
-                value = text[start:end]
-            output.append(re.sub(r"[^\n]", " ", value))
-        else:
-            output.append(value[0] + re.sub(r"[^\n]", " ", value[1:-1]) + value[-1])
+        token = match[0]
+        if token == "/*":
+            end = coverage.block_comment_end(text, end)
+            token = text[start:end]
+        pieces.append(text[offset:start])
+        pieces.append(masked_piece(token))
         offset = end
-    output.append(text[offset:])
-    return "".join(output)
+    pieces.append(text[offset:])
+    return "".join(pieces)
 
 
-def call_argument(masked_text, open_paren):
-    """The balanced argument text of the call opened at [open_paren] ("" when unterminated)."""
+def call_argument(code, open_paren):
+    """The balanced argument text of the call opened at [open_paren]; '' when unterminated."""
     depth = 0
-    for index in range(open_paren, len(masked_text)):
-        char = masked_text[index]
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                return masked_text[open_paren + 1:index]
-    return masked_text[open_paren + 1:]
+    for walked, char in enumerate(code[open_paren:]):
+        depth += (char == "(") - (char == ")")
+        if depth == 0:
+            return code[open_paren + 1:open_paren + walked]
+    return code[open_paren + 1:]
+
+
+def message_for(message, match):
+    """[message] with the pattern's captures substituted for {0} (imports name the leak)."""
+    if not match.groups():
+        return message
+    return message.format(*match.groups())
+
+
+def pattern_findings(code):
+    """(offset, message) for each regex-leak match in the masked [code]."""
+    return [(match.start(), message_for(message, match))
+            for pattern, message in LEAKS
+            for match in pattern.finditer(code)]
+
+
+def to_byte_array_finding(code, match):
+    """(offset, message) when [.match] turns a String into JVM bytes, else None.
+
+    A String receiver leaks (String.toByteArray is JVM-only); so does the charset
+    overload (only String has it); anything else is a multiplatform byte API.
+    """
+    receiver = code[:match.start()].rstrip(" \t")
+    if receiver.endswith('"'):
+        return match.start(), LITERAL_LEAK
+    if CHARSET_ARGUMENT.search(call_argument(code, match.end() - 1)):
+        return match.start(), CHARSET_LEAK
+    if not receiver.endswith(")"):
+        return None
+    if not STRING_RECEIVER.search(receiver):
+        return None
+    return match.start(), LITERAL_LEAK
 
 
 def string_to_byte_array_leaks(code):
-    """String.toByteArray( leaks: a String receiver, or the JVM-only charset overload."""
-    findings = []
-    for match in TO_BYTE_ARRAY.finditer(code):
-        prefix = code[:match.start()].rstrip(" \t")
-        arguments = call_argument(code, match.end() - 1)
-        if prefix.endswith('"') or (prefix.endswith(")") and STRING_RECEIVER.search(prefix)):
-            findings.append((match.start(), "String.toByteArray( is JVM-only: use encodeToByteArray()"))
-        elif CHARSET_ARGUMENT.search(arguments):
-            findings.append((match.start(), "toByteArray(charset) is the JVM-only String overload: use encodeToByteArray()"))
-    return findings
+    """Every String.toByteArray( leak of the masked [code], as (offset, message)."""
+    return list(filter(None, (to_byte_array_finding(code, match)
+                              for match in TO_BYTE_ARRAY.finditer(code))))
+
+
+def findings(code):
+    """Every leak (offset, message) in the masked [code], earlier offsets first."""
+    return sorted(pattern_findings(code) + string_to_byte_array_leaks(code))
+
+
+def shown_path(path, root):
+    """[path] reported relative to [root]; outside it (an explicit --files listing), itself."""
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return path
 
 
 def file_errors(path, root):
+    """Every 'path:line: message' leak that [path] contains in its common code."""
     raw = path.read_bytes()
     if MAYBE.search(raw) is None:
         return []
     code = masked(raw.decode("utf-8-sig"))
-    findings = []
-    for pattern, message in LEAKS:
-        for match in pattern.finditer(code):
-            findings.append((match.start(), message.format(*match.groups()) if match.groups() else message))
-    findings.extend(string_to_byte_array_leaks(code))
-    errors = []
-    for start, message in sorted(findings):
-        line = code.count("\n", 0, start) + 1
-        try:
-            shown = path.relative_to(root)
-        except ValueError:
-            shown = path
-        errors.append(f"{shown}:{line}: {message}")
-    return errors
+    return [f"{shown_path(path, root)}:{code.count(chr(10), 0, offset) + 1}: {message}"
+            for offset, message in findings(code)]
+
+
+def prune(subdirs):
+    """[subdirs] reduced to real source directories, sorted so scans are stable."""
+    subdirs[:] = sorted(name for name in subdirs if name not in PRUNED_DIRS)
+
+
+def common_kotlin_trees(root):
+    """Every src/common{Main,Test}/kotlin directory of the tree, without build output."""
+    for folder, subdirs, _ in os.walk(root / "android-compose"):
+        prune(subdirs)
+        directory = Path(folder)
+        if directory.parts[-3:] in COMMON_TREES:
+            yield directory
 
 
 def common_files(root):
-    """All android-compose/**/src/common{Main,Test}/kotlin/**/*.kt, without build output."""
-    for directory, subdirs, names in os.walk(root / "android-compose"):
-        subdirs[:] = sorted(name for name in subdirs if name not in PRUNED_DIRS)
-        folder = Path(directory)
-        parts = folder.relative_to(root).parts
-        for index, part in enumerate(parts):
-            if part == "src" and index + 3 <= len(parts) \
-                    and parts[index + 1] in SOURCE_SETS and parts[index + 2] == "kotlin":
-                for name in names:
-                    if name.endswith(".kt"):
-                        yield folder / name
-                break
+    """All android-compose/**/src/common{Main,Test}/kotlin/**/*.kt — the shared sources."""
+    for directory in common_kotlin_trees(root):
+        yield from directory.rglob("*.kt")
 
 
 def check(root, files):
+    """(number of files scanned, leak lines) for [files] relative to [root]."""
     errors, scanned = [], 0
     for path in files:
         scanned += 1
