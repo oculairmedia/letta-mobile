@@ -10,6 +10,84 @@ assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'"; }
 assert_contains() { [[ "$1" == *"$2"* ]] || fail "expected output to contain '$2': $1"; }
 assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to contain '$2': $1"; }
 
+# TLC scripts must distinguish expected witnesses from Java/parse/type errors.
+# Fake Java tests the shell contract without downloading TLC or invoking Gradle.
+mkdir -p "$TMP/tlc"
+touch "$TMP/tlc/tools.jar"
+cat > "$TMP/tlc/java" <<'SH'
+#!/usr/bin/env bash
+prop=""
+while read -r key value; do
+  if [[ "$key" == PROPERTIES ]]; then prop="$value"; fi
+done < run.cfg
+case "${FAKE_TLC_MODE:-pass}" in
+  pass) echo 'No error has been found.'; exit 0 ;;
+  violation) echo "Error: Invariant $prop is violated."; exit 12 ;;
+  type) echo 'Error: Invariant TypeOK is violated.'; exit 12 ;;
+  parse) echo 'Error: Parsing or semantic analysis failed.'; exit 150 ;;
+esac
+SH
+chmod +x "$TMP/tlc/java"
+formal_check() {
+  local mode="$1" cfg="$2" expected="$3" rc=0 result
+  result="$(FAKE_TLC_MODE="$mode" JAVA="$TMP/tlc/java" TLA2TOOLS="$TMP/tlc/tools.jar" \
+    OUT="$TMP/tlc/out" PROPS=ParentIsolation bash "$SOURCE_ROOT/tools/subagent-lifecycle/check.sh" "$cfg" 2>&1)" || rc=$?
+  assert_eq "$rc" "$expected"
+  case "$mode" in type|parse) assert_contains "$result" ERROR ;; esac
+}
+formal_check pass fixed 0
+formal_check violation main 0
+formal_check pass main 1  # A disappearing expected counterexample needs review.
+formal_check violation fixed 1
+formal_check type main 2
+formal_check parse main 2
+FAKE_TLC_MODE=violation JAVA="$TMP/tlc/java" TLA2TOOLS="$TMP/tlc/tools.jar" \
+  bash "$SOURCE_ROOT/tools/subagent-lifecycle/able-to-fail.sh" > "$TMP/tlc/mutations"
+assert_contains "$(<"$TMP/tlc/mutations")" 'caught'
+rc=0
+FAKE_TLC_MODE=type JAVA="$TMP/tlc/java" TLA2TOOLS="$TMP/tlc/tools.jar" \
+  bash "$SOURCE_ROOT/tools/subagent-lifecycle/able-to-fail.sh" > "$TMP/tlc/bad-mutations" 2>&1 || rc=$?
+assert_eq "$rc" 1
+assert_contains "$(<"$TMP/tlc/bad-mutations")" 'NOT CAUGHT'
+for script in tools/subagent-lifecycle/check.sh tools/subagent-lifecycle/able-to-fail.sh scripts/ci/check-formal-models.sh; do
+  bash -n "$SOURCE_ROOT/$script"
+done
+formal_workflow="$(<"$SOURCE_ROOT/.github/workflows/formal-models.yml")"
+assert_contains "$formal_workflow" 'continue-on-error: true'
+assert_contains "$formal_workflow" '936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88'
+assert_contains "$formal_workflow" 'sha256sum --check --strict'
+assert_not_contains "$formal_workflow" gradlew
+
+# Exercise the advisory wrapper's expected-failure allowlist independently.
+fixture="$TMP/formal-fixture"
+mkdir -p "$fixture/scripts/ci" "$fixture/tools/timeline-identity" "$fixture/tools/subagent-lifecycle"
+cp "$SOURCE_ROOT/scripts/ci/check-formal-models.sh" "$fixture/scripts/ci/"
+cat > "$fixture/tools/timeline-identity/check.sh" <<'SH'
+#!/usr/bin/env bash
+mkdir -p "$OUT"
+log="$OUT/$1.$PROPS.out"
+if [[ "${FORMAL_FAKE_MODE:-normal}" == type ]]; then
+  echo 'Error: Invariant TypeOK is violated.' > "$log"; exit 1
+fi
+case "$1:$PROPS" in
+  s3-settled-[bc]:StableKeysAcrossRecut)
+    echo "Error: Action property $PROPS is violated." > "$log"; exit 1 ;;
+esac
+echo 'No error has been found.' > "$log"
+SH
+cat > "$fixture/tools/subagent-lifecycle/check.sh" <<'SH'
+#!/usr/bin/env bash
+exit "${FORMAL_FAKE_SUBAGENT_STATUS:-0}"
+SH
+chmod +x "$fixture/tools/"*/check.sh
+bash "$fixture/scripts/ci/check-formal-models.sh" > "$TMP/tlc/advisory"
+rc=0
+FORMAL_FAKE_MODE=type bash "$fixture/scripts/ci/check-formal-models.sh" > "$TMP/tlc/advisory-type" 2>&1 || rc=$?
+assert_eq "$rc" 1
+rc=0
+FORMAL_FAKE_SUBAGENT_STATUS=2 bash "$fixture/scripts/ci/check-formal-models.sh" > "$TMP/tlc/advisory-subagent" 2>&1 || rc=$?
+assert_eq "$rc" 2
+
 # AGP 9 may omit detekt's Android variant tasks. The aggregate must scan
 # every source set instead of reverting Android modules to the plugin defaults.
 detekt_build="$(<"$SOURCE_ROOT/android-compose/build.gradle.kts")"

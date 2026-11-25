@@ -1,0 +1,49 @@
+name: Formal models (advisory)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/**'
+      - '.github/workflows/formal-models.yml'
+      - 'scripts/ci/check-formal-models.sh'
+      - 'scripts/tests/ci-policy-scripts-test.sh'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/subagents/**'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/**'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/**'
+      - 'android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ControllerSubagentRegistrySource.kt'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/*Subagent*'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/**'
+      - 'android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/**'
+      - 'android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomTimelineBoundedStore.kt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-models-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tlc:
+    name: TLC bounded models (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Deliberately advisory: do not add this context to branch protection yet.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install pinned TLC
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools-1.7.4.jar
+        run: |
+          curl --fail --location --retry 3 https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar --output "$TLA2TOOLS"
+          printf '%s  %s\n' 936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88 "$TLA2TOOLS" | sha256sum --check --strict
+      - name: Check models (including documented expected failures)
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools-1.7.4.jar
+        run: bash scripts/ci/check-formal-models.sh
