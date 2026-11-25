@@ -267,6 +267,15 @@ jobs:
           python3 scripts/ci/check-kdoc-hygiene.py
           python3 -m unittest discover -s scripts/tests -p test_changed_kotlin_code.py -v
 
+      # The Android app packages a vendored, 16 KB-realigned arm64 libiroh_ffi.so instead of the
+      # iroh-android artifact's, so an `iroh` bump must re-vendor it; JVM tests cannot catch a
+      # stale copy (they load the desktop library), and the device fails every Iroh dial.
+      - name: Vendored Android iroh native matches the iroh pin
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_vendored_iroh_native.py' -v
+          python3 scripts/ci/check-vendored-iroh-native.py
+
       - name: Enforce stateful mock isolation
         working-directory: ${{ github.workspace }}
         run: bash scripts/ci/stateful-mock-gate.sh
