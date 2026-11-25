@@ -1,6 +1,6 @@
 # Module Letta Mobile API
 
-Letta Mobile shares conversation state, transport, rendering and plugin contracts
+Baken shares conversation state, transport, rendering and plugin contracts
 across Android, desktop and browser hosts. Start with the module that owns the
 boundary you are integrating: `:core:ids` supplies typed identities,
 `:core:runtime` defines turn and delivery contracts, `:sharedLogic` implements

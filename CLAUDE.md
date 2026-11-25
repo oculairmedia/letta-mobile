@@ -1,8 +1,8 @@
-# Letta Mobile — Kotlin Multiplatform
+# Baken (repo: letta-mobile) — Kotlin Multiplatform
 
 ## Project Overview
 
-Letta Mobile is a Kotlin Multiplatform project that ships **three clients** from one `sharedLogic` codebase:
+Baken is a Kotlin Multiplatform project that ships **three clients** from one `sharedLogic` codebase:
 
 - **Android app** (`ca.oculair.meridian` release / `com.letta.mobile.dev` debug) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.

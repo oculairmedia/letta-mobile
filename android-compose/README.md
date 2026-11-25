@@ -1,6 +1,6 @@
 # Android Compose App
 
-This directory is the whole Gradle build: the production Letta Mobile Android app **and** its
+This directory is the whole Gradle build: the production Baken Android app **and** its
 Compose Desktop and browser (WASM) siblings. The name is historical — the shared modules here
 power all three clients, and `app/` is only the Android host.
 
