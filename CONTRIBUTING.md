@@ -153,10 +153,12 @@ is discoverable before opening the workspace:
 kotlin-lsp --version
 ```
 
-Point your LSP client's root markers at `android-compose/settings.gradle.kts` and
-`android-compose/build.gradle.kts`, because the Kotlin/Gradle workspace lives in
-the `android-compose/` subproject; the repository root intentionally does not
-contain Gradle marker files.
+The Kotlin/Gradle workspace is the `android-compose/` subproject; the repository root
+intentionally has no Gradle marker files. Configure your LSP client so `android-compose/` is the
+workspace root: use the bare file name `settings.gradle.kts` as the root marker (a client such as
+nvim-lspconfig's `root_pattern` resolves it from the open file upward to `android-compose/`), or set
+`android-compose/` as the root explicitly. A repository-prefixed marker such as
+`android-compose/settings.gradle.kts` resolves to the repository root instead.
 
 ## Recommended build checks
 
