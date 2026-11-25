@@ -31,6 +31,14 @@ internal class TimelineChatActions(
 
     override fun stopRun() = port.stopRun()
 
+    override fun updateSearchQuery(query: String) = port.updateSearchQuery(query)
+
+    override fun clearSearch() = port.clearSearch()
+
+    override fun refreshGoalStatus() = port.refreshGoalStatus()
+
+    override fun continueGoal() = port.continueGoal()
+
     override fun submitApproval(answer: ChatApprovalAnswer) = port.answerApproval(answer)
 
     override fun retryLoad() = port.retryLoad()
