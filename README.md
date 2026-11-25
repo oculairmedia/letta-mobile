@@ -15,18 +15,83 @@
   <a href="https://github.com/oculairmedia/baken/releases/latest">Download</a>
 </p>
 
-Baken is a native client for stateful AI agents. It pairs with an agent host you run yourself, so
-the agent, its memory and its tools stay on your hardware, and you can reach the same agent from
-your phone, your desktop or a browser. There is no account, no subscription and no Baken-operated
-server.
+<p align="center">
+  <img src="docs/screenshots/same-agent-everywhere.png" alt="The same Baken agent open on a desktop and on a phone" width="900">
+</p>
 
-- **Your own host.** Agents run on a machine you control. Their memory is a set of plain text files
-  there, which you can open and edit; it carries across every device.
-- **Direct phone pairing.** Pair by scanning a QR code. The connection is encrypted end to end and
-  goes direct when it can; when it can't, it falls back to a relay that cannot read the traffic.
-- **Real work.** Agents use the host's files, terminal, browser and local apps under one of four
-  permission modes, run long tasks in the background while the chat stays usable, hand work to
-  each other, and talk to you in voice mode.
+Baken is a native app for talking to AI agents that live on a computer you own. The agent, its
+memory and its tools stay on your hardware, and you reach the same agent from your phone, your
+desktop or a browser: pick up a conversation on one and carry on from the other. There is no
+account, no subscription and no Baken-operated server.
+
+## Built on Letta
+
+Baken is powered by [Letta](https://www.letta.com), the stateful-agent technology behind the best
+long-lived agents. Letta agents are [stateful](https://docs.letta.com/concepts/stateful-agents):
+they keep their identity and memory over time, across models and machines, and get better with use
+by managing their own context. Baken runs the open-source Letta Code harness on your host and puts
+a native client in front of it, so everything Letta gives an agent comes with you:
+
+- **Memory that is yours to read.** Each agent keeps a git-versioned memory filesystem
+  ([MemFS](https://docs.letta.com/concepts/memfs)): plain files on your machine that the agent
+  writes, reorganizes and learns from, and that you can open and edit.
+- **One memory across every conversation and device.** Start a thread on your phone, continue it
+  on your desktop; the agent remembers both.
+- **Skills, schedules and subagents.** Agents learn reusable skills, run scheduled tasks and spawn
+  subagents to work in parallel.
+- **Dreaming.** Between conversations, agents reflect and tidy their memory in the background.
+
+What Baken adds on top: native Android, Windows and Linux apps, direct end-to-end encrypted pairing
+with your host, voice, background tasks you can follow from anywhere, and a shared canvas.
+
+## What you can do
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/phone-chat.png" alt="A Baken chat on Android, with the agent's work timeline and voice controls" width="300"><br>
+      <strong>Talk to your agents.</strong> Replies stream in with the agent's work shown step by
+      step, and you can switch to voice at any time.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/phone-agents.png" alt="The agents panel on Android: agent list, model and context use, and recent conversations" width="300"><br>
+      <strong>All your agents in one place.</strong> See each agent's model and how much of its
+      context it is using, and jump to its memory, schedules, channels, skills or past
+      conversations.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/phone-memory.png" alt="An agent's memory view on Android" width="300"><br>
+      <strong>See what your agent remembers.</strong> Browse the memory an agent keeps on your
+      host, the same files it reads before it answers.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/phone-home.png" alt="The Baken Home screen on Android" width="300"><br>
+      <strong>Pick up where you left off.</strong> Home gathers your agents and recent work so you
+      can get back into a task in one tap.
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/desktop-home.png" alt="Baken desktop on Linux, showing Home and the agent rail" width="900">
+</p>
+
+**Same agents on the desktop.** The Windows and Linux apps share the phone's design and talk to
+the same agents, with room for a wider workspace.
+
+Agents also use your host's files, terminal, browser and local apps under one of four permission
+modes, run long tasks in the background while the chat stays usable, and hand work to each other.
+
+## How it works
+
+1. **Run your host.** Start [letta-code](https://docs.letta.com) and the Baken host wrapper on a
+   Linux or Windows machine you control.
+2. **Pair your devices.** Open Baken on your phone or desktop and scan the QR code from your host.
+   The connection is encrypted end to end and goes direct when it can; when it can't, it falls back
+   to a relay that cannot read the traffic.
+3. **Chat.** Your agents, their memory and their history are there on every paired device.
 
 ## Download
 
@@ -43,11 +108,11 @@ Every release is on [GitHub Releases](https://github.com/oculairmedia/baken/rele
 
 A browser client runs on [GitHub Pages](https://oculairmedia.github.io/baken/).
 
-Baken is built on [Letta](https://github.com/letta-ai/letta) agents and the Letta Code App Server.
 The source here is currently **source available**: you can read, build and run it for your own
 use; all other rights are reserved until a licence is published
 ([baken.ca/licenses](https://baken.ca/licenses/)). "Baken" and the Baken mark are covered by the
-[brand guidelines](https://baken.ca/brand/); if you distribute a fork, give it a different name.
+[brand guidelines](https://baken.ca/brand/); if you distribute a modified build, give it a
+different name.
 
 ## For contributors
 
