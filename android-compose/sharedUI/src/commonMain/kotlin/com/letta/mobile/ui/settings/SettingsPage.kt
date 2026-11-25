@@ -153,14 +153,17 @@ internal object SettingsAnchors {
     /** The group an anchor opens on. */
     fun groupOf(section: ShellSettingsSection): SettingsGroup = when (section) {
         ShellSettingsSection.Pairing -> SettingsGroup.Backend
+        ShellSettingsSection.Backend -> SettingsGroup.Backend
+        ShellSettingsSection.Chat -> SettingsGroup.Chat
+        ShellSettingsSection.Appearance -> SettingsGroup.Appearance
+        ShellSettingsSection.Notifications -> SettingsGroup.Notifications
+        ShellSettingsSection.Providers -> SettingsGroup.Providers
         ShellSettingsSection.About -> SettingsGroup.About
+        ShellSettingsSection.Developer -> SettingsGroup.Developer
+        ShellSettingsSection.Danger -> SettingsGroup.Danger
     }
 
     /** Whether [section] scrolls [group] into view; Pairing anchors its own card inside Backend instead. */
     fun scrollsTo(section: ShellSettingsSection?, group: SettingsGroup): Boolean =
         section != null && section != ShellSettingsSection.Pairing && groupOf(section) == group
 }
-
-/** The group an anchor opens on. */
-val ShellSettingsSection.group: SettingsGroup
-    get() = SettingsAnchors.groupOf(this)

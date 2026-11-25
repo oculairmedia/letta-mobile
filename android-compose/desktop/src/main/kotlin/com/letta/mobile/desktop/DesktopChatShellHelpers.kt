@@ -38,6 +38,7 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.rememberConversationMessageIndex
+import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -279,7 +280,8 @@ private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDe
 
 /**
  * The window's one unified search, shared by the header, the command palette and the quick-query bar:
- * what the shell holds, plus message text from a host-side index over App Server reads.
+ * what the shell holds, plus message text from a host-side index over App Server reads, and the
+ * Settings rows of the saved backend's own sections.
  */
 @Composable
 internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversations: List<DesktopConversationSummary>, focus: DesktopAgentFocus): UnifiedSearchSources {
@@ -289,8 +291,19 @@ internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversa
     val messages = rememberConversationMessageIndex(conversations, chat.conversationManagement.messageReader)
     val workPlayMode = context.navigator.workPlayMode
     val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }
-    return remember(conversations, focus, canvases, destinations, messages) {
-        UnifiedSearchSources(conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId, destinations, messages)
+    val config = context.core.bootstrap.activeConfig
+    val settings = remember(config) { defaultUnifiedSearchOptions(config, notifications = true, providers = true) }
+    return remember(conversations, focus, canvases, destinations, messages, settings) {
+        UnifiedSearchSources(
+            conversations,
+            focus.rosterAgents,
+            canvases,
+            focus.avatarStyleByAgentId,
+            focus.selectedAgentId,
+            destinations,
+            messageSearch = messages,
+            settings = settings,
+        )
     }
 }
 

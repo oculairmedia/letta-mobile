@@ -17,9 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.api.dismissAction
 import com.letta.mobile.data.shell.ShellDestination
@@ -30,12 +33,14 @@ import com.letta.mobile.di.pluginViewsOf
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.shell.pages.plugins.ProvidePluginToolPresenters
 import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
+import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlays
+import com.letta.mobile.ui.shell.workspace.fleetPaletteDestinations
+import com.letta.mobile.ui.shell.workspace.fleetSearchSources
 import com.letta.mobile.ui.shell.workspace.openSearchHit
 
 /** The page beside the workspace's navigation: the shared page for its destination, over the session graph. */
@@ -138,10 +143,12 @@ internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
 @Composable
 internal fun AndroidShellOverlays(shell: WorkspaceShell, agents: List<com.letta.mobile.data.model.Agent>) {
     val workspace = shell.workspace
+    val fleet by shell.drawerModel.fleet.collectAsStateWithLifecycle()
+    val canvases by shell.drawerModel.canvases.collectAsStateWithLifecycle()
     ShellWorkspaceOverlays(
         visibility = workspace.overlays,
         data = ShellWorkspaceOverlayData(
-            searchSources = UnifiedSearchSources(agents = agents, agentId = workspace.focusedAgentId?.value),
+            searchSources = androidSearchSources(agents, fleet, canvases, shell.config, workspace.focusedAgentId),
             railAgents = agents.map { it.id.value to it.name },
             rosterAgents = agents,
         ),
@@ -154,6 +161,23 @@ internal fun AndroidShellOverlays(shell: WorkspaceShell, agents: List<com.letta.
         ),
     )
 }
+
+/**
+ * The palette's search sources over the shell's live state (the fleet, the canvas library, the
+ * Settings rows and the pages the palette opens) — everything already in scope, nothing new loaded.
+ */
+internal fun androidSearchSources(
+    agents: List<com.letta.mobile.data.model.Agent>,
+    fleet: List<com.letta.mobile.data.model.Conversation>,
+    canvases: List<CanvasDocument>,
+    config: LettaConfig?,
+    focusedAgentId: AgentId?,
+) = fleetSearchSources(
+        agents,
+        fleet,
+        focusedAgentId,
+        settings = defaultUnifiedSearchOptions(config, notifications = true, providers = true),
+    ).copy(canvases = canvases, destinations = fleetPaletteDestinations(WorkPlayMode.Work))
 
 /** A chat with no agent to open yet: the connection, and the way on. */
 internal fun androidWaitingPage(shell: WorkspaceShell, connection: BackendConnectionStatus) =

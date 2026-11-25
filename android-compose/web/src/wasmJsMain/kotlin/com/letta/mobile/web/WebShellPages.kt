@@ -22,6 +22,7 @@ import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
 import com.letta.mobile.ui.settings.SettingsPageState
+import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
@@ -108,7 +109,7 @@ internal fun webWorkspaceHost(shell: WebShell, page: androidx.compose.runtime.St
     )
 }
 
-/** The header search and the palette look through the roster and the conversations. */
+/** The header search and the palette look through the roster, the conversations and the Settings rows. */
 internal fun webSearch(shell: WebShell, page: WebPageInputs) =
     ShellWorkspaceSearch(home = page.session.controllers.home, sources = webSearchSources(shell, page))
 
@@ -116,6 +117,7 @@ private fun webSearchSources(shell: WebShell, page: WebPageInputs) = UnifiedSear
     conversations = page.chat.list.state.conversations.toChatConversationSummaries(shell.backend.roster.toMap()),
     agents = shell.backend.agents.value,
     agentId = shell.workspace.focusedAgentId?.value,
+    settings = defaultUnifiedSearchOptions(shell.backend.config.value),
     prepareConversations = page.chat.owner?.lists?.let { it::prepareSearch },
     conversationPreparationError = page.chat.list.state.searchError,
 )
