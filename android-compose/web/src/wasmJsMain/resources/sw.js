@@ -45,9 +45,10 @@ self.addEventListener('activate', (event) => {
 });
 
 const cachedOrOffline = async (request) => {
-    const hit = await caches.match(request);
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(request);
     if (hit) return hit;
-    if (request.mode === 'navigate') return (await caches.match('./index.html')) ?? Response.error();
+    if (request.mode === 'navigate') return (await cache.match('./index.html')) ?? Response.error();
     return Response.error();
 };
 
@@ -70,13 +71,14 @@ const networkFirst = async (event) => {
 // the same way networkFirst does, so the next open is warm.
 const cacheFirst = async (event) => {
     const { request } = event;
-    const hit = await caches.match(request);
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(request);
     if (hit) return hit;
     try {
         const response = await fetch(request);
         if (response.ok) {
             const copy = response.clone();
-            event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)));
+            event.waitUntil(cache.put(request, copy));
         }
         return response;
     } catch {

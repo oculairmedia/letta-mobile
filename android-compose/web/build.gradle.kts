@@ -133,11 +133,22 @@ tasks.named<ProcessResources>("wasmJsProcessResources") {
     // freeze the first cached configuration's sha), and the input property below fingerprints it
     // so a new commit re-runs the stamping. Falls back to "dev" outside a git checkout rather
     // than failing the build.
-    val buildId = providers.exec {
+    val gitSha = providers.exec {
         commandLine("git", "rev-parse", "--short=12", "HEAD")
         workingDir = rootDir
         isIgnoreExitValue = true
-    }.standardOutput.asText.map { it.trim() }.orElse("").map { sha -> sha.ifEmpty { "dev" } }
+    }.standardOutput.asText.map { it.trim() }.orElse("")
+    val gitDirty = providers.exec {
+        commandLine("git", "status", "--porcelain")
+        workingDir = rootDir
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim().isNotEmpty() }.orElse(false)
+    val buildId = gitSha.zip(gitDirty) { sha, dirty ->
+        when {
+            sha.isNotEmpty() && !dirty -> sha
+            else -> "${sha.ifEmpty { "nogit" }}-${java.time.Instant.now().epochSecond}"
+        }
+    }
     inputs.property("brandName", identity.name)
     inputs.property("buildId", buildId)
     filesMatching(listOf("index.html", "manifest.webmanifest", "sw.js")) {

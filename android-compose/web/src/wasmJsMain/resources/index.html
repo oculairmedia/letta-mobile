@@ -60,7 +60,10 @@
         let initialization;
 
         const initialize = () => {
-            initialization ??= init('./iroh/letta_iroh_wasm_bg.wasm');
+            initialization ??= init('./iroh/letta_iroh_wasm_bg.wasm').catch((error) => {
+                initialization = undefined;
+                throw error;
+            });
             return initialization;
         };
 

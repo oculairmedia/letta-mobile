@@ -27,6 +27,16 @@ function worker(scope, options = {}) {
         warm.set(asPath(url), entry);
         return entry;
     });
+    const cachesByName = new Map([[cacheName, warm]]);
+    for (const [name, urls] of Object.entries(options.otherCaches ?? {})) {
+        const store = new Map();
+        for (const url of urls) store.set(asPath(url), { url, cache: name, stale: true });
+        cachesByName.set(name, store);
+    }
+    const storeOf = (name) => {
+        if (!cachesByName.has(name)) cachesByName.set(name, new Map());
+        return cachesByName.get(name);
+    };
     const fetches = [];
     const openedCaches = [];
     const cachedPuts = [];
@@ -44,20 +54,29 @@ function worker(scope, options = {}) {
             return options.fetch ? options.fetch(request) : Promise.reject(new Error('offline'));
         },
         caches: {
-            match: async (request) => warm.get(asPath(request)),
+            match: async (request) => {
+                for (const store of cachesByName.values()) {
+                    const hit = store.get(asPath(request));
+                    if (hit) return hit;
+                }
+                return undefined;
+            },
             open: async (name) => {
                 openedCaches.push(name);
+                const store = storeOf(name);
                 return {
+                    match: async (request) => store.get(asPath(request)),
                     put: async (request, copy) => {
-                        warm.set(asPath(request), copy);
+                        store.set(asPath(request), copy);
                         cachedPuts.push([name, asPath(request)]);
                     },
                     add: async () => {},
                 };
             },
-            keys: async () => options.caches ?? [],
+            keys: async () => options.caches ?? [...cachesByName.keys()],
             delete: async (key) => {
                 deletedCaches.push(key);
+                cachesByName.delete(key);
                 return true;
             },
         },
@@ -237,4 +256,30 @@ test('index.html stays well-formed and every inline script parses', () => {
             fs.rmSync(file, { force: true });
         }
     });
+});
+
+test('cacheFirst ignores stale entries held in an older build cache', async () => {
+    const scope = 'https://example.com/';
+    const fresh = { ok: true, fresh: true, clone: () => ({ ok: true, fresh: true }) };
+    const { listeners, fetches, cachedPuts } = worker(scope, {
+        otherCaches: { 'letta-web-oldbuild': ['./skiko.wasm'] },
+        fetch: async () => fresh,
+    });
+    let response;
+    const waits = [];
+    listeners.fetch({
+        request: { method: 'GET', mode: 'no-cors', url: new URL('./skiko.wasm', scope).href },
+        respondWith: (result) => { response = result; },
+        waitUntil: (p) => { waits.push(p); },
+    });
+    const resolved = await response;
+    await Promise.all(waits);
+    assert.equal(resolved, fresh, 'must fetch from network rather than serve a stale cache entry');
+    assert.deepEqual(fetches, ['/skiko.wasm']);
+    assert.deepEqual(cachedPuts, [[cacheName, '/skiko.wasm']]);
+});
+
+test('index.html clears the memoized Iroh initialization promise when it rejects', () => {
+    const html = fs.readFileSync(path.join(resources, 'index.html'), 'utf8');
+    assert.match(html, /initialization\s*\?\?=\s*init\([^)]*\)\.catch\(\([^)]*\)\s*=>\s*\{[\s\S]*?initialization\s*=\s*undefined;[\s\S]*?throw\s+/);
 });
