@@ -5,9 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.plugin.view.PluginViewsModel
+import com.letta.mobile.ui.screens.config.androidSettingsCatalog
 import com.letta.mobile.ui.screens.plugins.AndroidPluginPackagePicker
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
-import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
 import com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage
 import com.letta.mobile.ui.shell.workspace.ShellChatWaiting
@@ -144,8 +144,8 @@ internal fun AndroidShellOverlays(shell: WorkspaceShell, agents: List<com.letta.
     ShellWorkspaceOverlays(
         visibility = workspace.overlays,
         data = ShellWorkspaceOverlayData(
-            searchSources = fleetSearchSources(agents, fleet, workspace.focusedAgentId, canvases = canvases)
-                .copy(settings = defaultUnifiedSearchOptions(shell.config, notifications = true, providers = true)),
+            searchSources = fleetSearchSources(agents, fleet, workspace.focusedAgentId)
+                .copy(canvases = canvases, settings = androidSettingsCatalog(shell.config)),
             railAgents = agents.map { it.id.value to it.name },
             rosterAgents = agents,
         ),

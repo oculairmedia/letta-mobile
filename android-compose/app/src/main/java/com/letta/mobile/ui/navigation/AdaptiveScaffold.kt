@@ -146,7 +146,8 @@ private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)
+                .copy(settings = com.letta.mobile.ui.screens.config.androidSettingsCatalog(shell.config))),
             tabFor = fleetTabFor(fleet),
         ),
     )

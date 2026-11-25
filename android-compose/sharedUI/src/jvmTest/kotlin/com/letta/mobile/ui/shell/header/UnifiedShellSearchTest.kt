@@ -1,8 +1,10 @@
 package com.letta.mobile.ui.shell.header
 
+import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.search.MessageSearchHit
 import com.letta.mobile.ui.search.LettaSearchRow
 import kotlin.test.Test
@@ -61,7 +63,7 @@ class UnifiedShellSearchTest {
         assertTrue(UnifiedShellSearch.sections(UnifiedSearchQuery(""), sources, hits).none { it.title == "Messages" })
     }
 
-    /** The header covers canvases, the palette covers destinations; both are the same search. */
+    /** The header keeps only its own kinds, the palette adds destinations; both are the same search. */
     @Test
     fun eachSurfaceCoversItsOwnKinds() {
         val withPages = sources.copy(destinations = listOf(UnifiedSearchDestination("Settings", "Settings")))
@@ -69,8 +71,22 @@ class UnifiedShellSearchTest {
         val palette = UnifiedShellSearch.sections(UnifiedSearchQuery("settings", surface = UnifiedSearchSurface.Palette), withPages)
         assertTrue(header.none { it.title == "Go to" })
         assertEquals(listOf("Settings"), palette.single { it.title == "Go to" }.rows.map { it.label })
-        assertTrue(UnifiedShellSearch.scopesFor(UnifiedSearchSurface.Palette).none { it.id == UnifiedSearchKind.Canvases.id })
+        assertTrue(UnifiedShellSearch.scopesFor(UnifiedSearchSurface.Palette).any { it.id == UnifiedSearchKind.Canvases.id })
         assertTrue(UnifiedShellSearch.scopes.any { it.id == UnifiedSearchKind.Messages.id })
+    }
+
+    /** The palette finds a canvas by its title, like the header does (an Android palette searches the canvas library). */
+    @Test
+    fun thePaletteFindsCanvasesLikeTheHeader() {
+        val withCanvases = sources.copy(canvases = listOf(CanvasDocument(id = CanvasId("board-1"), title = "Release board")))
+        val canvas = UnifiedSearchKind.Canvases.id
+
+        val palette = UnifiedShellSearch.sections(UnifiedSearchQuery("release", surface = UnifiedSearchSurface.Palette), withCanvases)
+        val header = UnifiedShellSearch.sections(UnifiedSearchQuery("release"), withCanvases)
+
+        assertEquals(listOf("Release board"), palette.single { it.title == "Canvases" }.rows.map { it.label })
+        assertEquals(palette.single { it.title == "Canvases" }.rows, header.single { it.title == "Canvases" }.rows)
+        assertTrue(UnifiedShellSearch.scopesFor(UnifiedSearchSurface.Palette).any { it.id == canvas })
     }
 
     @Test

@@ -20,7 +20,12 @@ import kotlin.test.assertTrue
  */
 class UnifiedSettingsSearchIntegrationTest {
     private val config = LettaConfig(id = "c", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://letta.example")
-    private val sources = UnifiedSearchSources(settings = defaultUnifiedSearchOptions(config, notifications = true, providers = true))
+
+    /** The options a host that binds everything (an Android 12+ shell) lists. */
+    private val sources = UnifiedSearchSources(settings = catalog(dynamicColor = true, notifications = true, providers = true))
+
+    private fun catalog(dynamicColor: Boolean = false, notifications: Boolean = false, providers: Boolean = false) =
+        defaultUnifiedSearchOptions(config, dynamicColor, notifications = notifications, providers = providers)
 
     @Test
     fun aSettingIsSearchableOnBothSurfacesWithItsSectionAndGroup() {
@@ -32,6 +37,21 @@ class UnifiedSettingsSearchIntegrationTest {
         val row = header.single { it.title == "Settings" }.rows.single()
         assertEquals("Appearance", row.sublabel)
         assertEquals(UnifiedSearchHit(UnifiedSearchKind.Settings, "Appearance"), UnifiedShellSearch.hitOf(row))
+    }
+
+    /**
+     * The page only draws the dynamic-colour row where its binding exists (desktop, the web and
+     * Android before 12 bind none), so a host that binds none does not offer the row to find.
+     */
+    @Test
+    fun aHostThatBindsNoDynamicColourDoesNotOfferIt() {
+        val unbound = UnifiedSearchSources(settings = catalog())
+
+        val header = UnifiedShellSearch.sections(UnifiedSearchQuery("wallpaper"), unbound)
+        val palette = UnifiedShellSearch.sections(UnifiedSearchQuery("wallpaper", surface = UnifiedSearchSurface.Palette), unbound)
+
+        assertTrue(header.none { it.title == "Settings" })
+        assertTrue(palette.none { it.title == "Settings" })
     }
 
     @Test
@@ -97,15 +117,24 @@ class DefaultUnifiedSearchOptionsTest {
         val options = defaultUnifiedSearchOptions(null, notifications = true, providers = true)
 
         assertTrue(options.any { it.title == "Theme" && it.group == "Appearance" })
-        assertTrue(options.any { it.helper.orEmpty().contains("wallpaper") })
         assertTrue(options.any { it.title == "Permission mode" && it.group == "Chat" })
         assertTrue(options.any { it.title == "Notify me when an agent needs approval" && it.group == "Notifications" })
         assertTrue(options.any { it.title == "Manage providers" && it.group == "Providers" })
     }
 
+    /** The dynamic-colour row draws on a host that has wallpaper colours, and only there. */
+    @Test
+    fun dynamicColourIsListedOnlyWhereTheHostBindsIt() {
+        val unbound = defaultUnifiedSearchOptions(null)
+        val bound = defaultUnifiedSearchOptions(null, dynamicColor = true)
+
+        assertTrue(unbound.none { it.helper.orEmpty().contains("wallpaper") })
+        assertTrue(bound.any { it.helper.orEmpty().contains("wallpaper") })
+    }
+
     @Test
     fun sectionsTheHostDoesNotBindAreNotListed() {
-        val options = defaultUnifiedSearchOptions(null)
+        val options = defaultUnifiedSearchOptions(null, dynamicColor = true)
 
         assertTrue(options.none { it.title == "Notify me when an agent needs approval" })
         assertTrue(options.none { it.title == "Manage providers" })

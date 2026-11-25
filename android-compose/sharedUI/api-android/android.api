@@ -8131,8 +8131,8 @@ public final class com/letta/mobile/ui/settings/SettingsSearchEntry {
 }
 
 public final class com/letta/mobile/ui/settings/SettingsSearchKt {
-	public static final fun defaultUnifiedSearchOptions (Lcom/letta/mobile/data/model/LettaConfig;ZZ)Ljava/util/List;
-	public static synthetic fun defaultUnifiedSearchOptions$default (Lcom/letta/mobile/data/model/LettaConfig;ZZILjava/lang/Object;)Ljava/util/List;
+	public static final fun defaultUnifiedSearchOptions (Lcom/letta/mobile/data/model/LettaConfig;ZZZ)Ljava/util/List;
+	public static synthetic fun defaultUnifiedSearchOptions$default (Lcom/letta/mobile/data/model/LettaConfig;ZZZILjava/lang/Object;)Ljava/util/List;
 	public static final fun matching (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
 }
 
@@ -11927,8 +11927,9 @@ public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellFleetListsKt {
 	public static final fun fleetPaletteDestinations (Lcom/letta/mobile/data/lens/WorkPlayMode;)Ljava/util/List;
-	public static final fun fleetSearchSources-ggVUS58 (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
-	public static synthetic fun fleetSearchSources-ggVUS58$default (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+	public static synthetic fun fleetPaletteDestinations$default (Lcom/letta/mobile/data/lens/WorkPlayMode;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun fleetSearchSources-ts9AeiI (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+	public static synthetic fun fleetSearchSources-ts9AeiI$default (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public static final fun fleetTabFor (Ljava/util/List;)Lkotlin/jvm/functions/Function1;
 }
 

@@ -66,9 +66,10 @@ enum class UnifiedSearchKind(val id: String, val label: String) {
 }
 
 /**
- * Where the unified search is drawn, and so which kinds it covers: the
- * header covers canvases, the command palette (a picker mode of the same search) covers the pages
- * to go to. Both find conversations, the text of their messages, agents, and settings options.
+ * Where the unified search is drawn, and so which kinds it covers: both the
+ * header and the command palette (a picker mode of the same search) cover canvases; the palette
+ * also covers the pages to go to. Both find conversations, the text of their messages, agents, and
+ * settings options.
  */
 enum class UnifiedSearchSurface(val kinds: List<UnifiedSearchKind>) {
     Header(
@@ -86,6 +87,7 @@ enum class UnifiedSearchSurface(val kinds: List<UnifiedSearchKind>) {
             UnifiedSearchKind.Conversations,
             UnifiedSearchKind.Messages,
             UnifiedSearchKind.Agents,
+            UnifiedSearchKind.Canvases,
             UnifiedSearchKind.Destinations,
             UnifiedSearchKind.Settings,
         ),

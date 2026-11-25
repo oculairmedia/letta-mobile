@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.screens.config
 
+import android.os.Build
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
+import com.letta.mobile.ui.shell.header.UnifiedSettingsOption
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsOption
 import com.letta.mobile.data.settings.SettingsRow
@@ -256,3 +260,10 @@ fun embeddedModelDownloadProgressLabel(bytesDownloaded: Long, totalBytes: Long?)
     val percent = ((bytesDownloaded.toDouble() / total.toDouble()) * 100.0).roundToInt().coerceIn(0, 100)
     return "$downloaded / ${FormatHelpers.formatByteSize(total)} · $percent%"
 }
+
+/**
+ * The shell's search options for Android's Settings rows: the page binds approvals and providers,
+ * and a dynamic-colour row from Android 12, where the OS has wallpaper colours.
+ */
+internal fun androidSettingsCatalog(config: LettaConfig?): List<UnifiedSettingsOption> =
+    defaultUnifiedSearchOptions(config, Build.VERSION.SDK_INT >= Build.VERSION_CODES.S, notifications = true, providers = true)

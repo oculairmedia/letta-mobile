@@ -47,15 +47,17 @@ internal fun SettingsPageServices.searchEntries(mode: LettaConfig.Mode, hasSaved
 /**
  * The standard Settings rows a search outside the page can find, as the unified search's options:
  * the rows the page draws from [LettaConfig] alone, without a platform's services, so the shell's
- * search can list them wherever it runs. [notifications] and [providers] name the sections this host
- * binds (the page leaves their rows out where no port exists); a null [config] (nothing saved yet)
- * leaves the backend form and the danger zone out.
+ * search can list them wherever it runs. [dynamicColor], [notifications] and [providers] name the
+ * rows this host binds (the page only draws a row whose port exists; desktop, the web and Android
+ * before 12 bind no dynamic-colour row); a null [config] (nothing saved yet) leaves the backend
+ * form and the danger zone out.
  */
 fun defaultUnifiedSearchOptions(
     config: LettaConfig?,
+    dynamicColor: Boolean = false,
     notifications: Boolean = false,
     providers: Boolean = false,
-): List<UnifiedSettingsOption> = defaultSettingsSearchEntries(config, notifications, providers).map { entry ->
+): List<UnifiedSettingsOption> = defaultSettingsSearchEntries(config, dynamicColor, notifications, providers).map { entry ->
     UnifiedSettingsOption(group = entry.group.name, section = entry.section, title = entry.title, helper = entry.helper)
 }
 
@@ -65,12 +67,13 @@ fun defaultUnifiedSearchOptions(
  */
 internal fun defaultSettingsSearchEntries(
     config: LettaConfig?,
+    dynamicColor: Boolean = false,
     notifications: Boolean = false,
     providers: Boolean = false,
 ): List<SettingsSearchEntry> =
     backendCatalogEntries(config) +
         accessibilityEntries() +
-        appearanceCatalogEntries() +
+        appearanceCatalogEntries(dynamicColor) +
         chatCatalogEntries() +
         buildList {
             if (notifications) add(SettingsCopy.APPROVALS.entry(SettingsGroup.Notifications))
@@ -124,13 +127,13 @@ private fun accessibilityEntries(): List<SettingsSearchEntry> = listOf(
     SettingsCopy.HIGH_CONTRAST.entry(SettingsGroup.Appearance),
 )
 
-/** The catalog's appearance rows: all of the standard ones, whatever a host has bound. */
-private fun appearanceCatalogEntries(): List<SettingsSearchEntry> = listOf(
-    SettingsCopy.THEME,
-    SettingsCopy.DYNAMIC_COLOR,
-    SettingsCopy.PRESET,
-    SettingsCopy.HAPTICS,
-).map { it.entry(SettingsGroup.Appearance) }
+/** The catalog's appearance rows: all of the standard ones, with the dynamic-colour row only where the host binds it. */
+private fun appearanceCatalogEntries(dynamicColor: Boolean): List<SettingsSearchEntry> = buildList {
+    add(SettingsCopy.THEME)
+    if (dynamicColor) add(SettingsCopy.DYNAMIC_COLOR)
+    add(SettingsCopy.PRESET)
+    add(SettingsCopy.HAPTICS)
+}.map { it.entry(SettingsGroup.Appearance) }
 
 /** The catalog's chat rows: all of the standard ones, whatever a host has bound. */
 private fun chatCatalogEntries(): List<SettingsSearchEntry> = listOf(

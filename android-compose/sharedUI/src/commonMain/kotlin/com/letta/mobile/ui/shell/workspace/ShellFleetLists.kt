@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
-import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.Agent
@@ -12,34 +11,30 @@ import com.letta.mobile.data.shell.toShellDestination
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
-import com.letta.mobile.ui.shell.header.UnifiedSettingsOption
 
 /**
- * The search over a host holding a conversation fleet and its roster: the header covers the
- * [settings] rows and canvases too, and the palette's "Go to" pages default to this fleet's own
- * ([fleetPaletteDestinations] of the lens's sections) unless the host has its own.
+ * The search over a host holding a conversation fleet and its roster: the conversations, the agents
+ * and the focused agent fill [options]'s own empty seats, so the header and the palette share one
+ * sources object. [options] takes the palette to the fleet's own pages by default
+ * ([fleetPaletteDestinations]); a host narrows it with its own seats (`copy`), or widens it.
  */
 fun fleetSearchSources(
     agents: List<Agent>,
     fleet: List<Conversation>,
     focusedAgentId: AgentId?,
-    settings: List<UnifiedSettingsOption> = emptyList(),
-    canvases: List<CanvasDocument> = emptyList(),
-    destinations: List<UnifiedSearchDestination> = fleetPaletteDestinations(WorkPlayMode.Work),
-) = UnifiedSearchSources(
+    options: UnifiedSearchSources = UnifiedSearchSources(destinations = fleetPaletteDestinations()),
+): UnifiedSearchSources = options.copy(
     conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
     agents = agents,
     agentId = focusedAgentId?.value,
-    canvases = canvases,
-    destinations = destinations,
-    settings = settings,
 )
 
 /**
  * The palette's "Go to" rows for a fleet host: the lens's sections (Memory, Schedules, Channels and
- * Skills in Work vocabulary), each a shell route the shared opener decodes into the host's own page.
+ * Skills — [WorkPlayMode.Work]'s vocabulary by default), each a shell route the shared opener
+ * decodes into the host's own page.
  */
-fun fleetPaletteDestinations(mode: WorkPlayMode): List<UnifiedSearchDestination> = WorkPlayLens.navDestinations(mode)
+fun fleetPaletteDestinations(mode: WorkPlayMode = WorkPlayMode.Work): List<UnifiedSearchDestination> = WorkPlayLens.navDestinations(mode)
     .map { section ->
         UnifiedSearchDestination(
             id = ShellRoute.encode(section.toShellDestination(null)),
