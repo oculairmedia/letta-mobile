@@ -31,7 +31,6 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -108,8 +107,11 @@ class RiveFrameFailureTest {
     // the renderer up and provides the host), then a seat that shows the real orb stand-in whenever
     // the host cannot draw the agent's mascot.
     @Composable
-    private fun MascotWindow(renderer: RiveFrameRenderer) {
-        ProvideFrameMascots(renderer, MascotIdentityRegistry()) {
+    private fun MascotWindow(
+        renderer: RiveFrameRenderer,
+        registry: MascotIdentityRegistry = MascotIdentityRegistry(),
+    ) {
+        ProvideFrameMascots(renderer, registry) {
             MascotSeat(AGENT_ID, MascotStage.COMPOSER_COMPANION, MASCOT_SIZE, empty = ::seatStandIn)
         }
     }
@@ -230,22 +232,27 @@ class RiveFrameFailureTest {
     }
 
     // A failed mascot costs one view, not the agent: the seat that lost it shows the orb stand-in.
+    // The registry names the agent, so the seat would draw its scene - only the failed entry turns
+    // the seat to the orb, and the scene the window brought up proves that is what happened.
     @Test
     fun aFailedMascotLeavesItsSeatOnTheOrb() = runComposeUiTest {
+        mainClock.autoAdvance = false
         val scenes = mutableListOf<FailingScene>()
         val renderer = SceneRenderer {
-            FailingScene(IllegalStateException("the scene never draws"), FailsOn.NEVER).also { scenes += it }
+            FailingScene(IllegalStateException("the scene never draws"), FailsOn.RENDER).also { scenes += it }
         }
-        runBlocking {
-            val first = assertIs<FrameMascotEntry>(FrameMascotHost(renderer).entry(AGENT_ID, identity))
-            first.ensureLoaded()
-            first.markFailed()
-            assertTrue(first.failed, "one view's scene broke")
+        setContent {
+            MascotWindow(renderer, MascotIdentityRegistry().apply { update(mapOf(AGENT_ID to identity)) })
         }
-        setContent { MascotWindow(renderer) }
-        waitForIdle()
+        // The seat brings the scene up, then its surface's first rendered frame throws: offer the
+        // loop vsyncs until the failure lands and the seat falls to its stand-in.
+        repeat(10) {
+            mainClock.advanceTimeByFrame()
+            waitForIdle()
+        }
 
-        assertEquals(1, orbsDrawn(), "another view of the same agent draws its scene, not the orb")
+        assertTrue(scenes.isNotEmpty(), "the agent is named, so its seat brings a scene up before it fails")
+        assertEquals(1, orbsDrawn(), "the seat that lost its mascot shows the orb stand-in, not the scene")
     }
 
     // prepare() is the browser's bring-up: a renderer that cannot come up leaves every seat on its orb.

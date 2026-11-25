@@ -13,9 +13,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.timeline.TimelineSemanticField
 import com.letta.mobile.data.timeline.TimelineSemanticWindowResult
+import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 
 /**
  * Hard cut S9: the paged reader for a stored body too large to decode inline, ported from the
@@ -111,5 +116,35 @@ class TimelineDeferredBodyTest {
         assertEquals("m-1" to 42, openingAnchor("m-1" to 42, "target"))
         assertEquals("target" to 0, openingAnchor(null, "target"))
         assertEquals(null, openingAnchor(null, null))
+    }
+
+    /**
+     * The name lookup runs unattended in a LaunchedEffect, so any failure it lets through takes the
+     * whole timeline down — not just the row that could not be named. Whatever the store raises
+     * while reading the tool name leaves the row on its plain notice instead.
+     */
+    @Test
+    fun aStoreFailureBeyondAKnownCaseStillLeavesTheRowUnnamed() = runTest {
+        val read: DeferredBodyRead = { _, _ -> throw IOException("the store closed while reading") }
+
+        assertNull(readToolName(read), "an unreadable body means no tool name, not a failed timeline")
+    }
+
+    /** The mounted row keeps the plain notice when even the unattended read throws, as every scrolled-past row does. */
+    @Test
+    fun aRowWhoseNameCannotBeReadKeepsThePlainNotice() = runComposeUiTest {
+        show { field, _ ->
+            if (field == TimelineSemanticField.toolName()) throw IOException("the store closed while reading")
+            else missing()
+        }
+        onNodeWithText("Message too large to show inline").assertIsDisplayed()
+    }
+
+    /** Cancellation is not a failure to absorb: a row leaving composition still cancels its own read. */
+    @Test
+    fun aCancelledNameReadStillPropagates() = runTest {
+        val read: DeferredBodyRead = { _, _ -> throw CancellationException("the row left composition") }
+
+        assertIs<CancellationException>(runCatching { readToolName(read) }.exceptionOrNull())
     }
 }

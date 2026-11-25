@@ -173,10 +173,11 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
  *
  * This lookup runs unattended, when the row enters composition and before anything is asked for,
  * so it cannot share the pager's retry: a body whose chunk no longer matches its reference (a
- * presentation replaced under the row, a closed one) propagates an IllegalStateException out of
- * the window reader, and an unhandled failure in [LaunchedEffect] takes the whole timeline down.
- * Such a failure only means the name is unknown, so the row keeps the plain notice and a failed
- * page read still reports itself through the pager. Cancellation is not a failure and is rethrown.
+ * presentation replaced under the row, a closed one) - or anything else the store raises while
+ * the name is read - would otherwise land unhandled, and an unhandled failure in
+ * [LaunchedEffect] takes the whole timeline down. Any such failure only means the name is
+ * unknown, so the row keeps the plain notice and a failed page read still reports itself through
+ * the pager. Cancellation is not a failure and is rethrown, like the pager's own reads.
  */
 internal suspend fun readToolName(read: DeferredBodyRead): String? =
     try {
@@ -184,7 +185,7 @@ internal suspend fun readToolName(read: DeferredBodyRead): String? =
             ?.takeIf { it.isNotBlank() }
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: IllegalStateException) {
+    } catch (_: Exception) {
         null
     }
 

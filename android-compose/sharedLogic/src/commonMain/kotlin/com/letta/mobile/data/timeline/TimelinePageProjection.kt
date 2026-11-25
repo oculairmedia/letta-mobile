@@ -229,8 +229,9 @@ private data class IndexedRenderedRecord(
     val message: com.letta.mobile.data.model.UiMessage,
 )
 
-/** At most two metadata queries (one row each), two body reads, and 32 KiB additional bytes.
- * Body bytes also consume the remaining configured page budget; no scanning past an unknown edge.
+/** At most two metadata queries (one row each), two body reads, and 512 KiB additional bytes
+ * (two boundaries, each up to [MAX_BOUNDARY_BODY_BYTES] - the 256 KiB inline limit). Body bytes
+ * also consume the remaining configured page budget; no scanning past an unknown edge.
  */
 internal suspend fun TimelineStoreReader.runEnvelope(
     page: TimelineMetadataPage,
