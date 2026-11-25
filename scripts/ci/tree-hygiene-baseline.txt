@@ -2,13 +2,7 @@
 # Each entry may only be removed; see scripts/ci/tree-hygiene.py.
 dot .agent
 dot .claude
-dot .codex
-dot .handson
-dot .jules
-dot .omo
-dot .omp
 dot .serena
-dot .sisyphus
 script .claude/hooks/session-start.sh
 script android-compose/app/scripts/check-elf-16kb-alignment.sh
 script android-compose/app/scripts/realign-16kb.py
