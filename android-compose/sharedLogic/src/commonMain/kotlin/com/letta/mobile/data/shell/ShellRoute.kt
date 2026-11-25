@@ -9,7 +9,7 @@ import com.letta.mobile.data.pairing.PairLink
  *
  * ```
  * home | chat?agent=a&conversation=c | canvas?id=b | memory?agent=a | schedules?agent=a | channels
- * skills?agent=a&section=tools | settings?section=pairing | agent-editor?agent=a | agent-editor (a new agent) | providers | overview
+ * skills?agent=a&section=tools | settings?section=pairing | settings?section=appearance | agent-editor?agent=a | agent-editor (a new agent) | providers | overview
  * runs | templates | projects | plugins
  * ```
  *

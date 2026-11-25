@@ -44,6 +44,7 @@ import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
 import com.letta.mobile.ui.shell.shortcuts.WorkspaceShortcuts
 import com.letta.mobile.ui.shell.shortcuts.handleShortcut
+import com.letta.mobile.ui.settings.rememberUnifiedSearchOptions
 import com.letta.mobile.ui.shell.workspace.fleetSearchSources
 import com.letta.mobile.ui.shell.workspace.fleetTabFor
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
@@ -111,14 +112,11 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
     val sources = drawerModel.sources
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val shell = WorkspaceShell(
-        config = config,
-        workspace = workspace,
-        port = port,
-        drawerModel = drawerModel,
+        config = config, workspace = workspace,
+        port = port, drawerModel = drawerModel,
         layout = rememberShellLayoutController(config, sources.library.settings),
         drawer = remember { ShellWorkspaceDrawer() },
-        exits = exits,
-        chatPanel = remember { mutableStateOf(null) },
+        exits = exits, chatPanel = remember { mutableStateOf(null) },
         controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
     )
     // Before the early return, so the one reporter outlives the waiting page's swap to the workspace.
@@ -146,7 +144,8 @@ private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)
+                .copy(settings = rememberUnifiedSearchOptions(shell.config, shell.exits.settings.onProviders))),
             tabFor = fleetTabFor(fleet),
         ),
     )

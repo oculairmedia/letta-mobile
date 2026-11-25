@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.plugin.view.PluginViewsModel
+import com.letta.mobile.ui.settings.rememberUnifiedSearchOptions
 import com.letta.mobile.ui.screens.plugins.AndroidPluginPackagePicker
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
@@ -30,12 +31,12 @@ import com.letta.mobile.di.pluginViewsOf
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.shell.pages.plugins.ProvidePluginToolPresenters
 import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlays
+import com.letta.mobile.ui.shell.workspace.fleetSearchSources
 import com.letta.mobile.ui.shell.workspace.openSearchHit
 
 /** The page beside the workspace's navigation: the shared page for its destination, over the session graph. */
@@ -138,10 +139,13 @@ internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
 @Composable
 internal fun AndroidShellOverlays(shell: WorkspaceShell, agents: List<com.letta.mobile.data.model.Agent>) {
     val workspace = shell.workspace
+    val fleet by shell.drawerModel.fleet.collectAsStateWithLifecycle()
+    val canvases by shell.drawerModel.canvases.collectAsStateWithLifecycle()
     ShellWorkspaceOverlays(
         visibility = workspace.overlays,
         data = ShellWorkspaceOverlayData(
-            searchSources = UnifiedSearchSources(agents = agents, agentId = workspace.focusedAgentId?.value),
+            searchSources = fleetSearchSources(agents, fleet, workspace.focusedAgentId)
+                .copy(canvases = canvases, settings = rememberUnifiedSearchOptions(shell.config, shell.exits.settings.onProviders)),
             railAgents = agents.map { it.id.value to it.name },
             rosterAgents = agents,
         ),

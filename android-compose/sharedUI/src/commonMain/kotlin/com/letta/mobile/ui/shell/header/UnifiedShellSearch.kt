@@ -22,6 +22,14 @@ import com.letta.mobile.util.time.TimeLabels
 data class UnifiedSearchDestination(val id: String, val label: String)
 
 /**
+ * A searchable Settings option for the unified search, a Settings page row projected by the host
+ * (the Settings page's own catalog maps its rows to this): [group] is the target Settings group's
+ * name, which a hit opens Settings on, [section] the section name shown under a hit, [title] the
+ * row's label and [helper] its one-line explanation.
+ */
+data class UnifiedSettingsOption(val group: String, val section: String, val title: String, val helper: String? = null)
+
+/**
  * What the unified search looks through. Hosts feed what their graph has; empty lists are fine.
  * Message text is the one thing not matched here: [messageSearch] (the backend's search, or a
  * host-side [com.letta.mobile.data.search.ConversationMessageIndex]) finds it per query, see
@@ -35,6 +43,8 @@ data class UnifiedSearchSources(
     /** The focused agent: "Filter to this agent" narrows to it. */
     val agentId: String? = null,
     val destinations: List<UnifiedSearchDestination> = emptyList(),
+    /** The Settings rows the host catalogs for this search; not agent-filtered. */
+    val settings: List<UnifiedSettingsOption> = emptyList(),
     val messageSearch: MessageSearchSource? = null,
     /** Explicit search demand can fill an initially partial conversation catalog. */
     val prepareConversations: (suspend (com.letta.mobile.data.model.AgentId?) -> Unit)? = null,
@@ -52,16 +62,36 @@ enum class UnifiedSearchKind(val id: String, val label: String) {
     Agents("agents", "Agents"),
     Canvases("canvases", "Canvases"),
     Destinations("destinations", "Go to"),
+    Settings("settings", "Settings"),
 }
 
 /**
- * Where the unified search is drawn, and so which kinds it covers: the
- * header covers canvases, the command palette (a picker mode of the same search) covers the pages
- * to go to. Both find conversations, the text of their messages, and agents.
+ * Where the unified search is drawn, and so which kinds it covers: both the
+ * header and the command palette (a picker mode of the same search) cover canvases; the palette
+ * also covers the pages to go to. Both find conversations, the text of their messages, agents, and
+ * settings options.
  */
 enum class UnifiedSearchSurface(val kinds: List<UnifiedSearchKind>) {
-    Header(listOf(UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages, UnifiedSearchKind.Agents, UnifiedSearchKind.Canvases)),
-    Palette(listOf(UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages, UnifiedSearchKind.Agents, UnifiedSearchKind.Destinations)),
+    Header(
+        listOf(
+            UnifiedSearchKind.Conversations,
+            UnifiedSearchKind.Messages,
+            UnifiedSearchKind.Agents,
+            UnifiedSearchKind.Canvases,
+            UnifiedSearchKind.Settings,
+        ),
+    ),
+
+    Palette(
+        listOf(
+            UnifiedSearchKind.Conversations,
+            UnifiedSearchKind.Messages,
+            UnifiedSearchKind.Agents,
+            UnifiedSearchKind.Canvases,
+            UnifiedSearchKind.Destinations,
+            UnifiedSearchKind.Settings,
+        ),
+    ),
 }
 
 /**
@@ -86,10 +116,10 @@ data class UnifiedSearchHit(val kind: UnifiedSearchKind, val id: String)
 /**
  * The one search model behind the shell header's search and the command palette (was desktop's
  * DesktopUnifiedSearch plus sharedLogic's CommandPalette): one query across conversations, message
- * text, agents, canvases and destinations, each surface taking its [UnifiedSearchSurface.kinds].
- * Matching is [TextMatch]'s, the same token-based primitive the mention catalog and the model picker
- * use; message text is found by the host's message search and only ranked and drawn here. The UI
- * halves are `LettaSearch` (header) and `LettaPicker` (palette).
+ * text, agents, canvases, destinations and Settings options, each surface taking its
+ * [UnifiedSearchSurface.kinds]. Matching is [TextMatch]'s, the same token-based primitive the
+ * mention catalog and the model picker use; message text is found by the host's message search and
+ * only ranked and drawn here. The UI halves are `LettaSearch` (header) and `LettaPicker` (palette).
  */
 object UnifiedShellSearch {
     /** The default scope; the others narrow to one [UnifiedSearchKind]. */
@@ -112,7 +142,12 @@ object UnifiedShellSearch {
         val kind = UnifiedSearchKind.entries.firstOrNull { it.id == rowId.substring(0, separator) } ?: return null
         val id = rowId.substring(separator + 1)
         // A message row opens its conversation; its own id only keeps rows apart.
-        return UnifiedSearchHit(kind, if (kind == UnifiedSearchKind.Messages) id.substringBefore(MESSAGE_ID_SEPARATOR) else id)
+        return when {
+            // A settings row opens its group; its own id (the row's title) only keeps rows apart.
+            kind == UnifiedSearchKind.Messages -> UnifiedSearchHit(kind, id.substringBefore(ROW_ID_SEPARATOR))
+            kind == UnifiedSearchKind.Settings -> UnifiedSearchHit(kind, id.substringBefore(ROW_ID_SEPARATOR))
+            else -> UnifiedSearchHit(kind, id)
+        }
     }
 
     /**
@@ -157,6 +192,7 @@ object UnifiedShellSearch {
             UnifiedSearchKind.Agents -> agents()
             UnifiedSearchKind.Canvases -> canvases()
             UnifiedSearchKind.Destinations -> destinations()
+            UnifiedSearchKind.Settings -> settings()
         }
 
         /** The items "Filter to this agent" keeps: all of them, or those [owner] says the focused agent owns. */
@@ -190,7 +226,7 @@ object UnifiedShellSearch {
                 .mapIndexed { index, hit ->
                     val conversation = titles[hit.conversationId]
                     LettaSearchRow(
-                        id = rowId(UnifiedSearchKind.Messages, "${hit.conversationId}$MESSAGE_ID_SEPARATOR${hit.messageId ?: index}"),
+                        id = rowId(UnifiedSearchKind.Messages, "${hit.conversationId}$ROW_ID_SEPARATOR${hit.messageId ?: index}"),
                         label = snippet(hit, asked),
                         sublabel = conversation?.displayTitle(),
                         meta = hit.date?.let { TimeLabels.ageLabel(it) },
@@ -231,6 +267,23 @@ object UnifiedShellSearch {
             .take(limit)
             .map { LettaSearchRow(id = rowId(UnifiedSearchKind.Destinations, it.id), label = it.label, leading = LettaSearchLeading.Icon(LettaIcons.ArrowForward)) }
 
+        /**
+         * The Settings options the host catalogs, matched like every other kind (label, helper and
+         * section); a row opens its group, its own title riding the row id only to keep rows apart.
+         */
+        private fun settings(): List<LettaSearchRow> = sources.settings
+            .filter { TextMatch.matches(query, it.title, it.helper, it.section) }
+            .take(limit)
+            .map { option ->
+                LettaSearchRow(
+                    id = rowId(UnifiedSearchKind.Settings, "${option.group}$ROW_ID_SEPARATOR${option.title}"),
+                    label = option.title,
+                    sublabel = option.section,
+                    meta = option.helper,
+                    leading = LettaSearchLeading.Icon(LettaIcons.Settings),
+                )
+            }
+
         /** The roster's name for the conversation's agent: the summary's own field can hold a raw id, never shown. */
         private fun agentNameOf(conversation: ChatConversationSummary): String {
             val agentId = conversation.agentId ?: return conversation.agentName
@@ -259,7 +312,9 @@ object UnifiedShellSearch {
     }
 
     private const val DEFAULT_LIMIT = 20
-    private const val MESSAGE_ID_SEPARATOR = "#"
+
+    /** What a message or settings row appends to the hit's id so rows of one hit stay rows apart. */
+    private const val ROW_ID_SEPARATOR = "#"
     private const val SNIPPET_LENGTH = 80
     private const val SNIPPET_LEAD = 24
     private const val ELLIPSIS = "…"

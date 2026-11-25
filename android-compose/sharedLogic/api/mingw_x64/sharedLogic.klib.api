@@ -3602,7 +3602,14 @@ final enum class com.letta.mobile.data.shell/ShellPageKind : kotlin/Enum<com.let
 
 final enum class com.letta.mobile.data.shell/ShellSettingsSection : kotlin/Enum<com.letta.mobile.data.shell/ShellSettingsSection> { // com.letta.mobile.data.shell/ShellSettingsSection|null[0]
     enum entry About // com.letta.mobile.data.shell/ShellSettingsSection.About|null[0]
+    enum entry Appearance // com.letta.mobile.data.shell/ShellSettingsSection.Appearance|null[0]
+    enum entry Backend // com.letta.mobile.data.shell/ShellSettingsSection.Backend|null[0]
+    enum entry Chat // com.letta.mobile.data.shell/ShellSettingsSection.Chat|null[0]
+    enum entry Danger // com.letta.mobile.data.shell/ShellSettingsSection.Danger|null[0]
+    enum entry Developer // com.letta.mobile.data.shell/ShellSettingsSection.Developer|null[0]
+    enum entry Notifications // com.letta.mobile.data.shell/ShellSettingsSection.Notifications|null[0]
     enum entry Pairing // com.letta.mobile.data.shell/ShellSettingsSection.Pairing|null[0]
+    enum entry Providers // com.letta.mobile.data.shell/ShellSettingsSection.Providers|null[0]
 
     final val entries // com.letta.mobile.data.shell/ShellSettingsSection.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shell/ShellSettingsSection> // com.letta.mobile.data.shell/ShellSettingsSection.entries.<get-entries>|<get-entries>#static(){}[0]

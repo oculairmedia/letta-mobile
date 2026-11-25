@@ -12,6 +12,7 @@ import com.letta.mobile.util.TimelineOpenTrace
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellRoute
+import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
@@ -118,8 +119,9 @@ fun ShellWorkspaceNavigator.workspaceNavigationActions(
 
 /**
  * Opens a unified-search pick, from the header search, the command palette or a quick-query bar
- * alike: a message opens its conversation, a canvas goes to [openCanvas], and a destination hit
- * names a page through [destinationOf] (by default its shell route).
+ * alike: a message opens its conversation, a canvas goes to [openCanvas], a destination hit
+ * names a page through [destinationOf] (by default its shell route), and a settings hit opens
+ * Settings on its group's anchor.
  */
 fun ShellWorkspaceNavigator.openSearchHit(
     hit: UnifiedSearchHit,
@@ -131,8 +133,13 @@ fun ShellWorkspaceNavigator.openSearchHit(
         UnifiedSearchKind.Agents -> openAgent(AgentId(hit.id))
         UnifiedSearchKind.Canvases -> openCanvas(CanvasId(hit.id))
         UnifiedSearchKind.Destinations -> destinationOf(hit.id)?.let { navigate(it) }
+        UnifiedSearchKind.Settings -> settingsAnchorOf(hit.id)?.let { navigate(ShellDestination.Settings(it)) }
     }
 }
+
+/** The Settings anchor of the group [id] names (a settings row renders the group's own name). */
+internal fun settingsAnchorOf(id: String): ShellSettingsSection? =
+    ShellSettingsSection.entries.firstOrNull { it.name == id && it != ShellSettingsSection.Pairing }
 
 /**
  * A pick from the conversation list is where a conversation open begins, so it starts the open's

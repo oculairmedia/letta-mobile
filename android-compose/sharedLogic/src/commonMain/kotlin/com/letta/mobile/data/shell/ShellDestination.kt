@@ -119,10 +119,25 @@ enum class ShellPageKind {
 enum class ShellSkillsSection { Skills, Tools }
 
 /**
- * A Settings anchor. A pairing link opened from outside lands on [Pairing]; its secret never rides
- * the route. [About] is the diagnostics section (the desktop's Overview opens it).
+ * A Settings anchor: one named after a Settings page group (where a settings search hit opens the
+ * group it found), or one of the page's own cards. A pairing link opened from outside lands on
+ * [Pairing]; its secret never rides the route. [About] is the diagnostics section the desktop's
+ * Overview opens.
  */
-enum class ShellSettingsSection { Pairing, About }
+enum class ShellSettingsSection {
+    /** The pairing card inside the Backend group, not the group itself. */
+    Pairing,
+
+    /** The Settings page's groups, in page order, each anchoring its group's section. */
+    Backend,
+    Chat,
+    Appearance,
+    Notifications,
+    Providers,
+    About,
+    Developer,
+    Danger,
+}
 
 /** The Skills page section of this destination: its anchor on Skills, else the default. */
 val ShellDestination.skillsSection: ShellSkillsSection

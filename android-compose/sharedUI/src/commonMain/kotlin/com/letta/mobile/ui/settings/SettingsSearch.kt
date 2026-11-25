@@ -3,15 +3,19 @@ package com.letta.mobile.ui.settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.settings.AppearanceSettings
 import com.letta.mobile.data.settings.ChatSettings
+import com.letta.mobile.data.settings.NotificationSettings
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
+import com.letta.mobile.ui.shell.header.UnifiedSettingsOption
 
 /*
  * letta-mobile-ckmub.3.12.1: the Settings page's search. Every row the page would draw has an entry
@@ -42,6 +46,63 @@ internal fun SettingsPageServices.searchEntries(mode: LettaConfig.Mode, hasSaved
         contributions
             .filter { it.showForMode == null || it.showForMode == mode }
             .flatMap { it.initial.searchEntries(it.group) }
+
+/**
+ * The Settings sections a host's page binds, so a search outside the page offers only the rows the
+ * page can draw: [notifications] carries the approvals section's own settings (the row is offered
+ * when its attention port exists — the page's own gate), [providers] the page's providers port, and
+ * [dynamicColor] the OS's wallpaper colours, the page's dynamic-colour row's own gate (see
+ * [rememberHostAppearanceSettings]). Every default describes a host that binds none.
+ */
+data class BoundSettingsSections(
+    val dynamicColor: Boolean = false,
+    val notifications: NotificationSettings? = null,
+    val providers: (() -> Unit)? = null,
+)
+
+/**
+ * The standard Settings rows a search outside the page can find, as the unified search's options:
+ * the rows the page draws from [LettaConfig] alone, without a platform's services, so the shell's
+ * search can list them wherever it runs. A host supplies the sections its page binds in
+ * [bound]; a null [config] (nothing saved yet) leaves the backend form and the danger zone out.
+ */
+fun defaultUnifiedSearchOptions(
+    config: LettaConfig?,
+    bound: BoundSettingsSections = BoundSettingsSections(),
+): List<UnifiedSettingsOption> = defaultSettingsSearchEntries(config, bound).map { entry ->
+    UnifiedSettingsOption(group = entry.group.name, section = entry.section, title = entry.title, helper = entry.helper)
+}
+
+/**
+ * [defaultUnifiedSearchOptions]' rows from the sections the host's composition binds: the approvals
+ * section's settings as provided through [com.letta.mobile.ui.notify.LocalAttentionPrefs] (none where
+ * the composition provides none, as the browser's), the page's [providers] port, and the OS's
+ * wallpaper colours ([wallpaperColoursSupported]).
+ */
+@Composable
+fun rememberUnifiedSearchOptions(config: LettaConfig?, providers: (() -> Unit)? = null): List<UnifiedSettingsOption> {
+    val attention = LocalAttentionPrefs.current
+    return remember(config, attention, providers) {
+        defaultUnifiedSearchOptions(
+            config,
+            BoundSettingsSections(wallpaperColoursSupported(), NotificationSettings(attention), providers),
+        )
+    }
+}
+
+/**
+ * The settings behind [defaultUnifiedSearchOptions]: the same rows, as the Settings page's own
+ * entries. Kept internal; the page's search and the options above read the same copy.
+ */
+internal fun defaultSettingsSearchEntries(config: LettaConfig?, bound: BoundSettingsSections): List<SettingsSearchEntry> =
+    backendCatalogEntries(config) +
+        accessibilityEntries() +
+        appearanceCatalogEntries(bound) +
+        chatCatalogEntries() +
+        buildList {
+            bound.notifications?.attention?.let { add(SettingsCopy.APPROVALS.entry(SettingsGroup.Notifications)) }
+            bound.providers?.let { add(SettingsCopy.PROVIDERS.entry(SettingsGroup.Providers)) }
+        }
 
 /** A platform section's rows as entries; notes, logs and progress bars are not settings to find. */
 internal fun SettingsSectionModel.searchEntries(group: SettingsGroup): List<SettingsSearchEntry> = rows.flatMap { row ->
@@ -75,11 +136,36 @@ private fun SettingsPageServices.backendEntries(mode: LettaConfig.Mode, hasSaved
     backend.onIrohIdentityReset?.let { add(SettingsCopy.RESET_IDENTITY.entry(SettingsGroup.Danger)) }
 }
 
+/** [defaultSettingsSearchEntries]' backend: the runtime row, plus the form and danger rows [config] alone can draw. */
+private fun backendCatalogEntries(config: LettaConfig?): List<SettingsSearchEntry> = buildList {
+    add(SettingsCopy.MODE.entry(SettingsGroup.Backend))
+    if (config?.mode == LettaConfig.Mode.SELF_HOSTED) {
+        add(SettingsCopy.ADDRESS.entry(SettingsGroup.Backend))
+        add(SettingsCopy.TOKEN.entry(SettingsGroup.Backend))
+    }
+    if (config?.accessToken != null) add(SettingsCopy.CLEAR_TOKEN.entry(SettingsGroup.Danger))
+}
+
 private fun accessibilityEntries(): List<SettingsSearchEntry> = listOf(
     SettingsCopy.REDUCED_MOTION.entry(SettingsGroup.Appearance),
     SettingsCopy.HIGH_CONTRAST.entry(SettingsGroup.Appearance),
 )
 
+/** The catalog's appearance rows: all of the standard ones, with the dynamic-colour row only where the host binds it. */
+private fun appearanceCatalogEntries(bound: BoundSettingsSections): List<SettingsSearchEntry> = buildList {
+    add(SettingsCopy.THEME)
+    if (bound.dynamicColor) add(SettingsCopy.DYNAMIC_COLOR)
+    add(SettingsCopy.PRESET)
+    add(SettingsCopy.HAPTICS)
+}.map { it.entry(SettingsGroup.Appearance) }
+
+/** The catalog's chat rows: all of the standard ones, whatever a host has bound. */
+private fun chatCatalogEntries(): List<SettingsSearchEntry> = listOf(
+    SettingsCopy.CANVAS,
+    SettingsCopy.PERMISSION_MODE,
+).map { it.entry(SettingsGroup.Chat) }
+
+/** The appearance rows this host's settings bind; only the ones whose service exists. */
 private fun AppearanceSettings?.entries(): List<SettingsSearchEntry> = if (this == null) {
     emptyList()
 } else {
@@ -91,6 +177,7 @@ private fun AppearanceSettings?.entries(): List<SettingsSearchEntry> = if (this 
     ).map { it.entry(SettingsGroup.Appearance) }
 }
 
+/** The chat rows this host's settings bind; only the ones whose service exists. */
 private fun ChatSettings?.entries(): List<SettingsSearchEntry> = if (this == null) {
     emptyList()
 } else {
