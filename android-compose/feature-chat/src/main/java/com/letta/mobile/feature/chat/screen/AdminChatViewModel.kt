@@ -28,8 +28,6 @@ import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.IBlockRepository
-import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
@@ -97,18 +95,15 @@ import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
-import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
 import com.letta.mobile.data.chat.branch.branchHistory
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.toConversationState
-import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.ui.chat.session.currentHostApprovals
 import com.letta.mobile.ui.chat.session.hostApprovals
 import com.letta.mobile.ui.chat.session.withHostApprovals
@@ -129,8 +124,6 @@ internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
     private val agentRepository: IAgentRepository,
-    private val blockRepository: IBlockRepository,
-    private val bugReportRepository: IBugReportRepository,
     private val conversationRepository: IConversationRepository,
     private val settingsRepository: ISettingsRepository,
     private val sessionManager: SessionManager,
@@ -211,7 +204,6 @@ internal class AdminChatViewModel @Inject constructor(
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
         get() = chatConversationCoordinator.conversationId()?.let { ConversationId(it) }
-    val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver: ChatSessionResolver = ChatSessionResolver(
         agentRepository = agentRepository,
@@ -365,7 +357,7 @@ internal class AdminChatViewModel @Inject constructor(
             scope = pipelineLifetime.scope,
             agentId = agentId,
             explicitConversationId = explicitConversationId,
-            projectContextAvailable = projectContext != null,
+            projectContextAvailable = false,
             sources = com.letta.mobile.feature.chat.coordination.AdminChatSendSources(
                 conversationRepository = focusedConversations,
                 settingsRepository = settingsRepository,
@@ -430,7 +422,6 @@ internal class AdminChatViewModel @Inject constructor(
             agentId = agentId,
             slashCommandRepository = slashCommandRepository,
             composerCoordinator = composerCoordinator,
-            projectContext = projectContext,
             goalCoordinator = goalCoordinator,
         )
     }
@@ -696,18 +687,6 @@ internal class AdminChatViewModel @Inject constructor(
         ),
     )
 
-    private val projectChatCoordinator: ProjectChatCoordinator = ProjectChatCoordinator(
-        scope = viewModelScope,
-        agentId = agentId.value,
-        projectContext = projectContext,
-        uiState = _uiState,
-        agentRepository = agentRepository,
-        blockRepository = blockRepository,
-        bugReportRepository = bugReportRepository,
-        conversationId = { conversationId?.value },
-        sendMessage = ::sendMessage,
-    )
-    val projectBindings: ChatProjectBindings = projectChatCoordinator
     private val chatSessionInitializer: ChatSessionInitializer by lazy {
         ChatSessionInitializer(
             scope = viewModelScope,
@@ -719,13 +698,6 @@ internal class AdminChatViewModel @Inject constructor(
             prepareChat = {
                 agentSelectionCoordinator.seedAgentNameFromMemoryCache()
                 agentSelectionCoordinator.observeAgentNameCache()
-            },
-            loadProject = {
-                if (projectContext != null) {
-                    projectChatCoordinator.loadProjectAgents()
-                    projectChatCoordinator.loadProjectBrief()
-                    projectChatCoordinator.loadRecentBugReports()
-                }
             },
             openConversation = {
                 chatConversationCoordinator.recordOpenRequested()

@@ -16,10 +16,8 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
-import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.ui.theme.ChatBackground
 import kotlinx.coroutines.CoroutineScope
 
@@ -32,13 +30,11 @@ internal data class AgentScaffoldRuntimeState(
     val chatBackground: ChatBackground,
     val availableModels: List<LlmModel>,
     val activeAgentModel: String?,
-    val projectBindings: ChatProjectBindings,
     val drawerConversationRepo: IConversationRepository,
     val drawerConversations: List<Conversation>,
     val agentName: String,
     val agentIdValue: String,
     val conversationId: String?,
-    val projectContext: ProjectChatContext?,
     val switchableAgents: List<Agent>,
     val favoriteAgentId: String?,
     val pinnedAgentIds: Set<String>,
@@ -56,7 +52,6 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val favoriteAgentId by viewModel.favoriteAgentId.collectAsStateWithLifecycle()
     val availableModels by viewModel.llmModels.collectAsStateWithLifecycle()
     val activeAgentModel = rememberSelectedConversationModel(viewModel)
-    val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val drawerConversationRepo = params.workspace.drawer.sources.conversations
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
@@ -66,7 +61,6 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val agentId = viewModel.agentId
     val agentIdValue = agentId.value
     val conversationId = viewModel.conversationId?.value
-    val projectContext = viewModel.projectContext
     val switchableAgents = remember(availableAgents, agentId, agentName, favoriteAgentId, pinnedAgentIds) {
         val agents = if (availableAgents.any { it.id == agentId }) {
             availableAgents
@@ -89,13 +83,11 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
         chatBackground = chatBackground,
         availableModels = availableModels,
         activeAgentModel = activeAgentModel,
-        projectBindings = projectBindings,
         drawerConversationRepo = drawerConversationRepo,
         drawerConversations = drawerConversations,
         agentName = agentName,
         agentIdValue = agentIdValue,
         conversationId = conversationId,
-        projectContext = projectContext,
         switchableAgents = switchableAgents,
         favoriteAgentId = favoriteAgentId,
         pinnedAgentIds = pinnedAgentIds,

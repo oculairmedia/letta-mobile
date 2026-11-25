@@ -255,13 +255,11 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordin
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatHydrationTrace.kt 222
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatModelControl.kt 69
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatPipelineLifetime.kt 14
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatProjectBindings.kt 21
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatRunExpansionState.kt 95
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSearchController.kt 61
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSearchCoordinator.kt 107
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatSessionResolver.kt 66
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/InitialRouteMessageDeliveryGuard.kt 40
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ProjectChatCoordinator.kt 285
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/RecentMessagesReconcileRequest.kt 72
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/SelectedChatRuntimeProvider.kt 22
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/SelectedChatSendOwner.kt 39

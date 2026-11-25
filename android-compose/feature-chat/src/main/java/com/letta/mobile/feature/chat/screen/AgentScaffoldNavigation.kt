@@ -27,15 +27,8 @@ internal data class AgentScaffoldNavigationCallbacks(
 )
 
 internal data class AgentScaffoldSheetVisibility(
-    val showBugReportSheet: Boolean,
-    val onShowBugReportSheetChange: (Boolean) -> Unit,
     val showAgentSwitcher: Boolean,
     val onShowAgentSwitcherChange: (Boolean) -> Unit,
-)
-
-internal data class AgentScaffoldProjectUiState(
-    val isProjectInfoExpanded: Boolean,
-    val onProjectInfoExpandedChange: (Boolean) -> Unit,
 )
 
 internal data class AgentScaffoldBodyParams(
@@ -44,7 +37,6 @@ internal data class AgentScaffoldBodyParams(
     val chatMode: String,
     val onChatModeChange: (String) -> Unit,
     val sheetVisibility: AgentScaffoldSheetVisibility,
-    val projectUi: AgentScaffoldProjectUiState,
     /** The chat's one model picker (composer chip, `/models`, the drawer's card). */
     val modelPicker: ModelPickerBinding,
     /** The shared shell workspace around the chat (letta-mobile-ckmub.2): its header, rail and agent panel. */

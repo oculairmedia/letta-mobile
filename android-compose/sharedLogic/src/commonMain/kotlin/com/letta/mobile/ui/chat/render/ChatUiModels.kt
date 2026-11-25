@@ -5,7 +5,6 @@ import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
 import com.letta.mobile.data.model.ParsedSearchMessage
-import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.search.MessageSearchSelection
 import kotlinx.collections.immutable.ImmutableMap
@@ -13,17 +12,6 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
-
-@androidx.compose.runtime.Immutable
-data class ProjectChatContext(
-    val identifier: String,
-    val name: String,
-    val lettaFolderId: String? = null,
-    val filesystemPath: String? = null,
-    val gitUrl: String? = null,
-    val lastSyncAt: String? = null,
-    val activeCodingAgents: String? = null,
-)
 
 @androidx.compose.runtime.Immutable
 data class PendingToolCall(
@@ -50,83 +38,6 @@ data class A2uiActionSnackbarUi(
     val actionLabel: String? = null,
     val duration: ChatSnackbarDuration = ChatSnackbarDuration.Short,
     val retryAction: com.letta.mobile.data.a2ui.A2uiAction? = null,
-)
-
-enum class ProjectBriefSectionKey {
-    Description,
-    KeyDecisions,
-    TechStack,
-    ActiveGoals,
-    RecentChanges,
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectBriefSection(
-    val key: ProjectBriefSectionKey,
-    val blockLabel: String,
-    val content: String,
-    val updatedAt: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectBriefUiState(
-    val isLoading: Boolean = false,
-    val isSaving: Boolean = false,
-    // ImmutableMap so Compose treats this whole state as stable — raw
-    // kotlin.collections.Map is an unstable interface type to the
-    // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
-    val sections: ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
-        kotlinx.collections.immutable.persistentMapOf(),
-    val error: String? = null,
-)
-
-enum class BugSeverity(val wireValue: String) {
-    Critical("critical"),
-    High("high"),
-    Medium("medium"),
-    Low("low"),
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectBugReportDraft(
-    val title: String = "",
-    val description: String = "",
-    val severity: BugSeverity = BugSeverity.Medium,
-    val tags: ImmutableList<String> = persistentListOf(),
-    val attachmentReferences: ImmutableList<String> = persistentListOf(),
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectBugReportUiState(
-    val isSubmitting: Boolean = false,
-    val recentReports: ImmutableList<ProjectBugReport> = persistentListOf(),
-    val lastSubmittedPrompt: String? = null,
-    val error: String? = null,
-)
-
-enum class ProjectAgentStatusTone {
-    Neutral,
-    Good,
-    Busy,
-    Error,
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectAgentActivity(
-    val id: String,
-    val name: String,
-    val statusLabel: String,
-    val statusTone: ProjectAgentStatusTone,
-    val detail: String? = null,
-    val model: String? = null,
-    val lastActivity: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectAgentsUiState(
-    val isLoading: Boolean = false,
-    val agents: ImmutableList<ProjectAgentActivity> = persistentListOf(),
-    val error: String? = null,
 )
 
 @androidx.compose.runtime.Immutable
@@ -277,9 +188,6 @@ data class ChatUiState(
     val queuedApprovalRequestIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val collapsedRunIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val expandedReasoningMessageIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
-    val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
-    val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
-    val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
     val contextWindow: ContextWindowUiState = ContextWindowUiState(),
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,

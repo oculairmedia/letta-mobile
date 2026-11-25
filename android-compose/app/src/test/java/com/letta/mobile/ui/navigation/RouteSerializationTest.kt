@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.navigation
 
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -42,14 +41,6 @@ class RouteSerializationTest {
             freshRouteKey = 42L,
             initialMessage = "hello",
             scrollToMessageId = "msg-789",
-            projectIdentifier = "proj-x",
-            projectName = "Test Project",
-            projectLettaFolderId = "folder-1",
-            projectFilesystemPath = "/home/projects/test",
-            projectGitUrl = "https://github.com/test/repo",
-            projectLastSyncAt = "2024-01-01T00:00:00Z",
-            projectActiveCodingAgents = "agent-a,agent-b",
-            projectStartAction = ProjectChatStartAction.BUG_REPORT,
         )
         verifyRoundTrip(route)
     }

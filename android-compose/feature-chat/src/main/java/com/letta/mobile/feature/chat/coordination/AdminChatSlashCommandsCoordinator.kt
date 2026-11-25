@@ -4,7 +4,6 @@ import android.util.Log
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
-import com.letta.mobile.ui.chat.render.ProjectChatContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -16,7 +15,6 @@ internal class AdminChatSlashCommandsCoordinator(
     private val agentId: AgentId,
     private val slashCommandRepository: ISlashCommandRepository,
     private val composerCoordinator: AdminChatComposerCoordinator,
-    private val projectContext: ProjectChatContext?,
     private val goalCoordinator: AdminChatGoalCoordinator,
 ) {
     private var loadVersion: Long = 0L
@@ -24,19 +22,6 @@ internal class AdminChatSlashCommandsCoordinator(
     fun loadSlashCommands() {
         scope.launch {
             val version = ++loadVersion
-            val builtIns = buildList {
-                if (projectContext != null) {
-                    add(
-                        SlashCommand(
-                            name = "bug",
-                            command = "/bug",
-                            description = "Open a project bug report",
-                            source = "local",
-                            installed = true,
-                        ),
-                    )
-                }
-            }
             val agentCommands = slashCommandRepository.listForAgent(agentId.value)
                 .getOrElse { e ->
                     Log.d(TAG, "Agent slash commands unavailable: ${e.message}")
@@ -49,7 +34,7 @@ internal class AdminChatSlashCommandsCoordinator(
                     emptyList()
                 }
                 .map { it.copy(installed = (it.skillName ?: it.name) in installedNames) }
-            val merged = (builtIns + agentCommands + globalCommands)
+            val merged = (agentCommands + globalCommands)
                 .groupBy { it.command }
                 .map { (_, dupes) -> dupes.maxByOrNull { it.installed } ?: dupes.first() }
                 .sortedWith(

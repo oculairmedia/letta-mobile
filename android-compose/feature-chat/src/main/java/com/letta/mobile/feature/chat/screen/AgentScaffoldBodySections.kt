@@ -3,8 +3,6 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -14,16 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import com.composables.icons.lucide.Bug
-import com.composables.icons.lucide.Lucide
-import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
-import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.coroutines.launch
 
 @Composable
@@ -81,7 +72,7 @@ internal fun AgentScaffoldWorkspaceEffects(state: AgentScaffoldRuntimeState) {
 
 /**
  * The chat inside the shared shell workspace (letta-mobile-ckmub.2): the workspace draws the header,
- * the agent rail and panel, so the page is the chat and its project tray, edge to edge under them.
+ * the agent rail and panel, so the page is the chat edge to edge under them.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -89,7 +80,6 @@ internal fun AgentScaffoldChatPane(state: AgentScaffoldRuntimeState) {
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = { AgentScaffoldProjectBugFab(state) },
     ) { paddingValues ->
         // letta-mobile-bccty: thread the agentId -> display-name resolver
         // AND the agent-switch navigation callback down into the chat
@@ -131,20 +121,6 @@ internal fun AgentScaffoldChatPane(state: AgentScaffoldRuntimeState) {
 }
 
 @Composable
-private fun AgentScaffoldProjectBugFab(state: AgentScaffoldRuntimeState) {
-    if (state.projectContext == null) return
-    FloatingActionButton(
-        onClick = {
-            HapticEffects.contextClick(state.haptic, state.view)
-            state.params.sheetVisibility.onShowBugReportSheetChange(true)
-        },
-        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_FAB),
-    ) {
-        Icon(Lucide.Bug, contentDescription = stringResource(R.string.screen_project_bug_report_open))
-    }
-}
-
-@Composable
 internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
     val params = state.params
     val sheetVisibility = params.sheetVisibility
@@ -167,16 +143,5 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
             },
         )
     }
-
-    if (sheetVisibility.showBugReportSheet && state.projectContext != null) {
-        ProjectBugReportSheet(
-            state = state.uiState.bugReports,
-            onDismiss = { sheetVisibility.onShowBugReportSheetChange(false) },
-            onSubmit = {
-                state.projectBindings.submitStructuredBugReport(it)
-                sheetVisibility.onShowBugReportSheetChange(false)
-            },
-        )
-    }
-
 }
+

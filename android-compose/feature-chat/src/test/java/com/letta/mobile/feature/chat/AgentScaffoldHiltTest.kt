@@ -15,11 +15,9 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
-import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldContent
 import com.letta.mobile.feature.chat.screen.AgentScaffoldNavigationCallbacks
-import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
 import com.letta.mobile.feature.chat.screen.WorkspaceChatHost
 import com.letta.mobile.feature.chat.screen.WorkspaceChatPanel
@@ -65,7 +63,6 @@ class AgentScaffoldHiltTest {
     private val uiFlow = MutableStateFlow(ChatUiState(agentName = "IntegrationBot", contextWindow = ContextWindowUiState()))
 
     private lateinit var viewModel: AdminChatViewModel
-    private lateinit var projectBindings: ChatProjectBindings
     private lateinit var conversationRepository: IConversationRepository
     private lateinit var drawer: SharedNavDrawerViewModel
 
@@ -89,7 +86,6 @@ class AgentScaffoldHiltTest {
     @Before
     fun setup() {
         viewModel = mockk(relaxed = true)
-        projectBindings = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
         every { viewModel.uiState } returns uiFlow
         every { viewModel.pagingPresentation } returns MutableStateFlow(null)
@@ -105,10 +101,8 @@ class AgentScaffoldHiltTest {
         every { viewModel.llmModels } returns MutableStateFlow(emptyList())
         every { viewModel.hapticsEnabled } returns MutableStateFlow(false)
         every { viewModel.openChatsOnCanvas } returns MutableStateFlow(false)
-        every { viewModel.projectBindings } returns projectBindings
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
-        every { viewModel.projectContext } returns null
         every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(emptyList())
         coEvery { conversationRepository.refreshConversationsIfStale(any<AgentId>(), any()) } returns false
         val allConversations: IAllConversationsRepository = mockk(relaxed = true) {
@@ -170,11 +164,5 @@ class AgentScaffoldHiltTest {
         showChat()
         composeRule.waitForIdle()
         assertNotNull(panel.value)
-    }
-
-    @Test
-    fun noProjectContextHidesProjectBugFab() {
-        showChat()
-        composeRule.onAllNodesWithTag(AgentScaffoldTestTags.PROJECT_BUG_FAB).assertCountEquals(0)
     }
 }
