@@ -369,9 +369,10 @@ class AppServerTurnEngine(
         }
     }
 
-    private fun suppressChildFrame(received: AppServerReceivedFrame): Boolean {
+    private fun suppressChildFrame(received: AppServerReceivedFrame, scope: AppServerRuntimeScope): Boolean {
         val childDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return false
-        val subagentId = childDelta.subagentId ?: return false
+        val subagentId = childDelta.subagentId ?: return (childDelta.delta as? JsonObject)
+            ?.let { !admitsParentStreamDelta(it, scope) } ?: false
         val activity = com.letta.mobile.data.subagents.SubagentParentProjection.activityLine(childDelta.delta)
         Telemetry.event(
             "AppServerTurnEngine", "subagent.frame_suppressed",
@@ -1116,9 +1117,7 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (!admitFrame(received, context)) return
-        if (suppressChildFrame(received)) return
-        val delta = (received.frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject
-        if (delta != null && !admitsParentStreamDelta(delta, context.runtimeScope)) return
+        if (suppressChildFrame(received, context.runtimeScope)) return
         (received.frame as? AppServerInboundFrame.UpdateDeviceStatus)?.snapshot?.currentPermissionMode
             ?.let { onPermissionModeInForce(context.runtimeScope, it) }
         // letta-mobile-qygvv.8: a run bound to another client_message_id never reaches this lease.
