@@ -339,6 +339,9 @@ jobs:
 
       # Every push to main runs the full additive set; a PR runs the changed modules and,
       # transitively, every module that depends on them (letta-mobile-l8lcn).
+      # --group android (ci-speedup-pr2): the additive :sharedUI:jvmTest and
+      # :desktop:test suites run in the parallel shared-ui-desktop-tests job, so
+      # this runner keeps only the Android/CLI/architecture half of the set.
       - name: Resolve additive module tests
         id: additive_modules
         working-directory: ${{ github.workspace }}
@@ -349,7 +352,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${EVENT_NAME}" != pull_request ]]; then
-            tasks="$(./scripts/ci/changed-gradle-modules.sh --all)"
+            tasks="$(./scripts/ci/changed-gradle-modules.sh --all --group android)"
             echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
             echo "Full additive Gradle tasks on ${EVENT_NAME}: ${tasks}"
             exit 0
@@ -359,7 +362,7 @@ jobs:
           else
             base="origin/${BASE_REF}"
           fi
-          tasks="$(./scripts/ci/changed-gradle-modules.sh "$base")"
+          tasks="$(./scripts/ci/changed-gradle-modules.sh --group android "$base")"
           echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
           if [ -n "${tasks}" ]; then
             echo "Additive Gradle tasks vs ${base}: ${tasks}"
@@ -380,11 +383,9 @@ jobs:
       # dragged :sharedLogic:compileKotlinWasmJs/compileKotlinHostNative (+3m09s)
       # onto the Android test runner; the shared job compiles those targets anyway
       # and pushes the same abi dumps (api-contract artifact).
-      - name: Install Linux hotkey build prerequisites for desktop tests
-        if: contains(steps.additive_modules.outputs.tasks, ':desktop:')
-        run: |
-          bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
-
+      # ci-speedup-pr2: :app:testScreenshot left this graph. It matches zero test
+      # classes (PR #2661: app/src/test has no *ScreenshotTest; the real screenshot
+      # suites live in :designsystem and :feature-chat, which still run above).
       - name: Run Android verification task graph
         timeout-minutes: 55
         env:
@@ -397,7 +398,6 @@ jobs:
             :app:compileSideloadDebugKotlin
             :core:android-data:testDebugUnitTest
             :app:testRootDebugUnitTest
-            :app:testScreenshot
             :build-logic:test
             checkArchitectureBoundaries
             :architecture-tests:test
@@ -443,7 +443,147 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      # :sharedUI:jvmTest runs here as an additive task. Its Skiko UI tests can
+      # ci-speedup-pr2: the additive :sharedUI:jvmTest (412 files) and :desktop:test
+      # (121 files + the Rust native/tablet_input build) suites moved out of this
+      # job into the parallel shared-ui-desktop-tests job below. On main pushes and
+      # sharedUI/desktop-touched PRs they ran sequentially on this single 4-vCPU
+      # runner; they now run concurrently with the Android graph instead.
+
+  # ci-speedup-pr2: the shared Compose UI and desktop JVM suites of the additive
+  # module set, split from test-workload so they run in parallel instead of
+  # serially on the Android test runner. It needs no other job (it starts with
+  # test-workload and reports into required-test's pass/fail). Like api-contract
+  # windows this job always reports green semantics: the resolve step always
+  # runs, discovers the jvm-ui half of scripts/ci/changed-gradle-modules.sh
+  # (always both suites on main pushes; on a PR only when the diff touches or
+  # affects sharedUI/desktop — the skip rides step-level gates + a summary,
+  # never a skipped job, because required-test rejects `skipped`).
+  shared-ui-desktop-tests:
+    name: shared-ui-desktop-tests
+    runs-on: ubuntu-latest
+    # The desktop suite has hung before (see shared-multiplatform); keep the
+    # step-level watchdog as the early diagnostic signal and this as the backstop.
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: android-compose
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: additive-module resolution diffs against the PR base sha.
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        # Same JDK as test-workload / shared-multiplatform (ci-speedup-pr1) so
+        # Gradle build-cache entries stay under one JVM.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
+        with:
+          # Only main saves; PRs restore the matching job's cache.
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
+
+      - name: Ensure PR base for module-diff
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null; then
+            exit 0
+          fi
+          git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null \
+            || git fetch --no-tags origin "${BASE_REF}"
+
+      - name: Resolve shared UI and desktop tests
+        id: jvm_ui_scope
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" != pull_request ]]; then
+            tasks="$(./scripts/ci/changed-gradle-modules.sh --all --group jvm-ui)"
+            echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
+            echo "Shared UI + desktop JVM tests on ${EVENT_NAME}: ${tasks}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null; then
+            base="${BASE_SHA}"
+          else
+            base="origin/${BASE_REF}"
+          fi
+          tasks="$(./scripts/ci/changed-gradle-modules.sh --group jvm-ui "$base")"
+          echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${tasks}" ]]; then
+            echo "Shared UI + desktop JVM tests vs ${base}: ${tasks}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "Shared UI + desktop JVM tests: skipped on this PR."
+              echo "No file vs the PR base touches or (through dependency edges) affects \`sharedUI\` or \`desktop\`. The required \`test\` (test-workload) and \`shared-multiplatform\` jobs still gate the merge; main pushes always run both suites."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "No sharedUI/desktop additive tasks vs ${base}; skipping the Gradle steps."
+          fi
+
+      - name: Install Linux hotkey build prerequisites for desktop tests
+        if: contains(steps.jvm_ui_scope.outputs.tasks, ':desktop:')
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
+
+      # :desktop:test triggers processResources, which stages BOTH Rust bridges
+      # (desktop/build.gradle.kts): the pen bridge native/tablet_input (with the
+      # vendored ../octotablet) and the Mermaid renderer native/mermaid_renderer
+      # (resvg/fontdb). Cargo registry/git sources and both target dirs were
+      # rebuilt from scratch every run otherwise. Key on both Cargo.lock so a
+      # dependency bump misses exactly once. desktop.yml's Linux leg relies on
+      # the runner's preinstalled cargo; no toolchain step is needed here.
+      - name: Restore Cargo build state
+        if: contains(steps.jvm_ui_scope.outputs.tasks, ':desktop:')
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            android-compose/native/tablet_input/target
+            android-compose/native/mermaid_renderer/target
+          key: ${{ runner.os }}-cargo-desktop-native-v1-${{ hashFiles('android-compose/native/tablet_input/Cargo.lock', 'android-compose/native/mermaid_renderer/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-desktop-native-v1-
+
+      - name: Run shared UI and desktop JVM tests
+        if: steps.jvm_ui_scope.outputs.tasks != ''
+        timeout-minutes: 25
+        env:
+          ADDITIVE_TASKS: ${{ steps.jvm_ui_scope.outputs.tasks }}
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/gradle-hang-watchdog.sh" 1320 "$RUNNER_TEMP/gradle-hang/diagnostics.txt" &
+          watchdog=$!
+          trap 'pkill -P "$watchdog" || true; kill "$watchdog" 2>/dev/null || true' EXIT
+          read -r -a tasks <<< "${ADDITIVE_TASKS}"
+          ./gradlew "${tasks[@]}"
+
+      - name: Upload Gradle hang diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-ui-desktop-hang-diagnostics
+          path: ${{ runner.temp }}/gradle-hang/diagnostics.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # :sharedUI:jvmTest runs here since ci-speedup-pr2. Its Skiko UI tests can
       # fail on Linux alone (font metrics), and the console log carries neither
       # assertion messages nor stdout. Keep passing reports too, so selected
       # test methods and their verdicts remain independently verifiable.
@@ -455,6 +595,19 @@ jobs:
           path: |
             android-compose/sharedUI/build/test-results/jvmTest/**
             android-compose/sharedUI/build/reports/tests/jvmTest/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload desktop JVM test reports
+        # Same evidence policy as the sharedUI suite above: JUnit XML over
+        # truncated console output.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-jvmtest-reports-${{ github.run_id }}
+          path: |
+            android-compose/desktop/build/test-results/test/**
+            android-compose/desktop/build/reports/tests/test/**
           if-no-files-found: warn
           retention-days: 7
 
@@ -659,25 +812,28 @@ jobs:
         env:
           RUN_NOTEBOOK_NATIVE_TESTS: "true"
         # Do not request :sharedLogic:allTests (hostNativeTest hangs) or
-        # :desktop:test in this job (:desktop:test hung for the 25m timeout
-        # on follow-up PRs even when run before Konan). Desktop unit tests
-        # run in the required `test` job on every push to main and on PRs that
-        # touch desktop or anything it depends on (additive module tasks). Native compile still catches
-        # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
-        # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
-        # that ship no wasm artifact, without making web-wasm required
-        # (letta-mobile-o4ygk.2). :sharedUI compiles for wasm too, so JVM-only
-        # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
-        # :core:runtime owns its contract tests (letta-mobile-by4vm.58): JVM run
-        # plus native/wasm test compiles, in the same invocation.
+        # :desktop:test in this job — :desktop:test belongs to the
+        # shared-ui-desktop-tests job and hung this one for the 25m timeout
+        # when it still lived here (even when run before Konan). Native
+        # compile still catches JVM-only API leaks in
+        # commonMain/commonTest (b97bcf48). The wasmJs compiles catch breakage in
+        # wasmJsMain/wasmJsTest and dependencies that ship no wasm artifact,
+        # without making web-wasm required (letta-mobile-o4ygk.2). :sharedUI
+        # compiles for wasm too, so JVM-only calls in the shared Compose UI fail
+        # here (letta-mobile-o4ygk.4). :core:runtime owns its contract tests
+        # (letta-mobile-by4vm.58): JVM run plus native/wasm test compiles.
         # apiCheck moved here from test-workload (ci-speedup-pr1): this job already
         # compiles the shared wasmJs/hostNative targets the ABI comparison depends
         # on, so the Android test runner no longer pays +3m09s of KMP compiles it
         # has no other use for. The comparison itself is the required
         # `shared-multiplatform` check, so API drift still blocks every merge.
+        # ci-speedup-pr2: one invocation. The two sequential ones paid Gradle
+        # startup + configuration twice (~4m43s total job) for two task batches
+        # with no ordering requirement between them — Gradle fuses them into one
+        # DAG here. The bounded :sharedLogic:jvmTest phase above stays separate:
+        # it carries the timeout bound, continue-on-error and diagnostics trap.
         run: |
-          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs apiCheck
+          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs apiCheck
           node sharedLogic/karma.config.test.cjs
 
       # Moved with apiCheck from test-workload (ci-speedup-pr1): only apiCheck's
@@ -735,7 +891,7 @@ jobs:
   required-test:
     name: test
     runs-on: ubuntu-latest
-    needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate]
+    needs: [test, api-docs, api-contract-windows, web-wasm, pr-body-gate, shared-ui-desktop-tests]
     if: always()
     timeout-minutes: 5
     permissions:
@@ -749,11 +905,13 @@ jobs:
           DOCS_RESULT: ${{ needs.api-docs.result }}
           WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}
           WEB_RESULT: ${{ needs.web-wasm.result }}
+          SHARED_UI_DESKTOP_RESULT: ${{ needs.shared-ui-desktop-tests.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$DOCS_RESULT" = success
           test "$WINDOWS_API_RESULT" = success
           test "$WEB_RESULT" = success
+          test "$SHARED_UI_DESKTOP_RESULT" = success
           # The description checks only exist on pull_request; anywhere else the job is skipped.
           if [ "$EVENT_NAME" = pull_request ]; then
             test "$BODY_RESULT" = success
