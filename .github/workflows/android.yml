@@ -7,7 +7,6 @@ on:
       - ".github/workflows/android.yml"
       - "android-compose/**"
       - "docs/**"
-      - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
       - "scripts/docs/**"

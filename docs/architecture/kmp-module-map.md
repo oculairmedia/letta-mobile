@@ -24,4 +24,4 @@ The [sharedLogic build](../../android-compose/sharedLogic/build.gradle.kts) and 
 
 `SharedLogicIsolationTest` prevents sharedLogic from depending on platform/UI modules. `SharedUiIsolationTest` requires sharedLogic and forbids platform apps, Android data/features/designsystem and plugin-view. It does **not** restrict sharedUI to only one project dependency: avatar/core, drawbox and the Skia renderer support are current dependencies; test fixtures are a test dependency. Both tests live in [architecture-tests](../../android-compose/architecture-tests/src/test/kotlin/com/letta/mobile/architecture/).
 
-The [migration epic](kmp-structure-migration-epic.md) is a historical sequence, not the current graph. wasm sharedUI is implemented. The [entrypoint layout decision](kmp-phase-6-entrypoints.md) retains `app/`, `desktop/`, and `web/`; the historical `apps/*` proposal is not pending implementation.
+wasm sharedUI is implemented. The [entrypoint layout decision](kmp-phase-6-entrypoints.md) retains `app/`, `desktop/`, and `web/`; the historical `apps/*` proposal is not pending implementation.

@@ -15,8 +15,7 @@
 #
 # WHY THIS EXISTS
 # The App Server's own cron surfaces cannot tell a live scheduler from a dead
-# one. Measured 2026-08-01 (see docs/testing/lgns8-acceptance-evidence-ledger.md
-# section 8): every run-log entry reads status:"ok", outcome:"queued",
+# one. Measured 2026-08-01: every run-log entry reads status:"ok", outcome:"queued",
 # reason:"scheduled_time_matched" whether the fired turn EXECUTED or was dark,
 # and crons.json's last_fired_at / fire_count are written at ENQUEUE time, so
 # they advance through a total outage too. On top of that:

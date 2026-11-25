@@ -31,7 +31,7 @@ Emmanuel's decisions that drive this revision:
 3. **Desktop live views: JCEF via jcefmaven** (accepted).
 4. **Generic foundation, no specific consumer.** ComfyUI and Penpot are illustrations only; one trivial reference plugin exercises every contract feature for tests and docs.
 
-Inputs and verified facts are those of revision 1 (section 2) plus the prior-art report `docs/design/canvas-plugin-platform-prior-art.md`.
+Inputs and verified facts are those of revision 1 (section 2).
 
 ---
 

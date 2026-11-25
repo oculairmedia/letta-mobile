@@ -30,8 +30,6 @@ fun String.stripEnvelopeReminders(): String {
  *
  * Both variants coexist in the timeline; on server echo, a Local event is
  * replaced by a Confirmed event with the same otid, preserving its position.
- *
- * See `docs/architecture/message-sync-migration.md` for design rationale.
  */
 @Immutable
 sealed class TimelineEvent {
