@@ -8008,6 +8008,24 @@ public final class com/letta/mobile/ui/settings/BackendSettingsTags {
 	public static final field TOKEN Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/settings/BoundSettingsSections {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (ZLcom/letta/mobile/data/settings/NotificationSettings;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/settings/NotificationSettings;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Lcom/letta/mobile/data/settings/NotificationSettings;
+	public final fun component3 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (ZLcom/letta/mobile/data/settings/NotificationSettings;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/settings/BoundSettingsSections;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/settings/BoundSettingsSections;ZLcom/letta/mobile/data/settings/NotificationSettings;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/settings/BoundSettingsSections;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDynamicColor ()Z
+	public final fun getNotifications ()Lcom/letta/mobile/data/settings/NotificationSettings;
+	public final fun getProviders ()Lkotlin/jvm/functions/Function0;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt;
 	public fun <init> ()V
@@ -8062,6 +8080,10 @@ public final class com/letta/mobile/ui/settings/ConnectionTest$Testing : com/let
 
 public final class com/letta/mobile/ui/settings/HostAppearanceBindingKt {
 	public static final fun rememberHostAppearanceSettings (Lcom/letta/mobile/data/shellstate/HostAppearance;ZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/data/settings/AppearanceSettings;
+}
+
+public final class com/letta/mobile/ui/settings/HostAppearanceBinding_jvmKt {
+	public static final fun wallpaperColoursSupported ()Z
 }
 
 public final class com/letta/mobile/ui/settings/SavedBackends {
@@ -8272,9 +8294,10 @@ public final class com/letta/mobile/ui/settings/SettingsSearchEntry {
 }
 
 public final class com/letta/mobile/ui/settings/SettingsSearchKt {
-	public static final fun defaultUnifiedSearchOptions (Lcom/letta/mobile/data/model/LettaConfig;ZZZ)Ljava/util/List;
-	public static synthetic fun defaultUnifiedSearchOptions$default (Lcom/letta/mobile/data/model/LettaConfig;ZZZILjava/lang/Object;)Ljava/util/List;
+	public static final fun defaultUnifiedSearchOptions (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BoundSettingsSections;)Ljava/util/List;
+	public static synthetic fun defaultUnifiedSearchOptions$default (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BoundSettingsSections;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun matching (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
+	public static final fun rememberUnifiedSearchOptions (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)Ljava/util/List;
 }
 
 public final class com/letta/mobile/ui/settings/SettingsSectionKt {
@@ -12067,8 +12090,8 @@ public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellFleetListsKt {
-	public static final fun fleetPaletteDestinations (Lcom/letta/mobile/data/lens/WorkPlayMode;)Ljava/util/List;
-	public static synthetic fun fleetPaletteDestinations$default (Lcom/letta/mobile/data/lens/WorkPlayMode;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun fleetPaletteDestinations (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun fleetPaletteDestinations$default (Lcom/letta/mobile/data/lens/WorkPlayMode;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun fleetSearchSources-ts9AeiI (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public static synthetic fun fleetSearchSources-ts9AeiI$default (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public static final fun fleetTabFor (Ljava/util/List;)Lkotlin/jvm/functions/Function1;

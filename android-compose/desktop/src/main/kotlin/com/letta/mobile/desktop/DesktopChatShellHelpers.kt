@@ -38,7 +38,8 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.rememberConversationMessageIndex
-import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
+import com.letta.mobile.ui.settings.rememberUnifiedSearchOptions
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -290,17 +291,13 @@ internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversa
     val messages = rememberConversationMessageIndex(conversations, chat.conversationManagement.messageReader)
     val workPlayMode = context.navigator.workPlayMode
     val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }
-    val config = context.core.bootstrap.activeConfig
-    return remember(conversations, focus, canvases, destinations, messages, config) {
+    val settings = rememberUnifiedSearchOptions(context.core.bootstrap.activeConfig) {
+        context.navigator.navigate(ShellDestination.Providers)
+    }
+    return remember(conversations, focus, canvases, destinations, messages, settings) {
         UnifiedSearchSources(
-            conversations,
-            focus.rosterAgents,
-            canvases,
-            focus.avatarStyleByAgentId,
-            focus.selectedAgentId,
-            destinations,
-            messageSearch = messages,
-            settings = defaultUnifiedSearchOptions(config, notifications = true, providers = true),
+            conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId, destinations,
+            settings = settings, messageSearch = messages,
         )
     }
 }

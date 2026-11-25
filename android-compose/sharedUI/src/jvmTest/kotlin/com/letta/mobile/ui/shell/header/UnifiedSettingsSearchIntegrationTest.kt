@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.shell.header
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.notify.AttentionPrefs
+import com.letta.mobile.data.notify.AttentionPrefsRepository
+import com.letta.mobile.data.settings.NotificationSettings
+import com.letta.mobile.ui.settings.BoundSettingsSections
 import com.letta.mobile.data.shell.SessionShellChatPort
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSettingsSection
@@ -10,9 +14,17 @@ import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchSection
 import com.letta.mobile.ui.settings.defaultUnifiedSearchOptions
 import com.letta.mobile.ui.shell.workspace.openSearchHit
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/** The approvals section's repository a host that binds its attention port carries. */
+private val boundAttention = object : AttentionPrefsRepository {
+    override val prefs = MutableStateFlow(AttentionPrefs())
+    override fun setAgentMuted(agentId: String, muted: Boolean) {}
+    override fun setApprovalNotificationsEnabled(enabled: Boolean) {}
+}
 
 /**
  * The Settings options in the unified search (a search outside the Settings page still finds
@@ -25,7 +37,14 @@ class UnifiedSettingsSearchIntegrationTest {
     private val sources = UnifiedSearchSources(settings = catalog(dynamicColor = true, notifications = true, providers = true))
 
     private fun catalog(dynamicColor: Boolean = false, notifications: Boolean = false, providers: Boolean = false) =
-        defaultUnifiedSearchOptions(config, dynamicColor, notifications = notifications, providers = providers)
+        defaultUnifiedSearchOptions(
+            config,
+            BoundSettingsSections(
+                dynamicColor,
+                notifications = notifications.takeIf { it }?.let { NotificationSettings(boundAttention) },
+                providers = providers.takeIf { it }?.let { {} },
+            ),
+        )
 
     @Test
     fun aSettingIsSearchableOnBothSurfacesWithItsSectionAndGroup() {
@@ -114,7 +133,10 @@ class UnifiedSettingsSearchIntegrationTest {
 class DefaultUnifiedSearchOptionsTest {
     @Test
     fun theCatalogListsTheStandardRows() {
-        val options = defaultUnifiedSearchOptions(null, notifications = true, providers = true)
+        val options = defaultUnifiedSearchOptions(
+            null,
+            BoundSettingsSections(notifications = NotificationSettings(boundAttention), providers = { }),
+        )
 
         assertTrue(options.any { it.title == "Theme" && it.group == "Appearance" })
         assertTrue(options.any { it.title == "Permission mode" && it.group == "Chat" })
@@ -126,7 +148,7 @@ class DefaultUnifiedSearchOptionsTest {
     @Test
     fun dynamicColourIsListedOnlyWhereTheHostBindsIt() {
         val unbound = defaultUnifiedSearchOptions(null)
-        val bound = defaultUnifiedSearchOptions(null, dynamicColor = true)
+        val bound = defaultUnifiedSearchOptions(null, BoundSettingsSections(dynamicColor = true))
 
         assertTrue(unbound.none { it.helper.orEmpty().contains("wallpaper") })
         assertTrue(bound.any { it.helper.orEmpty().contains("wallpaper") })
@@ -134,7 +156,7 @@ class DefaultUnifiedSearchOptionsTest {
 
     @Test
     fun sectionsTheHostDoesNotBindAreNotListed() {
-        val options = defaultUnifiedSearchOptions(null, dynamicColor = true)
+        val options = defaultUnifiedSearchOptions(null, BoundSettingsSections(dynamicColor = true))
 
         assertTrue(options.none { it.title == "Notify me when an agent needs approval" })
         assertTrue(options.none { it.title == "Manage providers" })

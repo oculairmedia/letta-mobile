@@ -17,3 +17,9 @@ fun rememberHostAppearanceSettings(appearance: HostAppearance, dynamicColorSuppo
     val scope = rememberCoroutineScope()
     return remember(appearance, scope, dynamicColorSupported) { hostAppearanceSettings(appearance, scope, dynamicColorSupported) }
 }
+
+/**
+ * Whether this OS offers the page its wallpaper's dynamic colours ([AppearanceSettings.dynamicColor]'s row
+ * draws only where it does: Android 12 and later; the desktop and the browser have none).
+ */
+expect fun wallpaperColoursSupported(): Boolean

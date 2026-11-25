@@ -15,14 +15,17 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 /**
  * The search over a host holding a conversation fleet and its roster: the conversations, the agents
  * and the focused agent fill [options]'s own empty seats, so the header and the palette share one
- * sources object. [options] takes the palette to the fleet's own pages by default
- * ([fleetPaletteDestinations]); a host narrows it with its own seats (`copy`), or widens it.
+ * sources object. [options] takes the palette to the fleet's own pages by default —
+ * [fleetPaletteDestinations] for the focused agent, so a pick opens its page for it; a host narrows
+ * the options with its own seats (`copy`), or widens them.
  */
 fun fleetSearchSources(
     agents: List<Agent>,
     fleet: List<Conversation>,
     focusedAgentId: AgentId?,
-    options: UnifiedSearchSources = UnifiedSearchSources(destinations = fleetPaletteDestinations()),
+    options: UnifiedSearchSources = UnifiedSearchSources(
+        destinations = fleetPaletteDestinations(agentId = focusedAgentId?.value),
+    ),
 ): UnifiedSearchSources = options.copy(
     conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
     agents = agents,
@@ -31,13 +34,16 @@ fun fleetSearchSources(
 
 /**
  * The palette's "Go to" rows for a fleet host: the lens's sections (Memory, Schedules, Channels and
- * Skills — [WorkPlayMode.Work]'s vocabulary by default), each a shell route the shared opener
- * decodes into the host's own page.
+ * Skills — [WorkPlayMode.Work]'s vocabulary by default), each a shell route for the focused
+ * [agentId] the shared opener decodes into the host's own page.
  */
-fun fleetPaletteDestinations(mode: WorkPlayMode = WorkPlayMode.Work): List<UnifiedSearchDestination> = WorkPlayLens.navDestinations(mode)
+fun fleetPaletteDestinations(
+    mode: WorkPlayMode = WorkPlayMode.Work,
+    agentId: String? = null,
+): List<UnifiedSearchDestination> = WorkPlayLens.navDestinations(mode)
     .map { section ->
         UnifiedSearchDestination(
-            id = ShellRoute.encode(section.toShellDestination(null)),
+            id = ShellRoute.encode(section.toShellDestination(agentId)),
             label = WorkPlayLens.destinationLabel(mode, section),
         )
     }
