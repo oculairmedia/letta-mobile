@@ -596,7 +596,7 @@ assert_contains "$perf_workflow" 'issues: write'
 # required one without surfacing it here. `gh api ... branches/main/protection`
 # is the live source; this test pins the structural contract.
 branch_protection="$(
-  gh api repos/oculairmedia/letta-mobile/branches/main/protection \
+  gh api repos/oculairmedia/baken/branches/main/protection \
     --jq '.required_status_checks.contexts | sort | join(",")' \
     2>/dev/null || echo ''
 )"

@@ -87,7 +87,7 @@ function worker(scope, options = {}) {
 
 // The two pre-existing behaviors: /api requests are never intercepted, and navigation keeps its
 // offline fallback. These ran before letta-mobile-ckmub.17.19 and must keep passing.
-for (const prefix of ['/', '/letta-mobile/']) {
+for (const prefix of ['/', '/baken/']) {
     const scope = `https://example.com${prefix}`;
 
     test(`docs bypass app offline handling under ${prefix}`, () => {

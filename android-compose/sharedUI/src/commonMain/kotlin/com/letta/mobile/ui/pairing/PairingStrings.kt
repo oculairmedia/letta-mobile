@@ -200,7 +200,7 @@ object PairingStrings {
     const val INSTALL_BODY = "Scan with the phone's camera to download the Android app, then scan the pairing code below."
 
     /** The latest Android release; the APK is attached to every GitHub release. */
-    const val APP_DOWNLOAD_URL = "https://github.com/oculairmedia/letta-mobile/releases/latest"
+    const val APP_DOWNLOAD_URL = "https://github.com/oculairmedia/baken/releases/latest"
 
     private const val MS_PER_MINUTE = 60_000L
     private const val MS_PER_SECOND = 1_000L

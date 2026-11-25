@@ -701,7 +701,7 @@ nucleus.application {
             github {
                 enabled = true
                 owner = "oculairmedia"
-                repo = "letta-mobile"
+                repo = "baken"
                 channel = ReleaseChannel.Latest
                 releaseType = ReleaseType.Release
             }

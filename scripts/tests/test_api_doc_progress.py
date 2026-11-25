@@ -15,7 +15,7 @@ SOURCE = "android-compose/plugin-api/src/commonMain/kotlin/Clock file.kt"
 
 
 def page(identity, path):
-    return f'''<div id="content" pageIds="{identity}PointingToDeclaration//123"><br/><img src="example.png"><span data-element-type="source-link"><span>(</span><a href="https://github.com/oculairmedia/letta-mobile/tree/abc/{path}">source</a></span></div>'''
+    return f'''<div id="content" pageIds="{identity}PointingToDeclaration//123"><br/><img src="example.png"><span data-element-type="source-link"><span>(</span><a href="https://github.com/oculairmedia/baken/tree/abc/{path}">source</a></span></div>'''
 
 
 class ProgressTest(unittest.TestCase):
@@ -41,10 +41,10 @@ class ProgressTest(unittest.TestCase):
 
     def test_body_source_controls_only_not_navigation(self):
         parsed = progress.ApiPage()
-        parsed.feed(f'<nav><span data-element-type="source-link"><a href="https://github.com/oculairmedia/letta-mobile/tree/abc/wrong.kt">source</a></span></nav>')
+        parsed.feed(f'<nav><span data-element-type="source-link"><a href="https://github.com/oculairmedia/baken/tree/abc/wrong.kt">source</a></span></nav>')
         parsed.feed(page(":plugin-api::example/Clock/tick/#kotlin.Int/", SOURCE.replace(" ", "%20")))
-        parsed.feed('<a href="https://github.com/oculairmedia/letta-mobile/tree/abc/also-wrong.kt">navigation</a>')
-        parsed.feed('<footer><span data-element-type="source-link"><a href="https://github.com/oculairmedia/letta-mobile/tree/abc/footer-wrong.kt">source</a></span></footer>')
+        parsed.feed('<a href="https://github.com/oculairmedia/baken/tree/abc/also-wrong.kt">navigation</a>')
+        parsed.feed('<footer><span data-element-type="source-link"><a href="https://github.com/oculairmedia/baken/tree/abc/footer-wrong.kt">source</a></span></footer>')
         self.assertEqual({SOURCE}, parsed.paths)
 
     def test_full_overload_identity_and_changed_file_association(self):

@@ -58,7 +58,7 @@ run, extract it, and open `index.html`. The artifact is retained for 30 days.
 On main pushes, `assemble-web-pages` combines the WASM site with the generated
 reference under `api/`, then `deploy-web-pages` publishes the single Pages artifact.
 The app remains at the site root; the API reference is served at
-[letta-mobile/api/](https://oculairmedia.github.io/letta-mobile/api/) by that deployment.
+[letta-mobile/api/](https://oculairmedia.github.io/baken/api/) by that deployment.
 PRs generate downloadable docs without deploying.
 Both builds must succeed before the combined site can deploy.
 
@@ -78,7 +78,7 @@ Reference: [Dokka Gradle documentation](https://kotlinlang.org/docs/dokka-gradle
 
 ## Generated structure report
 
-The required `test` job also generates a [structure report](https://oculairmedia.github.io/letta-mobile/structure/),
+The required `test` job also generates a [structure report](https://oculairmedia.github.io/baken/structure/),
 published beside the API reference and attached to each PR as `kotlin-structure-report`.
 It reuses the architecture tests' Konsist production scope and package import
 resolver; the module-direction section is the existing boundary gate's report,

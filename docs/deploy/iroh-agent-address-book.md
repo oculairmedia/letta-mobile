@@ -47,7 +47,7 @@ The remainder records the original seed implementation and its acceptance
 checks. It is retained for provenance; use the current host contract above
 for new operations.
 
-> Status: implemented in [`letta-mobile-bn008.7`](https://github.com/oculairmedia/letta-mobile/pull/1122)
+> Status: implemented in [`letta-mobile-bn008.7`](https://github.com/oculairmedia/baken/pull/1122)
 > (PR title: `Seed host a2a address book + stable per-agent Iroh identities
 > (bn008.7)`).
 > Scope: local fs only. No host service mutation. No `letta` CLI invocation.

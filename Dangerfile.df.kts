@@ -2,7 +2,7 @@
 // Complements, and deliberately does not duplicate, the rules already enforced by
 // scripts/ci/agents-policy-check.sh (raw hex colors, sharedLogic JVM APIs, AlertDialog) and
 // scripts/ci/platform-ui-gate.sh (PUI001-PUI004, the authoritative new-platform-UI-file check).
-// Run locally:  danger-kotlin pr https://github.com/oculairmedia/letta-mobile/pull/<n>
+// Run locally:  danger-kotlin pr https://github.com/oculairmedia/baken/pull/<n>
 import systems.danger.kotlin.*
 import systems.danger.kotlin.models.git.GitCommit
 import java.io.File
