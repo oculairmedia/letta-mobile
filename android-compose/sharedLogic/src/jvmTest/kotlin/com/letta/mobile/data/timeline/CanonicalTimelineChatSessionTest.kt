@@ -9,6 +9,7 @@ import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.session.CanonicalTimelineChatSession
 import com.letta.mobile.data.timeline.session.CanonicalTimelineSend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,12 +17,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.serialization.json.JsonPrimitive
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 /**
  * The canonical chat session must be the presentation drawn as a [Timeline]: one conversation, one
@@ -98,7 +99,7 @@ class CanonicalTimelineChatSessionTest {
         val surfaces = harness.openSurfaces()
         try {
             val relayed = CopyOnWriteArrayList<TimelineSyncEvent>()
-            surfaces.scope.launch { surfaces.session.events.collect { relayed += it } }
+            surfaces.relayEventsInto(relayed)
             val openSelection = harness.owner.session.publication.value.selection
 
             surfaces.session.hydrate()
@@ -112,8 +113,9 @@ class CanonicalTimelineChatSessionTest {
                 "a second hydrate must not duplicate or reorder the loaded tail")
             assertEquals(openSelection, harness.owner.session.publication.value.selection,
                 "hydration is a page load; it must never reopen the conversation's runtime")
-            assertTrue(relayed.any { it is TimelineSyncEvent.Hydrated },
-                "the session must relay its load on the shared event contract")
+            awaitCondition({ "the session must relay its load on the shared event contract" }) {
+                relayed.any { it is TimelineSyncEvent.Hydrated }
+            }
         } finally {
             surfaces.close()
             harness.close()
@@ -169,7 +171,7 @@ class CanonicalTimelineChatSessionTest {
         try {
             surfaces.session.hydrate()
             val relayed = CopyOnWriteArrayList<TimelineSyncEvent>()
-            surfaces.scope.launch { surfaces.session.events.collect { relayed += it } }
+            surfaces.relayEventsInto(relayed)
 
             surfaces.session.send(USER_PROMPT_TEXT, emptyList())
 
@@ -188,8 +190,9 @@ class CanonicalTimelineChatSessionTest {
             }
             assertEquals(DeliveryState.FAILED, timeline.events.locals().single().deliveryState,
                 "the optimistic row must read as failed in the session, as in the writer's store")
-            assertTrue(relayed.filterIsInstance<TimelineSyncEvent.StreamError>().isNotEmpty(),
-                "the session must relay the transport failure on the shared event contract")
+            awaitCondition({ "the session must relay the transport failure on the shared event contract" }) {
+                relayed.any { it is TimelineSyncEvent.StreamError }
+            }
         } finally {
             surfaces.close()
             harness.close()
@@ -285,6 +288,17 @@ class CanonicalTimelineChatSessionTest {
             markedPrompts++
             delegate.markExternalTransportLocalFailed(agentId, conversationId, otid)
         }
+    }
+
+    /**
+     * Collects the session's relayed events into [sink], returning only once the collector is
+     * subscribed: [CanonicalTimelineChatSession.events] does not replay, so an event emitted before
+     * the subscription lands is lost and the relay assertion would fail by timing, not by behavior.
+     */
+    private suspend fun SessionSurfaces.relayEventsInto(sink: MutableList<TimelineSyncEvent>) {
+        val subscribed = CompletableDeferred<Unit>()
+        scope.launch { session.events.onSubscription { subscribed.complete(Unit) }.collect { sink += it } }
+        subscribed.await()
     }
 
     private suspend fun CanonicalTimelineChatSession.awaitTimeline(
