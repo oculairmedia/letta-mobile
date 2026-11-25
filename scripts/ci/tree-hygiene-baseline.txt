@@ -1,6 +1,5 @@
 # Existing exceptions at c232d5fc1. Remove entries as files/directories are retired.
 # Each entry may only be removed; see scripts/ci/tree-hygiene.py.
-dot .agent
 dot .claude
 dot .codex
 dot .handson
