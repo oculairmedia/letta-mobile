@@ -76,13 +76,13 @@ internal class LocalBackendContextReader(
         // letta-mobile-by4vm.21: letta.js names records agents/<base64url(id)>.json; bare <id>.json too.
         val agentFile = LocalBackendLayout.findAgentRecordFile(support.baseDir, AgentId(query.agentId)) ?: return@runCatching null
         val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
-        val key = Triple(query.agentId, dir.path, query.reportedTotal)
+        val key = cacheKey(query, dir)
         val fingerprint = listOf(agentFile, File(dir, "system-prompt.json"), File(dir, "conversation.json"), File(dir, "messages.jsonl"))
             .map(::stamp)
         synchronized(contextCache) { contextCache[key] }
             ?.takeIf { answer -> answer.second == fingerprint }
             ?.let { answer -> answer.first }
-            ?: readFresh(agentFile, dir, query, key, fingerprint)
+            ?: readFresh(agentFile, dir, query, fingerprint)
     }.getOrNull()
 
     /**
@@ -95,7 +95,6 @@ internal class LocalBackendContextReader(
         agentFile: File,
         dir: File,
         query: AgentContextQuery,
-        key: Triple<String, String, Int?>,
         fingerprint: List<String>,
     ): JsonObject? {
         agentContextFullReads += 1
@@ -108,7 +107,7 @@ internal class LocalBackendContextReader(
             reportedTotal = query.reportedTotal,
         )
         return ContextBreakdownEstimator.estimate(inputs).toAgentContextJson()
-            .also { projected -> synchronized(contextCache) { contextCache[key] = projected to fingerprint } }
+            .also { projected -> synchronized(contextCache) { contextCache[cacheKey(query, dir)] = projected to fingerprint } }
     }
 
     /**
@@ -139,6 +138,9 @@ internal class LocalBackendContextReader(
      * changes what the file holds changes its size or its modification time, so a stamp that is
      * still the same says the cached answer still matches the file on disk.
      */
+    /** The cache key of [query] answered from [dir]: the one thing both the lookup and the store must agree on. */
+    private fun cacheKey(query: AgentContextQuery, dir: File) = Triple(query.agentId, dir.path, query.reportedTotal)
+
     private fun stamp(file: File): String = "${file.path}|${file.exists()}|${file.lastModified()}|${file.length()}"
 
     private fun readJson(file: File): JsonObject? = runCatching {
