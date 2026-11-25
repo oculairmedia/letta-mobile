@@ -22,11 +22,9 @@ Live paths can be checked explicitly with a `live-path:` HTML comment containing
 The existing `scripts/ci/docs-freshness-check.py` gate validates those paths and
 architecture status headers in addition to module, gate and root-link consistency.
 
-**No new Markdown files.** New plans, handoffs, evidence and status notes go in a bead, not here; the tree-hygiene
-gate rejects any new `.md` path except wire-contract specs paired with a fixture and Dokka `Module.md`. The existing
-folders (`evidence/`, `testing/`, `handoff/`, `architecture/`) are being moved into beads or deleted.
-[plan/](../plan/) holds historical planning; [poc/](../poc/) holds experimental code,
-not production modules. Existing historical filenames are retained unless misleading.
+Use `evidence/` for captured observations, `testing/` for validation procedures,
+`handoff/` for dated session handoffs, and `architecture/` for designs/contracts.
+Existing historical filenames are retained unless misleading.
 
 The product Gradle root is [android-compose/](../android-compose/): open that
 folder in Android Studio/IDEA and run Gradle there. Hosts keep their declared
@@ -117,7 +115,6 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Live external tools and re-advertisement](architecture/live-external-tools.md)
 - [Message Sync Architecture Migration Plan](architecture/message-sync-migration.md)
 - [Mobile embedded bridge and desktop runtime hosting](architecture/mobile-embedded-bridge-vs-desktop.md)
-- [POC Validation Results](architecture/poc-validation-results.md)
 - [Progressive Composer Affordances: Design &amp; Migration Plan](architecture/progressive-composer-affordances.md)
 - [Android Project Work API Contract](architecture/project-work-api-android-contract.md)
 - [PromptComposerState prototype](architecture/prompt-composer-state-migration.md)

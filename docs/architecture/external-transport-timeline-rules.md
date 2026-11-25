@@ -35,4 +35,4 @@ For canonical storage, `CanonicalTimelineEngine.ingest` maintains a bounded live
 
 The App Server transport preserves one socket's arrival sequence through `inboundFrames`. The runtime router/fanout routes by runtime scope and generation. Turn execution is in `AppServerTurnEngine`; tests cover stale generations, concurrency, reconnect, approvals and terminal handling. Do not infer wire semantics from old shim `start`/`turn_done` examples.
 
-The [boundary test matrix](chat-boundary-regression-harness.md) and [snapshot policy](timeline-rest-snapshot-policy.md) name the current regression suites. Historical REST/POC evidence is preserved in [message-sync-migration](message-sync-migration.md) and [POC results](poc-validation-results.md); those reports do not define the current App Server contract.
+The [boundary test matrix](chat-boundary-regression-harness.md) and [snapshot policy](timeline-rest-snapshot-policy.md) name the current regression suites. Historical REST/POC evidence is preserved in [message-sync-migration](message-sync-migration.md); it does not define the current App Server contract.

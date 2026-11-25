@@ -125,7 +125,6 @@ are unchanged on purpose: renaming them would orphan existing installs and break
 The display name and icons come from one source, [`android-compose/branding/`](android-compose/branding/brand.properties).
 
 Documentation index and lifecycle conventions: [docs/README.md](docs/README.md).
-Historical planning and experiments live in [plan/](plan/) and [poc/](poc/).
 
 ## Features
 
