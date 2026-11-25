@@ -209,8 +209,11 @@ are validated and resolved to a full immutable object ID before comparison.
 ## Public API review contract
 
 The API documentation convention enables Kotlin's built-in ABI validation for
-all five published modules. The required `test` CI job runs `apiCheck`, which
-compares compiler-derived public signatures with the checked-in `api` and `api-android` dumps.
+all five published modules. The required `shared-multiplatform` CI job runs
+`apiCheck`, which compares compiler-derived public signatures with the
+checked-in `api` and `api-android` dumps (the job already compiles the shared
+wasmJs/hostNative targets; the Windows host re-verifies them through the
+path-gated `api-contract-windows` job).
 A public signature change fails until its dump is explicitly regenerated:
 
 ```bash

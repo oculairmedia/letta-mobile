@@ -171,7 +171,12 @@ assert_contains "$required_test_job" 'EVENT_NAME: ${{ github.event_name }}'
 api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
   active && /^  [[:alnum:]_-]+:$/ { exit }
   active { print }' "$android_workflow")"
+# ci-speedup-pr1: the 18m Dokka HTML graph is path-gated. The fixture carries the
+# gate condition too, so an edit that un-conditions the precompile (or reorders
+# its `if:` behind `run:`) fails the endswith match below, exactly like a removal
+# or a duplicate did before.
 docs_precompile_step='      - name: Precompile shared Android API dependency
+        if: steps.dokka_gate.outputs.run == '\''true'\''
         working-directory: android-compose
         run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process --console=plain :sharedLogic:compileAndroidMain'
 
@@ -185,6 +190,17 @@ docs_compiles_in_separate_process() {
 }
 
 docs_compiles_in_separate_process "$api_docs_job" || fail 'API documentation must precompile Android in a separate single-use JVM'
+# The fast tooling checks stay on every PR — no gate may attach to them — and the
+# heavy Gradle steps may only run behind the gate. The gate opens on non-PR events
+# and on exactly the public-API/docs paths that can change the rendered reference.
+assert_contains "$api_docs_job" $'- name: Verify documentation tooling\n        env:'
+assert_contains "$api_docs_job" "if: steps.dokka_gate.outputs.run == 'true'"
+assert_not_contains "$api_docs_job" $'- name: Verify documentation tooling\n        if:'
+assert_not_contains "$api_docs_job" $'- name: Setup Java 26\n        uses:'
+assert_contains "$api_docs_job" "- name: Setup Java 26
+        if: steps.dokka_gate.outputs.run == 'true'
+"
+assert_contains "$api_docs_job" "grep -Eq '^android-compose/(sharedLogic|sharedUI|core/ids|core/runtime|plugin-api)/|^docs/|(^|/)Module\\.md$|^scripts/ci/api-doc-undocumented-baseline\\.txt$|^\\.github/workflows/android\\.yml$'"
 for invalid_docs_job in \
   "${api_docs_job/"$docs_precompile_step"/}" \
   "${api_docs_job/"$docs_precompile_step"/}"$'\n'"$docs_precompile_step" \
@@ -374,10 +390,61 @@ assert_contains "$test_job" 'github.event.pull_request.base.sha'
 assert_not_contains "$test_job" 'changed-gradle-modules.sh origin/main'
 gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
-assert_contains "$test_job" 'apiCheck'
+# ci-speedup-pr1: apiCheck moved off the Android test runner (it dragged
+# :sharedLogic:compileKotlinWasmJs/compileKotlinHostNative, +3m09s, onto it) into
+# required `shared-multiplatform`, which compiles those targets anyway; the
+# test workload must not re-import it. Line-precise: the explanation comment in
+# the job may mention apiCheck, the verification task graph may not list it again.
+assert_not_contains "$test_job" $'\n            apiCheck\n'
 assert_not_contains "$test_job" '--continue'
 assert_contains "$(cat "$android_workflow")" 'api-contract-windows:'
 assert_contains "$(cat "$android_workflow")" 'Check Windows public API contracts'
+# ci-speedup-pr1: the 21m44s single-threaded Windows apiCheck runs on non-PR
+# events and only when a PR changes a public-API surface (shared modules, an
+# *.api dump, gradle/build-logic, this workflow). Skipping is reported in the
+# step summary and every heavy step — including the Konan save, which must not
+# persist a toolchain an apiCheck never verified — rides the same gate output.
+win_api_job="$(
+  awk '/^  api-contract-windows:$/ { active=1; next }
+    active && /^  [[:alnum:]_-]+:$/ { exit }
+    active { print }' "$android_workflow"
+)"
+assert_contains "$win_api_job" '- name: Resolve whether the Windows API contract must run'
+assert_contains "$win_api_job" "if: steps.win_api.outputs.run == 'true'"
+assert_contains "$win_api_job" "grep -Eq '^android-compose/(sharedLogic|sharedUI|core/ids|core/runtime|plugin-api|gradle|build-logic)/|\\.api$|^\\.github/workflows/android\\.yml$'"
+assert_not_contains "$win_api_job" $'- name: Check Windows public API contracts\n        run:'
+assert_contains "$win_api_job" "- name: Check Windows public API contracts
+        if: steps.win_api.outputs.run == 'true'
+"
+# The job itself must stay unconditional: required-test reads its result and
+# rejects `skipped`, so the skip rides green steps, never a skipped job.
+assert_not_contains "$win_api_job" $'\n    if:'
+
+# ci-speedup-pr1: web-wasm splits in two scopes. cargo fmt/test/clippy on
+# native/iroh-wasm run on non-PR events or when the crate changed; the heavy
+# :web:wasmJsBrowserDistribution + :web:wasmJsBrowserTest + bundle-budget
+# group run on non-PR events or when the web client surface it compiles
+# changed (web, sharedUI, sharedLogic, plugin-api, core/runtime, gradle,
+# build-logic, iroh-wasm, this workflow). The wasm-bindgen CLI comes from the
+# pinned prebuilt release tarball with a cargo-install fallback, and cargo
+# state is cached off Cargo.lock. The fast identity-store node test stays on
+# every run.
+web_wasm_job="$(
+  awk '/^  web-wasm:$/ { active=1; next }
+    active && /^  [[:alnum:]_-]+:$/ { exit }
+    active { print }' "$android_workflow"
+)"
+assert_contains "$web_wasm_job" '- name: Resolve WASM verification scope'
+assert_contains "$web_wasm_job" "if: steps.wasm_gates.outputs.heavy == 'true'"
+assert_contains "$web_wasm_job" "if: steps.wasm_gates.outputs.rust == 'true'"
+assert_contains "$web_wasm_job" "if: steps.wasm_gates.outputs.rust == 'true' || steps.wasm_gates.outputs.heavy == 'true'"
+assert_contains "$web_wasm_job" 'wasm-bindgen-0.2.127-x86_64-unknown-linux-musl.tar.gz'
+assert_contains "$web_wasm_job" 'cargo install wasm-bindgen-cli --version 0.2.127 --locked'
+assert_contains "$web_wasm_job" "grep -Eq '^android-compose/(web|sharedUI|sharedLogic|plugin-api|core/runtime|gradle|build-logic|native/iroh-wasm)/|^\\.github/workflows/android\\.yml$'"
+assert_contains "$web_wasm_job" 'cargo-iroh-wasm-v1-${{ hashFiles('
+assert_not_contains "$web_wasm_job" $'- name: Test browser Iroh identity store\n        if:'
+assert_not_contains "$web_wasm_job" $'- name: Build and test Compose web client\n        timeout-minutes:'
+assert_not_contains "$web_wasm_job" $'\n    if:'
 
 # One Pages deployment must contain both the app and generated API reference.
 # Uploading each site independently would let one replace the other.
@@ -492,6 +559,12 @@ assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:com
 assert_contains "$shared_job" ':sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
+# ci-speedup-pr1: apiCheck moved here from test-workload. This job already compiles
+# the shared wasmJs/hostNative targets the ABI comparison needs, and it is the
+# required `shared-multiplatform` check, so API drift still blocks every merge.
+# Pin it onto the shared-target invocation, the one that already compiles what
+# the comparison drags in.
+assert_contains "$shared_job" ':sharedUI:compileTestKotlinWasmJs apiCheck'
 
 detekt_job="$(
   awk '
