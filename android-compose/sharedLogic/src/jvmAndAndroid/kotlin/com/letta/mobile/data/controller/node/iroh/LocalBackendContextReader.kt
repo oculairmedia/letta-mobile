@@ -10,6 +10,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 
+/** Answers held per reader in [LocalBackendContextReader]'s stamped cache. */
+internal const val MAX_CACHED_AGENT_CONTEXTS = 64
+
 /** One `agent.context` request. */
 data class AgentContextQuery(
     val agentId: String,
@@ -41,24 +44,71 @@ internal class LocalBackendContextReader(
 ) {
 
     /**
+     * Full parses served by [agentContextProjected] since construction. A repeat whose file
+     * stamps are unchanged is served from [contextCache] and does not count, so a test can
+     * observe that the bodies were parsed once.
+     */
+    internal var agentContextFullReads: Int = 0
+        private set
+
+    /**
+     * The last answers of [agentContextProjected], keyed by (agentId, conversation dir path,
+     * reported total) with the fingerprints the stable reads leave on disk. Entry order is
+     * access order, so touching an entry saves it from eviction when the cap is reached.
+     */
+    private val contextCache: LinkedHashMap<Triple<String, String, Int?>, Pair<JsonObject, List<String>>> =
+        object : LinkedHashMap<Triple<String, String, Int?>, Pair<JsonObject, List<String>>>(16, 0.75f, true) {
+            override fun removeEldestEntry(
+                ignored: MutableMap.MutableEntry<Triple<String, String, Int?>, Pair<JsonObject, List<String>>>?,
+            ): Boolean = size > MAX_CACHED_AGENT_CONTEXTS
+        }
+
+    /**
      * Returns null when the agent is unknown or the store cannot be read, so the caller fails
      * closed rather than serving a hollow context window.
+     *
+     * A repeat call whose four files (agent record, `system-prompt.json`, `conversation.json`,
+     * `messages.jsonl`) still have the same exists/lastModified/length stamps is answered from
+     * [contextCache] without re-reading or re-parsing the bodies — the host calls this on every
+     * chat switch, and re-parsing was the slowest local read on the live host.
      */
-    fun agentContextProjected(query: AgentContextQuery): JsonObject? =
-        runCatching {
-            // letta-mobile-by4vm.21: letta.js names records agents/<base64url(id)>.json; bare <id>.json too.
-            val agentFile = LocalBackendLayout.findAgentRecordFile(support.baseDir, AgentId(query.agentId)) ?: return@runCatching null
-            val agent = readJson(agentFile) ?: return@runCatching null
-            val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
-            val inputs = LocalContextInputs(
-                systemPromptSidecar = readJson(File(dir, "system-prompt.json")),
-                agent = agent,
-                conversation = readJson(File(dir, "conversation.json")),
-                transcript = readTranscript(File(dir, "messages.jsonl")) ?: return@runCatching null,
-                reportedTotal = query.reportedTotal,
-            )
-            ContextBreakdownEstimator.estimate(inputs).toAgentContextJson()
-        }.getOrNull()
+    fun agentContextProjected(query: AgentContextQuery): JsonObject? = runCatching {
+        // letta-mobile-by4vm.21: letta.js names records agents/<base64url(id)>.json; bare <id>.json too.
+        val agentFile = LocalBackendLayout.findAgentRecordFile(support.baseDir, AgentId(query.agentId)) ?: return@runCatching null
+        val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
+        val key = cacheKey(query, dir)
+        val fingerprint = listOf(agentFile, File(dir, "system-prompt.json"), File(dir, "conversation.json"), File(dir, "messages.jsonl"))
+            .map(::stamp)
+        synchronized(contextCache) { contextCache[key] }
+            ?.takeIf { answer -> answer.second == fingerprint }
+            ?.let { answer -> answer.first }
+            ?: readFresh(agentFile, dir, query, fingerprint)
+    }.getOrNull()
+
+    /**
+     * The uncached path, unchanged from before the cache existed: parse the agent record, the
+     * sidecar, the conversation record and the transcript, then remember the answer (stamped with
+     * the fingerprint that produced it) so repeats cost four stat calls instead of the parses.
+     * Nulls and failures are not stored.
+     */
+    private fun readFresh(
+        agentFile: File,
+        dir: File,
+        query: AgentContextQuery,
+        fingerprint: List<String>,
+    ): JsonObject? {
+        agentContextFullReads += 1
+        val agent = readJson(agentFile) ?: return null
+        val inputs = LocalContextInputs(
+            systemPromptSidecar = readJson(File(dir, "system-prompt.json")),
+            agent = agent,
+            conversation = readJson(File(dir, "conversation.json")),
+            transcript = readTranscript(File(dir, "messages.jsonl")) ?: return null,
+            reportedTotal = query.reportedTotal,
+        )
+        return ContextBreakdownEstimator.estimate(inputs).toAgentContextJson()
+            .also { projected -> synchronized(contextCache) { contextCache[cacheKey(query, dir)] = projected to fingerprint } }
+    }
 
     /**
      * The in-context transcript (compaction summary plus messages) in estimated
@@ -82,6 +132,16 @@ internal class LocalBackendContextReader(
         if (file.length() > maxTranscriptBytes) return null
         return BoundedTranscriptReader.readTranscriptContext(file, maxInlineValueChars)
     }
+
+    /**
+     * A look at one file, never a read of it: (path, exists, lastModified, length). Any write that
+     * changes what the file holds changes its size or its modification time, so a stamp that is
+     * still the same says the cached answer still matches the file on disk.
+     */
+    /** The cache key of [query] answered from [dir]: the one thing both the lookup and the store must agree on. */
+    private fun cacheKey(query: AgentContextQuery, dir: File) = Triple(query.agentId, dir.path, query.reportedTotal)
+
+    private fun stamp(file: File): String = "${file.path}|${file.exists()}|${file.lastModified()}|${file.length()}"
 
     private fun readJson(file: File): JsonObject? = runCatching {
         file.takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
