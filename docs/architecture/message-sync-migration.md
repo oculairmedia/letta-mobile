@@ -8,7 +8,7 @@ The POC validation report exists and the extracted timeline/reducers now live in
 
 ## Original record
 
-See [validation results](poc-validation-results.md); this is not the current transport contract.
+This is not the current transport contract.
 **Date:** 2026-04-16
 **Author:** Huly - letta-mobile agent + Emmanuel
 
@@ -166,7 +166,7 @@ Before touching the mobile app, validate the architecture with a minimal CLI. Th
 
 ### POC scope
 
-**Location:** `/opt/stacks/letta-mobile/poc/chat-cli/` (new directory)
+**Location:** `poc/chat-cli/` (removed; the design now lives in `sharedLogic/data/timeline`)
 **Language:** Kotlin (matches mobile code, reuses types)
 **Runtime:** JVM CLI (ktor client, no Android deps)
 

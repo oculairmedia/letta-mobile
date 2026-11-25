@@ -2,7 +2,7 @@
 
 **Status:** Current source map; audited 2026-10-18 against Gradle declarations and isolation tests.
 
-The product Gradle root is `android-compose/`. Its [settings](../../android-compose/settings.gradle.kts) declare the included projects; `poc/chat-cli/` is a separate experimental build. The unused root REST-era `cli/` build has been removed; the supported developer CLI is `:cli` in this graph.
+The product Gradle root is `android-compose/`. Its [settings](../../android-compose/settings.gradle.kts) declare the included projects. The unused root REST-era `cli/` build has been removed; the supported developer CLI is `:cli` in this graph.
 
 | Project | Current responsibility / targets |
 |---|---|

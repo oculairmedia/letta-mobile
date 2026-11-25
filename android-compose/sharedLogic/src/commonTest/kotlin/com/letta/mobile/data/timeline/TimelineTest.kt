@@ -12,10 +12,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Unit tests for the [Timeline] data model.
- *
- * Mirrors the POC CLI tests in `poc/chat-cli/src/test/kotlin/com/letta/poc/TimelineTest.kt`
- * to ensure the mobile port preserves the validated invariants.
+ * Unit tests for the [Timeline] data model: the otid-based invariants the timeline relies on.
  */
 class TimelineTest {
     private var ownedTelemetryHistory: AutoCloseable? = null
