@@ -1,14 +1,16 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.34.39",
+    "version": "0.34.70",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "6c50a2345e42d6b9521127cd07c1e175c73f320b5e5724a2a0782fe963eb8881",
-    "protocol_corpus_sha256": "12203bda8d79504ea99db8144d01579f046d37fd506867a4995f520aea389ab0",
+    "protocol_sha256": "2568073ad0f1f18e3bb4b1635b065f0a75d5dcb62a5fca493d3cae8a7725f2f9",
+    "protocol_corpus_sha256": "f13642da6979e4ec2e6d65c8e3dbb20c4676df5127895b80bb766b497363c658",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
+      "dist/types/experiments/types.d.ts",
+      "dist/types/permissions/mode.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
       "dist/types/types/app-server-info.d.ts",
       "dist/types/types/app-server-protocol.d.ts",
@@ -24,6 +26,7 @@
       "dist/types/types/input-command.d.ts",
       "dist/types/types/input-create-message.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
+      "dist/types/types/protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
       "dist/types/types/provider-oauth-config.d.ts",
       "dist/types/types/queue-update-protocol.d.ts",
@@ -163,6 +166,7 @@
     "turn_finished",
     "update_subagent_state",
     "external_tool_call_request",
+    "external_tool_call_cancel",
     "abort_message_response",
     "resume_queue_response",
     "sync_response",
@@ -575,8 +579,10 @@
       ],
       "messages": [
         "external_tool_call_request",
-        "runtime_external_tools_update_response"
-      ]
+        "runtime_external_tools_update_response",
+        "external_tool_call_cancel"
+      ],
+      "client_note": "external_tool_call_cancel (0.34.70): unused; the server sends it only for tools registered with capabilities.external_tool_call_cancel=true, which the client never sets (AppServerExternalToolsGroup has no capabilities), so an aborted turn waits for the client's external_tool_call_response as before. It would decode as an unknown frame."
     },
     {
       "id": "experiments_reflection_commands",
