@@ -248,7 +248,7 @@ class DurableSubagentRegistryTtlTest {
         assertEquals(SubagentChipRecord.TERMINAL_REASON_STALE, store.load().single().terminalReason)
     }
 
-    /** letta-mobile-dear2: replayed RUNNING snapshots cannot keep a chip whose completion was seen alive. */
+    /** Replayed RUNNING snapshots cannot keep a chip whose completion was seen alive. */
     @Test
     fun runningSightingsDoNotRenewAChipHoldingAnEarlyCompletion() {
         val reg = registry()

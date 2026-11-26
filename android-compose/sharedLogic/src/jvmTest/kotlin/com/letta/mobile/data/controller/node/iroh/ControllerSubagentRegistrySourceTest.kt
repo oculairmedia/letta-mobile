@@ -567,7 +567,7 @@ class ControllerSubagentRegistrySourceTest {
         )
     }
 
-    // letta-mobile-dear2 gap 1 (TLA+ EventuallyTerminal): the completion can reach the parent stream
+    // TLA+ EventuallyTerminal: the completion can reach the parent stream
     // before the dispatch receipt that carries its task id. It must be applied when the receipt arrives,
     // and later stale RUNNING snapshots must not keep the chip alive.
     private val earlyDispatch = """{

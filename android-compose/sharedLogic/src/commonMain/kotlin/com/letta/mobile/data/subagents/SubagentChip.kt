@@ -191,8 +191,8 @@ data class SubagentChipRecord(
     /** Host-proven App Server process identity at first observation; null in legacy records. */
     @SerialName("app_server_process_identity") val appServerProcessIdentity: String? = null,
     /**
-     * Completions this dispatch might own, seen before its receipt supplied [taskId]
-     * (letta-mobile-dear2). Applied by exact task identity when the receipt arrives, then
+     * Completions this dispatch might own, seen before its receipt supplied [taskId].
+     * Applied by exact task identity when the receipt arrives, then
      * cleared; bounded by [DurableSubagentRegistry.MAX_EARLY_TERMINALS].
      */
     @SerialName("early_terminals") val earlyTerminals: List<SubagentEarlyTerminal> = emptyList(),

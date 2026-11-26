@@ -199,7 +199,7 @@ class ControllerSubagentRegistrySource(
         }
 
         /**
-         * letta-mobile-dear2: a completion can overtake the dispatch receipt that names its task.
+         * A completion can overtake the dispatch receipt that names its task.
          * Keep it, by exact task id only, on each live dispatch of this parent still awaiting a
          * receipt; the registry applies it when a receipt reports that task. No task id, no memory.
          */

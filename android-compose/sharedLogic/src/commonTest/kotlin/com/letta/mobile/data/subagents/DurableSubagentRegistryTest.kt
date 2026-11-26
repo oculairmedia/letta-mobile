@@ -443,7 +443,7 @@ class DurableSubagentRegistryTest {
         assertEquals(listOf("term/1"), store.load().evictedTombstones().map { it.toolCallId })
     }
 
-    /** letta-mobile-dear2 gap 2 (TLA+ NoResurrection): eviction must not forget that a key ended. */
+    /** TLA+ NoResurrection: eviction must not forget that a key ended. */
     @Test
     fun evictedTerminalKeyCannotBeResurrectedAsRunning() {
         val store = InMemorySubagentRegistryStore()

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-dear2 gap 3 (TLA+ NoPendingRow). The host journals `turn_closed` after every frame it relayed
+ * TLA+ NoPendingRow: The host journals `turn_closed` after every frame it relayed
  * for the turn, so a parent tool call still unanswered at that entry has no result coming in this turn. A feed
  * conversation runs no ledger sweep (the indexed maintenance skips it), so before the fix the row stayed
  * pending forever. A real result journaled later (async tool, replay in a later turn) still wins.

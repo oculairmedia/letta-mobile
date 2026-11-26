@@ -349,7 +349,7 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * letta-mobile-dear2: once the receipt has named this dispatch's task, a completion that
+     * Once the receipt has named this dispatch's task, a completion that
      * arrived before it is applied by exact task identity, and every other remembered early
      * notification is dropped (the receipt proved it belongs to another task).
      */
@@ -375,7 +375,7 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * letta-mobile-dear2: a completion this dispatch may own has been seen, so a live sighting is
+     * A completion this dispatch may own has been seen, so a live sighting is
      * not evidence of life; replayed RUNNING snapshots must not keep resetting the stale TTL.
      */
     private fun SubagentChipRecord.keepingSilenceWhileCompletionPending(
@@ -390,7 +390,7 @@ class DurableSubagentRegistry(
 
     /**
      * Remember a terminal notification for each live dispatch in [candidates] that has no task id
-     * yet (letta-mobile-dear2). Changes neither lifecycle nor last-seen: it is not a sighting of
+     * yet. Changes neither lifecycle nor last-seen: it is not a sighting of
      * the dispatch, only a fact to correlate once its receipt names its task.
      */
     internal fun rememberEarlyTerminal(candidates: Collection<SubagentChipKey>, early: SubagentEarlyTerminal): Int =
