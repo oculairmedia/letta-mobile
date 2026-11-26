@@ -33,9 +33,9 @@
           "credential": {"kind": "token", "token": "contract-admin-token"},
           "expect_frame": {"type": "auth", "request_id": "c-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
           "replies": [
-            {"lane": "control", "frame": {"type": "auth_response", "request_id": "c-1", "success": true, "paired": true, "capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part", "ordered_event_seq_v1"]}}
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "c-1", "success": true, "paired": true, "capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "event_seq_ordered_v1", "frame_part"]}}
           ],
-          "expect": {"capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part", "ordered_event_seq_v1"], "paired": true}
+          "expect": {"capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "event_seq_ordered_v1", "frame_part"], "paired": true}
         },
         {"op": "close", "session": "c"},
         {
@@ -132,9 +132,9 @@
           "credential": {"kind": "token", "token": "contract-admin-token"},
           "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
           "replies": [
-            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["frame_part", "ordered_event_seq_v1"]}}
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["event_seq_ordered_v1", "frame_part"]}}
           ],
-          "expect": {"capabilities": ["frame_part", "ordered_event_seq_v1"], "paired": false}
+          "expect": {"capabilities": ["event_seq_ordered_v1", "frame_part"], "paired": false}
         },
         {
           "op": "request", "session": "a",
