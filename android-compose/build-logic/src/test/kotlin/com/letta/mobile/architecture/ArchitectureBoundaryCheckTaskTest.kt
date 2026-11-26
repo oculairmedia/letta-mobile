@@ -1,5 +1,6 @@
 package com.letta.mobile.architecture
 
+import com.letta.mobile.testkit.FixtureRunner
 import org.gradle.testkit.runner.GradleRunner
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -32,10 +33,10 @@ class ArchitectureBoundaryCheckTaskTest {
         assertTrue(success.output.contains("Module-boundary gate: PASSED"), success.output)
     }
 
-    private fun runner(): GradleRunner = GradleRunner.create()
-        .withProjectDir(projectDir)
-        .withPluginClasspath()
-        .withArguments("checkArchitectureBoundaries", "--configuration-cache", "--stacktrace")
+    private fun runner(): GradleRunner = FixtureRunner.create(
+        projectDir,
+        listOf("checkArchitectureBoundaries", "--configuration-cache", "--stacktrace"),
+    )
 
     private fun write(path: String, content: String) {
         projectDir.resolve(path).apply { parentFile.mkdirs() }.writeText(content)

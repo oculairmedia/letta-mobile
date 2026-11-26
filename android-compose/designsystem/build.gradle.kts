@@ -1,5 +1,6 @@
 plugins {
     id("com.letta.mobile.android.library")
+    id("com.letta.mobile.robolectric-deps")
     id("app.cash.paparazzi")
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")

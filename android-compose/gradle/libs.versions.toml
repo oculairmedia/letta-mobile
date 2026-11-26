@@ -118,6 +118,16 @@ androidx-paging-compose = { module = "androidx.paging:paging-compose", version.r
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+# Robolectric's pre-instrumented Android framework jars, one per SDK level the tests ask for
+# (`@Config(sdk = ...)` and every robolectric.properties). The version strings are fixed by the
+# `robolectric` version above: read them from org.robolectric.plugins.DefaultSdkProvider in
+# robolectric-<version>.jar. The `com.letta.mobile.robolectric-deps` plugin resolves every
+# `robolectric-android-all-*` entry through Gradle (retries, mirror, dependency cache) and hands the
+# paths to Robolectric, so tests never download them. A Robolectric bump that leaves these stale, or a
+# test that needs an SDK not listed here, fails with "no artifacts found" instead of fetching live.
+robolectric-android-all-sdk32 = { module = "org.robolectric:android-all-instrumented", version = "12.1-robolectric-8229987-i7" }
+robolectric-android-all-sdk33 = { module = "org.robolectric:android-all-instrumented", version = "13-robolectric-9030017-i7" }
+robolectric-android-all-sdk34 = { module = "org.robolectric:android-all-instrumented", version = "14-robolectric-10818077-i7" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }

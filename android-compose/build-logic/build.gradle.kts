@@ -5,6 +5,8 @@ plugins {
 
 group = "com.letta.mobile.buildlogic"
 
+val GRADLE_USER_HOME_PROPERTY = "letta.gradle.user.home"
+
 kotlin {
     jvmToolchain(17)
 }
@@ -41,6 +43,10 @@ gradlePlugin {
             id = "com.letta.mobile.brand"
             implementationClass = "com.letta.mobile.brand.BrandPlugin"
         }
+        create("robolectricDeps") {
+            id = "com.letta.mobile.robolectric-deps"
+            implementationClass = "com.letta.mobile.robolectric.RobolectricDepsPlugin"
+        }
         create("jni16Kb") {
             id = "com.letta.mobile.jni-16kb"
             implementationClass = "com.letta.mobile.jni.Jni16KbPlugin"
@@ -50,4 +56,7 @@ gradlePlugin {
 
 tasks.test {
     useJUnitPlatform()
+    // TestKit fixtures start with an empty Gradle user home; they read this one's dependency cache
+    // (GRADLE_RO_DEP_CACHE) before going to the network. See FixtureRunner.
+    systemProperty(GRADLE_USER_HOME_PROPERTY, gradle.gradleUserHomeDir.absolutePath)
 }

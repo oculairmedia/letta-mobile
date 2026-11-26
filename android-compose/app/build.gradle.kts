@@ -22,6 +22,7 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
     // The `brand` extension: launcher label and icons from branding/brand.properties.
     id("com.letta.mobile.brand")
+    id("com.letta.mobile.robolectric-deps")
 }
 
 // Kotzilla observability — debug builds only, gated via Gradle property.
