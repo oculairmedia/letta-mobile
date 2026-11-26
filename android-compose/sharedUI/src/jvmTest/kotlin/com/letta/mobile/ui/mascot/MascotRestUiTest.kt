@@ -93,6 +93,50 @@ class MascotRestUiTest {
     }
 
     @Test
+    fun heldPosesRestAfterTheirTransitionInsteadOfMovingForAsLongAsTheyStand() = runComposeUiTest {
+        // A background reflection the host never reports finished, a parked approval and a failed
+        // attempt can each stand for hours with no turn running: on a phone the composer's mascot
+        // advanced (and redrew the window) every vsync for all of it.
+        val held = listOf(
+            AgentPresence(dreaming = true),
+            AgentPresence(awaitingApproval = true),
+            AgentPresence(error = true),
+        )
+        val host = RecordingMascotHost()
+        val shell = FakeMascotShell(agent, layerMounted = false, host = host)
+        showSeat(shell)
+        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds + REST_MARGIN_MILLIS)
+        assertEquals(false, host.lastPlaying, "an idle mascot starts at rest")
+
+        held.forEach { presence ->
+            shell.registry.setPresence(agent, presence)
+            mainClock.advanceTimeByFrame()
+            mainClock.advanceTimeByFrame()
+            assertEquals(true, host.lastPlaying, "$presence begins: the mascot moves into the pose")
+            mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds * 3)
+            assertEquals(false, host.lastPlaying, "$presence still stands: the mascot holds the pose and asks for no frames")
+        }
+
+        shell.registry.clearPresence(agent)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        assertEquals(true, host.lastPlaying, "the pose ending is a beat too: the mascot moves out of it")
+        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds + REST_MARGIN_MILLIS)
+        assertEquals(false, host.lastPlaying, "then rests")
+    }
+
+    @Test
+    fun typingToTheAgentKeepsItsMascotMoving() = runComposeUiTest {
+        val host = RecordingMascotHost()
+        val shell = FakeMascotShell(agent, layerMounted = false, host = host)
+        shell.registry.setPresence(agent, AgentPresence(userTyping = true))
+        showSeat(shell)
+
+        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds * 3)
+        assertEquals(true, host.lastPlaying, "the mascot reacts to every keystroke while the user types")
+    }
+
+    @Test
     fun stillPointerLetsTheMascotRestAndAMoveWakesIt() = runComposeUiTest {
         val host = RecordingMascotHost()
         val shell = FakeMascotShell(agent, layerMounted = false, host = host)
