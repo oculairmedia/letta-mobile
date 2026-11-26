@@ -2,15 +2,18 @@ package com.letta.mobile.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import com.letta.mobile.AgentListLaunchTarget
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.PairLinkLaunchTarget
 import com.letta.mobile.ShareLaunchTarget
 import com.letta.mobile.data.repository.LastChatSelection
+import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.CurrentFocusInputs
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.shell.entrySnapshot
 import com.letta.mobile.data.shell.initialCurrentFocus
 
 /** Unknown-source legacy settings and favourite/admin preferences cannot seed current focus. */
@@ -36,25 +39,30 @@ internal fun initializeAndroidFocus(workspace: ShellWorkspaceState, inputs: Curr
 }
 
 /** A launch the workspace takes once it is up ([target]), and how it hands back that it did. */
-internal class AndroidShellLaunch(
-    val target: AppLaunchTarget?, val onConsumed: () -> Unit, val openPairingScan: () -> Unit,
-    val focusInputs: CurrentFocusInputs? = null,
-)
+internal class AndroidShellLaunch(val target: AppLaunchTarget?, val onConsumed: () -> Unit, val openPairingScan: () -> Unit) {
+    /** This launch as a new focus entry on [source]: a notification opens exactly its conversation. */
+    fun focusInputs(source: String): CurrentFocusInputs? {
+        val chat = target as? NotificationNavigationTarget ?: return null
+        return CurrentFocusInputs(source, deepLink = ShellDestination.Chat(chat.agentId, chat.conversationId).entrySnapshot(source))
+    }
+}
+
+/** Arbitrates [launch]'s entry on [source] through [bind] while composing, before any page or effect starts. */
+@Composable
+internal fun BindLaunchFocus(
+    launch: AndroidShellLaunch, workspace: ShellWorkspaceState, graph: SessionGraph, source: String, bind: (CurrentFocusInputs?) -> Unit,
+) {
+    val entry = remember(launch.target, source) { launch.focusInputs(source) }
+    remember(workspace, source, graph.id, entry) { bind(entry) }
+}
 
 /** A notification opens its chat, a share waits for its agent, the agent directory opens, a pairing link scans. */
 @Composable
 internal fun AndroidShellLaunchEffect(shell: WorkspaceShell, launch: AndroidShellLaunch) {
-    LaunchedEffect(launch.target, launch.focusInputs, shell.config != null, shell.sourceReady) {
+    LaunchedEffect(launch.target, shell.config != null, shell.sourceReady) {
         when (val target = launch.target ?: return@LaunchedEffect) {
-            is NotificationNavigationTarget -> {
-                if (shell.config == null || !shell.sourceReady) return@LaunchedEffect
-                val entry = launch.focusInputs?.deepLink ?: return@LaunchedEffect
-                if (entry.sourceKey != shell.workspace.sourceKey) {
-                    launch.onConsumed()
-                    return@LaunchedEffect
-                }
-                if (shell.workspace.currentFocus != entry.focus) return@LaunchedEffect
-            }
+            // A bound source means BindLaunchFocus has already arbitrated the entry: hand it back once.
+            is NotificationNavigationTarget -> if (shell.config == null || !shell.sourceReady) return@LaunchedEffect
             is ShareLaunchTarget -> {
                 shell.port.pendingShare = target.sharedText
                 shell.workspace.overlays.newConversation = true

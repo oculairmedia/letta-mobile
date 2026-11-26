@@ -27,6 +27,17 @@ internal fun ShellDestination.initialFocus(): CurrentFocus {
     )
 }
 
+/**
+ * A new external entry (a deep link or a notification tap) that opens this destination on
+ * [sourceKey], for [CurrentFocusInputs.deepLink]. A chat with a conversation is an exact target.
+ * Null when the destination cannot be a valid focus target (for example a blank id).
+ */
+fun ShellDestination.entrySnapshot(sourceKey: String): CurrentFocusSnapshot? = CurrentFocusSnapshot(
+    sourceKey = sourceKey,
+    focus = initialFocus(),
+    editorRoute = (this as? ShellDestination.AgentEditor)?.let(ShellRoute::encode),
+).takeIf { it.valid() }
+
 /** Construct a validated navigation envelope, before binding or for a source reset. */
 internal fun initialFocusSnapshot(
     page: ShellDestination,

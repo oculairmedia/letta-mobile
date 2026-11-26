@@ -54763,6 +54763,7 @@ public final class com/letta/mobile/data/shell/ShellDestinationKt {
 }
 
 public final class com/letta/mobile/data/shell/ShellFocusRoutesKt {
+	public static final fun entrySnapshot (Lcom/letta/mobile/data/shell/ShellDestination;Ljava/lang/String;)Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
 	public static final fun projectFocus (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/jvm/functions/Function1;)V
 }
 
