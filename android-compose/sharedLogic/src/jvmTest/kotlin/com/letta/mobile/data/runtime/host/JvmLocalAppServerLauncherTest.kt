@@ -1,5 +1,7 @@
 package com.letta.mobile.data.runtime.host
 
+import com.letta.mobile.data.controller.node.iroh.assertOnlyCurrentUserAllowed
+import com.letta.mobile.data.controller.node.iroh.isWindowsHost
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
@@ -17,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assume.assumeTrue
 
 /** letta-mobile-by4vm.110.4: the JVM child-process launcher, against real `sh` children (POSIX). */
 class JvmLocalAppServerLauncherTest {
@@ -73,6 +76,24 @@ class JvmLocalAppServerLauncherTest {
         assertTrue(descendants.none { it.isAlive }, "no descendant outlives the server")
         assertTrue(withTimeout(10_000) { process.awaitExit() } != 0, "a killed server does not exit cleanly")
         withTimeout(10_000) { reader.join() }
+    }
+
+    @Test
+    fun theTokenFileAclAllowsOnlyTheCurrentUserOnWindows() {
+        assumeTrue("Windows ACLs only", isWindowsHost())
+        val tokenFile = File(root, "backend/ws-token")
+
+        // The token is written before the spawn, so a missing executable still leaves it to inspect.
+        assertFailsWith<LocalAppServerStartException> {
+            JvmLocalAppServerLauncher().start(
+                launch = LocalAppServerLaunch(listOf(File(root, "no-such-node").absolutePath), root.absolutePath),
+                tokenFile = tokenFile.absolutePath,
+                token = "secret",
+            )
+        }
+
+        assertEquals("secret", tokenFile.readText())
+        assertOnlyCurrentUserAllowed(tokenFile.toPath())
     }
 
     @Test
