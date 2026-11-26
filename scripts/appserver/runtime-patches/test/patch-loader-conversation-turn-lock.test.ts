@@ -58,6 +58,37 @@ function helperSource(patched: string): string {
   return patched.slice(from, to + HELPER_END.length);
 }
 
+// The real temp dir, read before any test points TMPDIR at a scratch dir.
+const BASE_TMP = tmpdir();
+// Every child and scratch dir this file creates; removed by each scratch's cleanup and again when
+// the runner exits or is signalled (a timed-out run must not leave holders or lock files behind).
+const children = new Set<ChildProcess>();
+const scratchDirs = new Set<string>();
+function reapAll() {
+  for (const child of children) child.kill("SIGKILL");
+  for (const dir of scratchDirs) rmSync(dir, { recursive: true, force: true });
+}
+process.on("exit", reapAll);
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    reapAll();
+    process.exit(128 + (signal === "SIGINT" ? 2 : 15));
+  });
+}
+
+/** Starts the helper in a child with its lock directory under [tmp]; resolves on its first stdout line. */
+function startChild(script: string, tmp: string): { child: ChildProcess; firstLine: Promise<string> } {
+  const child = spawn(process.execPath, ["-e", script], { env: { PATH: process.env.PATH ?? "", TMPDIR: tmp }, stdio: ["ignore", "pipe", "inherit"] });
+  children.add(child);
+  child.once("exit", () => children.delete(child));
+  const firstLine = new Promise<string>((resolve, reject) => {
+    child.stdout!.once("data", (data) => resolve(String(data).trim()));
+    child.once("exit", (code) => reject(new Error(`child exited early with ${code}`)));
+  });
+  firstLine.catch(() => {});
+  return { child, firstLine };
+}
+
 /** A process that loads the helper, takes the lock for one conversation and holds it until killed. */
 function startHolder(helper: string, storageDir: string, tmp: string, agentId = "agent-a"): Promise<ChildProcess> {
   const script = `${helper}
@@ -66,11 +97,8 @@ globalThis.__lcpTurnLock.acquire(backend, ${JSON.stringify(agentId)}, "default",
   process.stdout.write("held\\n");
   setInterval(() => {}, 1000);
 });`;
-  const child = spawn(process.execPath, ["-e", script], { env: { PATH: process.env.PATH ?? "", TMPDIR: tmp }, stdio: ["ignore", "pipe", "inherit"] });
-  return new Promise((resolve, reject) => {
-    child.stdout!.once("data", () => resolve(child));
-    child.once("exit", (code) => reject(new Error(`holder exited early with ${code}`)));
-  });
+  const { child, firstLine } = startChild(script, tmp);
+  return firstLine.then(() => child);
 }
 
 /** Loads the helper in this process with its lock directory under [tmp]; returns the restore hook. */
@@ -92,7 +120,8 @@ function loadHelperHere(helper: string, tmp: string): { lock: TurnLock; restore:
 function scratch(t: { skip: (reason: string) => void }) {
   const patched = patchedOrSkip(t);
   if (!patched) return null;
-  const tmp = mkdtempSync(join(tmpdir(), "lcp-turn-lock-"));
+  const tmp = mkdtempSync(join(BASE_TMP, "lcp-turn-lock-"));
+  scratchDirs.add(tmp);
   const storageDir = join(tmp, "store");
   const helper = helperSource(patched);
   const { lock, restore } = loadHelperHere(helper, tmp);
@@ -106,8 +135,10 @@ function scratch(t: { skip: (reason: string) => void }) {
     patched, tmp, storageDir, helper, lock, backend, lockFiles,
     lockDirPath: () => join(tmp, lockDir() ?? "letta-turn-locks-x"),
     cleanup: () => {
+      for (const child of children) child.kill("SIGKILL");
       restore();
       rmSync(tmp, { recursive: true, force: true });
+      scratchDirs.delete(tmp);
     },
   };
 }
@@ -270,6 +301,130 @@ test("lcp-conversation-turn-lock: an empty or garbage lock file is reclaimed onc
       releaseAfter();
       assert.equal(existsSync(file), false);
     }
+  } finally {
+    s.cleanup();
+  }
+});
+
+test("lcp-conversation-turn-lock: a garbage lock file with a future mtime is reclaimed, not honoured for ever", async (t) => {
+  const s = scratch(t);
+  if (!s) return;
+  try {
+    const release = await s.lock.acquire(s.backend, "agent-a", "default", "probe");
+    const [name] = s.lockFiles();
+    assert.ok(name);
+    release();
+    const file = join(s.lockDirPath(), name!);
+    writeFileSync(file, "{garbage");
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    utimesSync(file, future, future);
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new Error("a future-mtime lock file blocked the conversation")), 3000);
+    try {
+      const releaseAfter = await s.lock.acquire(s.backend, "agent-a", "default", "after", { signal: timeout.signal });
+      assert.equal(s.lock.holder(s.backend, "agent-a", "default")?.pid, process.pid);
+      releaseAfter();
+    } finally {
+      clearTimeout(timer);
+    }
+    assert.equal(existsSync(file), false);
+  } finally {
+    s.cleanup();
+  }
+});
+
+test("lcp-conversation-turn-lock: two contenders racing to reclaim one stale lock, only one acquires", async (t) => {
+  const s = scratch(t);
+  if (!s) return;
+  try {
+    // A lock left by a process that is gone: its pid answers ESRCH.
+    const release = await s.lock.acquire(s.backend, "agent-a", "default", "probe");
+    const [name] = s.lockFiles();
+    release();
+    const dead = startChild("process.stdout.write(String(process.pid) + '\\n'); setInterval(() => {}, 1000);", s.tmp);
+    const deadPid = Number(await dead.firstLine);
+    dead.child.kill("SIGKILL");
+    await new Promise((resolve) => dead.child.once("exit", resolve));
+    writeFileSync(join(s.lockDirPath(), name!), JSON.stringify({ pid: deadPid, start: null, token: "dead-owner", holder: "dead" }));
+    const contender = (label: string) => startChild(`${s.helper}
+const backend = { getLocalStorageDir: () => ${JSON.stringify(s.storageDir)} };
+globalThis.__lcpTurnLock.acquire(backend, "agent-a", "default", ${JSON.stringify(label)}).then(() => {
+  process.stdout.write("held\\n");
+  setInterval(() => {}, 1000);
+});`, s.tmp);
+    const racers = [contender("racer 1"), contender("racer 2")];
+    const held: number[] = [];
+    racers.forEach((racer, index) => racer.firstLine.then(() => held.push(index), () => {}));
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    assert.equal(held.length, 1, "exactly one contender owns the reclaimed conversation");
+    const owner = s.lock.holder(s.backend, "agent-a", "default");
+    assert.equal(owner?.pid, racers[held[0]!]!.child.pid, "the lock file names the contender that acquired");
+  } finally {
+    s.cleanup();
+  }
+});
+
+test("lcp-conversation-turn-lock: a contender that reclaims while another is mid-reclaim does not end up sharing the lock", async (t) => {
+  const s = scratch(t);
+  if (!s) return;
+  // The node:fs object the helper gets from process.getBuiltinModule; its methods can be wrapped.
+  const fs = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+  const realUnlink = fs.unlinkSync;
+  const abort = new AbortController();
+  try {
+    const release = await s.lock.acquire(s.backend, "agent-a", "default", "probe");
+    const [name] = s.lockFiles();
+    release();
+    const file = join(s.lockDirPath(), name!);
+    const dead = startChild("process.stdout.write(String(process.pid) + '\\n'); setInterval(() => {}, 1000);", s.tmp);
+    const deadPid = Number(await dead.firstLine);
+    dead.child.kill("SIGKILL");
+    await new Promise((resolve) => dead.child.once("exit", resolve));
+    writeFileSync(file, JSON.stringify({ pid: deadPid, start: null, token: "dead-owner", holder: "dead" }));
+    // Two independent helper instances (two contenders), each with its own held-lock table.
+    const first = s.lock;
+    delete (globalThis as { __lcpTurnLock?: unknown }).__lcpTurnLock;
+    new Function(s.helper)();
+    const second = (globalThis as unknown as { __lcpTurnLock: TurnLock }).__lcpTurnLock;
+    const acquired: string[] = [];
+    // The worst interleaving: the second contender runs its whole reclaim and create in the
+    // moment between the first contender's last check of the dead lock and its unlink.
+    let interleaved = false;
+    fs.unlinkSync = ((path: import("node:fs").PathLike) => {
+      if (!interleaved && String(path) === file) {
+        interleaved = true;
+        void second.acquire(s.backend, "agent-a", "default", "second", { signal: abort.signal })
+          .then((r) => { acquired.push("second"); return r; }, () => {});
+      }
+      return realUnlink(path);
+    }) as typeof fs.unlinkSync;
+    void first.acquire(s.backend, "agent-a", "default", "first", { signal: abort.signal })
+      .then((r) => { acquired.push("first"); return r; }, () => {});
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    assert.equal(interleaved, true, "the interleaving ran");
+    assert.equal(acquired.length, 1, `exactly one contender owns the conversation (got ${acquired.join(", ") || "none"})`);
+  } finally {
+    fs.unlinkSync = realUnlink;
+    abort.abort();
+    s.cleanup();
+  }
+});
+
+test("lcp-conversation-turn-lock: a release by a former owner cannot remove a lock another process took since", async (t) => {
+  const s = scratch(t);
+  if (!s) return;
+  try {
+    const staleRelease = await s.lock.acquire(s.backend, "agent-a", "default", "former owner");
+    const [name] = s.lockFiles();
+    const file = join(s.lockDirPath(), name!);
+    // The lock was reclaimed from under the former owner and retaken by another process.
+    rmSync(file);
+    const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+    const retaken = readFileSync(file, "utf8");
+    staleRelease();
+    assert.equal(existsSync(file), true, "the former owner's release leaves the new owner's lock in place");
+    assert.equal(readFileSync(file, "utf8"), retaken);
+    assert.equal(s.lock.holder(s.backend, "agent-a", "default")?.pid, holder.pid);
   } finally {
     s.cleanup();
   }

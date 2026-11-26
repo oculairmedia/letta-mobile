@@ -2718,8 +2718,10 @@ globalThis.__lcpTurnLock ??= (() => {
     }
     return true;
   };
+  // An unparseable file is honoured only while it may be a writer mid-create: an mtime more than
+  // UNREADABLE_STALE_MS away from now in either direction (clock skew, a copied file) is stale.
   const stale = (owner) => owner.unreadable
-    ? owner.mtimeMs !== null && Date.now() - owner.mtimeMs > UNREADABLE_STALE_MS
+    ? owner.mtimeMs !== null && Math.abs(Date.now() - owner.mtimeMs) > UNREADABLE_STALE_MS
     : !ownerAlive(owner);
   const sameOwner = (a, b) => a.unreadable ? b.unreadable === true : b.token === a.token;
   const reclaimIfStale = (file, seen) => {
