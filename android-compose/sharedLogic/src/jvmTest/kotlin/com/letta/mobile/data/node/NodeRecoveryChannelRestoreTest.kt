@@ -12,20 +12,29 @@ import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The node's post-connect recovery against an App Server that never answers `channels_list`
@@ -237,10 +246,101 @@ class NodeRecoveryChannelRestoreTest {
         nodeJob.cancel()
     }
 
+    /**
+     * Cancellation is cooperative: a restore already inside its last, non-suspending step (the
+     * account-cache write) when its generation fails cannot be stopped there. The next
+     * generation's restore must wait it out instead of reading and writing the same cache
+     * alongside it. Real threads, because the stuck step blocks a thread.
+     */
+    @Test
+    fun aRestoreStuckInItsFinalCacheWriteIsWaitedOutByTheNextGenerationsRestore() = runBlocking {
+        val events = Collections.synchronizedList(mutableListOf<String>())
+        val firstWriteEntered = CountDownLatch(1)
+        val releaseFirstWrite = CountDownLatch(1)
+        val secondRestoreStarted = CountDownLatch(1)
+        val cache = object : ChannelAccountCache {
+            private val delegate = InMemoryChannelAccountCache()
+            private var writes = 0
+
+            override fun lastKnownEnabled(): List<ChannelAccountRef> {
+                if (events.contains("write 1 start")) {
+                    events += "read 2"
+                    secondRestoreStarted.countDown()
+                }
+                return delegate.lastKnownEnabled()
+            }
+
+            override fun record(accounts: List<ChannelAccountRef>) {
+                val write = ++writes
+                events += "write $write start"
+                if (write == 1) {
+                    firstWriteEntered.countDown()
+                    releaseFirstWrite.await(STUCK_WRITE_BOUND_S, TimeUnit.SECONDS)
+                }
+                delegate.record(accounts)
+                events += "write $write end"
+            }
+        }
+        val nodeScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val servers = listOf("matrix", "slack").map {
+                ListenModeAppServer(channelServiceRunning = true, channels = listOf(it))
+            }
+            val generations = servers.map(::Generation)
+            var next = 0
+            val client = ReconnectingAppServerClient(
+                connect = {
+                    val generation = generations[next++]
+                    AppServerClientGeneration(
+                        client = DefaultAppServerClient(generation.server.transport, parentScope = nodeScope),
+                        connectionState = generation.connectionState,
+                        close = {},
+                    )
+                },
+                listener = NodeRecoveryListener(
+                    log = log,
+                    controller = { null },
+                    coordinator = { null },
+                    adminState = MutableStateFlow(ReconnectingClientState.Ready(connectionEpoch = 1)),
+                    channelAccountCache = cache,
+                    restoreScope = nodeScope,
+                ),
+                sleep = {},
+            )
+
+            client.start(nodeScope)
+            assertTrue(firstWriteEntered.await(STUCK_WRITE_BOUND_S, TimeUnit.SECONDS), "first restore reached its cache write")
+            generations[0].connectionState.value =
+                AppServerConnectionState.Failed(terminal = false, reason = "socket closed")
+            // Give a replacement restore the chance to start while the first is still writing.
+            val overlapped = secondRestoreStarted.await(OVERLAP_WINDOW_S, TimeUnit.SECONDS)
+            releaseFirstWrite.countDown()
+            withTimeout(STUCK_WRITE_BOUND_S.seconds) {
+                client.state.first { it is ReconnectingClientState.Ready && it.connectionEpoch == 2L }
+            }
+            withTimeout(STUCK_WRITE_BOUND_S.seconds) {
+                while (!events.contains("write 2 end")) kotlinx.coroutines.delay(10)
+            }
+
+            assertTrue(!overlapped, "the next restore started while the previous one was still writing: $events")
+            assertEquals(listOf("write 1 start", "write 1 end", "read 2", "write 2 start", "write 2 end"), events.toList())
+            assertTrue("slack/slack-bot" in servers[1].startedAccounts, "${servers[1].startedAccounts}")
+        } finally {
+            releaseFirstWrite.countDown()
+            nodeScope.coroutineContext[Job]?.cancelAndJoin()
+        }
+    }
+
     private companion object {
         const val READY_WITHIN_MS = 5_000L
 
         /** Past the enumeration bound, well short of the wrapper's request timeout. */
         const val RESTORE_SETTLES_WITHIN_MS = 60_000L
+
+        /** Upper bound on any real-time wait in the stuck-write test; never reached when it passes. */
+        const val STUCK_WRITE_BOUND_S = 20L
+
+        /** How long the stuck-write test lets an overlapping restore show itself. */
+        const val OVERLAP_WINDOW_S = 3L
     }
 }
