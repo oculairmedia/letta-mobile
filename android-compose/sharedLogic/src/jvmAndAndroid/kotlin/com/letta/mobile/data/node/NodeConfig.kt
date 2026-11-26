@@ -5,6 +5,9 @@ import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.node.info.NodeCapability
+import com.letta.mobile.data.node.info.NodeInfoWire
+import com.letta.mobile.data.node.info.NodeOs
 import com.letta.mobile.data.transport.iroh.IrohCanvasRelay
 import java.io.File
 
@@ -17,12 +20,14 @@ import java.io.File
  * @property requestTimeoutMs the App Server request timeout.
  * @property endpoint where the node's Iroh endpoint binds and which identity it uses.
  * @property admin the admin_rpc router's host services.
+ * @property identity what the node reports about itself in `node.info`.
  */
 data class NodeConfig(
     val modelExposureFile: String,
     val requestTimeoutMs: Long,
     val endpoint: NodeEndpointConfig,
     val admin: NodeAdminConfig = NodeAdminConfig(),
+    val identity: NodeIdentityConfig = NodeIdentityConfig(),
 ) {
     /** The directory that holds the node's host-held state. */
     val hostStateDirectory: File get() = File(modelExposureFile).absoluteFile.parentFile
@@ -36,6 +41,26 @@ data class NodeEndpointConfig(
     val bindAddr: String,
     val secretKeyPath: String? = null,
 )
+
+/**
+ * What a node says about itself in `node.info`, beyond what its App Server reports.
+ *
+ * @property appVersion the Baken build version; unknown when the host cannot tell.
+ * @property capabilities what the node advertises. The default is a headless node's set.
+ * @property os the OS family token, from this JVM's `os.name` unless the host says otherwise.
+ */
+data class NodeIdentityConfig(
+    val appVersion: String = NodeInfoWire.UNKNOWN,
+    val capabilities: Set<NodeCapability> = HEADLESS_CAPABILITIES,
+    val os: String = NodeOs.family(System.getProperty("os.name")),
+) {
+    companion object {
+        /** A headless, always-on node (the Linux host): it holds the catalog and full replicas and runs agents. */
+        val HEADLESS_CAPABILITIES: Set<NodeCapability> = setOf(
+            NodeCapability.CATALOG, NodeCapability.EXECUTE, NodeCapability.STORE, NodeCapability.ALWAYS_ON,
+        )
+    }
+}
 
 /**
  * The admin_rpc router's host services. Null fields leave the matching methods unregistered or

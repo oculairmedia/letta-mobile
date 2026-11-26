@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.BackendServerUrlCheck
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.node.info.NodeHandshakeResult
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.SettingsConfirmText
 import com.letta.mobile.data.settings.SettingsOption
@@ -107,14 +108,16 @@ val LettaConfig.Mode.settingsDescription: String
 const val REMOTE_HOST_PLACEHOLDER = "iroh://<endpoint id>@host:port, iroh://<ticket> or ws://host:port"
 
 /**
- * The Backend form, the saved config it edits (a new, empty one while [saved] is adding) and the live
- * connection; [onFormChange] keeps the form hoisted to the page.
+ * The Backend form, the saved config it edits (a new, empty one while [saved] is adding), the live
+ * connection and the connected node's version handshake ([node], null before one ran); [onFormChange]
+ * keeps the form hoisted to the page.
  */
 class BackendFormState(
     val config: LettaConfig,
     val form: BackendSettingsForm,
     val connection: BackendConnectionStatus? = null,
     val saved: SavedBackendsState? = null,
+    val node: NodeHandshakeResult? = null,
     val onFormChange: (BackendSettingsForm) -> Unit,
 ) {
     val adding: Boolean get() = saved?.adding == true
@@ -182,6 +185,7 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
             LinkRow(SettingsRow.Link(SettingsCopy.SCAN.key, SettingsCopy.SCAN.title, SettingsCopy.SCAN.helper, onClick = scan))
         }
         state.connection?.let { StatusRow(SettingsRow.Status(SettingsCopy.STATUS.key, SettingsCopy.STATUS.title, it.settingsStatus(), it.settingsHelper())) }
+        state.node?.let { StatusRow(it.settingsRow()) }
         if (form.mode == LettaConfig.Mode.SELF_HOSTED) {
             RemoteHostRows(state)
             actions.testConnection?.let { tester -> TestConnectionRow(test, enabled = form.serverUrl.isNotBlank()) { onTest(tester) } }

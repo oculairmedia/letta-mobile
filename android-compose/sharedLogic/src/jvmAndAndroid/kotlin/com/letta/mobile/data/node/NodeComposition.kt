@@ -25,6 +25,7 @@ import com.letta.mobile.data.node.carrier.InProcessNodeCarrier
 import com.letta.mobile.data.node.carrier.NodeAddress
 import com.letta.mobile.data.node.carrier.NodePeerAcceptor
 import com.letta.mobile.data.node.carrier.NodePeerIdentity
+import com.letta.mobile.data.node.info.NodeFacts
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -197,6 +198,12 @@ class NodeComposition(
             // Non-LLM service credentials live beside them too; the secrets in an owner-only file.
             serviceCredentialRoutes = ServiceCredentialRoutes.forHost(stateDir),
             feedRoutes = FeedRoutes.forHost(feedJournal, pushes = true),
+            nodeFacts = NodeFacts(
+                os = config.identity.os,
+                appVersion = config.identity.appVersion,
+                capabilities = config.identity.capabilities,
+                runtimePatches = ports.runtimePatches,
+            ),
         )
     }
 }

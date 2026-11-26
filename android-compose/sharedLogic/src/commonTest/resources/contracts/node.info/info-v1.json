@@ -1,0 +1,28 @@
+{
+  "method": "node.info",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/node/info/NodeInfoService.kt",
+  "cases": [
+    {
+      "name": "unconfigured-node",
+      "context": {"authenticated": true},
+      "host_state": {"controller_state": "connected"},
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": true,
+        "result": {
+          "schema": 1,
+          "os": "unknown",
+          "app_version": "unknown",
+          "letta_code_version": "unknown",
+          "store_format": {"major": 1, "minor": 0},
+          "capabilities": [],
+          "models": [],
+          "runtime_patches": {"source": "unknown", "applied": null, "skipped": null, "patch_ids_sha256": null}
+        }
+      }
+    }
+  ]
+}

@@ -39,6 +39,10 @@ import com.letta.mobile.data.node.NodeEndpointParts
 import com.letta.mobile.data.node.NodeToolsSocket
 import com.letta.mobile.data.node.host.AppServerProcessSource
 import com.letta.mobile.data.node.host.NodeHostBindings
+import com.letta.mobile.data.node.NodeIdentityConfig
+import com.letta.mobile.data.node.info.NodeInfoWire
+import com.letta.mobile.data.node.info.RuntimePatchBootLineObserver
+import com.letta.mobile.data.node.info.RuntimePatchSetSource
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.runtime.host.ownedLocalAppServerHost
@@ -342,6 +346,9 @@ class AppServerServeIrohCommand : CliktCommand(
             "Only used with --own-app-server.",
     ).default("letta")
 
+    /** The owned App Server's patch loader boot summary, read from its output for `node.info`. */
+    private val runtimePatches = RuntimePatchBootLineObserver()
+
     @Suppress("NoDetachedCoroutineLifecycle")
     override fun run() = runBlocking {
         if (notebookGrantsFile != null) com.letta.mobile.wrapper.notebook.requireNotebookHostDurability()
@@ -542,13 +549,17 @@ class AppServerServeIrohCommand : CliktCommand(
             localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
             runRecordsFile = wrapperStores.runRecordsFile,
         ),
+        identity = NodeIdentityConfig(
+            appVersion = AppServerServeIrohCommand::class.java.`package`?.implementationVersion ?: NodeInfoWire.UNKNOWN,
+        ),
     )
 
     /**
      * The node ports on this OS's bindings: the external App Server's identity from its PID file and
      * the local `meridian/tools/1` endpoint over the registry the controller advertises, binding
-     * callers to the shell calls seen on the App Server frames this host relays. An owned App Server
-     * leaves the identity unknown here.
+     * callers to the shell calls seen on the App Server frames this host relays, and the runtime patch set
+     * an owned App Server's boot line reports (an external App Server's boot output is not visible here). An
+     * owned App Server leaves the identity unknown here.
      */
     private fun nodePorts() = hostNodePorts(
         bindings = hostBindings,
@@ -556,6 +567,7 @@ class AppServerServeIrohCommand : CliktCommand(
             serverUrl = appServerUrl.takeUnless { ownAppServer },
             pidFile = appServerPidFile?.let(java.nio.file.Path::of),
         ),
+        runtimePatches = runtimePatches.takeIf { ownAppServer } ?: RuntimePatchSetSource.Unknown,
         // Built when the node starts the socket, not here: the registry must not be evaluated
         // before the canvas relay has supplied the host's canvas tools.
         toolsSocket = NodeToolsSocket { scope, client ->
@@ -643,7 +655,10 @@ class AppServerServeIrohCommand : CliktCommand(
     }
 
     private fun ownedAppServerHost(scope: CoroutineScope, backendDir: java.io.File): LocalAppServerHost {
-        return ownedLocalAppServerHost(listOf(lettaCommand), backendDir.path, scope) { System.err.println("[app-server] $it") }
+        return ownedLocalAppServerHost(listOf(lettaCommand), backendDir.path, scope) { line ->
+            System.err.println("[app-server] $line")
+            runtimePatches.observe(line)
+        }
     }
 
     /**
