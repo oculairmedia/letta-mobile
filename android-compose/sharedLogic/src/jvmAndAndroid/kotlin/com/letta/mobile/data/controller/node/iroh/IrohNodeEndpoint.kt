@@ -374,12 +374,13 @@ class IrohNodeEndpoint(
         )
     }
 
-    fun start(controller: AppServerController) {
-        val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
-        require(acceptJob == null) { "IrohNodeEndpoint already started" }
+    /**
+     * Creates this endpoint generation's [NodeTurnHost] and starts its relay of the turns the App Server starts by
+     * itself, so they reach the feed and the conversation's viewers like a client's turn.
+     */
+    internal fun startTurnHost(controller: AppServerController): NodeTurnHost {
         val host = NodeTurnHost.childOf(scope, turnJournal)
         turnHost = host
-        // Turns the App Server starts by itself reach the feed and the viewers like a client's turn.
         controller.observeRuntimeFrames()?.let { frames ->
             host.relayServerStartedTurns(
                 frames,
@@ -390,6 +391,13 @@ class IrohNodeEndpoint(
                 ),
             )
         }
+        return host
+    }
+
+    fun start(controller: AppServerController) {
+        val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
+        require(acceptJob == null) { "IrohNodeEndpoint already started" }
+        val host = startTurnHost(controller)
 
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {

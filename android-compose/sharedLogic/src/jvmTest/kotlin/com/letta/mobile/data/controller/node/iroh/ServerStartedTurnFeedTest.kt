@@ -40,47 +40,66 @@ class ServerStartedTurnFeedTest {
         }
     }
 
-    private class Node(val host: NodeTurnHost, val journal: FeedJournalStore, val frames: MutableSharedFlow<AppServerReceivedFrame>)
+    private class Node(val host: NodeTurnHost, val journal: FeedJournalStore, val frames: MutableSharedFlow<AppServerReceivedFrame>) {
+        var nowMs = 0L
+    }
 
     private fun TestScope.node(viewers: () -> Set<ViewerHandle>): Node {
         val journal = FeedJournalStore()
         val host = NodeTurnHost(CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), journal)
         val frames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
-        host.relayServerStartedTurns(frames, TurnFanoutDelivery(viewersFor = { viewers() }))
+        val node = Node(host, journal, frames)
+        host.relayServerStartedTurns(frames, TurnFanoutDelivery(viewersFor = { viewers() }), nowMs = { node.nowMs })
         runCurrent()
-        return Node(host, journal, frames)
+        return node
     }
 
-    /** A client turn of the conversation that relays [relay] and ends when [finish] completes. */
-    private fun TestScope.clientTurn(node: Node, finish: CompletableDeferred<Unit>, relay: List<String> = emptyList()): Job {
+    /** A client turn of the conversation, with [CLIENT_TURN] as its prompt's client message id, relaying what its engine hands it. */
+    private class ClientTurn(val job: Job, val engine: kotlinx.coroutines.channels.Channel<String>, val finish: CompletableDeferred<Unit>)
+
+    private fun TestScope.clientTurn(node: Node, viewers: () -> Set<ViewerHandle> = { emptySet() }): ClientTurn {
         val writer = node.journal.openTurn(AGENT, CONVERSATION, CLIENT_TURN)
         val fanout = ConversationTurnFanout(
             conversationId = CONVERSATION.value,
-            runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(AGENT.value, CONVERSATION.value),
-            delivery = TurnFanoutDelivery(viewersFor = { emptySet() }),
+            runtime = RUNTIME_SCOPE,
+            delivery = TurnFanoutDelivery(viewersFor = { viewers() }, serverTurnOwns = node.host::serverTurnOwns),
             initiatorViewer = null,
             trackInitiatorFrame = writer::append,
             turnId = CLIENT_TURN,
         )
-        return launch {
+        val engine = kotlinx.coroutines.channels.Channel<String>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        val finish = CompletableDeferred<Unit>()
+        val job = launch {
             node.host.run(
                 NodeTurn(CONVERSATION.value, CLIENT_TURN, fanout, writer) {
-                    relay.forEach { fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(frameId = it, body = it)) }
+                    launch { for (raw in engine) fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(frameId = raw, body = raw)) }
                     finish.await()
+                    engine.close()
                 },
             )
         }
+        return ClientTurn(job, engine, finish)
+    }
+
+    /** What the App Server sends once, delivered to the node's standing relay and to the client turn's engine. */
+    private suspend fun Node.sendToBoth(client: ClientTurn, raw: String) {
+        frames.emit(decode(raw))
+        client.engine.send(raw)
+    }
+
+    private suspend fun TestScope.finishedClientTurn(node: Node, relay: List<String>) {
+        val client = clientTurn(node)
+        relay.forEach { client.engine.send(it) }
+        runCurrent()
+        client.finish.complete(Unit)
+        client.job.join()
     }
 
     @Test
     fun aTurnTheServerStartsAfterTheClientTurnClosedReachesTheFeedAndTheViewers() = runTest {
         val viewer = RecordingViewer("phone")
         val node = node { setOf(viewer) }
-        val finish = CompletableDeferred<Unit>()
-        val client = clientTurn(node, finish, relay = listOf(assistant("Still running: task_42.", run = "local-run-1206")))
-        runCurrent()
-        finish.complete(Unit)
-        client.join()
+        finishedClientTurn(node, listOf(assistant("Still running: task_42.", run = "local-run-1206")))
         viewer.frames.clear()
 
         serverStartedTurn().forEach { node.frames.emit(it) }
@@ -115,34 +134,146 @@ class ServerStartedTurnFeedTest {
     fun framesOfARunningClientTurnAreRelayedOnceByThatTurn() = runTest {
         val viewer = RecordingViewer("phone")
         val node = node { setOf(viewer) }
-        val finish = CompletableDeferred<Unit>()
-        val client = clientTurn(node, finish)
+        val client = clientTurn(node) { setOf(viewer) }
         runCurrent()
 
-        serverStartedTurn().forEach { node.frames.emit(it) }
+        clientRun().forEach { node.sendToBoth(client, it) }
         runCurrent()
-        finish.complete(Unit)
-        client.join()
+        client.finish.complete(Unit)
+        client.job.join()
 
-        assertTrue(entries(node.journal).none { it.turn != CLIENT_TURN }, "no second turn beside the client's: ${entries(node.journal)}")
-        assertTrue(viewer.frames.isEmpty(), "the client turn's own relay is the only copy")
+        assertEquals(setOf(CLIENT_TURN), entries(node.journal).map { it.turn }.toSet(), "one turn, the client's")
+        assertEquals(listOf("assistant_message", "stop_reason"), viewer.frames.map { it.delta().text("message_type") }, "one copy of each frame")
     }
 
     @Test
     fun lateFramesOfAFinishedClientRunOpenNoServerTurn() = runTest {
         val viewer = RecordingViewer("phone")
         val node = node { setOf(viewer) }
-        val finish = CompletableDeferred<Unit>()
-        val client = clientTurn(node, finish, relay = listOf(assistant("Done.", run = "local-run-1206")))
-        runCurrent()
-        finish.complete(Unit)
-        client.join()
+        finishedClientTurn(node, listOf(assistant("Done.", run = CLIENT_RUN)))
+        viewer.frames.clear()
 
-        node.frames.emit(decode(assistant("Done. And more.", run = "local-run-1206")))
+        node.frames.emit(decode(assistant("Done. And more.", run = CLIENT_RUN)))
         runCurrent()
 
         assertTrue(entries(node.journal).none { it.turn != CLIENT_TURN }, "the client run's late frame is not a new turn")
         assertTrue(viewer.frames.isEmpty())
+    }
+
+    /**
+     * A client sends while a server-started turn runs. The App Server queues the input behind it, so the server
+     * turn's remaining frames belong to the server-started turn, which keeps them; the client's own run starts after
+     * the server's `turn_finished` and belongs to the client turn. Each frame reaches the feed and the viewer once.
+     */
+    @Test
+    fun aClientTurnStartingDuringAServerStartedTurnLeavesItsFramesToItAndKeepsItsOwn() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        val server = serverStartedTurn()
+        node.frames.emit(server[0])
+        node.frames.emit(server[1])
+        runCurrent()
+
+        val client = clientTurn(node) { setOf(viewer) }
+        runCurrent()
+        // The node's engine hands its turn every frame of the runtime it does not drop; the relay sees them all too.
+        server.drop(2).dropLast(1).forEach { node.frames.emit(it); client.engine.send(it.raw.toString()) }
+        node.frames.emit(server.last())
+        runCurrent()
+        clientRun().forEach { node.sendToBoth(client, it) }
+        runCurrent()
+        client.finish.complete(Unit)
+        client.job.join()
+
+        val byTurn = entries(node.journal).filter { it.kind == "stream_delta" }.groupBy({ it.turn }) { it.payload?.text("message_type") }
+        val serverTurn = byTurn.keys.single { it != CLIENT_TURN }
+        assertEquals(listOf("user_message", "assistant_message", "usage_statistics", "stop_reason"), byTurn[serverTurn])
+        assertEquals(listOf("assistant_message", "stop_reason"), byTurn[CLIENT_TURN])
+        assertEquals(
+            listOf("user_message", "assistant_message", "usage_statistics", "stop_reason", "assistant_message", "stop_reason"),
+            viewer.frames.map { it.delta().text("message_type") },
+            "every frame once, in server order",
+        )
+    }
+
+    /** A server-started turn whose `turn_finished` was lost closes when it goes quiet, and a later client turn keeps its frames. */
+    @Test
+    fun aServerStartedTurnThatNeverFinishesClosesAfterSilenceAndStealsNothing() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        serverStartedTurn().dropLast(1).forEach { node.frames.emit(it) }
+        runCurrent()
+        node.nowMs += NodeTurnHost.SERVER_TURN_SILENCE_MS
+        viewer.frames.clear()
+
+        val client = clientTurn(node) { setOf(viewer) }
+        runCurrent()
+        clientRun().forEach { node.sendToBoth(client, it) }
+        runCurrent()
+        client.finish.complete(Unit)
+        client.job.join()
+
+        val journal = entries(node.journal)
+        val serverTurn = journal.first { it.turn != CLIENT_TURN }.turn
+        assertEquals("turn_closed", journal.last { it.turn == serverTurn }.kind)
+        assertEquals("false", journal.last { it.turn == serverTurn }.payload?.get("terminal_observed").toString(), "no terminal was seen")
+        assertEquals(listOf("assistant_message", "stop_reason"), journal.filter { it.turn == CLIENT_TURN && it.kind == "stream_delta" }.map { it.payload?.text("message_type") })
+        assertEquals(listOf("assistant_message", "stop_reason"), viewer.frames.map { it.delta().text("message_type") })
+    }
+
+    /** The same, when the client's run is bound by `update_loop_status` before the silence bound passes. */
+    @Test
+    fun aClientRunBoundWhileAServerStartedTurnLostItsFinishGoesToTheClientTurn() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        serverStartedTurn().dropLast(1).forEach { node.frames.emit(it) }
+        runCurrent()
+        viewer.frames.clear()
+
+        val client = clientTurn(node) { setOf(viewer) }
+        runCurrent()
+        node.frames.emit(decode(loopStatus(CLIENT_RUN, CLIENT_TURN)))
+        runCurrent()
+        clientRun().forEach { node.sendToBoth(client, it) }
+        runCurrent()
+        client.finish.complete(Unit)
+        client.job.join()
+
+        assertEquals(listOf("assistant_message", "stop_reason"), entries(node.journal).filter { it.turn == CLIENT_TURN && it.kind == "stream_delta" }.map { it.payload?.text("message_type") })
+        assertEquals(listOf("assistant_message", "stop_reason"), viewer.frames.map { it.delta().text("message_type") })
+    }
+
+    /** A turn the server starts right after a client turn (inside its post-turn queue window) is relayed once. */
+    @Test
+    fun aServerStartedTurnRightAfterAClientTurnIsRelayedOnce() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        finishedClientTurn(node, clientRun())
+        viewer.frames.clear()
+
+        serverStartedTurn().forEach { node.frames.emit(it) }
+        runCurrent()
+
+        assertEquals(listOf("user_message", "assistant_message", "usage_statistics", "stop_reason"), viewer.frames.map { it.delta().text("message_type") })
+        assertEquals(1, entries(node.journal).count { it.kind == "turn_open" && it.turn != CLIENT_TURN })
+    }
+
+    /** A real server-started turn the App Server ran on a `<task-notification>` (feed journal of local-conv-95806538, text redacted). */
+    @Test
+    fun aCapturedServerStartedTurnReachesTheFeedInFull() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        val captured = requireNotNull(javaClass.getResource("/appserver/server-started-turn-deltas.jsonl")).readText().lines().filter { it.isNotBlank() }
+
+        captured.forEach { node.frames.emit(decode(frame(it))) }
+        node.frames.emit(turnFinished())
+        runCurrent()
+
+        val journaled = entries(node.journal).filter { it.kind == "stream_delta" }.map { it.payload?.text("message_type") }
+        val expected = captured.map { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonObject.text("message_type") }
+        assertEquals(expected, journaled)
+        assertEquals("turn_closed", entries(node.journal).last().kind)
+        assertTrue(viewer.frames.isNotEmpty())
     }
 
     @Test
@@ -158,6 +289,30 @@ class ServerStartedTurnFeedTest {
         assertEquals(REPLY, replay[2].payload?.text("content"))
     }
 
+    /** The endpoint starts the relay itself: a node whose relay is never started is the bug this guards. */
+    @Test
+    fun theEndpointStartsTheRelayForItsController() = runTest {
+        val registry = ConnectionRegistry()
+        val viewer = RecordingViewer("phone")
+        registry.register(CONVERSATION.value, viewer)
+        val journal = FeedJournalStore()
+        val endpoint = IrohNodeEndpoint(
+            scope = backgroundScope,
+            authPolicy = com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            connectionRegistry = registry,
+            turnJournal = journal,
+        )
+        val frames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        endpoint.startTurnHost(controllerRunning(frames) { kotlinx.coroutines.flow.emptyFlow() })
+        runCurrent()
+
+        serverStartedTurn().forEach { frames.emit(it) }
+        runCurrent()
+
+        assertEquals(listOf("turn_open", "stream_delta", "stream_delta", "stream_delta", "stream_delta", "turn_closed"), entries(journal).map { it.kind })
+        assertEquals(4, viewer.frames.size)
+    }
+
     private fun entries(journal: FeedJournalStore): List<FeedDelta> =
         journal.page(JournalKey.of(AGENT, CONVERSATION), from = null, limit = 200).entries
 
@@ -171,6 +326,8 @@ class ServerStartedTurnFeedTest {
         const val CHILD = "agent-local-2cf9d01d-2328-4145-9779-7127351c2961"
         const val CLIENT_TURN = "e39d7e74-e18c-406f-8045-c15ec1ef31ff"
         const val RUN = "local-run-1207"
+        const val CLIENT_RUN = "local-run-1208"
+        val RUNTIME_SCOPE = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(AGENT.value, CONVERSATION.value)
         const val REPLY = "task_42 finished; dispatching the review."
         private const val RUNTIME = """"runtime":{"agent_id":"agent-c356b54a-8b37-4d53-b9d0-b43164749b6f","conversation_id":"local-conv-95806538"}"""
         private var seq = 4000L
@@ -184,6 +341,17 @@ class ServerStartedTurnFeedTest {
         fun assistant(text: String, run: String = RUN) = frame(
             """{"id":"ui-msg-9310564","date":"2026-11-26T01:23:24.617Z","agent_id":"${AGENT.value}","conversation_id":"${CONVERSATION.value}","message_type":"assistant_message","run_id":"$run","seq_id":1,"type":"message","content":"$text"}""",
         )
+
+        /** The client's own run: its reply and its end. */
+        fun clientRun(): List<String> = listOf(
+            assistant("On it.", run = CLIENT_RUN),
+            frame("""{"message_type":"stop_reason","stop_reason":"end_turn","run_id":"$CLIENT_RUN","seq_id":2,"type":"message"}"""),
+        )
+
+        fun loopStatus(run: String, clientMessageId: String): String {
+            seq += 1
+            return """{"type":"update_loop_status","loop_status":{"status":"PROCESSING_API_RESPONSE","active_run_ids":["$run"],"client_message_ids_by_run_id":{"$run":["$clientMessageId"]}},$RUNTIME,"event_seq":$seq,"emitted_at":"2026-11-26T01:24:00Z","idempotency_key":"update_loop_status:$seq:k"}"""
+        }
 
         fun decode(raw: String): AppServerReceivedFrame = AppServerProtocol.decodeFrame(raw, AppServerChannel.Stream)
 

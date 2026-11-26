@@ -125,6 +125,11 @@ internal class TurnFanoutDelivery(
      * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
      */
     val initiatorWrites: ObserverWriteQueue? = observerWrites,
+    /**
+     * Whether a turn the App Server started by itself owns a raw stream delta of the runtime on a run
+     * ([NodeTurnHost.serverTurnOwns]). That turn relays it, so a client turn's fanout leaves it alone.
+     */
+    val serverTurnOwns: (AppServerRuntimeScope, String?) -> Boolean = { _, _ -> false },
 )
 
 /**
@@ -201,6 +206,7 @@ internal class ConversationTurnFanout(
     private val observerWriteTimeoutMs = delivery.observerWriteTimeoutMs
     private val observerWrites = delivery.observerWrites
     private val initiatorWrites = delivery.initiatorWrites
+    private val serverTurnOwns = delivery.serverTurnOwns
 
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
@@ -340,6 +346,7 @@ internal class ConversationTurnFanout(
     private suspend fun emitRawFrameBody(body: String): Boolean {
         val candidate = innerDeltaOf(body)
         if (candidate != null && !admitsParentStreamDelta(candidate, runtime)) return false
+        if (candidate != null && serverTurnOwns(runtime, (candidate["run_id"] as? JsonPrimitive)?.contentOrNull)) return false
         openToolCalls.observe(body)
         identity?.noteFrame(body)
         val delta = innerDeltaOf(body) ?: run {
