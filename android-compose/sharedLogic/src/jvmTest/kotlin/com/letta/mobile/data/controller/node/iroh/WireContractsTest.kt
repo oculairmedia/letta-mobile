@@ -37,15 +37,21 @@ class WireContractsTest {
 
     private fun fixtures(): List<WireContractFixture> = fixtureRoot.walkTopDown()
         .filter { it.isFile && it.extension == "json" }.sortedBy { it.path }
-        // Semantic fixtures have their own common tests, not Admin RPC methods.
-        .filterNot {
-            it.relativeTo(fixtureRoot).invariantSeparatorsPath in setOf(
-                "active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json", "feed-delta/v1.json",
-            )
-        }
+        // Semantic fixtures have their own common tests, not Admin RPC methods. The one list is the gate script's.
+        .filterNot { it.relativeTo(fixtureRoot).invariantSeparatorsPath in nonRpcFixtures() }
         .map { WireContractFixture(it.readText()) }.toList().also {
             assertTrue(it.isNotEmpty(), "Expected at least one contract fixture")
         }
+
+    private fun nonRpcFixtures(): Set<String> {
+        val script = File(root, "scripts/ci/check-wire-contracts.py").readText()
+        val list = requireNotNull(Regex("""NON_RPC_FIXTURES = \{([^}]*)\}""").find(script)) {
+            "check-wire-contracts.py must define NON_RPC_FIXTURES"
+        }.groupValues[1]
+        return Regex(""""([^"]+)"""").findAll(list).map { it.groupValues[1] }.toSet().also {
+            assertTrue(it.isNotEmpty(), "NON_RPC_FIXTURES must not be empty")
+        }
+    }
 
     @Test
     fun everyRegisteredMethodHasAContractOrAnUncoveredBaselineEntry() = runTest {

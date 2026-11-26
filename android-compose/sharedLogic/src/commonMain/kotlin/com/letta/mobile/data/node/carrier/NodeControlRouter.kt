@@ -15,7 +15,8 @@ import kotlinx.coroutines.withContext
 /**
  * Reads a link's inbound frames once and routes them: a control frame whose `request_id` a pending [request] waits
  * for completes it; everything else goes to [unsolicited]. When the link ends, every pending request fails with the
- * link's closure.
+ * link's closure. When the routing ends first (its scope was cancelled, or the inbound flow failed), the router
+ * closes the link itself, so no link outlives its router.
  */
 internal class NodeControlRouter private constructor(private val link: NodeLink) {
     private val mutex = Mutex()
@@ -66,11 +67,18 @@ internal class NodeControlRouter private constructor(private val link: NodeLink)
         fun start(link: NodeLink, scope: CoroutineScope): NodeControlRouter {
             val router = NodeControlRouter(link)
             scope.launch {
+                // Cancelled routing means the session's owner went away: close as a detach.
+                var closure = NodeLinkClosure.NORMAL
                 try {
-                    // A transport that fails its inbound flow has lost the link; pending requests fail in end().
                     runCatchingCancellable { link.inbound.collect { router.route(it) } }
+                    // The inbound flow ended or failed without a cancel: the link is gone. Close is a no-op when the
+                    // link already ended, which is the usual case.
+                    closure = NodeLinkClosure.LOST
                 } finally {
-                    withContext(NonCancellable) { router.end() }
+                    withContext(NonCancellable) {
+                        runCatchingCancellable { link.close(closure) }
+                        router.end()
+                    }
                 }
             }
             return router

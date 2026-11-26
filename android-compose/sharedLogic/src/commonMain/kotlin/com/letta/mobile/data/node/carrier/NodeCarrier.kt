@@ -40,7 +40,10 @@ interface NodeLink {
     /** The node this link reached, as the carrier verified it. */
     val node: NodePeerIdentity
 
-    /** Control responses and node pushes, in order per lane. Collect once. */
+    /**
+     * Control responses and node pushes, in order per lane. Collect once. A carrier may buffer frames the shell has
+     * not collected yet; the shell keeps collecting for the link's whole life.
+     */
     val inbound: Flow<NodeInbound>
 
     /** Null while the link is open; then why it ended. */
@@ -50,9 +53,10 @@ interface NodeLink {
     suspend fun sendControl(frame: NodeFrame)
 
     /**
-     * Opens a new call lane and writes [request] (an `admin_rpc` frame) as its first frame. The shell then calls
-     * [NodeCallLane.finishSending] for a one-shot call, or keeps the send half open to write `admin_rpc_cancel` for a
-     * streamed one.
+     * Opens a new call lane and writes [request] (an `admin_rpc` frame) as its first frame. The node may answer with
+     * frames before its `admin_rpc_response` (a streamed method's `admin_rpc_stream` frames). The shell then calls
+     * [NodeCallLane.finishSending] for a one-shot call, or keeps the send half open for a streamed one: it may write
+     * `admin_rpc_cancel` carrying the call's `request_id`, and finishing the send half also cancels a streamed call.
      */
     suspend fun openCall(request: NodeFrame): NodeCallLane
 
@@ -103,6 +107,8 @@ interface NodePeerLink {
      * The node tells the link which transport capabilities the peer advertised in its accepted `auth` frame, so a
      * carrier with optional encodings may use them (Iroh splits frames into `frame_part`s only for a peer that
      * advertised it). A carrier without optional encodings ignores it.
+     *
+     * Called once, after the peer authenticated. The link trusts what it is given, so nothing calls it earlier.
      */
     fun onPeerCapabilities(capabilities: Set<String>)
 

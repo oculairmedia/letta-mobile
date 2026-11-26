@@ -65,6 +65,20 @@ class WireContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without spec"):
             self.module.contracts(self.root)
 
+    def test_node_carrier_spec_beside_its_semantic_fixture_is_not_an_rpc_spec(self):
+        self.pair()
+        fixture = self.root / self.module.FIXTURES / "node-carrier/v1.json"
+        spec = self.root / self.module.SPECS / "node-carrier/node-carrier-v1.md"
+        fixture.parent.mkdir(parents=True)
+        spec.parent.mkdir(parents=True)
+        fixture.write_text("{}")
+        spec.write_text("# node carrier v1\n")
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+        # The exemption covers only the named fixture; another file beside it still needs a spec.
+        fixture.with_name("v2.json").write_text("{}")
+        with self.assertRaisesRegex(ValueError, "without spec"):
+            self.module.contracts(self.root)
+
     def test_voice_endpoint_semantic_fixture_is_no_longer_exempt(self):
         # The voice endpoint moved to per-method RPC fixtures; a stray semantic file is an orphan.
         self.pair()

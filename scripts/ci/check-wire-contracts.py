@@ -17,6 +17,7 @@ SPECS = "docs/reference/contracts"
 FIXTURES = "android-compose/sharedLogic/src/commonTest/resources/contracts"
 INDEX = SPECS + "/README.md"
 # Explicit semantic fixtures have their own common tests; all other JSON still needs RPC coverage.
+# WireContractsTest reads this set from here, so it is the only list: keep it on one line.
 NON_RPC_FIXTURES = {"active-turn/v1.json", "object-verbs/v1.json", "current-focus/v1.json", "feed-delta/v1.json", "node-carrier/v1.json"}
 NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+")
 
@@ -60,7 +61,11 @@ def previous_baseline(root, diff_base):
 def contracts(root):
     # Only <method>/<name>-vN.md files are RPC specs; prose contracts (for example
     # conversation-lanes-v1.md) and the generated README.md sit directly in SPECS.
-    specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md") if p.parent != root / SPECS}
+    # A semantic fixture's own spec may sit in its fixture's directory (tree-hygiene only admits new
+    # specs as <dir>/<name>-vN.md); it documents that fixture, not an RPC method.
+    semantic_dirs = {name.split("/", 1)[0] for name in NON_RPC_FIXTURES}
+    specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md")
+             if p.parent != root / SPECS and p.relative_to(root / SPECS).parts[0] not in semantic_dirs}
     fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")
                 if p.relative_to(root / FIXTURES).as_posix() not in NON_RPC_FIXTURES}
     require_pairs(specs, fixtures)

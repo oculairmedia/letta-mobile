@@ -16,4 +16,10 @@ sealed interface NodeCarrierFailure {
 
     /** The node answered an `admin_rpc` the session needed a result from with `success: false`. */
     data class Refused(val method: String, val error: String) : NodeCarrierFailure
+
+    /**
+     * The node kept answering [method] with more to read after the session read [pages] pages, so the session stopped
+     * rather than return a result that looks complete.
+     */
+    data class Incomplete(val method: String, val pages: Int) : NodeCarrierFailure
 }
