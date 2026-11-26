@@ -64,7 +64,7 @@ def contracts(root):
     specs = rpc_specs(root)
     fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")
                 if p.relative_to(root / FIXTURES).as_posix() not in NON_RPC_FIXTURES}
-    specs = {key: path for key, path in specs.items() if key.split("/", 1)[0] not in CORE_SPEC_DIRS}
+    specs = {key: path for key, path in specs.items() if not is_core_spec_dir(key.split("/", 1)[0])}
     require_pairs(specs, fixtures)
     return [contract_row(root, key, path, specs[key]) for key, path in sorted(fixtures.items())]
 
@@ -154,9 +154,15 @@ def is_repository_file(root, handler):
 
 
 CASE_FIELDS = ("context", "host_state", "params", "expected_response")
-# Protocol specs whose fixtures sit beside them under SPECS and are run by the Rust core's tests (core/), not
-# admin_rpc method contracts; they need no RPC fixture.
-CORE_SPEC_DIRS = {"node-protocol"}
+
+
+def is_core_spec_dir(name):
+    """Core specs (node-protocol, store, log, ...) live in a directory that is not a dotted RPC method name.
+
+    Their fixtures sit beside them under SPECS and are run by the Rust core's tests (core/), not admin_rpc method
+    contracts, so they need no RPC fixture. An RPC contract directory is always named after its dotted method.
+    """
+    return NAME.fullmatch(name) is None
 
 
 def render_index(rows):

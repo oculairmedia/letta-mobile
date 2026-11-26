@@ -178,8 +178,8 @@ class WireContractsTest(unittest.TestCase):
         spec.write_text("# node protocol v1\n")
         (spec.parent / "codec-vectors-v1.json").write_text("{}")
         self.assertEqual(1, len(self.module.contracts(self.root)))
-        # The exemption is the directory, not any spec: another directory's spec without a fixture is still an orphan.
-        other = self.root / self.module.SPECS / "node-other/node-other-v1.md"
+        # The exemption is the directory name, not any spec: a dotted method directory's spec without a fixture is still an orphan.
+        other = self.root / self.module.SPECS / "other.method/other-v1.md"
         other.parent.mkdir(parents=True)
         other.write_text("# other\n")
         with self.assertRaisesRegex(ValueError, "without fixture"):
