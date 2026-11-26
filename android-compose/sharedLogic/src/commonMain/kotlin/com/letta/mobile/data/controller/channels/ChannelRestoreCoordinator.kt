@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -240,17 +241,25 @@ class ChannelRestoreCoordinator(
         }
     }
 
-    /** `channels_list` → the ids of channels that have any configuration at all. */
+    /**
+     * `channels_list` → the ids of channels that have any configuration at all.
+     *
+     * Bounded by [ENUMERATION_TIMEOUT_MS] rather than the client's request timeout. An App Server
+     * started as `letta server --listen` runs no channel service, and its socket router drops every
+     * `channel_*` command without a reply, so the request would otherwise sit for the full request
+     * timeout before failing with a bare "timed out". The listing is answered from local state
+     * when the service exists, so the bound costs a host that has channels nothing.
+     */
     private suspend fun listConfiguredChannels(
         failures: MutableList<ChannelRestoreFailure>,
     ): List<String>? {
         val response = transportCall(
-            block = { client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory())) },
-            onFailure = { e ->
-                failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
-                warn("list_channels_failed", "reason" attr e.messageOrClass())
-                return null
+            block = {
+                withTimeoutOrNull(ENUMERATION_TIMEOUT_MS.milliseconds) {
+                    client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory()))
+                } ?: return listChannelsFailed(failures, CHANNELS_LIST_UNANSWERED)
             },
+            onFailure = { e -> return listChannelsFailed(failures, e.messageOrClass()) },
         )
         if (!response.success) {
             failures += ChannelRestoreFailure(
@@ -262,6 +271,12 @@ class ChannelRestoreCoordinator(
             return null
         }
         return response.channels.filter { it.configured }.map { it.channelId }
+    }
+
+    private fun listChannelsFailed(failures: MutableList<ChannelRestoreFailure>, reason: String): List<String>? {
+        failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, reason)
+        warn("list_channels_failed", "reason" attr reason)
+        return null
     }
 
     /**
@@ -438,6 +453,12 @@ class ChannelRestoreCoordinator(
         const val DEFAULT_BASE_BACKOFF_MS: Long = 500
         const val DEFAULT_MAX_BACKOFF_MS: Long = 8_000
         private const val MAX_BACKOFF_SHIFT: Int = 20
+        private const val ENUMERATION_TIMEOUT_MS: Long = 15_000
+
+        /** The named reason a `channels_list` that the App Server never answers is reported with. */
+        internal const val CHANNELS_LIST_UNANSWERED: String =
+            "channels_list unanswered after ${ENUMERATION_TIMEOUT_MS}ms: this App Server is not " +
+                "routing channel commands (no channel service, e.g. `letta server --listen`)"
 
         private val defaultChannelRequestId = AppServerRequestIdFactory("channel-restore")
     }
