@@ -19,8 +19,10 @@ import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
@@ -153,7 +155,7 @@ internal class NodeAppServerConnector(
  *   `channel_start` still re-wires ingress to the live socket. That client is the generation's
  *   own, not the reconnecting facade, so its calls are admitted whatever the supervisor's state.
  * - Nothing in recovery reads the restore's outcome: it never failed recovery, and a failure
- *   escaping it now is logged inside the launched job instead of reaching the node scope.
+ *   escaping it is logged by name and stops only that restore, never the node scope.
  * - One restore at a time: a new generation cancels and waits out the previous generation's
  *   restore before starting its own, so two passes never write the shared account cache at once.
  * - A dead generation's restore stops with it: [onDisconnected] cancels it.
@@ -210,17 +212,22 @@ internal class NodeRecoveryListener(
         log.error("App Server reconnect gave up: ${reason ?: "unknown"}")
     }
 
+    /**
+     * Parent of every restore. The node scope is not a supervisor, so a restore that failed as its
+     * direct child would cancel the whole node; under this supervisor a failure stops only that
+     * restore and reaches [restoreFailureHandler]. Still a child of the node scope, so cancelling
+     * the node cancels any restore in flight.
+     */
+    private val restoreSupervisor = SupervisorJob(restoreScope.coroutineContext[Job])
+
+    private val restoreFailureHandler = CoroutineExceptionHandler { _, failure ->
+        log.error("channel restore failed: ${failure::class.simpleName}: ${failure.message}")
+    }
+
     private suspend fun launchChannelRestore(client: AppServerClient) {
         channelRestore.getAndSet(null)?.cancelAndJoin()
-        channelRestore.value = restoreScope.launch {
-            // The node scope is not a supervisor: an escaping failure would cancel the whole node.
-            try {
-                restoreChannels(client)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.error("channel restore failed: ${e::class.simpleName}: ${e.message}")
-            }
+        channelRestore.value = restoreScope.launch(restoreSupervisor + restoreFailureHandler) {
+            restoreChannels(client)
         }
     }
 

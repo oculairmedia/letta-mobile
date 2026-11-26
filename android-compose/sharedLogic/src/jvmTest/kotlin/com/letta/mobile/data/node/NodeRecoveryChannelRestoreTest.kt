@@ -1,5 +1,7 @@
 package com.letta.mobile.data.node
 
+import com.letta.mobile.data.controller.channels.ChannelAccountCache
+import com.letta.mobile.data.controller.channels.ChannelAccountRef
 import com.letta.mobile.data.controller.channels.InMemoryChannelAccountCache
 import com.letta.mobile.data.controller.channels.ListenModeAppServer
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
@@ -9,8 +11,11 @@ import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
@@ -56,7 +61,11 @@ class NodeRecoveryChannelRestoreTest {
     }
 
     /** A runtime lane over [servers], one per generation, with a management lane that is already Ready. */
-    private fun TestScope.runtimeLane(vararg servers: ListenModeAppServer): Pair<ReconnectingAppServerClient, List<Generation>> {
+    private fun TestScope.runtimeLane(
+        vararg servers: ListenModeAppServer,
+        cache: ChannelAccountCache = InMemoryChannelAccountCache(),
+        restoreScope: CoroutineScope = backgroundScope,
+    ): Pair<ReconnectingAppServerClient, List<Generation>> {
         val generations = servers.map(::Generation)
         var next = 0
         val client = ReconnectingAppServerClient(
@@ -77,8 +86,8 @@ class NodeRecoveryChannelRestoreTest {
                 controller = { null },
                 coordinator = { null },
                 adminState = MutableStateFlow(ReconnectingClientState.Ready(connectionEpoch = 1)),
-                channelAccountCache = InMemoryChannelAccountCache(),
-                restoreScope = backgroundScope,
+                channelAccountCache = cache,
+                restoreScope = restoreScope,
             ),
             sleep = {},
         )
@@ -166,6 +175,35 @@ class NodeRecoveryChannelRestoreTest {
             "the first generation's restore must be cancelled, not left to time out: $lines",
         )
         assertEquals(listOf("matrix/matrix-bot"), second.startedAccounts)
+    }
+
+    /**
+     * A failure the coordinator does not turn into a restore result (here the account cache
+     * throwing) stops that restore and is logged by name; it must not cancel the node scope, which
+     * in production is a plain, non-supervisor scope that also runs the Iroh endpoint.
+     */
+    @Test
+    fun anUnexpectedRestoreFailureIsLoggedAndLeavesTheNodeScopeRunning() = runTest {
+        val nodeJob = Job(backgroundScope.coroutineContext[Job])
+        val nodeScope = backgroundScope + nodeJob
+        val brokenCache = object : ChannelAccountCache {
+            override fun lastKnownEnabled(): List<ChannelAccountRef> = throw IllegalStateException("cache unreadable")
+
+            override fun record(accounts: List<ChannelAccountRef>) = Unit
+        }
+        val (client, _) = runtimeLane(ListenModeAppServer(), cache = brokenCache, restoreScope = nodeScope)
+
+        client.start(backgroundScope)
+        client.awaitReady()
+        advanceTimeBy(RESTORE_SETTLES_WITHIN_MS)
+        runCurrent()
+
+        assertTrue(nodeJob.isActive, "one restore failure must not cancel the node scope")
+        assertTrue(
+            lines.any { it == "error: channel restore failed: IllegalStateException: cache unreadable" },
+            "$lines",
+        )
+        nodeJob.cancel()
     }
 
     private companion object {
