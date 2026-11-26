@@ -466,7 +466,7 @@ class AdminRpcStreamServerTest {
     }
 
     private fun TestScope.launchTracked(server: AdminRpcStreamServer, stream: AdminRpcBiStream): Job =
-        with(server) { launchHandler(stream) }
+        server.launchHandler(this, stream)
 
     private fun router(): AdminRpcRouter = AdminRpcRouter().apply {
         register("health.check") { JsonPrimitive("ok") }

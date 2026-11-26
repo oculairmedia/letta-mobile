@@ -9,7 +9,6 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
-import computer.iroh.BiStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -31,33 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 import kotlin.time.Duration.Companion.milliseconds
-
-internal interface AdminRpcRecvStream {
-    suspend fun read(maxBytes: UInt): ByteArray
-}
-
-internal interface AdminRpcSendStream {
-    suspend fun writeAll(bytes: ByteArray)
-    suspend fun finish()
-}
-
-internal interface AdminRpcBiStream {
-    fun recv(): AdminRpcRecvStream
-    fun send(): AdminRpcSendStream
-}
-
-internal fun BiStream.asAdminRpcBiStream(): AdminRpcBiStream = object : AdminRpcBiStream {
-    override fun recv(): AdminRpcRecvStream = object : AdminRpcRecvStream {
-        private val delegate = this@asAdminRpcBiStream.recv()
-        override suspend fun read(maxBytes: UInt): ByteArray = delegate.read(maxBytes)
-    }
-
-    override fun send(): AdminRpcSendStream = object : AdminRpcSendStream {
-        private val delegate = this@asAdminRpcBiStream.send()
-        override suspend fun writeAll(bytes: ByteArray) = delegate.writeAll(bytes)
-        override suspend fun finish() = delegate.finish()
-    }
-}
 
 /** Resource bounds for stream-per-request RPC. Logical frame limits apply only after authentication and frame-part negotiation. */
 internal class AdminRpcStreamLimits(
@@ -86,7 +58,7 @@ internal class AdminRpcStreamLimits(
 @Suppress("TooManyFunctions") // One request/response stream lifecycle: accept, read, dispatch, answer and close share one state.
 internal class AdminRpcStreamServer(
     private val router: AdminRpcRouter,
-    private val authenticated: AtomicBoolean,
+    internal val authenticated: AtomicBoolean,
     private val remoteEndpointId: String = "",
     limits: AdminRpcStreamLimits = AdminRpcStreamLimits(),
     /**
@@ -96,7 +68,7 @@ internal class AdminRpcStreamServer(
      * replaced by a typed error envelope so old peers fail cleanly instead of
      * receiving framing they cannot decode.
      */
-    private val peerSupportsFrameParts: () -> Boolean = { false },
+    internal val peerSupportsFrameParts: () -> Boolean = { false },
     /**
      * Per-connection observer of admin_rpc method calls. admin_rpc runs
      * on its own BiStream(s), disjoint from the turn/stream BiStream, so the
@@ -129,8 +101,11 @@ internal class AdminRpcStreamServer(
 ) {
     private val maxActiveHandlers = limits.maxActiveHandlers
     private val firstFrameTimeoutMs = limits.firstFrameTimeoutMs
-    private val maxFrameBytes = limits.maxFrameBytes
-    private val maxReassembledBytes = limits.maxReassembledBytes
+    /** The largest plain frame on a call lane. */
+    internal val maxFrameBytes = limits.maxFrameBytes
+
+    /** The largest chunked logical frame, once the peer has authenticated and advertised `frame_part`. */
+    internal val maxReassembledBytes = limits.maxReassembledBytes
 
     /** This connection, for handlers that keep per-connection limits. */
     private val connection = AdminRpcConnection()
@@ -160,17 +135,8 @@ internal class AdminRpcStreamServer(
         get() = maxObservedActiveHandlers.get()
 
     /**
-     * Accepts admin_rpc bi-streams until [acceptBi] returns null or the scope
-     * is cancelled. Each stream is handled on its own child job under a
-     * supervisor scope so one failing stream never tears down siblings or the
-     * accept loop itself.
-     */
-    suspend fun serveAcceptLoop(acceptBi: suspend () -> AdminRpcBiStream?) =
-        serveCalls { acceptBi()?.let(::exchangeOf) }
-
-    /**
      * Serves call lanes until [nextCall] returns null or the scope is cancelled, each on its own child job under a
-     * supervisor scope, as [serveAcceptLoop] does for raw bi-streams.
+     * supervisor scope, so one failing lane never tears down its siblings or the loop itself.
      */
     suspend fun serveCalls(nextCall: suspend () -> NodeCallExchange?) = supervisorScope {
         while (true) {
@@ -179,7 +145,8 @@ internal class AdminRpcStreamServer(
         }
     }
 
-    fun CoroutineScope.launchHandler(stream: AdminRpcBiStream): Job = launchExchange(exchangeOf(stream))
+    /** Serves [exchange] on its own job in [scope], under the same handler permits as [serveCalls]. */
+    internal fun launchCall(scope: CoroutineScope, exchange: NodeCallExchange): Job = scope.launchExchange(exchange)
 
     private fun CoroutineScope.launchExchange(exchange: NodeCallExchange): Job = launch {
         permits.withPermit {
@@ -190,37 +157,6 @@ internal class AdminRpcStreamServer(
             } finally {
                 activeHandlers.decrementAndGet()
             }
-        }
-    }
-
-    /**
-     * Serves exactly one admin_rpc exchange on [stream]: one request, then one response, or for a
-     * streamed method ([AdminRpcRouter.registerStreamed]) stream frames and then the final response.
-     */
-    suspend fun handleStream(stream: AdminRpcBiStream) = handleExchange(exchangeOf(stream))
-
-    /**
-     * [stream] as a call exchange: length-prefixed frames, a request bounded like any frame until the peer has
-     * authenticated and advertised `frame_part`, and a response chunked when it is larger than one frame.
-     */
-    private fun exchangeOf(stream: AdminRpcBiStream): NodeCallExchange {
-        val sendStream = stream.send()
-        // Chunked (frame_part) requests may only widen reassembly memory
-        // beyond a single frame once the peer has authenticated AND advertised
-        // the capability — otherwise a peer holding just the ticket could pin
-        // maxReassembled bytes per stream before presenting any token.
-        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
-            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
-        })
-        val nextFrame = frameReader(stream.recv(), decoder)
-        return object : NodeCallExchange {
-            override suspend fun next(): String? = nextFrame()
-
-            override suspend fun write(frame: String) = sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes))
-
-            override suspend fun respond(response: String) = writeResponse(sendStream, response)
-
-            override suspend fun finish() = sendStream.finish()
         }
     }
 
@@ -306,17 +242,6 @@ internal class AdminRpcStreamServer(
             throw IrohFrameCodec.FrameTooLargeException("Iroh frame too large: $bytes bytes > max $maxFrameBytes")
         }
         return frame
-    }
-
-    /** Writes an already fitted [response] on a byte lane: one frame, or `frame_part`s when it is larger than one. */
-    private suspend fun writeResponse(sendStream: AdminRpcSendStream, response: String) {
-        val payload = response.encodeToByteArray()
-        val buffers = if (payload.size > maxFrameBytes && peerSupportsFrameParts()) {
-            IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes, maxReassembledBytes)
-        } else {
-            listOf(IrohFrameCodec.encodeFrame(payload, maxFrameBytes))
-        }
-        buffers.forEach { sendStream.writeAll(it) }
     }
 
     private fun tooLargeEnvelope(response: String, bytes: Int, detail: String): String {
@@ -508,24 +433,6 @@ internal class AdminRpcStreamServer(
         private const val REQUEST_ID_FIELD = "requestId"
         private const val METHOD_FIELD = "method"
         private const val HEALTH_CHECK_METHOD = "health.check"
-    }
-}
-
-private const val READ_CHUNK_SIZE = 8192
-
-/** Reads [recv] frame by frame through [decoder], keeping frames that arrived together; null once the peer finished. */
-private fun frameReader(recv: AdminRpcRecvStream, decoder: IrohFrameCodec.Decoder): suspend () -> String? {
-    val pending = ArrayDeque<String>()
-    return reader@{
-        while (pending.isEmpty()) {
-            val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
-            if (chunk.isEmpty()) {
-                decoder.finish()
-                return@reader null
-            }
-            pending.addAll(decoder.feed(chunk))
-        }
-        pending.removeFirst()
     }
 }
 

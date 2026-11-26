@@ -40,8 +40,12 @@ internal class NodePeerLinkWire(
      * Reads the link's control lane. When it completes because the link ended (rather than because the peer finished
      * sending), this throws [NodeCarrierException], so the node treats the end as it treats any lost connection.
      */
-    override suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit) {
-        (link as? NodePeerReassemblyBound)?.boundReassembly(maxReassembledBytes)
+    override suspend fun readControl(
+        maxReassembledBytes: () -> Int,
+        peerFrameParts: () -> Boolean,
+        onFrame: suspend (String) -> Unit,
+    ) {
+        (link as? NodePeerReassemblyBound)?.boundReassembly(maxReassembledBytes, peerFrameParts)
         link.control.collect { frame -> onFrame(frame.encode()) }
         link.closure.value?.let { throw NodeCarrierException(NodeCarrierFailure.Closed(it)) }
     }

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.servicecredentials
 
 import com.letta.mobile.data.controller.node.iroh.AdminRpcBiStream
+import com.letta.mobile.data.controller.node.iroh.handleStream
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRecvStream
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter

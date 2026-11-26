@@ -49,7 +49,8 @@ suspend fun serveIrohNodePeer(connection: Connection, acceptor: NodePeerAcceptor
  * are open, as the node has always started serving a connection; the control lane also ends when the peer finishes
  * sending on it. Writes wait until the peer has opened the lane they go on; frames go as `frame_part`s only after the
  * node reported, through [onPeerCapabilities], that the peer advertised them. How far the peer's frames may be
- * reassembled is the node's call ([boundReassembly]); until the node says, it is one Iroh frame unless the peer
+ * reassembled, and whether the peer accepts `frame_part`s, are the node's call ([boundReassembly]); until the node
+ * says (a link served by anything but the node), it is one Iroh frame unless the peer
  * advertised `frame_part`.
  *
  * Nothing is read ahead of the node without bound: control frames and each call lane's frames wait in a small buffer,
@@ -73,6 +74,9 @@ internal class IrohNodePeerLink(
 
     @Volatile
     private var reassemblyBound: (() -> Int)? = null
+
+    @Volatile
+    private var nodeFrameParts: (() -> Boolean)? = null
 
     override val peer: NodePeerIdentity = NodePeerIdentity(IrohDiagnostics.endpointIdHex(connection.remoteId()))
 
@@ -106,7 +110,7 @@ internal class IrohNodePeerLink(
             core.scope.launch { awaitPeerListening(push) }
             while (true) {
                 val stream = connection.acceptBi()
-                val call = IrohCallLane(core, stream, frameParts = { peerFrameParts }, maxReassembledBytes = ::maxReassembledBytes)
+                val call = IrohCallLane(core, stream, frameParts = ::frameParts, maxReassembledBytes = ::maxReassembledBytes)
                 callLanes.send(call)
             }
         } catch (error: CancellationException) {
@@ -122,15 +126,19 @@ internal class IrohNodePeerLink(
     }
 
     private fun maxReassembledBytes(): Int = reassemblyBound?.invoke()
-        ?: if (peerFrameParts) IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES else IrohLinkCore.MAX_FRAME_BYTES
+        ?: if (frameParts()) IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES else IrohLinkCore.MAX_FRAME_BYTES
 
-    override fun boundReassembly(maxBytes: () -> Int) {
+    /** Whether this link may split its writes into `frame_part`s: the node's answer once bound, else the peer's advertisement. */
+    private fun frameParts(): Boolean = nodeFrameParts?.invoke() ?: peerFrameParts
+
+    override fun boundReassembly(maxBytes: () -> Int, frameParts: () -> Boolean) {
+        nodeFrameParts = frameParts
         reassemblyBound = maxBytes
     }
 
-    override suspend fun sendControl(frame: NodeFrame) = core.write(awaitOpen(controlSend), controlLock, frame, peerFrameParts)
+    override suspend fun sendControl(frame: NodeFrame) = core.write(awaitOpen(controlSend), controlLock, frame, frameParts())
 
-    override suspend fun push(frame: NodeFrame) = core.write(awaitOpen(pushSend), pushLock, frame, peerFrameParts)
+    override suspend fun push(frame: NodeFrame) = core.write(awaitOpen(pushSend), pushLock, frame, frameParts())
 
     private suspend fun awaitOpen(lane: CompletableDeferred<SendStream>): SendStream {
         if (core.closure.value != null) throw core.closed()

@@ -562,10 +562,10 @@ class IrohNodeConnection internal constructor(
 
         try {
             wire.readControl(
-                // Chunked requests may only widen reassembly memory beyond a
-                // single frame once the peer authenticated AND advertised
-                // frame_part — the auth frame itself arrives on this stream,
-                // so pre-auth peers stay bounded to MAX_FRAME_BYTES.
+                // The node decides both, and the carrier applies them to the control lane and every call lane: a
+                // peer's frames may widen past one frame only once it authenticated AND advertised frame_part (the
+                // auth frame itself arrives here, so a pre-auth peer stays at MAX_FRAME_BYTES), and the carrier
+                // splits writes into frame_parts on the same answer the admin server fits responses to.
                 maxReassembledBytes = {
                     if (authenticated.get() && peerSupportsFrameParts()) {
                         IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES
@@ -573,6 +573,7 @@ class IrohNodeConnection internal constructor(
                         MAX_FRAME_BYTES
                     }
                 },
+                peerFrameParts = { peerSupportsFrameParts() },
             ) { frameJson ->
                 Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" attr remoteEndpointId, "bytes" attr frameJson.length)
                 try {

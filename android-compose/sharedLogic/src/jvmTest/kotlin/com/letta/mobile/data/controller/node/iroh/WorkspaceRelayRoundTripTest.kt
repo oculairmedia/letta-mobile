@@ -287,7 +287,7 @@ class WorkspaceRelayRoundTripTest {
         val scope = this
         return WorkspaceRelayCall { method, params ->
             val stream = FakeBiStream()
-            val job = with(server) { scope.launchHandler(stream) }
+            val job = server.launchHandler(scope, stream)
             val request = AppServerProtocol.encodeCommand(AppServerCommand.AdminRpc(requestId = "admin-1", method = method, params = params))
             stream.recv.chunks.send(IrohFrameCodec.encodeFrame(request))
             stream.recv.chunks.send(ByteArray(0))
