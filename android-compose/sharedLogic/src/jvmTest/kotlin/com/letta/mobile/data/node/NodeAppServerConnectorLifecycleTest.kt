@@ -131,7 +131,11 @@ class NodeAppServerConnectorLifecycleTest {
 
         // The leak itself: a controller collector still subscribed after its node scope ended.
         withTimeoutOrNull(TIMEOUT) { sourceTools.subscriptionCount.first { it == 0 } }
-        assertEquals(0, sourceTools.subscriptionCount.value, "a controller collector is still subscribed after the node scope was cancelled")
+        assertEquals(
+            0,
+            sourceTools.subscriptionCount.value,
+            "a controller collector is still subscribed after the node scope was cancelled",
+        )
     }
 
     @Test
