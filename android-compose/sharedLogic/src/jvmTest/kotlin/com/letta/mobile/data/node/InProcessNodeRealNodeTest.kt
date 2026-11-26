@@ -51,6 +51,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -132,8 +133,23 @@ class InProcessNodeRealNodeTest {
         val refused = runCatching { open(asPeer(STRANGER)) }.exceptionOrNull()
         assertEquals(NodeCarrierFailure.AuthRejected("pairing_required"), (refused as? NodeCarrierException)?.failure)
 
+        // Local-shell admission belongs to the in-process carrier's own acceptor, not to the peer label: a link that
+        // reports LOCAL_SHELL through the general acceptor is refused without a token like any other peer.
+        val impostor = runCatching { open(asPeer(NodePeerIdentity.LOCAL_SHELL)) }.exceptionOrNull()
+        assertEquals(NodeCarrierFailure.AuthRejected("pairing_required"), (impostor as? NodeCarrierException)?.failure)
+
         session.close()
         assertEquals(NodeLinkClosure.NORMAL, session.closure.value)
+    }
+
+    @Test
+    fun aNodeThatStopsLosesTheLink() = scenario {
+        // The session's routing runs in a scope of its own, so only the node stops.
+        val shell = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val session = NodeSession.open(local, NodeOpenRequest(local.address, NodeCredential.CarrierIdentity), shell)
+        scope.cancel()
+        assertEquals(NodeLinkClosure.LOST, session.closure.first { it != null }, "a stopped node is a lost link, not a detach")
+        shell.cancel()
     }
 
     @Test

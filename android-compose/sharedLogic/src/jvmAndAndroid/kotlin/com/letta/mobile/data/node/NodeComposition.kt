@@ -127,13 +127,18 @@ class NodeComposition(
     }
 
     /**
-     * The node's end of every carrier link: each link is served as one node connection on [endpoint], with the same
-     * router, auth, gates, viewers, turns and feed as an Iroh peer accepted there. The in-process shell's link is
-     * admitted as an admin peer by its carrier identity; any other peer meets the endpoint's policy. Links are served
-     * once [start] has run; one that arrives earlier is closed.
+     * The node's end of a carrier link from anywhere but this process: each link is served as one node connection on
+     * [endpoint], with the same router, auth, gates, viewers, turns and feed as an Iroh peer accepted there, and every
+     * peer meets the endpoint's policy, whatever identity its link reports. Links are served once [start] has run; one
+     * that arrives earlier is closed.
      */
-    fun peerAcceptor(endpoint: IrohNodeEndpoint): NodePeerAcceptor = NodePeerAcceptor { link ->
-        coroutineScope { endpoint.serveWire(NodePeerLinkWire(link, this)) }
+    internal fun peerAcceptor(endpoint: IrohNodeEndpoint): NodePeerAcceptor = acceptor(endpoint, localShell = false)
+
+    /** Like [peerAcceptor], but every link is the in-process shell's, admitted as an admin peer by construction. */
+    private fun localShellAcceptor(endpoint: IrohNodeEndpoint): NodePeerAcceptor = acceptor(endpoint, localShell = true)
+
+    private fun acceptor(endpoint: IrohNodeEndpoint, localShell: Boolean) = NodePeerAcceptor { link ->
+        coroutineScope { endpoint.serveWire(NodePeerLinkWire(link, this, localShell)) }
     }
 
     /**
@@ -141,16 +146,16 @@ class NodeComposition(
      * sees [node] as the node's identity: by default the endpoint's own Iroh id, so it sees the same node over either
      * carrier (the endpoint must be bound for the default).
      */
-    fun inProcessCarrier(
+    internal fun inProcessCarrier(
         endpoint: IrohNodeEndpoint,
         node: NodePeerIdentity = NodePeerIdentity(endpoint.nodeIdHex()),
-    ): InProcessNodeCarrier = InProcessNodeCarrier(IN_PROCESS_NAME, node, peerAcceptor(endpoint), scope)
+    ): InProcessNodeCarrier = InProcessNodeCarrier(IN_PROCESS_NAME, node, localShellAcceptor(endpoint), scope)
 
     companion object {
         private const val IN_PROCESS_NAME = "node"
 
         /** The address the shell dials its own process's node at over the in-process carrier. */
-        val IN_PROCESS_ADDRESS: NodeAddress = NodeAddress(InProcessNodeCarrier.SCHEME + IN_PROCESS_NAME)
+        internal val IN_PROCESS_ADDRESS: NodeAddress = NodeAddress(InProcessNodeCarrier.SCHEME + IN_PROCESS_NAME)
     }
 
     private fun adminRouterSpec(
