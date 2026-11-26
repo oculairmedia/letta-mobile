@@ -15,12 +15,15 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * The carrier for the node in the shell's own process. Each dial makes one link of channels, one per lane direction
  * plus a pair per call lane, and hands its node end to [acceptor] (the node), served in [scope] (the node's lifetime).
- * Only [NodeFrame]s cross: a frame is an immutable JSON object, so it passes whole without re-encoding, and nothing
- * else the shell or the node holds is reachable from the other side. Moving the node into its own process later
+ * Only [NodeFrame]s cross, each as a deep snapshot of its JSON tree (a [JsonObject] may wrap a map its builder still
+ * holds), without re-encoding, so nothing else the shell or the node holds is reachable from the other side. Moving the node into its own process later
  * swaps this carrier for one that serializes, with no change above it.
  *
  * The shell's end reports [node] (the node's own Iroh endpoint id, so the shell sees the same node either way); the
@@ -98,9 +101,12 @@ private class InProcessLink(private val node: NodePeerIdentity) {
         lanes.value.forEach(InProcessCall::close)
     }
 
-    /** Hands [frame] to the other end on [channel]; throws [NodeCarrierFailure.Closed] once the link or lane ended. */
+    /**
+     * Hands a deep snapshot of [frame] to the other end on [channel], so nothing its sender still holds is shared;
+     * throws [NodeCarrierFailure.Closed] once the link or lane ended.
+     */
     fun write(channel: Channel<NodeFrame>, frame: NodeFrame) {
-        if (closureState.value != null || channel.trySend(frame).isFailure) throw closed()
+        if (closureState.value != null || channel.trySend(NodeFrame(frame.json.snapshot())).isFailure) throw closed()
     }
 
     private fun closed() = NodeCarrierException(NodeCarrierFailure.Closed(closureState.value ?: NodeLinkClosure.NORMAL))
@@ -173,3 +179,12 @@ private class InProcessCall(private val link: InProcessLink) {
         }
     }
 }
+
+/** A copy of this tree that shares no map or list with it; primitives are immutable and are shared. */
+private fun JsonElement.snapshot(): JsonElement = when (this) {
+    is JsonObject -> snapshot()
+    is JsonArray -> JsonArray(map { it.snapshot() })
+    else -> this
+}
+
+private fun JsonObject.snapshot(): JsonObject = JsonObject(entries.associate { (key, value) -> key to value.snapshot() })

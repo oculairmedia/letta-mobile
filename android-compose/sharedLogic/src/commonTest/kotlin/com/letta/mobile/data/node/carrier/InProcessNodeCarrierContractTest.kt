@@ -2,6 +2,7 @@ package com.letta.mobile.data.node.carrier
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -9,6 +10,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** The contract suite against the in-process carrier, plus what is particular to it: identities and a stopped node. */
 class InProcessNodeCarrierContractTest : NodeCarrierContractSuite() {
@@ -51,6 +55,17 @@ class InProcessNodeCarrierContractTest : NodeCarrierContractSuite() {
         val link = carrier.dial(carrier.address)
         node.cancel()
         assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null })
+    }
+
+    @Test
+    fun aFrameCrossesAsASnapshotNotTheSendersTree() = runTest {
+        val received = CompletableDeferred<NodeFrame>()
+        val carrier = InProcessNodeCarrier(NAME, NODE, { link -> received.complete(link.control.first()) }, backgroundScope)
+        val fields = mutableMapOf<String, JsonElement>("type" to JsonPrimitive("sync"))
+        val link = carrier.dial(carrier.address)
+        link.sendControl(NodeFrame(JsonObject(fields)))
+        fields["type"] = JsonPrimitive("changed")
+        assertEquals("sync", received.await().type, "a later change by the sender never reaches the node")
     }
 
     @Test
