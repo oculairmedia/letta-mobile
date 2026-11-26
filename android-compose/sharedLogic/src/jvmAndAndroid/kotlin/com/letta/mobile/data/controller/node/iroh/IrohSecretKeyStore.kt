@@ -159,18 +159,6 @@ object IrohSecretKeyStores {
 
     private val OWNER_ONLY_POSIX = java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")
 
-    /** An `acl:acl` creation attribute granting the current user alone full control, or null when the user is not found. */
-    private fun currentUserOnlyAcl(file: java.nio.file.Path): java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>>? {
-        val user = runCatching {
-            file.fileSystem.userPrincipalLookupService.lookupPrincipalByName(System.getProperty("user.name"))
-        }.getOrNull() ?: return null
-        val entries = listOf(fullControlFor(user))
-        return object : java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>> {
-            override fun name(): String = "acl:acl"
-            override fun value(): List<java.nio.file.attribute.AclEntry> = entries
-        }
-    }
-
     /** Owner-only access (POSIX `rw-------`, else an ACL naming only the owner), or a thrown error. */
     private fun restrictToOwnerOnly(file: java.nio.file.Path) {
         val posix = runCatching { java.nio.file.Files.setPosixFilePermissions(file, OWNER_ONLY_POSIX) }
@@ -185,11 +173,25 @@ object IrohSecretKeyStores {
         ) { "no ACL view for $path" }
         view.acl = listOf(fullControlFor(view.owner))
     }
-
-    private fun fullControlFor(principal: java.nio.file.attribute.UserPrincipal): java.nio.file.attribute.AclEntry =
-        java.nio.file.attribute.AclEntry.newBuilder()
-            .setType(java.nio.file.attribute.AclEntryType.ALLOW)
-            .setPrincipal(principal)
-            .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission::class.java))
-            .build()
 }
+
+/** An `acl:acl` creation attribute granting the current user alone full control, or null when the user is not found. */
+private fun currentUserOnlyAcl(
+    file: java.nio.file.Path,
+): java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>>? {
+    val user = runCatching {
+        file.fileSystem.userPrincipalLookupService.lookupPrincipalByName(System.getProperty("user.name"))
+    }.getOrNull() ?: return null
+    val entries = listOf(fullControlFor(user))
+    return object : java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>> {
+        override fun name(): String = "acl:acl"
+        override fun value(): List<java.nio.file.attribute.AclEntry> = entries
+    }
+}
+
+private fun fullControlFor(principal: java.nio.file.attribute.UserPrincipal): java.nio.file.attribute.AclEntry =
+    java.nio.file.attribute.AclEntry.newBuilder()
+        .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+        .setPrincipal(principal)
+        .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission::class.java))
+        .build()
