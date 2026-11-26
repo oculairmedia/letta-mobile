@@ -26,8 +26,12 @@ class BackgroundProcessRelayTest {
         val channel = ScriptedAppServerTransport { emptyList() }
         val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
         val registry = ConnectionRegistry()
-        IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            connectionRegistry = registry).attachToolsetStatuses(client)
+        IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
+            scope = backgroundScope,
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            connectionRegistry = registry,
+        ).attachToolsetStatuses(client)
         val denied = object : ViewerHandle by Viewer("denied") {
             override fun adminContext() = null
         }
@@ -48,8 +52,12 @@ class BackgroundProcessRelayTest {
         val channel = ScriptedAppServerTransport { emptyList() }
         val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
         val registry = ConnectionRegistry()
-        val endpoint = IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            connectionRegistry = registry)
+        val endpoint = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
+            scope = backgroundScope,
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            connectionRegistry = registry,
+        )
         endpoint.attachToolsetStatuses(client)
         val phone = Viewer("phone")
         val desktop = Viewer("desktop")
@@ -95,8 +103,12 @@ class BackgroundProcessRelayTest {
             }
         } as AppServerClient
         val registry = ConnectionRegistry()
-        IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            connectionRegistry = registry).attachToolsetStatuses(client)
+        IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
+            scope = backgroundScope,
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            connectionRegistry = registry,
+        ).attachToolsetStatuses(client)
         fun status(conversation: String, generation: Long) = AppServerProtocol.decodeFrame(
             """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",
                 "runtime":{"agent_id":"a","conversation_id":"$conversation"},
