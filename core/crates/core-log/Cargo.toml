@@ -13,9 +13,15 @@ core-store.workspace = true
 futures.workspace = true
 sha1.workspace = true
 sha2.workspace = true
+bytes.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["io-util"] }
+hex.workspace = true
 core-testkit.workspace = true
 futures = { version = "0.3", features = ["executor"] }
 proptest.workspace = true

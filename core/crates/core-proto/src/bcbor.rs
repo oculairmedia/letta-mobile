@@ -14,6 +14,12 @@
 //!
 //! Sorted sets (arrays whose elements are sorted by their encodings, without duplicates) are a
 //! schema-level rule, checked by [`check_sorted_set`].
+//!
+//! The CBOR itself (heads, lengths, byte and text slicing, UTF-8, truncation, encoding) is the
+//! `minicbor` crate's. This module owns only the profile: which major types are allowed, the
+//! shortest-form rule (minicbor's decoder accepts longer heads, so each head's width is checked
+//! against the value it carries), key order, and the depth and size limits, which it enforces
+//! before descending so hostile input never recurses or allocates past them.
 
 use std::collections::BTreeMap;
 
@@ -128,59 +134,41 @@ pub fn encode(value: &Value) -> Vec<u8> {
     out
 }
 
-/// Appends the canonical encoding of `value` to `out`.
+/// Appends the canonical encoding of `value` to `out`. minicbor writes every int and length in its
+/// shortest form, and [`Value::Map`] iterates its keys in ascending order.
 pub fn encode_into(value: &Value, out: &mut Vec<u8>) {
-    match value {
-        Value::Uint(n) => write_head(out, 0, *n),
-        Value::Bytes(bytes) => {
-            write_head(out, 2, len_u64(bytes.len()));
-            out.extend_from_slice(bytes);
-        }
-        Value::Text(text) => {
-            write_head(out, 3, len_u64(text.len()));
-            out.extend_from_slice(text.as_bytes());
-        }
+    let mut encoder = minicbor::Encoder::new(out);
+    write_value(&mut encoder, value);
+}
+
+fn write_value(encoder: &mut minicbor::Encoder<&mut Vec<u8>>, value: &Value) {
+    // Writing to a Vec cannot fail, so every result is Ok.
+    let _ = match value {
+        Value::Uint(n) => encoder.u64(*n),
+        Value::Bytes(bytes) => encoder.bytes(bytes),
+        Value::Text(text) => encoder.str(text),
         Value::Array(items) => {
-            write_head(out, 4, len_u64(items.len()));
+            let _ = encoder.array(len_u64(items.len()));
             for item in items {
-                encode_into(item, out);
+                write_value(encoder, item);
             }
+            Ok(&mut *encoder)
         }
         Value::Map(entries) => {
-            write_head(out, 5, len_u64(entries.len()));
+            let _ = encoder.map(len_u64(entries.len()));
             for (key, item) in entries {
-                write_head(out, 0, *key);
-                encode_into(item, out);
+                let _ = encoder.u64(*key);
+                write_value(encoder, item);
             }
+            Ok(&mut *encoder)
         }
-        Value::Bool(false) => out.push(0xf4),
-        Value::Bool(true) => out.push(0xf5),
-        Value::Null => out.push(0xf6),
-    }
+        Value::Bool(flag) => encoder.bool(*flag),
+        Value::Null => encoder.null(),
+    };
 }
 
 fn len_u64(len: usize) -> u64 {
     u64::try_from(len).unwrap_or(u64::MAX)
-}
-
-fn write_head(out: &mut Vec<u8>, major: u8, n: u64) {
-    let major = major << 5;
-    if n < 24 {
-        // n < 24 fits in the low five bits.
-        out.push(major | u8::try_from(n).unwrap_or(0));
-    } else if let Ok(small) = u8::try_from(n) {
-        out.push(major | 0x18);
-        out.push(small);
-    } else if let Ok(medium) = u16::try_from(n) {
-        out.push(major | 0x19);
-        out.extend_from_slice(&medium.to_be_bytes());
-    } else if let Ok(large) = u32::try_from(n) {
-        out.push(major | 0x1a);
-        out.extend_from_slice(&large.to_be_bytes());
-    } else {
-        out.push(major | 0x1b);
-        out.extend_from_slice(&n.to_be_bytes());
-    }
 }
 
 /// Decodes exactly one canonical BCBOR value from `bytes`.
@@ -189,9 +177,11 @@ fn write_head(out: &mut Vec<u8>, major: u8, n: u64) {
 ///
 /// The first rule the input breaks, as a [`BcborError`].
 pub fn decode(bytes: &[u8]) -> Result<Value, BcborError> {
-    let mut reader = Reader { bytes, pos: 0 };
+    let mut reader = Reader {
+        decoder: minicbor::Decoder::new(bytes),
+    };
     let value = reader.item(1)?;
-    if reader.pos != bytes.len() {
+    if reader.decoder.position() != bytes.len() {
         return Err(BcborError::TrailingBytes);
     }
     Ok(value)
@@ -220,133 +210,181 @@ pub fn sorted_set(items: impl IntoIterator<Item = Value>) -> Value {
     Value::Array(keyed.into_iter().map(|(_, v)| v).collect())
 }
 
-struct Reader<'a> {
-    bytes: &'a [u8],
-    pos: usize,
+/// The width in bytes of the shortest head carrying `n`.
+const fn shortest_head(n: u64) -> usize {
+    match n {
+        0..=23 => 1,
+        24..=0xff => 2,
+        0x100..=0xffff => 3,
+        0x1_0000..=0xffff_ffff => 5,
+        _ => 9,
+    }
 }
 
-impl Reader<'_> {
-    fn take(&mut self, count: usize) -> Result<&[u8], BcborError> {
-        let end = self.pos.checked_add(count).ok_or(BcborError::Truncated)?;
-        let slice = self.bytes.get(self.pos..end).ok_or(BcborError::Truncated)?;
-        self.pos = end;
-        Ok(slice)
+/// Maps a minicbor error: running out of input is truncation; any other failure is `other` (for a
+/// text string that is invalid UTF-8, otherwise a length this platform cannot address, which is
+/// truncation too).
+fn cbor_error(error: &minicbor::decode::Error, other: BcborError) -> BcborError {
+    if error.is_end_of_input() {
+        BcborError::Truncated
+    } else {
+        other
+    }
+}
+
+struct Reader<'b> {
+    decoder: minicbor::Decoder<'b>,
+}
+
+impl<'b> Reader<'b> {
+    /// The next head byte, without consuming it.
+    fn peek_head(&self) -> Result<u8, BcborError> {
+        self.decoder
+            .input()
+            .get(self.decoder.position())
+            .copied()
+            .ok_or(BcborError::Truncated)
     }
 
-    fn byte(&mut self) -> Result<u8, BcborError> {
-        Ok(self.take(1)?[0])
+    fn remaining(&self) -> usize {
+        self.decoder.input().len() - self.decoder.position()
     }
 
-    /// Reads an item head's argument for additional info `info`, enforcing the shortest form.
-    fn argument(&mut self, info: u8) -> Result<u64, BcborError> {
-        let (value, minimum) = match info {
-            0..=23 => return Ok(u64::from(info)),
-            24 => (u64::from(self.byte()?), 24),
-            25 => {
-                let raw = self.take(2)?;
-                (u64::from(u16::from_be_bytes([raw[0], raw[1]])), 0x100)
-            }
-            26 => {
-                let raw = self.take(4)?;
-                (
-                    u64::from(u32::from_be_bytes([raw[0], raw[1], raw[2], raw[3]])),
-                    0x1_0000,
-                )
-            }
-            27 => {
-                let raw = self.take(8)?;
-                let mut array = [0_u8; 8];
-                array.copy_from_slice(raw);
-                (u64::from_be_bytes(array), 0x1_0000_0000)
-            }
-            31 => return Err(BcborError::IndefiniteLength),
-            _ => return Err(BcborError::ReservedInfo),
-        };
-        if value < minimum {
-            return Err(BcborError::NonShortest);
+    /// Rejects the additional-info values no BCBOR head uses: 28-30 (reserved) and 31 (indefinite).
+    fn check_info(head: u8) -> Result<(), BcborError> {
+        match head & 0x1f {
+            31 => Err(BcborError::IndefiniteLength),
+            28..=30 => Err(BcborError::ReservedInfo),
+            _ => Ok(()),
         }
-        Ok(value)
     }
 
-    fn length(&mut self, info: u8) -> Result<usize, BcborError> {
-        let length = self.argument(info)?;
-        usize::try_from(length).map_err(|_| BcborError::Truncated)
+    /// Runs `read`, which consumes one head and `content` further bytes, and checks that the head
+    /// was the shortest one for the `n` it carried.
+    fn shortest<T>(
+        &mut self,
+        other: BcborError,
+        read: impl FnOnce(
+            &mut minicbor::Decoder<'b>,
+        ) -> Result<(T, u64, usize), minicbor::decode::Error>,
+    ) -> Result<T, BcborError> {
+        let start = self.decoder.position();
+        let (value, n, content) =
+            read(&mut self.decoder).map_err(|error| cbor_error(&error, other))?;
+        if self.decoder.position() - start - content == shortest_head(n) {
+            Ok(value)
+        } else {
+            Err(BcborError::NonShortest)
+        }
+    }
+
+    fn uint(&mut self) -> Result<u64, BcborError> {
+        self.shortest(BcborError::Truncated, |decoder| {
+            decoder.u64().map(|n| (n, n, 0))
+        })
     }
 
     fn item(&mut self, depth: usize) -> Result<Value, BcborError> {
-        let head = self.byte()?;
-        let major = head >> 5;
-        let info = head & 0x1f;
-        match major {
-            0 => Ok(Value::Uint(self.argument(info)?)),
+        let head = self.peek_head()?;
+        match head >> 5 {
+            0 => {
+                Self::check_info(head)?;
+                Ok(Value::Uint(self.uint()?))
+            }
             1 => Err(BcborError::NegativeInt),
             2 => {
-                let length = self.length(info)?;
-                Ok(Value::Bytes(self.take(length)?.to_vec()))
+                Self::check_info(head)?;
+                self.shortest(BcborError::Truncated, |decoder| {
+                    decoder.bytes().map(|bytes| {
+                        (
+                            Value::Bytes(bytes.to_vec()),
+                            len_u64(bytes.len()),
+                            bytes.len(),
+                        )
+                    })
+                })
             }
             3 => {
-                let length = self.length(info)?;
-                let raw = self.take(length)?;
-                let text = std::str::from_utf8(raw).map_err(|_| BcborError::InvalidUtf8)?;
-                Ok(Value::Text(text.to_owned()))
+                Self::check_info(head)?;
+                self.shortest(BcborError::InvalidUtf8, |decoder| {
+                    decoder.str().map(|text| {
+                        (
+                            Value::Text(text.to_owned()),
+                            len_u64(text.len()),
+                            text.len(),
+                        )
+                    })
+                })
             }
-            4 => self.array(info, depth),
-            5 => self.map(info, depth),
+            4 => {
+                let count = self.count(head, depth, minicbor::Decoder::array)?;
+                let mut items = Vec::new();
+                for _ in 0..count {
+                    items.push(self.item(depth + 1)?);
+                }
+                Ok(Value::Array(items))
+            }
+            5 => {
+                let count = self.count(head, depth, minicbor::Decoder::map)?;
+                let mut entries = BTreeMap::new();
+                let mut previous: Option<u64> = None;
+                for _ in 0..count {
+                    let key_head = self.peek_head()?;
+                    if key_head >> 5 != 0 {
+                        return Err(BcborError::NonUintKey);
+                    }
+                    Self::check_info(key_head)?;
+                    let key = self.uint()?;
+                    match previous {
+                        Some(last) if key == last => return Err(BcborError::DuplicateKey),
+                        Some(last) if key < last => return Err(BcborError::UnsortedKeys),
+                        _ => {}
+                    }
+                    previous = Some(key);
+                    entries.insert(key, self.item(depth + 1)?);
+                }
+                Ok(Value::Map(entries))
+            }
             6 => Err(BcborError::Tag),
-            _ => match head {
-                0xf4 => Ok(Value::Bool(false)),
-                0xf5 => Ok(Value::Bool(true)),
-                0xf6 => Ok(Value::Null),
-                0xff => Err(BcborError::IndefiniteLength),
-                _ => Err(BcborError::ForbiddenSimple),
-            },
+            _ => {
+                let value = match head {
+                    0xf4 | 0xf5 => Value::Bool(head == 0xf5),
+                    0xf6 => Value::Null,
+                    0xff => return Err(BcborError::IndefiniteLength),
+                    _ => return Err(BcborError::ForbiddenSimple),
+                };
+                self.decoder.set_position(self.decoder.position() + 1);
+                Ok(value)
+            }
         }
     }
 
-    fn count(&mut self, info: u8, depth: usize) -> Result<u64, BcborError> {
+    /// Reads an array or map head: the depth limit first, then the count's form and size.
+    fn count(
+        &mut self,
+        head: u8,
+        depth: usize,
+        read: impl FnOnce(&mut minicbor::Decoder<'b>) -> Result<Option<u64>, minicbor::decode::Error>,
+    ) -> Result<u64, BcborError> {
         if depth > MAX_DEPTH {
             return Err(BcborError::TooDeep);
         }
-        let count = self.argument(info)?;
+        Self::check_info(head)?;
+        // Info 31 was refused above, so minicbor always reports a definite count.
+        let count = self.shortest(BcborError::Truncated, |decoder| {
+            read(decoder).map(|count| {
+                let count = count.unwrap_or(u64::MAX);
+                (count, count, 0)
+            })
+        })?;
         if count > MAX_ITEMS {
             return Err(BcborError::TooManyItems);
         }
         // Every item takes at least one byte, so a count beyond the input is truncated.
-        if count > len_u64(self.bytes.len() - self.pos) {
+        if count > len_u64(self.remaining()) {
             return Err(BcborError::Truncated);
         }
         Ok(count)
-    }
-
-    fn array(&mut self, info: u8, depth: usize) -> Result<Value, BcborError> {
-        let count = self.count(info, depth)?;
-        let mut items = Vec::new();
-        for _ in 0..count {
-            items.push(self.item(depth + 1)?);
-        }
-        Ok(Value::Array(items))
-    }
-
-    fn map(&mut self, info: u8, depth: usize) -> Result<Value, BcborError> {
-        let count = self.count(info, depth)?;
-        let mut entries = BTreeMap::new();
-        let mut previous: Option<u64> = None;
-        for _ in 0..count {
-            let head = self.byte()?;
-            if head >> 5 != 0 {
-                return Err(BcborError::NonUintKey);
-            }
-            let key = self.argument(head & 0x1f)?;
-            match previous {
-                Some(last) if key == last => return Err(BcborError::DuplicateKey),
-                Some(last) if key < last => return Err(BcborError::UnsortedKeys),
-                _ => {}
-            }
-            previous = Some(key);
-            let value = self.item(depth + 1)?;
-            entries.insert(key, value);
-        }
-        Ok(Value::Map(entries))
     }
 }
 

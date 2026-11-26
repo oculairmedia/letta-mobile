@@ -1,10 +1,10 @@
-//! The async driver of one `baken/log/1` session, generic over a minimal byte-stream link.
+//! The async driver of one `baken/log/1` session, generic over a byte stream.
 //!
-//! [`ByteRead`] and [`ByteWrite`] are the two halves of one bidirectional stream (a QUIC stream
-//! under Iroh). They are deliberately the smallest surface the protocol needs; when `core-carrier`
-//! lands, its `Link` streams implement them through a thin adapter, so this driver does not depend
-//! on any carrier. [`Clock`] supplies time and timers, so the driver runs on any executor (tokio on
-//! nodes, the browser's event loop for wasm, a manual clock in tests).
+//! The stream is the two halves of one bidirectional stream (a QUIC stream under Iroh) as tokio's
+//! [`AsyncRead`] and [`AsyncWrite`], framed by `tokio_util`'s [`FramedRead`] and [`FramedWrite`]
+//! with the log's length-delimited codec ([`crate::wire::frame_codec`]). Neither needs a tokio
+//! runtime. [`Clock`] supplies time and timers, so the driver runs on any executor (tokio on nodes,
+//! the browser's event loop for wasm, a manual clock in tests).
 //!
 //! Each received frame is handled in one store transaction, committed before any reply (an `ack`)
 //! is sent. Entries a session stores are published on the node's [`Hub`], which hands them to its
@@ -13,33 +13,17 @@
 use std::future::Future;
 use std::sync::Mutex;
 
+use bytes::Bytes;
 use core_store::{EntryHash, LogId, Store, StoreError};
 use futures::channel::mpsc;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::{FutureExt as _, SinkExt, StreamExt as _};
 use thiserror::Error;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodecError};
 
 use crate::judge::ClaimJudge;
 use crate::replicator::{Session, SessionConfig, SessionEvent};
-use crate::wire::{FrameReader, Message, WireError};
-
-/// A link failure.
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-#[error("link: {0}")]
-pub struct LinkError(pub String);
-
-/// The receiving half of a byte stream.
-pub trait ByteRead {
-    /// Reads at least one byte into `buf`, or returns 0 at end of stream.
-    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = Result<usize, LinkError>>;
-}
-
-/// The sending half of a byte stream.
-pub trait ByteWrite {
-    /// Writes all of `bytes`.
-    fn write_all(&mut self, bytes: &[u8]) -> impl Future<Output = Result<(), LinkError>>;
-    /// Finishes the stream.
-    fn close(&mut self) -> impl Future<Output = ()>;
-}
+use crate::wire::{self, Message, WireError};
 
 /// Time for the driver.
 pub trait Clock {
@@ -119,9 +103,9 @@ pub enum SessionEnd {
 /// Why a session failed.
 #[derive(Debug, Error)]
 pub enum DriverError {
-    /// The link failed.
-    #[error(transparent)]
-    Link(#[from] LinkError),
+    /// The stream failed.
+    #[error("link: {0}")]
+    Link(#[from] std::io::Error),
     /// The peer sent an undecodable frame.
     #[error("wire: {0}")]
     Wire(#[from] WireError),
@@ -145,7 +129,7 @@ enum Inbound {
 #[allow(clippy::too_many_arguments)]
 pub async fn run_session<R, W, S, J, C, F>(
     reader: R,
-    mut writer: W,
+    writer: W,
     store: &S,
     judge: &J,
     hub: &Hub,
@@ -154,14 +138,15 @@ pub async fn run_session<R, W, S, J, C, F>(
     mut observe: F,
 ) -> Result<SessionEnd, DriverError>
 where
-    R: ByteRead,
-    W: ByteWrite,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
     S: Store,
     J: ClaimJudge + ?Sized,
     C: Clock,
     F: FnMut(&SessionEvent),
 {
     let mut subscription = hub.subscribe();
+    let mut writer = FramedWrite::new(writer, wire::frame_codec());
     let (inbound_tx, mut inbound_rx) = mpsc::unbounded::<Inbound>();
     let read_side = read_frames(reader, inbound_tx).fuse();
     let main = async {
@@ -171,10 +156,11 @@ where
             while let Some(message) =
                 store.read(|txn| session.poll_transmit(txn, clock.now_ms()))?
             {
-                writer.write_all(&message.encode_frame()).await?;
+                writer.send(Bytes::from(message.encode_body())).await?;
             }
             if session.is_closing() {
-                writer.close().await;
+                // The session is over either way; a failed finish changes nothing.
+                let _ = SinkExt::<Bytes>::close(&mut writer).await;
                 return Ok(SessionEnd::Closed);
             }
             let now = clock.now_ms();
@@ -219,42 +205,37 @@ where
     }
 }
 
-async fn read_frames<R: ByteRead>(mut reader: R, inbound: mpsc::UnboundedSender<Inbound>) {
-    let mut frames = FrameReader::new();
-    let mut buffer = vec![0_u8; 64 * 1024];
+/// Reads frames concurrently with the main loop (so a peer blocked writing is always read), and
+/// hands each decoded message, the end of stream or the first failure to it.
+async fn read_frames<R: AsyncRead + Unpin>(reader: R, inbound: mpsc::UnboundedSender<Inbound>) {
+    let mut frames = FramedRead::new(reader, wire::frame_codec());
     loop {
-        match reader.read(&mut buffer).await {
-            Ok(0) => {
-                let _ = inbound.unbounded_send(Inbound::Eof);
-                break;
-            }
-            Ok(read) => {
-                frames.push(&buffer[..read]);
-                loop {
-                    match frames.next_body() {
-                        Ok(Some(body)) => {
-                            let item = Message::decode_body(&body)
-                                .map_or_else(|e| Inbound::Failed(e.into()), Inbound::Frame);
-                            let failed = matches!(item, Inbound::Failed(_));
-                            let _ = inbound.unbounded_send(item);
-                            if failed {
-                                futures::future::pending::<()>().await;
-                            }
-                        }
-                        Ok(None) => break,
-                        Err(error) => {
-                            let _ = inbound.unbounded_send(Inbound::Failed(error.into()));
-                            futures::future::pending::<()>().await;
-                        }
-                    }
-                }
-            }
-            Err(error) => {
-                let _ = inbound.unbounded_send(Inbound::Failed(error.into()));
-                break;
-            }
+        let item = match frames.next().await {
+            None => Inbound::Eof,
+            Some(Ok(body)) => Message::decode_body(&body)
+                .map_or_else(|e| Inbound::Failed(e.into()), Inbound::Frame),
+            Some(Err(error)) => Inbound::Failed(frame_error(error)),
+        };
+        let last = !matches!(item, Inbound::Frame(_));
+        let _ = inbound.unbounded_send(item);
+        if last {
+            break;
         }
     }
     // Keep the select alive until the main loop has drained what was read.
     futures::future::pending::<()>().await;
+}
+
+/// The error behind a failed frame read: the codec reports an oversized length prefix as an I/O
+/// error wrapping its own error type, which is the wire's [`WireError::TooLarge`].
+fn frame_error(error: std::io::Error) -> DriverError {
+    let too_large = error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<LengthDelimitedCodecError>())
+        .is_some();
+    if too_large {
+        WireError::TooLarge.into()
+    } else {
+        error.into()
+    }
 }

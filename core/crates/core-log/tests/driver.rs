@@ -11,71 +11,12 @@ use std::future::Future;
 use std::rc::Rc;
 
 use common::{agent, append_payload, genesis_payload, key, log, node};
-use core_log::driver::{ByteRead, ByteWrite, Clock, Hub, LinkError, Notice, run_session};
+use core_log::driver::{Clock, Hub, Notice, run_session};
 use core_log::payload::Payload;
 use core_log::{AgentLog, Mode, SessionConfig, StructuralJudge};
 use core_store::{MemoryStore, Store, StoreError};
-use futures::StreamExt as _;
-use futures::channel::mpsc;
 use futures::executor::LocalPool;
 use futures::task::LocalSpawnExt as _;
-
-struct PipeRead {
-    rx: mpsc::UnboundedReceiver<Vec<u8>>,
-    pending: Vec<u8>,
-}
-
-struct PipeWrite {
-    tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
-}
-
-impl ByteRead for PipeRead {
-    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = Result<usize, LinkError>> {
-        async move {
-            if self.pending.is_empty() {
-                match self.rx.next().await {
-                    Some(bytes) => self.pending = bytes,
-                    None => return Ok(0),
-                }
-            }
-            // Deliver in small pieces to exercise reassembly.
-            let n = self.pending.len().min(buf.len()).min(97);
-            buf[..n].copy_from_slice(&self.pending[..n]);
-            self.pending.drain(..n);
-            Ok(n)
-        }
-    }
-}
-
-impl ByteWrite for PipeWrite {
-    fn write_all(&mut self, bytes: &[u8]) -> impl Future<Output = Result<(), LinkError>> {
-        let result = self
-            .tx
-            .as_ref()
-            .ok_or_else(|| LinkError("closed".into()))
-            .and_then(|tx| {
-                tx.unbounded_send(bytes.to_vec())
-                    .map_err(|e| LinkError(e.to_string()))
-            });
-        async move { result }
-    }
-
-    fn close(&mut self) -> impl Future<Output = ()> {
-        self.tx = None;
-        async {}
-    }
-}
-
-fn pipe() -> (PipeWrite, PipeRead) {
-    let (tx, rx) = mpsc::unbounded();
-    (
-        PipeWrite { tx: Some(tx) },
-        PipeRead {
-            rx,
-            pending: Vec::new(),
-        },
-    )
-}
 
 /// A clock whose timers never fire: the test drives everything by messages.
 #[derive(Clone, Default)]
@@ -107,13 +48,13 @@ fn config(id: u8) -> SessionConfig {
     }
 }
 
-/// Connects two nodes with a pair of pipes and spawns both session drivers. Returns the two
-/// write halves' kill switches (dropping them ends the link).
+/// Connects two nodes with an in-memory duplex stream and spawns both session drivers. The duplex
+/// buffer is small, so frames arrive in pieces and exercise reassembly.
 fn connect(pool: &LocalPool, a: &Node, b: &Node) {
     let spawner = pool.spawner();
-    let (a_to_b_w, a_to_b_r) = pipe();
-    let (b_to_a_w, b_to_a_r) = pipe();
-    for (node, reader, writer) in [(a, b_to_a_r, a_to_b_w), (b, a_to_b_r, b_to_a_w)] {
+    let (a_end, b_end) = tokio::io::duplex(97);
+    for (node, end) in [(a, a_end), (b, b_end)] {
+        let (reader, writer) = tokio::io::split(end);
         let store = node.store.clone();
         let hub = node.hub.clone();
         let id = node.id;

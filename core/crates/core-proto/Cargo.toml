@@ -12,6 +12,7 @@ blake3.workspace = true
 ed25519-dalek.workspace = true
 hex.workspace = true
 lru.workspace = true
+minicbor.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

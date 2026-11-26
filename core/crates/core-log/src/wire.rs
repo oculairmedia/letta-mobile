@@ -1,10 +1,13 @@
 //! `baken/log/1` messages (C1 §4.2) and their framing: a `u32 BE` length, then a BCBOR map whose
-//! key 0 is the type, at most `MAX_FRAME` bytes.
+//! key 0 is the type, at most `MAX_FRAME` bytes. The framing is `tokio_util`'s
+//! `LengthDelimitedCodec` ([`frame_codec`]).
 
+use ::bytes::{Bytes, BytesMut};
 use core_proto::bcbor::{self, Value};
 use core_proto::{AgentId, Epoch, NodeId};
 use core_store::{EntryHash, LogId};
 use thiserror::Error;
+use tokio_util::codec::{Decoder as _, Encoder as _, LengthDelimitedCodec};
 
 use crate::MAX_FRAME;
 use crate::value::{
@@ -340,14 +343,18 @@ impl Message {
         bcbor::encode(&self.to_value())
     }
 
-    /// The framed bytes: `u32 BE` length, then the body.
+    /// The framed bytes: `u32 BE` length, then the body, as [`frame_codec`] writes them.
+    ///
+    /// # Panics
+    ///
+    /// When the body is longer than `MAX_FRAME`; no message this crate builds is.
     #[must_use]
     pub fn encode_frame(&self) -> Vec<u8> {
-        let body = self.encode_body();
-        let mut out = Vec::with_capacity(body.len() + 4);
-        out.extend_from_slice(&u32::try_from(body.len()).unwrap_or(u32::MAX).to_be_bytes());
-        out.extend_from_slice(&body);
-        out
+        let mut out = BytesMut::new();
+        frame_codec()
+            .encode(Bytes::from(self.encode_body()), &mut out)
+            .expect("a message body fits in MAX_FRAME");
+        out.to_vec()
     }
 
     /// Decodes a body (without the length prefix).
@@ -525,17 +532,39 @@ fn agent_have(value: &Value) -> Result<AgentHave, ShapeError> {
     })
 }
 
-/// Splits a byte stream into frame bodies.
-#[derive(Debug, Default)]
+/// The `baken/log/1` framing: `tokio_util`'s [`LengthDelimitedCodec`] with a `u32 BE` length
+/// prefix (its default) and bodies of at most `MAX_FRAME` bytes. A longer prefix is refused from the
+/// header alone, before its body is buffered.
+#[must_use]
+pub fn frame_codec() -> LengthDelimitedCodec {
+    LengthDelimitedCodec::builder()
+        .length_field_type::<u32>()
+        .max_frame_length(MAX_FRAME)
+        .new_codec()
+}
+
+/// Splits a byte stream into frame bodies with [`frame_codec`], for callers that hold bytes rather
+/// than a stream.
+#[derive(Debug)]
 pub struct FrameReader {
-    buffer: Vec<u8>,
+    codec: LengthDelimitedCodec,
+    buffer: BytesMut,
+}
+
+impl Default for FrameReader {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FrameReader {
     /// An empty reader.
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            codec: frame_codec(),
+            buffer: BytesMut::new(),
+        }
     }
 
     /// Appends received bytes.
@@ -550,24 +579,9 @@ impl FrameReader {
     /// [`WireError::TooLarge`] when the length prefix exceeds `MAX_FRAME`; the stream is then
     /// unusable.
     pub fn next_body(&mut self) -> Result<Option<Vec<u8>>, WireError> {
-        if self.buffer.len() < 4 {
-            return Ok(None);
-        }
-        let len = u32::from_be_bytes([
-            self.buffer[0],
-            self.buffer[1],
-            self.buffer[2],
-            self.buffer[3],
-        ]);
-        let len = usize::try_from(len).map_err(|_| WireError::TooLarge)?;
-        if len > MAX_FRAME {
-            return Err(WireError::TooLarge);
-        }
-        if self.buffer.len() < 4 + len {
-            return Ok(None);
-        }
-        let body = self.buffer[4..4 + len].to_vec();
-        self.buffer.drain(..4 + len);
-        Ok(Some(body))
+        self.codec
+            .decode(&mut self.buffer)
+            .map(|body| body.map(|body| body.to_vec()))
+            .map_err(|_| WireError::TooLarge)
     }
 }
