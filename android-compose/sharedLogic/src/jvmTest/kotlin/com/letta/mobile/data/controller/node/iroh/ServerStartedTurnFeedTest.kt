@@ -428,6 +428,48 @@ class ServerStartedTurnFeedTest {
         assertTrue("turn_closed" !in kinds, "$kinds")
     }
 
+    /**
+     * The server says WAITING_ON_INPUT while it still names an active run: a turn is still running, so the runtime is
+     * not idle. A delta of another run then does not close the turn as "server idle".
+     */
+    @Test
+    fun aWaitingOnInputStatusThatStillNamesAnActiveRunDoesNotArmTheIdleClose() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(serverLoopStatus(RUN, "WAITING_ON_INPUT")))
+        node.frames.emit(decode(assistant("Still the same turn.", run = NEXT_RUN)))
+        runCurrent()
+
+        val kinds = entries(node.journal).map { it.kind }
+        assertEquals(1, kinds.count { it == "turn_open" }, "$kinds")
+        assertTrue("turn_closed" !in kinds, "$kinds")
+    }
+
+    /**
+     * While the parent turn is idle (aborted and settling), a child agent's delta carries a run of its own. It is not
+     * the parent's next turn, so it neither closes the turn as "server idle" nor is relayed; the parent's own
+     * `turn_finished` then still closes the one turn as truly ended.
+     */
+    @Test
+    fun aChildAgentDeltaOfAnotherRunDoesNotCloseAnIdleParentTurn() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(idleLoopStatus()))
+        node.frames.emit(childSubagentDelta())
+        runCurrent()
+
+        assertStillOpen(node)
+
+        node.frames.emit(decode(toolReturn()))
+        node.frames.emit(turnFinished())
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_open" }, "${journal.map { it.kind }}")
+        assertEquals(1, journal.count { it.kind == "turn_closed" }, "${journal.map { it.kind }}")
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
     /** A pending approval is a wait too: silence alone keeps the turn open. */
     @Test
     fun anApprovalWaitKeepsABusyTurnOpenThroughSilence() = runTest {
