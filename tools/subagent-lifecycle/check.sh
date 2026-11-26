@@ -37,6 +37,8 @@ for cfg in "${cfgs[@]}"; do
       if [[ "$actual" = PASS ]] && [[ "${KEEP:-0}" != 1 ]]; then rm -f "$log"; fi
     else
       printf '%-20s %-26s %s (expected %s; log: %s)\n' "$cfg" "$prop" "$actual" "$expected" "$log"
+      # CI deletes OUT on exit and uploads no artifact, so the log is the only triage evidence.
+      cat "$log"
       status=1
       [[ "$actual" != ERROR ]] || status=2
     fi
