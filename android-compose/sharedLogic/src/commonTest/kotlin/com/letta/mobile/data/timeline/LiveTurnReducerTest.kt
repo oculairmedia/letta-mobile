@@ -127,7 +127,7 @@ class LiveTurnReducerTest {
      */
     @Test
     fun eachReturnOfATwoCallMessageJoinsItsOwnCallLive() {
-        val fold = LiveFold().apply { feed(parallel("call-a", "call-b")) }
+        val fold = LiveFold().apply { feed(parallel(Tool("call-a"), Tool("call-b"))) }
 
         fold.feed(Tool("call-b").returned("second"))
         val afterSecond = fold.row("tc-call-a")
@@ -148,7 +148,7 @@ class LiveTurnReducerTest {
         val fold = LiveFold().apply { feed(Tool("call-b").returned("early")) }
         assertEquals(listOf("call-b"), fold.pending.keys.toList())
 
-        fold.feed(parallel("call-a", "call-b"))
+        fold.feed(parallel(Tool("call-a"), Tool("call-b")))
 
         val row = fold.row("tc-call-a")
         assertEquals(mapOf("call-b" to "early"), row.toolReturnContentByCallId.toMap())
@@ -162,7 +162,7 @@ class LiveTurnReducerTest {
         val fold = LiveFold().apply { feed(Tool("call-a").call(Args.DATE), Tool("call-b").returned("waited")) }
         assertEquals(listOf("call-b"), fold.pending.keys.toList())
 
-        fold.feed(parallel("call-a", "call-b"))
+        fold.feed(parallel(Tool("call-a"), Tool("call-b")))
 
         assertEquals("waited", fold.row("tc-call-a").toolReturnContentByCallId["call-b"])
         assertTrue(fold.pending.isEmpty())
@@ -170,7 +170,7 @@ class LiveTurnReducerTest {
 
     @Test
     fun aReturnForACallNoRowListsStaysParkedAndTouchesNoRow() {
-        val fold = LiveFold().apply { feed(parallel("call-a", "call-b"), Tool("call-z").returned("stray")) }
+        val fold = LiveFold().apply { feed(parallel(Tool("call-a"), Tool("call-b")), Tool("call-z").returned("stray")) }
 
         assertEquals(listOf("call-z"), fold.pending.keys.toList())
         val row = fold.row("tc-call-a")
@@ -200,7 +200,7 @@ class LiveTurnReducerTest {
     fun everyOrderingOfATwoCallRoundLeavesNothingParked() {
         val random = Random(SEED)
         repeat(ITERATIONS) { iteration ->
-            val frames = listOf(Tool("call-a").returned("A"), Tool("call-b").returned("B"), parallel("call-a", "call-b"))
+            val frames = listOf(Tool("call-a").returned("A"), Tool("call-b").returned("B"), parallel(Tool("call-a"), Tool("call-b")))
                 .shuffled(random)
                 .let { if (random.nextBoolean()) listOf(Tool("call-a").call(Args.DATE)) + it else it }
             val fold = LiveFold()
@@ -332,10 +332,12 @@ class LiveTurnReducerTest {
     }
 
     private class Tool(private val callId: String) {
+        fun toolCall(args: Args = Args.EMPTY) = ToolCall(toolCallId = callId, name = "Bash", arguments = args.json)
+
         fun call(args: Args = Args.EMPTY) = ToolCallMessage(
             id = "toolcall-$callId",
-            toolCall = ToolCall(toolCallId = callId, name = "Bash", arguments = args.json),
-            toolCalls = listOf(ToolCall(toolCallId = callId, name = "Bash", arguments = args.json)),
+            toolCall = toolCall(args),
+            toolCalls = listOf(toolCall(args)),
             logicalMessageId = "tc-$callId",
         )
 
@@ -349,10 +351,10 @@ class LiveTurnReducerTest {
     }
 
     /** One assistant message carrying several calls, stamped as the host stamps it: after its first call. */
-    private fun parallel(vararg callIds: String) = ToolCallMessage(
-        id = "toolcall-${callIds.first()}",
-        toolCalls = callIds.map { ToolCall(toolCallId = it, name = "Bash", arguments = Args.UPTIME.json) },
-        logicalMessageId = "tc-${callIds.first()}",
+    private fun parallel(first: Tool, vararg rest: Tool) = ToolCallMessage(
+        id = first.call().id,
+        toolCalls = (listOf(first) + rest).map { it.toolCall(Args.UPTIME) },
+        logicalMessageId = first.call().logicalMessageId,
     )
 
     private class LiveFold {
