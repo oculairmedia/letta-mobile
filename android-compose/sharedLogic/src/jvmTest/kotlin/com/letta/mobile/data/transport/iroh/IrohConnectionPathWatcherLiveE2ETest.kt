@@ -5,21 +5,16 @@ import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import computer.iroh.Connection
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEvent
 import computer.iroh.PathEventCallback
 import computer.iroh.PathSnapshot
-import computer.iroh.RelayMode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.junit.Assume.assumeTrue
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -37,27 +32,16 @@ import kotlin.time.Duration.Companion.seconds
  * [IrohEndpointWatcherAttachTest] pins the same mechanism hermetically (endpoint watchers,
  * no dial); this test exercises the exact production connection surface.
  *
- * OPT-IN ONLY, like the other live-QUIC suites: it dials a REAL loopback QUIC connection
- * via iroh-ffi, which is flaky in sandboxed CI runners. Run explicitly with:
- *
- *   ./gradlew :sharedLogic:jvmTest -DrunIrohLiveE2E=true \
- *     --tests 'com.letta.mobile.data.transport.iroh.IrohConnectionPathWatcherLiveE2ETest'
+ * Relays are disabled on both ends, so the dial never leaves this machine: it runs in the default jvmTest.
  */
 class IrohConnectionPathWatcherLiveE2ETest {
-
-    @BeforeTest
-    fun requireOptIn() {
-        assumeTrue(
-            "Live-QUIC Iroh E2E is opt-in; pass -DrunIrohLiveE2E=true to run it.",
-            System.getProperty("runIrohLiveE2E") == "true",
-        )
-    }
 
     @Test
     fun connectionPathWatchersAttachAndDeliverObservations(): Unit = runBlocking {
         val alpn = "/letta/pw/1".encodeToByteArray()
         val serverAccepted = CompletableDeferred<Unit>()
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("unused-app-server-peer")),
             protocolHandlers = listOf(object : IrohNodeProtocolHandler {
@@ -72,7 +56,7 @@ class IrohConnectionPathWatcherLiveE2ETest {
                 }
             }),
         )
-        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val client = bindLoopbackEndpoint()
         try {
             server.create()
             server.start(FakeAppServerController())

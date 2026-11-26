@@ -44,9 +44,9 @@ detekt {
     parallel = true
 }
 
-// Forward the opt-in flag for the live-QUIC Iroh E2E suite to the test JVM.
-// Those tests dial a real loopback QUIC connection via iroh-ffi, which is flaky
-// in CI runners; they are skipped (via JUnit Assume) unless this is "true".
+// Forward the opt-in flag for live Iroh suites that need the public relay or address lookup.
+// The loopback suites bind with relays disabled and run by default; a suite that must reach
+// the internet is skipped (via JUnit Assume) unless this is "true".
 tasks.withType<Test>().configureEach {
     System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
     // A planted host secret (letta-mobile-cdgpr.10): PluginTrustTest asserts a plugin process

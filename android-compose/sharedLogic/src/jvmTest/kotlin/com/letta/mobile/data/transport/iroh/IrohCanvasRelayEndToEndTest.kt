@@ -26,10 +26,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
 import computer.iroh.EndpointTicket
-import computer.iroh.RelayMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,9 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import org.junit.Assume.assumeTrue
 import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -58,20 +53,11 @@ import kotlin.time.Duration.Companion.seconds
  * each with an [IrohCanvasRelayClient] attached and a [CanvasSession] editing - as Android and
  * desktop wire them.
  *
- * OPT-IN like [IrohChannelTransportEndToEndTest] (live loopback QUIC is flaky on CI runners): run it
- * with `:sharedLogic:jvmTest -DrunIrohLiveE2E=true --tests '*IrohCanvasRelayEndToEndTest'`.
+ * Relays are disabled on both ends, so the dial never leaves this machine: it runs in the default jvmTest.
  */
 class IrohCanvasRelayEndToEndTest {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @BeforeTest
-    fun requireOptIn() {
-        assumeTrue(
-            "Live-QUIC Iroh E2E is opt-in; pass -DrunIrohLiveE2E=true to run it.",
-            System.getProperty("runIrohLiveE2E") == "true",
-        )
-    }
 
     @AfterTest
     fun tearDown() {
@@ -130,7 +116,7 @@ class IrohCanvasRelayEndToEndTest {
     fun aCanvasDialWithoutAnAuthenticatedAppServerConnectionIsRefused() = runBlocking {
         val ticket = startHost()
         // A peer that never signed in on the App Server dials the canvas protocol directly.
-        val stranger = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
+        val stranger = bindLoopbackEndpoint()
         val connection = stranger.connect(EndpointTicket.fromString(ticket).endpointAddr(), IrohCanvasRelay.CANVAS_RELAY_ALPN)
         // The host closes it on arrival: the write or the read fails, and nothing ever comes back.
         val reply = withTimeoutOrNull(10.seconds) {
@@ -152,6 +138,7 @@ class IrohCanvasRelayEndToEndTest {
 
     private suspend fun startHost(): String {
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = scope,
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             canvasRelay = IrohCanvasRelay(scope, InMemoryCanvasRelayStore()),

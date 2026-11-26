@@ -32,6 +32,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -116,6 +118,13 @@ class IrohNodeEndpoint(
      * detached turns never outlive the endpoint and a restarted endpoint gets a live host.
      */
     private var turnHost: NodeTurnHost? = null
+
+    /**
+     * The handled-turn set every connection of this endpoint shares, so a peer's redial (a new
+     * connection to the same endpoint) re-sending a turn is recognised. The wrapper binds one
+     * endpoint for its whole process; across a restart the durable [turnJournal] recognises it.
+     */
+    private val clientMessageDedupe = ProcessScopedClientMessageDedupe()
 
     init {
         // letta-mobile-6vf4r (S3): a connection that starts viewing a conversation mid-turn learns
@@ -312,9 +321,23 @@ class IrohNodeEndpoint(
                 relayMode = relayMode,
             )
         ).also { ep ->
-            ep.online()
+            awaitDialable(ep)
             attachWatchers(ep)
             emitEndpointStatus(ep, "online")
+        }
+    }
+
+    /**
+     * Waits until [ep] can be dialed. With a relay that is [Endpoint.online] (a home relay is
+     * connected). A direct-only endpoint never gets a home relay, so `online()` would never return:
+     * it is dialable once it reports a direct address, which its ticket then carries.
+     */
+    private suspend fun awaitDialable(ep: Endpoint) {
+        when (relayConfig) {
+            is IrohRelayConfig.Default, is IrohRelayConfig.Custom -> ep.online()
+            is IrohRelayConfig.Disabled -> withTimeoutOrNull(DIRECT_ADDRESS_WAIT_MS.milliseconds) {
+                while (ep.addr().directAddresses().isEmpty()) delay(DIRECT_ADDRESS_POLL_MS.milliseconds)
+            }
         }
     }
 
@@ -532,6 +555,7 @@ class IrohNodeEndpoint(
                 remoteEndpointId = remoteId,
             ),
             connectionRegistry = connectionRegistry,
+            clientMessageDedupe = clientMessageDedupe,
             turnHost = turnHost,
             turnIdentity = turnIdentity,
         )
@@ -606,6 +630,8 @@ class IrohNodeEndpoint(
         private const val HANDSHAKE_TIMEOUT_MS = 15_000L
         private const val ACCEPT_NULL_RETRY_MS = 1_000L
         private const val ACCEPT_FAILURE_RETRY_MS = 500L
+        private const val DIRECT_ADDRESS_WAIT_MS = 10_000L
+        private const val DIRECT_ADDRESS_POLL_MS = 50L
     }
 }
 

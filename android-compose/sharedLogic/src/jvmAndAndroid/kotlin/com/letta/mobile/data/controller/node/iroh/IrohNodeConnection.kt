@@ -86,9 +86,8 @@ class IrohNodeConnection(
     // conversation. Null in legacy/test constructions that don't use fanout.
     private val connectionRegistry: ConnectionRegistry? = null,
     /**
-     * Server-process-scoped duplicate-suppression for client message ids. Shared
-     * across connections so a redial re-delivery of the same turn does not
-     * double-run. Injectable for tests.
+     * Duplicate-suppression for client message ids. Shared across connections (the endpoint
+     * passes its own) so a redial re-delivery of the same turn does not double-run.
      */
     private val clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
     /**
@@ -903,7 +902,7 @@ class IrohNodeConnection(
     /** A re-sent input is a duplicate in this process (the dedupe set) or in an earlier one (the journal). */
     private fun isResentInput(input: AppServerCommand.Input, message: AppServerInputMessage): Boolean {
         val clientMsgId = message.clientMessageId ?: return false
-        return !clientMessageDedupe.markHandled(clientMsgId) ||
+        return !clientMessageDedupe.markHandled(input.owner(), input.conversation(), clientMsgId) ||
             turnHost.journal.knowsTurn(input.owner(), input.conversation(), clientMsgId)
     }
 
@@ -1090,8 +1089,7 @@ class IrohNodeConnection(
         const val ADMIN_RPC_REQUEST_TIMEOUT_MS = 15_000L
         const val MAX_CONCURRENT_ADMIN_RPC_STREAMS = 16
 
-        // Process-scoped so they persist across the per-connection lifecycle and
-        // survive a redial (new IrohNodeConnection instance).
+        // Fallback for constructions without an endpoint (legacy/tests); an endpoint passes its own.
         internal val SHARED_CLIENT_MESSAGE_DEDUPE = ProcessScopedClientMessageDedupe()
     }
 }

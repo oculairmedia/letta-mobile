@@ -65,12 +65,8 @@ class NotebookNativeCallerTest {
         try {
             NotebookLocalStore(root.resolve("notebooks"), "host").use { notebooks ->
                 registerNotebookAdminRoutes(host.adminRpcRouter, notebooks, FileNotebookGrantStore(root.resolve("grants.json")))
-                // Endpoint.create waits for relay online(), which cannot complete in disabled-relay mode.
-                // Inject only the real native binding; start/accept/authentication/RPC are production paths.
-                val nativeHost = Endpoint.bind(EndpointOptions(
-                    relayMode = RelayMode.disabled(), alpns = listOf(IrohNodeEndpoint.DEFAULT_ALPN),
-                ))
-                IrohNodeEndpoint::class.java.getDeclaredField("endpoint").apply { isAccessible = true }.set(host, nativeHost)
+                // A relays-disabled host is ready once it has a direct address; create/start/accept/RPC are production paths.
+                host.create()
                 host.start(DefaultAppServerController(UnusedClient))
                 withTimeout(30_000) { assertAuthorities(root, notebooks, host.addr(), listOf(alice, bob)) }
             }

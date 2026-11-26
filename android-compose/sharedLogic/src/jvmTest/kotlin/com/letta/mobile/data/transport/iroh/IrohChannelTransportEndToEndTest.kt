@@ -16,9 +16,6 @@ import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import computer.iroh.Connection
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -30,6 +27,11 @@ import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.stampDraft
+import com.letta.mobile.data.runtime.turnStreamIdentityFor
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,11 +45,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.Assume.assumeTrue
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -65,28 +65,15 @@ import kotlin.time.Duration.Companion.seconds
  *   server: IrohNodeEndpoint.start(stubController) -> IrohNodeConnection.serve()
  *   assert: client.events emits AssistantMessage(content contains expected) + TurnDone(completed)
  *
- * OPT-IN ONLY. These tests dial a REAL loopback QUIC connection via iroh-ffi.
- * That handshake/relay path is flaky in sandboxed/CI runners (intermittent
- * connect/stream timeouts unrelated to app logic), so it is NOT a default CI
- * gate — it would red-flag pipelines nondeterministically. The deterministic CI
- * guard for the receive→emit chain is
- * [com.letta.mobile.data.runtime.AppServerTurnEngineReceiveChainTest] in
- * commonTest. Run this live-QUIC suite explicitly with:
- *
- *   ./gradlew :sharedLogic:jvmTest -DrunIrohLiveE2E=true \
- *     --tests 'com.letta.mobile.data.transport.iroh.IrohChannelTransportEndToEndTest'
+ * These tests dial a REAL QUIC connection via iroh-ffi, but only on this machine: the host binds
+ * with relays disabled and its ticket carries its direct addresses (see [loopbackHostBinding]), so
+ * nothing reaches a public relay or address lookup and the suite runs in the default jvmTest.
+ * Several tests send the same client message id to their own host: each host remembers only the
+ * turns it was sent, so none of them may be taken for a re-send.
  */
 class IrohChannelTransportEndToEndTest {
 
     private val clientScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @BeforeTest
-    fun requireOptIn() {
-        assumeTrue(
-            "Live-QUIC Iroh E2E is opt-in; pass -DrunIrohLiveE2E=true to run it.",
-            System.getProperty("runIrohLiveE2E") == "true",
-        )
-    }
 
     @AfterTest
     fun tearDown() {
@@ -99,14 +86,15 @@ class IrohChannelTransportEndToEndTest {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
         val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("other-app-server-peer")),
             protocolHandlers = listOf(createHandler(resultPeer)),
         )
-        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val client = bindLoopbackEndpoint()
         try {
             server.create()
-            server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
+            server.start(ScriptedReplyController { ASSISTANT_REPLY })
             val connection = client.connect(server.addr(), notebookAlpn)
             val actualPeer = withTimeout(15.seconds) { resultPeer.await() }
             assertEquals(
@@ -159,11 +147,12 @@ class IrohChannelTransportEndToEndTest {
     @Test
     fun deviceSendOverIrohRoundTripsAssistantResponse() = runBlocking {
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
         server.create()
-        server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
+        server.start(ScriptedReplyController { ASSISTANT_REPLY })
         val ticket = server.ticketString()
 
         val transport = IrohChannelTransport(
@@ -181,7 +170,7 @@ class IrohChannelTransportEndToEndTest {
                 clientVersion = "harness-1",
             )
 
-            val frames = mutableListOf<ServerFrame>()
+            val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
             val collector = clientScope.async {
                 transport.events.collect { frames.add(it) }
             }
@@ -225,54 +214,16 @@ class IrohChannelTransportEndToEndTest {
         }
     }
 
-    /**
-     * Stub controller that starts any runtime and, on runTurn, emits a single assistant
-     * stream frame followed by a Completed lifecycle — the minimal real-response shape.
-     */
-    private class EchoAssistantController(
-        private val reply: String,
-        delegate: AppServerController = FakeAppServerController(),
-    ) : AppServerController by delegate {
-        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
-            emit(
-                RuntimeEventDraft(
-                    backendId = BackendId("harness"),
-                    runtimeId = RuntimeId("harness"),
-                    agentId = command.agentId,
-                    conversationId = command.conversationId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RemoteStreamFrame(
-                        frameId = "harness-frame-1",
-                        messageId = "harness-msg-1",
-                        messageType = "assistant_message",
-                        body = reply,
-                    ),
-                ),
-            )
-            emit(
-                RuntimeEventDraft(
-                    backendId = BackendId("harness"),
-                    runtimeId = RuntimeId("harness"),
-                    agentId = command.agentId,
-                    conversationId = command.conversationId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RunLifecycleChanged(
-                        status = RuntimeRunStatus.Completed,
-                    ),
-                ),
-            )
-        }
-    }
-
     @Test
     fun multipleTurnsOverOneIrohConnectionEachGetResponse() = runBlocking {
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
         server.create()
         // Reply echoes the turn index so we can assert each turn got ITS own response.
-        server.start(PerTurnEchoController())
+        server.start(ScriptedReplyController(reply = ::replyForTurn))
         val ticket = server.ticketString()
 
         val transport = IrohChannelTransport(
@@ -283,7 +234,7 @@ class IrohChannelTransportEndToEndTest {
         try {
             transport.connect("iroh://$ticket", "", "harness-device", "harness-1")
 
-            val frames = mutableListOf<ServerFrame>()
+            val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
             val collector = clientScope.async { transport.events.collect { frames.add(it) } }
 
             val turns = 3
@@ -340,7 +291,7 @@ class IrohChannelTransportEndToEndTest {
                 )
             },
         )
-        val frames = mutableListOf<ServerFrame>()
+        val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             val first = clientScope.async {
@@ -423,11 +374,12 @@ class IrohChannelTransportEndToEndTest {
         // Simulates real-world timing: first turn takes 500ms (LLM latency),
         // second turn should still work after it completes (c0qm0 regression guard).
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
         server.create()
-        server.start(LatentEchoController(delayMs = 500))
+        server.start(ScriptedReplyController(latency = 500.milliseconds, reply = ::replyForTurn))
         val ticket = server.ticketString()
 
         val transport = IrohChannelTransport(
@@ -438,7 +390,7 @@ class IrohChannelTransportEndToEndTest {
         try {
             transport.connect("iroh://$ticket", "", "harness-device", "harness-1")
 
-            val frames = mutableListOf<ServerFrame>()
+            val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
             val collector = clientScope.async { transport.events.collect { frames.add(it) } }
 
             // Turn 1
@@ -465,93 +417,136 @@ class IrohChannelTransportEndToEndTest {
     }
 
     /**
-     * Controller that adds a configurable delay before emitting each turn's response,
-     * simulating real LLM latency.
+     * A client message id is unique per conversation, not per host: the same id sent to two
+     * conversations of one host is two turns, and each must run. Only a re-send to the SAME
+     * conversation is a duplicate.
      */
-    /**
-     * Controller that adds a configurable delay before emitting each turn's response,
-     * simulating real LLM latency.
-     */
-    private class LatentEchoController(
-        private val delayMs: Long,
-        delegate: AppServerController = FakeAppServerController(),
-    ) : AppServerController by delegate {
-        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
-            val turnN = (command.input as? TurnInput.UserMessage)?.text?.let { t -> t.substringAfterLast('-').ifEmpty { "1" } } ?: "1"
-            return flow {
-                delay(delayMs.milliseconds)
-                emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RemoteStreamFrame("f-$turnN", "msg-$turnN", "assistant_message", "reply-for-turn-$turnN")))
-                delay((delayMs / 2).milliseconds)
-                emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
+    @Test
+    fun theSameClientMessageIdInAnotherConversationRunsItsOwnTurn() = runBlocking {
+        val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
+        server.create()
+        server.start(ScriptedReplyController(reply = ::replyForTurn))
+        val ticket = server.ticketString()
+        val transport = IrohChannelTransport(scope = clientScope, onConnect = {}, forcedIrohUrl = "iroh://$ticket")
+        try {
+            transport.connect("iroh://$ticket", "", "harness-device", "harness-1")
+            val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
+            val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+            fun answered(turn: String) = frames.any { it is ServerFrame.AssistantMessage && it.content == replyForTurn(turn) }
+
+            transport.send("agent-test", "conv-first", "turn-a", "otid-shared", null, false)
+            val firstAnswered = withTimeoutOrNull(15.seconds) {
+                while (!answered("turn-a") || frames.count { it is ServerFrame.TurnDone } < 1) delay(50.milliseconds)
             }
-        }
-    }
+            assertTrue(firstAnswered != null, "the first conversation's turn must run")
 
-    /** Emits one assistant reply per turn, echoing the input text so each turn is distinguishable. */
-    private class PerTurnEchoController(
-        delegate: AppServerController = FakeAppServerController(),
-    ) : AppServerController by delegate {
-        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
-            val turnText = (command.input as? TurnInput.UserMessage)?.text ?: "?"
-            val n = turnText.substringAfterLast('-')
-            emit(
-                RuntimeEventDraft(
-                    backendId = BackendId("harness"), runtimeId = RuntimeId("harness"),
-                    agentId = command.agentId, conversationId = command.conversationId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RemoteStreamFrame(
-                        frameId = "frame-$n", messageId = "msg-$n",
-                        messageType = "assistant_message", body = "reply-for-turn-$n",
-                    ),
-                ),
+            transport.send("agent-test", "conv-second", "turn-b", "otid-shared", null, false)
+            val secondAnswered = withTimeoutOrNull(15.seconds) {
+                while (!answered("turn-b") || frames.count { it is ServerFrame.TurnDone } < 2) delay(50.milliseconds)
+            }
+            assertTrue(
+                secondAnswered != null,
+                "the same client message id in another conversation is another turn and must run, " +
+                    "not be ignored as a re-send. Got: ${frames.map { it::class.simpleName }}",
             )
-            emit(
-                RuntimeEventDraft(
-                    backendId = BackendId("harness"), runtimeId = RuntimeId("harness"),
-                    agentId = command.agentId, conversationId = command.conversationId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
-                ),
-            )
-        }
-    }
-
-    /** Emits a single excessively large frame to exercise the OOM guard line buffer. */
-    private class BigFrameController(
-        delegate: AppServerController = FakeAppServerController(),
-    ) : AppServerController by delegate {
-        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
-            // Emit a frame larger than MAX_LINE_BYTES (1MB) to trigger the overflow guard
-            val big = "x".repeat(2_000_000)
-            emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
-                payload = RuntimeEventPayload.RemoteStreamFrame("big", "big", "assistant_message", big)))
-            emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
-                payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
+            collector.cancel()
+        } finally {
+            runCatching { transport.disconnect() }
+            runCatching { server.shutdown() }
         }
     }
 
     @Test
     fun largeFrameDoesNotCauseOom() = runBlocking {
         val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
-        server.create(); server.start(BigFrameController())
+        server.create(); server.start(ScriptedReplyController { BIG_REPLY })
         val transport = IrohChannelTransport(scope = clientScope, onConnect = {}, forcedIrohUrl = "iroh://${server.ticketString()}")
         try {
             transport.connect("iroh://${server.ticketString()}", "", "h", "h")
-            val frames = mutableListOf<ServerFrame>()
+            val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
             val collector = clientScope.async { transport.events.collect { frames.add(it) } }
             transport.send("a", "c", "hi", "otid-1", null, false)
             withTimeout(15.seconds) { while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50.milliseconds) }
             // Should have completed without OOM — the big frame should be handled gracefully
             assertTrue(frames.any { it is ServerFrame.TurnDone }, "Turn should complete even with oversized frame")
+            assertTrue(
+                frames.any { it is ServerFrame.AssistantMessage && it.content == BIG_REPLY },
+                "the oversized assistant frame must arrive whole (frame_part chunking), not be dropped",
+            )
             collector.cancel()
         } finally { runCatching { transport.disconnect() }; runCatching { server.shutdown() } }
     }
 
+    /**
+     * A host controller whose turns answer with one assistant message, after [latency], and then
+     * complete. It emits what the real turn engine emits for that: the App Server's `stream_delta`
+     * envelope as a remote stream frame, stamped with the turn's stream identity, then a Completed
+     * lifecycle. A bare text body is not a frame the engine ever produces; the node drops it.
+     */
+    private class ScriptedReplyController(
+        private val latency: Duration = Duration.ZERO,
+        delegate: AppServerController = FakeAppServerController(),
+        private val reply: (String) -> String,
+    ) : AppServerController by delegate {
+        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
+            val input = command.input as TurnInput.UserMessage
+            val identity = turnStreamIdentityFor(input.localMessageId)
+            delay(latency)
+            emit(requireNotNull(identity.stampDraft(command.draft(assistantFrame(command, input, reply(input.text))))))
+            delay(latency / 2)
+            emit(command.draft(RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
+        }
+
+        private fun TurnCommand.draft(payload: RuntimeEventPayload) = RuntimeEventDraft(
+            backendId = BackendId("harness"),
+            runtimeId = RuntimeId("harness"),
+            agentId = agentId,
+            conversationId = conversationId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = payload,
+        )
+
+        private fun assistantFrame(command: TurnCommand, input: TurnInput.UserMessage, text: String): RuntimeEventPayload {
+            val messageId = "harness-msg-${input.localMessageId}"
+            val envelope = buildJsonObject {
+                put("type", "stream_delta")
+                put("runtime", buildJsonObject {
+                    put("agent_id", command.agentId.value)
+                    put("conversation_id", command.conversationId.value)
+                })
+                // Unique per frame, as the App Server mints it: the host relays a frame key only once.
+                put("idempotency_key", "harness-delta-${java.util.UUID.randomUUID()}")
+                put("delta", buildJsonObject {
+                    put("message_type", "assistant_message")
+                    put("id", messageId)
+                    put("content", text)
+                })
+            }
+            return RuntimeEventPayload.RemoteStreamFrame(
+                frameId = "harness-frame-${input.localMessageId}",
+                messageId = messageId,
+                messageType = "assistant_message",
+                body = envelope.toString(),
+            )
+        }
+    }
+
     private companion object {
         const val ASSISTANT_REPLY = "harness-assistant-reply-OK"
+
+        /** Larger than one 1 MiB Iroh frame, so the host must send it as frame parts. */
+        val BIG_REPLY = "x".repeat(2_000_000)
+
+        /** Echoes the turn index of a `turn-N` prompt, so each turn's reply is distinguishable. */
+        fun replyForTurn(prompt: String): String = "reply-for-turn-${prompt.substringAfterLast('-')}"
     }
 }
 

@@ -12,8 +12,6 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationClass
 import com.letta.mobile.data.model.ConversationId
 import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -27,15 +25,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import org.junit.After
-import org.junit.Assume.assumeTrue
-import org.junit.Before
 
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-bn008.3: OPT-IN real-loopback probe for the full receive path.
- * A sender (bn008.2) dials a receiver; the inbound message lands in the correct
- * INTERACTIVE conversation and triggers exactly one turn — and never lands in the
+ * Real-loopback probe for the full receive path (relays disabled, so it
+ * needs no network beyond this machine and runs in the default jvmTest).
+ * A sender dials a receiver; an unaddressed message lands in the agent's inbox (the
+ * conversation tagged `lane:inbox`) and triggers exactly one turn — and never lands in the
  * heartbeat (autonomous) conversation.
  *
  * letta-mobile-xmpqm: the receiver address is now published as ONE host
@@ -61,10 +58,6 @@ class IrohAgentMessageReceiveE2ETest {
     }
 
 
-    @Before fun requireOptIn() {
-        assumeTrue("set -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
-    }
-
     private lateinit var senderEp: Endpoint
     private var host: IrohNodeEndpoint? = null
     private val hostScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -83,6 +76,7 @@ class IrohAgentMessageReceiveE2ETest {
      */
     private suspend fun startHost(receiver: IrohAgentMessageReceiver): IrohNodeEndpoint =
         IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
             scope = hostScope,
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("some-other-paired-peer")),
             protocolHandlers = listOf(receiver),
@@ -103,12 +97,19 @@ class IrohAgentMessageReceiveE2ETest {
         return store
     }
 
-    private fun bindSender(): Endpoint =
-        runBlocking { Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode())).also { it.online() } }
-            .also { senderEp = it }
+    private fun bindSender(): Endpoint = runBlocking { bindLoopbackEndpoint() }.also { senderEp = it }
 
     private fun interactive(id: String, at: String) = IrohAgentMessageRouter.ConversationState(
         Conversation(ConversationId(id), AgentId("agent-recv"), conversationClass = ConversationClass.INTERACTIVE, lastMessageAt = at), busy = false,
+    )
+
+    /** The agent's inbox: an interactive conversation tagged `lane:inbox`, where an unaddressed message lands. */
+    private fun inbox(id: String, at: String) = IrohAgentMessageRouter.ConversationState(
+        Conversation(
+            ConversationId(id), AgentId("agent-recv"), conversationClass = ConversationClass.INTERACTIVE,
+            lastMessageAt = at, tags = listOf("lane:inbox"),
+        ),
+        busy = false,
     )
     private fun heartbeat(id: String, at: String) = IrohAgentMessageRouter.ConversationState(
         Conversation(ConversationId(id), AgentId("agent-recv"), conversationClass = ConversationClass.AUTONOMOUS, lastMessageAt = at), busy = false,
@@ -136,7 +137,7 @@ class IrohAgentMessageReceiveE2ETest {
                 // The heartbeat conversation is MORE recent, but must be skipped.
                 listOf(
                     heartbeat("hb", "2026-07-17T12:00:00Z"),
-                    interactive("chat", "2026-07-17T10:00:00Z"),
+                    inbox("chat", "2026-07-17T10:00:00Z"),
                 )
             },
             onDeliver = { _, decision ->
@@ -164,8 +165,10 @@ class IrohAgentMessageReceiveE2ETest {
         // letta-mobile-5nspp: the receiver MUST emit a2a.recv BEFORE ack/decision,
         // so the sensor sees the inbound even if downstream drops/rewrites it.
         // The recv and route telemetry must pair 1:1 (a route without a recv is a bug).
-        val recvEvents = com.letta.mobile.util.Telemetry.events.value
-            .drop(initialEventCount)
+        // The history is newest-first: the events since the send are its head.
+        val history = com.letta.mobile.util.Telemetry.events.value
+        val recvEvents = history
+            .take(history.size - initialEventCount)
             .filter { it.name == "a2a.recv" && it.attrs["msgId"]?.textOrNull == "m-1" }
         assertEquals(
             1,
