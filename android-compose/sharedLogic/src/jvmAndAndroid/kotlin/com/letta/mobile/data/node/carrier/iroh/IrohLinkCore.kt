@@ -39,6 +39,7 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
     private val onEnd = CopyOnWriteArrayList<() -> Unit>()
 
     /** The link's coroutines (stream readers, the close watcher); cancelled when the link ends. */
+    @Suppress("NoDetachedCoroutineLifecycle") // A child of the caller's scope; the link's end cancels its job.
     val scope: CoroutineScope = CoroutineScope(parent.coroutineContext + job)
 
     /** Null while the link is open; then why it ended. */
