@@ -9001,6 +9001,10 @@ public final class com/letta/mobile/data/canvas/NotebookPeerGrant$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/canvas/NotebookProjectionLifecycleKt {
+	public static final fun pollProjectionsWhile (Lcom/letta/mobile/data/canvas/NotebookLocalStore;Lkotlinx/coroutines/flow/Flow;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/canvas/NotebookProjectionResult : java/lang/Enum {
 	public static final field CONFLICT Lcom/letta/mobile/data/canvas/NotebookProjectionResult;
 	public static final field ERROR Lcom/letta/mobile/data/canvas/NotebookProjectionResult;
