@@ -109,6 +109,15 @@ open class SubagentRepository(
     private val dismissedKeys = mutableSetOf<Triple<String, String, String>>()
     private val terminalKeys = mutableSetOf<Triple<String, String, String>>()
 
+    private val pushesReceived = kotlinx.atomicfu.atomic(0L)
+    // The pushes received so far, reported with the last push's conversation and active count at most once per window.
+    private val pushReport = com.letta.mobile.util.flight.LatestReporter<Triple<Long, String, Int>>(
+        repositoryScope, PUSH_REPORT_MS,
+    ) { (received, conversationId, active) ->
+        Telemetry.event(
+            "SubagentRepo", "push.received", "conversationId" attr conversationId, "received" attr received, "active" attr active,
+        )
+    }
     private val pushJob = repositoryScope.launch { observePushEvents() }
     private val reconnectJob = repositoryScope.launch { observeReconnects() }
     // letta-mobile-ulcg6 (RC1): liveness check. Periodic sweep that VERIFIES
@@ -498,6 +507,9 @@ open class SubagentRepository(
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
             if (frame !is ServerFrame.SubagentsUpdated) return@collect
+            pushReport.offer(
+                Triple(pushesReceived.incrementAndGet(), frame.parentConversationId ?: UNSCOPED_LABEL, frame.subagentsActive.size),
+            )
             // mergeSnapshot stamps lastSeenAtMs for the liveness check (ve08r AC#4).
             stateMutex.withLock {
                 state.value = mergeSnapshot(
@@ -644,6 +656,9 @@ open class SubagentRepository(
         // is dropped - not failed - so it cannot pin a chip forever.
         internal const val UNVERIFIABLE_SILENCE_MS = 30 * 60_000L
         private const val UNSCOPED_LABEL = "<unscoped>"
+
+        /** Longest the running count of received subagent pushes goes unreported while pushes keep arriving. */
+        private const val PUSH_REPORT_MS = 5_000L
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,

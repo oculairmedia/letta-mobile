@@ -945,6 +945,10 @@ Portable palette, spacing, shape, motion and chat tokens. Compose theme construc
 
 Formatting, telemetry and coroutine/error helpers. Platform actuals supply logging/time-format details so portable callers need not import operating-system utilities. Keep domain workflows and sensitive payload logging outside general helpers; bind telemetry through [TelemetryDelegate](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.util/-telemetry-delegate/index.html) and platform formatting through the declared expect/actual functions.
 
+# Package com.letta.mobile.util.flight
+
+The client's flight record: a small, bounded record of its own connection, turn and feed telemetry that outlives logcat, so a "wedged" conversation can be read from the client side after the fact. [FlightRecording](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.util.flight/-flight-recording/index.html) attaches to the host's TelemetryRecorder and writes the events its policy selects (ids, seqs, states, counts and timings, never content) off the caller's thread, rate-limited per event. Android and desktop keep it in a rotating file pair (`files/telemetry/flight-record.log`, `~/.letta-mobile/logs/flight-record.log`); the browser has no file system here and keeps it in memory behind the same store interface.
+
 # Package com.letta.mobile.util.time
 
 The one relative-age label ("5m", "3h", "2mo") and the one duration label ("340ms", "4.2s", "1m 12s") every surface shows, through [TimeLabels](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.util.time/-time-labels/index.html). The package imports nothing of the app's, so any UI or data package can use it without an import cycle. Signed countdowns (ScheduleFormat.relative) and metric-tile value/unit pairs (FormatHelpers) are separate idioms and stay where they are.

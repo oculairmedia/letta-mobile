@@ -16,7 +16,9 @@ import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.timeline.handover.HandedOverPrompts
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.platform.MemoryPressure
+import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TimelineOpenTrace
+import com.letta.mobile.util.attr
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -223,6 +225,17 @@ class CanonicalTimelinePresentation private constructor(
      */
     val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
 
+    /**
+     * The live list handed to the chat list, for the flight record: its row count and its first row's key (an id, never
+     * content), at most once per window.
+     */
+    private val liveReport = com.letta.mobile.util.flight.LatestReporter<Pair<Int, String?>>(scope, LIVE_REPORT_MS) { (rows, first) ->
+        Telemetry.event(
+            "CanonicalTimeline", "live.published", "conversationId" attr conversationId.value, "rows" attr rows,
+            "firstRow" attr first, "feedBacked" attr isFeedBacked,
+        )
+    }
+
     // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
     private val liveProjection: Flow<List<ChatRenderItem>> = feedRows?.let(::feedProjection) ?: createLiveProjection()
 
@@ -334,7 +347,12 @@ class CanonicalTimelinePresentation private constructor(
     }
 
     init {
-        scope.launch { liveProjection.collect { mutableLive.value = it } }
+        scope.launch {
+            liveProjection.collect {
+                mutableLive.value = it
+                liveReport.offer(it.size to it.firstOrNull()?.key)
+            }
+        }
         feedRows?.let { rows -> scope.launch { confirmFeedEchoes(rows) } }
     }
 
@@ -574,6 +592,9 @@ private fun TimelinePageKey.ledgerTimestamp(): String =
     if (order > 0) Instant.fromEpochMilliseconds(order).toString() else ""
 
 private const val SETTLE_POLLS_PER_QUIET_PERIOD = 5
+
+/** Longest a changing live list goes unreported to the flight record. */
+private const val LIVE_REPORT_MS = 5_000L
 
 /** A conversation's rows from the host feed, built in the scope given; null until its first read (FeedTimelineSource.rowsFor). */
 typealias TimelineFeedRows = (CoroutineScope) -> StateFlow<List<ChatRenderItem>?>

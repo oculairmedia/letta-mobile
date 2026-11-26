@@ -24,7 +24,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.data.settings.NotificationSettings
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.platform.BatteryOptimizationHelper
-import com.letta.mobile.runtime.local.RotatingLineFile
+import com.letta.mobile.util.flight.RotatingLineFile
 import com.letta.mobile.runtime.local.runtimeLifecycleLogFile
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.notify.LocalAttentionPrefs

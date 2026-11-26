@@ -29,8 +29,10 @@ import javax.inject.Inject
 class LettaApplication : Application(), SingletonImageLoader.Factory {
     private val telemetryRecorder = com.letta.mobile.util.TelemetryRecorder()
     private val telemetryRecording = com.letta.mobile.util.Telemetry.installRecorder(telemetryRecorder)
+    private var flightRecording: AutoCloseable? = null
 
     override fun onTerminate() {
+        flightRecording?.close()
         telemetryRecording.close()
         super.onTerminate()
     }
@@ -77,6 +79,10 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         com.letta.mobile.util.Telemetry.delegate = com.letta.mobile.util.AndroidTelemetryDelegate()
+        // Connection, turn and feed telemetry kept past logcat: `adb shell run-as <package> cat files/telemetry/flight-record.log`.
+        flightRecording = com.letta.mobile.util.flight.installFileFlightRecording(
+            telemetryRecorder, java.io.File(filesDir, "telemetry"), BuildConfig.VERSION_NAME,
+        )
         // Core-loop capture is opt-in on the root debug flavour; release never enables it.
         com.letta.mobile.util.Telemetry.renderDiagEnabled.set(
             BuildConfig.DEBUG && BuildConfig.FLAVOR == "root" &&

@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.util.flight.RotatingLineFile
 import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
