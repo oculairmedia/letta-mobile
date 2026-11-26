@@ -69,11 +69,14 @@ The App Server runs `/root/.bun/bin/letta` (a symlink to an install's `letta.js`
 via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: never swap it.
 
 1. **Stage the merged runtime-patch loader first** ([appserver-runtime-patches.md](appserver-runtime-patches.md))
-   and confirm `lcp-patches applied=<N> skipped=0` on the old bundle.
-2. **Install side by side**: `mkdir -p /root/letta-code-<new> && cd $_ && npm install --no-audit --no-fund @letta-ai/letta-code@<new>`.
+   and confirm `lcp-patches applied=<N> skipped=0` on the old bundle. `<N>` is the loader's patch count
+   (36 since letta-code 0.34.70); `survey` prints it as the repo loader's `applied=`.
+2. **Install side by side** (this leaves the shell in the install directory; the commands below use absolute paths):
+   `mkdir -p /root/letta-code-<new> && cd $_ && npm install --no-audit --no-fund @letta-ai/letta-code@<new>`.
 3. **Service Node, if the engines floor needs it**: the official tarball, verified against `SHASUMS256.txt`, into `/opt/meridian/node/v<ver>/`.
-4. **Pre-flight on the exact install**: `node scripts/appserver/letta-code-upgrade.mjs survey <new> --package-root /root/letta-code-<new>`
-   must report READY; `<node> <letta.js> --version`; and
+4. **Pre-flight on the exact install**, with `<letta.js>` = `/root/letta-code-<new>/node_modules/@letta-ai/letta-code/letta.js`:
+   `~/.nvm/versions/node/v24.18.0/bin/node <checkout>/scripts/appserver/letta-code-upgrade.mjs survey <new> --package-root /root/letta-code-<new>`
+   must report READY; `<service node> <letta.js> --version`; and
    `LETTA_BIN=<letta.js> bash /usr/local/lib/meridian/check-image-support.sh` (sharp at the pinned version, a successful probe resize).
 5. **Check who else uses the symlink**: `grep -rl /root/.bun/bin/letta /etc/systemd`.
 6. **Wait for workers inside the App Server to finish, or back up their work.** The restart kills every
@@ -82,9 +85,10 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    ```bash
    install -m 0755 <checkout>/scripts/deploy/letta-code-host-cutover.sh /usr/local/sbin/
    systemd-run --unit=letta-code-cutover --collect --no-block \
-     env EXPECTED_PATCHES=<N> /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
+     env EXPECTED_PATCHES=36 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
-   It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
+   Always pass `EXPECTED_PATCHES` (36 for the 0.34.70 loader): the script's default, 28, predates the
+   current loader and would roll back a healthy cutover. It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
    `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts once, and requires a new
    boot line `lcp-patches applied=<N> skipped=0`, the new node and env in the live process and the
    `:4500` listener in the service's cgroup. On any failure it restores all three and restarts.
