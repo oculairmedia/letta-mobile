@@ -91,6 +91,8 @@ name = "core-proto"
 version = "0.1.0"
 dependencies = [
  "core-testkit",
+ "hex",
+ "lru",
  "proptest",
  "serde",
  "serde_json",
@@ -101,6 +103,7 @@ dependencies = [
 name = "core-testkit"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "serde",
  "serde_json",
  "thiserror",
@@ -174,6 +177,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "735eaa21a6a5ffb2e84362faaeb90c05ba8e19797ca30428478cb6ea3a4921bc"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,6 +209,12 @@ name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
+name = "lru"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4e2a1b977b42ee8b53a2a4adbd1183431c493f1d1960b7ccd893e2f0b9407ba"
 
 [[package]]
 name = "memchr"

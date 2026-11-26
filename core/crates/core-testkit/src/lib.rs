@@ -5,7 +5,6 @@
 //! The fixtures are found relative to this crate (`core/crates/core-testkit` is three levels below
 //! the repository root). Set `BAKEN_CONTRACTS_DIR` to read them from somewhere else.
 
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -141,41 +140,14 @@ impl ByteVector {
 /// # Errors
 ///
 /// [`FixtureError::Bytes`] for an odd length or a non-hex digit.
-pub fn decode_hex(hex: &str) -> Result<Vec<u8>, FixtureError> {
-    let digits = hex.as_bytes();
-    if !digits.len().is_multiple_of(2) {
-        return Err(FixtureError::Bytes(format!("odd-length hex {hex:?}")));
-    }
-    digits
-        .chunks_exact(2)
-        .map(|pair| {
-            let high = hex_value(pair[0]);
-            let low = hex_value(pair[1]);
-            match (high, low) {
-                (Some(high), Some(low)) => Ok((high << 4) | low),
-                _ => Err(FixtureError::Bytes(format!("non-hex digit in {hex:?}"))),
-            }
-        })
-        .collect()
+pub fn decode_hex(text: &str) -> Result<Vec<u8>, FixtureError> {
+    hex::decode(text).map_err(|error| FixtureError::Bytes(format!("{error} in {text:?}")))
 }
 
 /// Encodes bytes as lowercase hex, for readable assertion failures.
 #[must_use]
 pub fn encode_hex(bytes: &[u8]) -> String {
-    let mut text = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        let _ = write!(text, "{byte:02x}");
-    }
-    text
-}
-
-const fn hex_value(digit: u8) -> Option<u8> {
-    match digit {
-        b'0'..=b'9' => Some(digit - b'0'),
-        b'a'..=b'f' => Some(digit - b'a' + 10),
-        b'A'..=b'F' => Some(digit - b'A' + 10),
-        _ => None,
-    }
+    hex::encode(bytes)
 }
 
 #[cfg(test)]

@@ -34,13 +34,7 @@ impl NodeId {
     /// The canonical text form: 64 lowercase hex characters.
     #[must_use]
     pub fn to_hex(&self) -> String {
-        const DIGITS: &[u8; 16] = b"0123456789abcdef";
-        let mut text = String::with_capacity(Self::BYTES * 2);
-        for byte in self.0 {
-            text.push(char::from(DIGITS[usize::from(byte >> 4)]));
-            text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
-        }
-        text
+        hex::encode(self.0)
     }
 }
 
@@ -53,23 +47,13 @@ impl FromStr for NodeId {
     type Err = NodeIdError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let digits = text.as_bytes();
-        if digits.len() != Self::BYTES * 2 {
+        // `hex` accepts either case; the canonical spelling is lowercase only.
+        if text.bytes().any(|digit| digit.is_ascii_uppercase()) {
             return Err(NodeIdError);
         }
         let mut bytes = [0_u8; 32];
-        for (byte, pair) in bytes.iter_mut().zip(digits.chunks_exact(2)) {
-            *byte = (lower_hex_value(pair[0])? << 4) | lower_hex_value(pair[1])?;
-        }
+        hex::decode_to_slice(text, &mut bytes).map_err(|_| NodeIdError)?;
         Ok(Self(bytes))
-    }
-}
-
-const fn lower_hex_value(digit: u8) -> Result<u8, NodeIdError> {
-    match digit {
-        b'0'..=b'9' => Ok(digit - b'0'),
-        b'a'..=b'f' => Ok(digit - b'a' + 10),
-        _ => Err(NodeIdError),
     }
 }
 
