@@ -57,6 +57,8 @@ internal fun mayReadFeed(conversation: String, agent: AgentId?, context: AdminRp
  */
 internal class FeedRouteSet(private val journal: FeedJournalStore, private val pushes: Boolean = false) : AdminRpcRoutes {
     override fun register(router: AdminRpcRouter) {
+        // [owner] below resolves and checks the journal's recorded owner itself, failing closed for a scoped peer.
+        router.handlerOwnedConversationScope += ConversationFeedWire.SUBSCRIBE
         router.registerScoped(ConversationFeedWire.SUBSCRIBE) { params, context ->
             if (!journal.epochPersisted) refuse(OUTCOME_UNAVAILABLE, UNAVAILABLE)
             val request = FeedRequest.parse(params)

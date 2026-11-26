@@ -96,6 +96,11 @@ class WireContractsTest {
                             authenticatedEndpointId = context["authenticated_endpoint_id"]?.jsonPrimitive?.content,
                         ),
                     )
+                    // letta-mobile-wisqe.2: the router resolves the owner of every conversation an agent-scoped case
+                    // names. Each case addresses a conversation of the agent it names, which the host's records here
+                    // agree with; the owner check itself (foreign, unknown, failing) is AgentScopeGuardTest's.
+                    val namedAgent = invocation.params?.get("agent_id")?.jsonPrimitive?.content
+                    router.conversationOwner = { namedAgent }
                     val response = Json.parseToJsonElement(router.dispatch(invocation)).jsonObject
                     assertEquals(LettaJsMessagePaging.expanded(fixture.response(name)), response, "${fixture.method}/$name wire response")
                 }

@@ -133,7 +133,12 @@ class IrohNodeEndpoint(
      * every conversation (see [ViewerHandle.receivesConversationEvents]), on its stream channel.
      */
     fun conversationChangeTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
-        val result = connectionRegistry.broadcast(frame) { it.receivesConversationEvents() }
+        // letta-mobile-wisqe.2: the frame names a conversation and its agent; agent-scoped peers get only their agents'.
+        val agent = runCatching {
+            (kotlinx.serialization.json.Json.parseToJsonElement(frame) as? kotlinx.serialization.json.JsonObject)
+                ?.get("agent_id")?.let { it as? kotlinx.serialization.json.JsonPrimitive }?.content
+        }.getOrNull()
+        val result = connectionRegistry.broadcast(frame) { it.receivesConversationUpdateOf(agent) }
         Telemetry.event(
             "IrohNode",
             "conversation_updated.broadcast",

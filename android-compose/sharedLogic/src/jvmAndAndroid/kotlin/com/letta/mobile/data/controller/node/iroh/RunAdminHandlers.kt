@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -25,12 +27,14 @@ object RunAdminHandlers {
             store.listRunsProjected(runQuery(params))
                 ?: adminError("run.list could not read the local backend run store")
         }
-        router.register("run.get") { params ->
+        router.registerScoped("run.get") { params, context ->
             val runId = params.requireParam(AdminParamKey("run_id"))
+            requireRunInAgentScope(store, runId, context)
             store.getRunProjected(runId) ?: adminError("run $runId not found")
         }
-        router.register("step.list") { params ->
+        router.registerScoped("step.list") { params, context ->
             val runId = params.requireParam(AdminParamKey("run_id"))
+            requireRunInAgentScope(store, runId, context)
             // admin-shim 404s the steps route for an unknown run rather than
             // serving an empty page; preserve that so callers can tell "no such
             // run" from "run with no steps".
@@ -38,6 +42,17 @@ object RunAdminHandlers {
             store.listStepsProjected(runId, stepQuery(params))
                 ?: adminError("step.list could not read the local backend run store")
         }
+    }
+
+    /**
+     * letta-mobile-wisqe.2: a run is addressed only by its id, so the router's agent guard never sees its agent. An
+     * agent-scoped peer may read a run (or its steps) only when the run's recorded agent is in its scope; a run it
+     * cannot see and a run that does not exist answer the same denial.
+     */
+    private fun requireRunInAgentScope(store: LocalBackendAdminStore, runId: String, context: AdminRpcRequestContext) {
+        val scope = context.authorizedAgentIds ?: return
+        val owner = store.getRunProjected(runId)?.get("agent_id")?.let { it as? JsonPrimitive }?.contentOrNull
+        if (owner == null || owner !in scope) adminError(AgentScopeGuard.DENIED)
     }
 
     /** Port of admin-shim `handleRunsList`'s query-param mapping. */

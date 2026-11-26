@@ -98,6 +98,7 @@ object ConversationAdminHandlers {
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
+        router.conversationOwner = { id -> conversationOwner(nativeClient, id) }
         // Without a local store there is no cheap change signal, so every list is fetched as before.
         val heldList = tiers.localBackendStore?.let { store ->
             HeldListCache(
@@ -113,6 +114,20 @@ object ConversationAdminHandlers {
         registerConversationReadRoutes(router, nativeClient, tiers, heldList)
         registerConversationWriteRoutes(router, nativeClient, tiers.localBackendStore, controller, onChanged)
         registerMessageRoutes(router, nativeClient, tiers.localBackendStore, tiers.turnIdentity)
+    }
+
+    /**
+     * The agent that owns [conversationId] by the host's own records: a `conv-default-<agent>` alias names it, any
+     * other id is the App Server's `conversation_retrieve` row. Null (no client, refused, no owner field) denies an
+     * agent-scoped peer at [AdminRpcRouter.preauthorize].
+     */
+    private suspend fun conversationOwner(client: AppServerClient?, conversationId: String): String? {
+        resolveConversationReadTarget(ConversationId(conversationId))?.second?.let { return it.value }
+        val response = client?.conversationRetrieve(
+            AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = conversationId),
+        ) ?: return null
+        val owner = response.conversation?.get("agent_id") as? JsonPrimitive
+        return owner?.takeIf { response.success && it.isString }?.content?.takeIf { it.isNotBlank() }
     }
 
     private fun registerConversationReadRoutes(
@@ -350,6 +365,7 @@ object ConversationAdminHandlers {
         // Server's own list already drops them (`include_hidden` defaults off); this covers the
         // on-disk list_agent tier, which did not.
         val visible = result.filterNot { element -> (element as? JsonObject)?.isHiddenConversation() == true }
+            .filter { element -> ownerInAgentScope(element, context.authorizedAgentIds) }
         val authorized = context.authorizedConversationIds ?: return JsonArray(visible)
         val filtered = visible.filter { element ->
             val id = (element as? JsonObject)?.get("id")?.let { it as? JsonPrimitive }?.contentOrNull
@@ -670,6 +686,16 @@ object ConversationAdminHandlers {
         pageSize: Int,
         pageLimit: Int,
     ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
+
+    /**
+     * letta-mobile-wisqe.2: an agent-scoped peer lists only conversations owned by an agent in its scope. A row naming
+     * no agent is dropped too: the router's result filter keeps such rows, and this peer could never open one.
+     */
+    private fun ownerInAgentScope(row: JsonElement, scope: Set<String>?): Boolean {
+        if (scope == null) return true
+        val owner = ((row as? JsonObject)?.get("agent_id") as? JsonPrimitive)?.contentOrNull
+        return owner != null && owner in scope
+    }
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
         if (!context.canAccessConversation(conversationId) || !aliasOwnerInScope(context, conversationId)) {

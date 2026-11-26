@@ -155,7 +155,10 @@ internal class FakeNativeClient(
         AppServerInboundFrame.ConversationRetrieveResponse(
             requestId = command.requestId,
             success = true,
-            conversation = buildJsonObject { put("id", command.conversationId) },
+            conversation = buildJsonObject {
+                put("id", command.conversationId)
+                conversationAgentIds[command.conversationId]?.let { put("agent_id", it) }
+            },
         ),
     )
 

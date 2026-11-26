@@ -48,6 +48,9 @@ class CanvasMountRoutes internal constructor(
             Telemetry.event(CANVAS_MOUNT_TAG, "routes.withheld", "reason" attr "insecure_policy")
             return
         }
+        // The mount authority requires the host's own record to say the conversation belongs to the addressed agent,
+        // which must be in the connection's agent scope, and answers its own uniform denial.
+        router.handlerOwnedConversationScope += CanvasMountWire.METHODS
         val handlers = CanvasMountHandlers(host)
         CanvasMountRoute.entries.forEach { route ->
             router.registerScoped(route.method) { params, context -> handlers.handle(route, params, context) }

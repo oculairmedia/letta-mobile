@@ -38,6 +38,17 @@ interface ViewerHandle {
     fun receivesConversationEvents(): Boolean = false
 
     /**
+     * Whether this connection may receive the `conversation_updated` push of a conversation owned by [agentId] (null:
+     * the frame names no agent). Beyond [receivesConversationEvents], an agent-scoped peer gets only conversations of
+     * agents in its scope, and none naming no agent (letta-mobile-wisqe.2). Evaluated at send time.
+     */
+    fun receivesConversationUpdateOf(agentId: String?): Boolean {
+        if (!receivesConversationEvents()) return false
+        val scope = adminContext()?.authorizedAgentIds ?: return true
+        return agentId != null && agentId in scope
+    }
+
+    /**
      * Whether this connection may receive the host's `pins_updated` pushes, which name every pinned agent on
      * the host: the peer must be authenticated, allowed to read agents, and not bounded to some agents (the
      * same peers `pins.get` answers). Evaluated at send time. Default: only through those two checks.
