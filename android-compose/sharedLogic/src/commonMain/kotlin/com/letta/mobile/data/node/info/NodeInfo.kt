@@ -72,7 +72,8 @@ data class StoreFormatVersion(val major: Int, val minor: Int) {
  *   it has no source (its App Server is supervised elsewhere, or the boot line was not seen yet).
  * @property applied patches the loader applied, when known.
  * @property skipped patches the loader skipped (an anchor that no longer matches), when known.
- * @property digest a stable hash of the applied patch ids, when the node can see them; null otherwise.
+ * @property digest the sha256 (lowercase hex) of the sorted applied patch ids, the `lcp:` part of the
+ *   runtime parity string `letta-code@<version>+lcp:<digest>`, when the node can see them; null otherwise.
  */
 @Serializable
 data class RuntimePatchSet(

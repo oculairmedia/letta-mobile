@@ -2208,6 +2208,55 @@ final enum class com.letta.mobile.data.node.carrier/NodeLane : kotlin/Enum<com.l
     final fun values(): kotlin/Array<com.letta.mobile.data.node.carrier/NodeLane> // com.letta.mobile.data.node.carrier/NodeLane.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.node.info/NodeAvailability : kotlin/Enum<com.letta.mobile.data.node.info/NodeAvailability> { // com.letta.mobile.data.node.info/NodeAvailability|null[0]
+    enum entry COMPATIBLE // com.letta.mobile.data.node.info/NodeAvailability.COMPATIBLE|null[0]
+    enum entry LIMITED // com.letta.mobile.data.node.info/NodeAvailability.LIMITED|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.data.node.info/NodeAvailability.UNAVAILABLE|null[0]
+    enum entry UNVERIFIED // com.letta.mobile.data.node.info/NodeAvailability.UNVERIFIED|null[0]
+
+    final val entries // com.letta.mobile.data.node.info/NodeAvailability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.node.info/NodeAvailability> // com.letta.mobile.data.node.info/NodeAvailability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.node.info/NodeAvailability // com.letta.mobile.data.node.info/NodeAvailability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.node.info/NodeAvailability> // com.letta.mobile.data.node.info/NodeAvailability.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.node.info/NodeCapability : kotlin/Enum<com.letta.mobile.data.node.info/NodeCapability> { // com.letta.mobile.data.node.info/NodeCapability|null[0]
+    enum entry ALWAYS_ON // com.letta.mobile.data.node.info/NodeCapability.ALWAYS_ON|null[0]
+    enum entry APPROVE // com.letta.mobile.data.node.info/NodeCapability.APPROVE|null[0]
+    enum entry CATALOG // com.letta.mobile.data.node.info/NodeCapability.CATALOG|null[0]
+    enum entry EXECUTE // com.letta.mobile.data.node.info/NodeCapability.EXECUTE|null[0]
+    enum entry STORE // com.letta.mobile.data.node.info/NodeCapability.STORE|null[0]
+    enum entry UI // com.letta.mobile.data.node.info/NodeCapability.UI|null[0]
+
+    final val entries // com.letta.mobile.data.node.info/NodeCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wireName // com.letta.mobile.data.node.info/NodeCapability.wireName|{}wireName[0]
+        final fun <get-wireName>(): kotlin/String // com.letta.mobile.data.node.info/NodeCapability.wireName.<get-wireName>|<get-wireName>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.node.info/NodeCapability // com.letta.mobile.data.node.info/NodeCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeCapability.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.info/NodeCapability.Companion|null[0]
+        final fun fromWire(kotlin/String): com.letta.mobile.data.node.info/NodeCapability? // com.letta.mobile.data.node.info/NodeCapability.Companion.fromWire|fromWire(kotlin.String){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.node.info/NodeIncompatibilityKind : kotlin/Enum<com.letta.mobile.data.node.info/NodeIncompatibilityKind> { // com.letta.mobile.data.node.info/NodeIncompatibilityKind|null[0]
+    enum entry LETTA_CODE // com.letta.mobile.data.node.info/NodeIncompatibilityKind.LETTA_CODE|null[0]
+    enum entry RUNTIME_PATCHES // com.letta.mobile.data.node.info/NodeIncompatibilityKind.RUNTIME_PATCHES|null[0]
+    enum entry SCHEMA // com.letta.mobile.data.node.info/NodeIncompatibilityKind.SCHEMA|null[0]
+    enum entry STORE_FORMAT // com.letta.mobile.data.node.info/NodeIncompatibilityKind.STORE_FORMAT|null[0]
+
+    final val blocks // com.letta.mobile.data.node.info/NodeIncompatibilityKind.blocks|{}blocks[0]
+        final fun <get-blocks>(): kotlin.collections/Set<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeIncompatibilityKind.blocks.<get-blocks>|<get-blocks>(){}[0]
+    final val entries // com.letta.mobile.data.node.info/NodeIncompatibilityKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.node.info/NodeIncompatibilityKind> // com.letta.mobile.data.node.info/NodeIncompatibilityKind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.node.info/NodeIncompatibilityKind // com.letta.mobile.data.node.info/NodeIncompatibilityKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.node.info/NodeIncompatibilityKind> // com.letta.mobile.data.node.info/NodeIncompatibilityKind.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.notify/AttentionSuppression : kotlin/Enum<com.letta.mobile.data.notify/AttentionSuppression> { // com.letta.mobile.data.notify/AttentionSuppression|null[0]
     enum entry ApprovalsDisabled // com.letta.mobile.data.notify/AttentionSuppression.ApprovalsDisabled|null[0]
     enum entry Attended // com.letta.mobile.data.notify/AttentionSuppression.Attended|null[0]
@@ -5343,6 +5392,15 @@ abstract fun interface com.letta.mobile.data.node.carrier/NodePeerAcceptor { // 
     abstract suspend fun serve(com.letta.mobile.data.node.carrier/NodePeerLink) // com.letta.mobile.data.node.carrier/NodePeerAcceptor.serve|serve(com.letta.mobile.data.node.carrier.NodePeerLink){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.node.info/RuntimePatchSetSource { // com.letta.mobile.data.node.info/RuntimePatchSetSource|null[0]
+    abstract fun current(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchSetSource.current|current(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.info/RuntimePatchSetSource.Companion|null[0]
+        final val Unknown // com.letta.mobile.data.node.info/RuntimePatchSetSource.Companion.Unknown|{}Unknown[0]
+            final fun <get-Unknown>(): com.letta.mobile.data.node.info/RuntimePatchSetSource // com.letta.mobile.data.node.info/RuntimePatchSetSource.Companion.Unknown.<get-Unknown>|<get-Unknown>(){}[0]
+    }
+}
+
 abstract fun interface com.letta.mobile.data.notify/AttentionFocus { // com.letta.mobile.data.notify/AttentionFocus|null[0]
     abstract fun isAttending(kotlin/String): kotlin/Boolean // com.letta.mobile.data.notify/AttentionFocus.isAttending|isAttending(kotlin.String){}[0]
 }
@@ -6517,6 +6575,18 @@ abstract interface com.letta.mobile.data.node.carrier/NodePeerLink { // com.lett
     abstract suspend fun close(com.letta.mobile.data.node.carrier/NodeLinkClosure = ...) // com.letta.mobile.data.node.carrier/NodePeerLink.close|close(com.letta.mobile.data.node.carrier.NodeLinkClosure){}[0]
     abstract suspend fun push(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodePeerLink.push|push(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
     abstract suspend fun sendControl(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodePeerLink.sendControl|sendControl(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+}
+
+abstract interface com.letta.mobile.data.node.info/NodeRuntimeFacts { // com.letta.mobile.data.node.info/NodeRuntimeFacts|null[0]
+    abstract fun lettaCodeVersion(): kotlin/String? // com.letta.mobile.data.node.info/NodeRuntimeFacts.lettaCodeVersion|lettaCodeVersion(){}[0]
+    abstract suspend fun models(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.node.info/NodeRuntimeFacts.models|models(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.info/NodeRuntimeFacts.Companion|null[0]
+        final val None // com.letta.mobile.data.node.info/NodeRuntimeFacts.Companion.None|{}None[0]
+            final fun <get-None>(): com.letta.mobile.data.node.info/NodeRuntimeFacts // com.letta.mobile.data.node.info/NodeRuntimeFacts.Companion.None.<get-None>|<get-None>(){}[0]
+
+        final fun of(kotlin/Function0<kotlin/String?>, kotlin.coroutines/SuspendFunction0<kotlin.collections/List<kotlin/String>>): com.letta.mobile.data.node.info/NodeRuntimeFacts // com.letta.mobile.data.node.info/NodeRuntimeFacts.Companion.of|of(kotlin.Function0<kotlin.String?>;kotlin.coroutines.SuspendFunction0<kotlin.collections.List<kotlin.String>>){}[0]
+    }
 }
 
 abstract interface com.letta.mobile.data.notify/AttentionPrefsRepository { // com.letta.mobile.data.notify/AttentionPrefsRepository|null[0]
@@ -14192,6 +14262,40 @@ sealed interface com.letta.mobile.data.node.carrier/NodeCredential { // com.lett
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.node.info/NodeHandshakeResult { // com.letta.mobile.data.node.info/NodeHandshakeResult|null[0]
+    final class Checked : com.letta.mobile.data.node.info/NodeHandshakeResult { // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked|null[0]
+        constructor <init>(com.letta.mobile.data.node.info/NodeCompatibility) // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.<init>|<init>(com.letta.mobile.data.node.info.NodeCompatibility){}[0]
+
+        final val compatibility // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.compatibility|{}compatibility[0]
+            final fun <get-compatibility>(): com.letta.mobile.data.node.info/NodeCompatibility // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.compatibility.<get-compatibility>|<get-compatibility>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.node.info/NodeCompatibility // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.node.info/NodeCompatibility = ...): com.letta.mobile.data.node.info/NodeHandshakeResult.Checked // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.copy|copy(com.letta.mobile.data.node.info.NodeCompatibility){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeHandshakeResult.Checked.toString|toString(){}[0]
+    }
+
+    final class Failed : com.letta.mobile.data.node.info/NodeHandshakeResult { // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.<init>|<init>(kotlin.String){}[0]
+
+        final val message // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.message.<get-message>|<get-message>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.node.info/NodeHandshakeResult.Failed // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeHandshakeResult.Failed.toString|toString(){}[0]
+    }
+
+    final object Legacy : com.letta.mobile.data.node.info/NodeHandshakeResult { // com.letta.mobile.data.node.info/NodeHandshakeResult.Legacy|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeHandshakeResult.Legacy.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeHandshakeResult.Legacy.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeHandshakeResult.Legacy.toString|toString(){}[0]
     }
 }
 
@@ -55306,6 +55410,220 @@ final class com.letta.mobile.data.node.carrier/NodeSession { // com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.node.info/NodeCompatibility { // com.letta.mobile.data.node.info/NodeCompatibility|null[0]
+    constructor <init>(com.letta.mobile.data.node.info/NodeInfo?, kotlin.collections/List<com.letta.mobile.data.node.info/NodeIncompatibility>) // com.letta.mobile.data.node.info/NodeCompatibility.<init>|<init>(com.letta.mobile.data.node.info.NodeInfo?;kotlin.collections.List<com.letta.mobile.data.node.info.NodeIncompatibility>){}[0]
+
+    final val availability // com.letta.mobile.data.node.info/NodeCompatibility.availability|{}availability[0]
+        final fun <get-availability>(): com.letta.mobile.data.node.info/NodeAvailability // com.letta.mobile.data.node.info/NodeCompatibility.availability.<get-availability>|<get-availability>(){}[0]
+    final val blocked // com.letta.mobile.data.node.info/NodeCompatibility.blocked|{}blocked[0]
+        final fun <get-blocked>(): kotlin.collections/Set<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeCompatibility.blocked.<get-blocked>|<get-blocked>(){}[0]
+    final val info // com.letta.mobile.data.node.info/NodeCompatibility.info|{}info[0]
+        final fun <get-info>(): com.letta.mobile.data.node.info/NodeInfo? // com.letta.mobile.data.node.info/NodeCompatibility.info.<get-info>|<get-info>(){}[0]
+    final val reasons // com.letta.mobile.data.node.info/NodeCompatibility.reasons|{}reasons[0]
+        final fun <get-reasons>(): kotlin.collections/List<com.letta.mobile.data.node.info/NodeIncompatibility> // com.letta.mobile.data.node.info/NodeCompatibility.reasons.<get-reasons>|<get-reasons>(){}[0]
+
+    final fun allows(com.letta.mobile.data.node.info/NodeCapability): kotlin/Boolean // com.letta.mobile.data.node.info/NodeCompatibility.allows|allows(com.letta.mobile.data.node.info.NodeCapability){}[0]
+    final fun component1(): com.letta.mobile.data.node.info/NodeInfo? // com.letta.mobile.data.node.info/NodeCompatibility.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.node.info/NodeIncompatibility> // com.letta.mobile.data.node.info/NodeCompatibility.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.node.info/NodeInfo? = ..., kotlin.collections/List<com.letta.mobile.data.node.info/NodeIncompatibility> = ...): com.letta.mobile.data.node.info/NodeCompatibility // com.letta.mobile.data.node.info/NodeCompatibility.copy|copy(com.letta.mobile.data.node.info.NodeInfo?;kotlin.collections.List<com.letta.mobile.data.node.info.NodeIncompatibility>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeCompatibility.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeCompatibility.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeCompatibility.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.info/NodeCompatibility.Companion|null[0]
+        final val LEGACY // com.letta.mobile.data.node.info/NodeCompatibility.Companion.LEGACY|{}LEGACY[0]
+            final fun <get-LEGACY>(): com.letta.mobile.data.node.info/NodeCompatibility // com.letta.mobile.data.node.info/NodeCompatibility.Companion.LEGACY.<get-LEGACY>|<get-LEGACY>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.node.info/NodeFacts { // com.letta.mobile.data.node.info/NodeFacts|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/String = ..., kotlin.collections/Set<com.letta.mobile.data.node.info/NodeCapability> = ..., com.letta.mobile.data.node.info/RuntimePatchSetSource = ...) // com.letta.mobile.data.node.info/NodeFacts.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.Set<com.letta.mobile.data.node.info.NodeCapability>;com.letta.mobile.data.node.info.RuntimePatchSetSource){}[0]
+
+    final val appVersion // com.letta.mobile.data.node.info/NodeFacts.appVersion|{}appVersion[0]
+        final fun <get-appVersion>(): kotlin/String // com.letta.mobile.data.node.info/NodeFacts.appVersion.<get-appVersion>|<get-appVersion>(){}[0]
+    final val capabilities // com.letta.mobile.data.node.info/NodeFacts.capabilities|{}capabilities[0]
+        final fun <get-capabilities>(): kotlin.collections/Set<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeFacts.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
+    final val os // com.letta.mobile.data.node.info/NodeFacts.os|{}os[0]
+        final fun <get-os>(): kotlin/String // com.letta.mobile.data.node.info/NodeFacts.os.<get-os>|<get-os>(){}[0]
+    final val runtimePatches // com.letta.mobile.data.node.info/NodeFacts.runtimePatches|{}runtimePatches[0]
+        final fun <get-runtimePatches>(): com.letta.mobile.data.node.info/RuntimePatchSetSource // com.letta.mobile.data.node.info/NodeFacts.runtimePatches.<get-runtimePatches>|<get-runtimePatches>(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.info/NodeFacts.Companion|null[0]
+        final val UNKNOWN // com.letta.mobile.data.node.info/NodeFacts.Companion.UNKNOWN|{}UNKNOWN[0]
+            final fun <get-UNKNOWN>(): com.letta.mobile.data.node.info/NodeFacts // com.letta.mobile.data.node.info/NodeFacts.Companion.UNKNOWN.<get-UNKNOWN>|<get-UNKNOWN>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.node.info/NodeHandshake { // com.letta.mobile.data.node.info/NodeHandshake|null[0]
+    constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker, kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.node.info/NodeInfo?> = ...) // com.letta.mobile.data.node.info/NodeHandshake.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.node.info.NodeInfo?>){}[0]
+
+    final suspend fun run(): com.letta.mobile.data.node.info/NodeHandshakeResult // com.letta.mobile.data.node.info/NodeHandshake.run|run(){}[0]
+}
+
+final class com.letta.mobile.data.node.info/NodeIncompatibility { // com.letta.mobile.data.node.info/NodeIncompatibility|null[0]
+    constructor <init>(com.letta.mobile.data.node.info/NodeIncompatibilityKind, kotlin/String, kotlin/String) // com.letta.mobile.data.node.info/NodeIncompatibility.<init>|<init>(com.letta.mobile.data.node.info.NodeIncompatibilityKind;kotlin.String;kotlin.String){}[0]
+
+    final val actual // com.letta.mobile.data.node.info/NodeIncompatibility.actual|{}actual[0]
+        final fun <get-actual>(): kotlin/String // com.letta.mobile.data.node.info/NodeIncompatibility.actual.<get-actual>|<get-actual>(){}[0]
+    final val expected // com.letta.mobile.data.node.info/NodeIncompatibility.expected|{}expected[0]
+        final fun <get-expected>(): kotlin/String // com.letta.mobile.data.node.info/NodeIncompatibility.expected.<get-expected>|<get-expected>(){}[0]
+    final val kind // com.letta.mobile.data.node.info/NodeIncompatibility.kind|{}kind[0]
+        final fun <get-kind>(): com.letta.mobile.data.node.info/NodeIncompatibilityKind // com.letta.mobile.data.node.info/NodeIncompatibility.kind.<get-kind>|<get-kind>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.node.info/NodeIncompatibilityKind // com.letta.mobile.data.node.info/NodeIncompatibility.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.node.info/NodeIncompatibility.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.node.info/NodeIncompatibility.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.node.info/NodeIncompatibilityKind = ..., kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.node.info/NodeIncompatibility // com.letta.mobile.data.node.info/NodeIncompatibility.copy|copy(com.letta.mobile.data.node.info.NodeIncompatibilityKind;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeIncompatibility.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeIncompatibility.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeIncompatibility.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.node.info/NodeInfo { // com.letta.mobile.data.node.info/NodeInfo|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.node.info/StoreFormatVersion = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.node.info/RuntimePatchSet = ...) // com.letta.mobile.data.node.info/NodeInfo.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.node.info.StoreFormatVersion;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.node.info.RuntimePatchSet){}[0]
+
+    final val appVersion // com.letta.mobile.data.node.info/NodeInfo.appVersion|{}appVersion[0]
+        final fun <get-appVersion>(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.appVersion.<get-appVersion>|<get-appVersion>(){}[0]
+    final val capabilities // com.letta.mobile.data.node.info/NodeInfo.capabilities|{}capabilities[0]
+        final fun <get-capabilities>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.node.info/NodeInfo.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
+    final val capabilitySet // com.letta.mobile.data.node.info/NodeInfo.capabilitySet|{}capabilitySet[0]
+        final fun <get-capabilitySet>(): kotlin.collections/Set<com.letta.mobile.data.node.info/NodeCapability> // com.letta.mobile.data.node.info/NodeInfo.capabilitySet.<get-capabilitySet>|<get-capabilitySet>(){}[0]
+    final val knowsLettaCodeVersion // com.letta.mobile.data.node.info/NodeInfo.knowsLettaCodeVersion|{}knowsLettaCodeVersion[0]
+        final fun <get-knowsLettaCodeVersion>(): kotlin/Boolean // com.letta.mobile.data.node.info/NodeInfo.knowsLettaCodeVersion.<get-knowsLettaCodeVersion>|<get-knowsLettaCodeVersion>(){}[0]
+    final val lettaCodeVersion // com.letta.mobile.data.node.info/NodeInfo.lettaCodeVersion|{}lettaCodeVersion[0]
+        final fun <get-lettaCodeVersion>(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.lettaCodeVersion.<get-lettaCodeVersion>|<get-lettaCodeVersion>(){}[0]
+    final val models // com.letta.mobile.data.node.info/NodeInfo.models|{}models[0]
+        final fun <get-models>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.node.info/NodeInfo.models.<get-models>|<get-models>(){}[0]
+    final val os // com.letta.mobile.data.node.info/NodeInfo.os|{}os[0]
+        final fun <get-os>(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.os.<get-os>|<get-os>(){}[0]
+    final val runtimePatches // com.letta.mobile.data.node.info/NodeInfo.runtimePatches|{}runtimePatches[0]
+        final fun <get-runtimePatches>(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/NodeInfo.runtimePatches.<get-runtimePatches>|<get-runtimePatches>(){}[0]
+    final val schema // com.letta.mobile.data.node.info/NodeInfo.schema|{}schema[0]
+        final fun <get-schema>(): kotlin/Int // com.letta.mobile.data.node.info/NodeInfo.schema.<get-schema>|<get-schema>(){}[0]
+    final val storeFormat // com.letta.mobile.data.node.info/NodeInfo.storeFormat|{}storeFormat[0]
+        final fun <get-storeFormat>(): com.letta.mobile.data.node.info/StoreFormatVersion // com.letta.mobile.data.node.info/NodeInfo.storeFormat.<get-storeFormat>|<get-storeFormat>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.node.info/NodeInfo.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.node.info/StoreFormatVersion // com.letta.mobile.data.node.info/NodeInfo.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.node.info/NodeInfo.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.node.info/NodeInfo.component7|component7(){}[0]
+    final fun component8(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/NodeInfo.component8|component8(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.node.info/StoreFormatVersion = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.node.info/RuntimePatchSet = ...): com.letta.mobile.data.node.info/NodeInfo // com.letta.mobile.data.node.info/NodeInfo.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.node.info.StoreFormatVersion;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.node.info.RuntimePatchSet){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/NodeInfo.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/NodeInfo.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.info/NodeInfo.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.node.info/NodeInfo> { // com.letta.mobile.data.node.info/NodeInfo.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.node.info/NodeInfo.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.node.info/NodeInfo.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.node.info/NodeInfo.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.node.info/NodeInfo // com.letta.mobile.data.node.info/NodeInfo.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.node.info/NodeInfo) // com.letta.mobile.data.node.info/NodeInfo.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.node.info.NodeInfo){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.node.info/NodeInfo.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.node.info/NodeInfo.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.node.info/NodeInfo> // com.letta.mobile.data.node.info/NodeInfo.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.node.info/NodeInfoService { // com.letta.mobile.data.node.info/NodeInfoService|null[0]
+    constructor <init>(com.letta.mobile.data.node.info/NodeFacts, com.letta.mobile.data.node.info/NodeRuntimeFacts = ...) // com.letta.mobile.data.node.info/NodeInfoService.<init>|<init>(com.letta.mobile.data.node.info.NodeFacts;com.letta.mobile.data.node.info.NodeRuntimeFacts){}[0]
+
+    final suspend fun read(): com.letta.mobile.data.node.info/NodeInfo // com.letta.mobile.data.node.info/NodeInfoService.read|read(){}[0]
+    final suspend fun readJson(): kotlinx.serialization.json/JsonElement // com.letta.mobile.data.node.info/NodeInfoService.readJson|readJson(){}[0]
+}
+
+final class com.letta.mobile.data.node.info/RuntimePatchBootLineObserver : com.letta.mobile.data.node.info/RuntimePatchSetSource { // com.letta.mobile.data.node.info/RuntimePatchBootLineObserver|null[0]
+    constructor <init>() // com.letta.mobile.data.node.info/RuntimePatchBootLineObserver.<init>|<init>(){}[0]
+
+    final fun current(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchBootLineObserver.current|current(){}[0]
+    final fun observe(kotlin/String) // com.letta.mobile.data.node.info/RuntimePatchBootLineObserver.observe|observe(kotlin.String){}[0]
+}
+
+final class com.letta.mobile.data.node.info/RuntimePatchSet { // com.letta.mobile.data.node.info/RuntimePatchSet|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/String? = ...) // com.letta.mobile.data.node.info/RuntimePatchSet.<init>|<init>(kotlin.String;kotlin.Int?;kotlin.Int?;kotlin.String?){}[0]
+
+    final val applied // com.letta.mobile.data.node.info/RuntimePatchSet.applied|{}applied[0]
+        final fun <get-applied>(): kotlin/Int? // com.letta.mobile.data.node.info/RuntimePatchSet.applied.<get-applied>|<get-applied>(){}[0]
+    final val digest // com.letta.mobile.data.node.info/RuntimePatchSet.digest|{}digest[0]
+        final fun <get-digest>(): kotlin/String? // com.letta.mobile.data.node.info/RuntimePatchSet.digest.<get-digest>|<get-digest>(){}[0]
+    final val isKnown // com.letta.mobile.data.node.info/RuntimePatchSet.isKnown|{}isKnown[0]
+        final fun <get-isKnown>(): kotlin/Boolean // com.letta.mobile.data.node.info/RuntimePatchSet.isKnown.<get-isKnown>|<get-isKnown>(){}[0]
+    final val skipped // com.letta.mobile.data.node.info/RuntimePatchSet.skipped|{}skipped[0]
+        final fun <get-skipped>(): kotlin/Int? // com.letta.mobile.data.node.info/RuntimePatchSet.skipped.<get-skipped>|<get-skipped>(){}[0]
+    final val source // com.letta.mobile.data.node.info/RuntimePatchSet.source|{}source[0]
+        final fun <get-source>(): kotlin/String // com.letta.mobile.data.node.info/RuntimePatchSet.source.<get-source>|<get-source>(){}[0]
+    final val summary // com.letta.mobile.data.node.info/RuntimePatchSet.summary|{}summary[0]
+        final fun <get-summary>(): kotlin/String // com.letta.mobile.data.node.info/RuntimePatchSet.summary.<get-summary>|<get-summary>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.node.info/RuntimePatchSet.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.node.info/RuntimePatchSet.component2|component2(){}[0]
+    final fun component3(): kotlin/Int? // com.letta.mobile.data.node.info/RuntimePatchSet.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.node.info/RuntimePatchSet.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Int? = ..., kotlin/Int? = ..., kotlin/String? = ...): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchSet.copy|copy(kotlin.String;kotlin.Int?;kotlin.Int?;kotlin.String?){}[0]
+    final fun differsFrom(com.letta.mobile.data.node.info/RuntimePatchSet): kotlin/Boolean? // com.letta.mobile.data.node.info/RuntimePatchSet.differsFrom|differsFrom(com.letta.mobile.data.node.info.RuntimePatchSet){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/RuntimePatchSet.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/RuntimePatchSet.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.info/RuntimePatchSet.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.node.info/RuntimePatchSet> { // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.node.info/RuntimePatchSet) // com.letta.mobile.data.node.info/RuntimePatchSet.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.node.info.RuntimePatchSet){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.node.info/RuntimePatchSet.Companion|null[0]
+        final const val SOURCE_BOOT_LINE // com.letta.mobile.data.node.info/RuntimePatchSet.Companion.SOURCE_BOOT_LINE|{}SOURCE_BOOT_LINE[0]
+            final fun <get-SOURCE_BOOT_LINE>(): kotlin/String // com.letta.mobile.data.node.info/RuntimePatchSet.Companion.SOURCE_BOOT_LINE.<get-SOURCE_BOOT_LINE>|<get-SOURCE_BOOT_LINE>(){}[0]
+
+        final val UNKNOWN // com.letta.mobile.data.node.info/RuntimePatchSet.Companion.UNKNOWN|{}UNKNOWN[0]
+            final fun <get-UNKNOWN>(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchSet.Companion.UNKNOWN.<get-UNKNOWN>|<get-UNKNOWN>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.node.info/RuntimePatchSet> // com.letta.mobile.data.node.info/RuntimePatchSet.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.node.info/StoreFormatVersion { // com.letta.mobile.data.node.info/StoreFormatVersion|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.letta.mobile.data.node.info/StoreFormatVersion.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val major // com.letta.mobile.data.node.info/StoreFormatVersion.major|{}major[0]
+        final fun <get-major>(): kotlin/Int // com.letta.mobile.data.node.info/StoreFormatVersion.major.<get-major>|<get-major>(){}[0]
+    final val minor // com.letta.mobile.data.node.info/StoreFormatVersion.minor|{}minor[0]
+        final fun <get-minor>(): kotlin/Int // com.letta.mobile.data.node.info/StoreFormatVersion.minor.<get-minor>|<get-minor>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.node.info/StoreFormatVersion.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.node.info/StoreFormatVersion.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.node.info/StoreFormatVersion // com.letta.mobile.data.node.info/StoreFormatVersion.copy|copy(kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.info/StoreFormatVersion.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.info/StoreFormatVersion.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.info/StoreFormatVersion.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.node.info/StoreFormatVersion> { // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.node.info/StoreFormatVersion // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.node.info/StoreFormatVersion) // com.letta.mobile.data.node.info/StoreFormatVersion.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.node.info.StoreFormatVersion){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.node.info/StoreFormatVersion.Companion|null[0]
+        final val CURRENT // com.letta.mobile.data.node.info/StoreFormatVersion.Companion.CURRENT|{}CURRENT[0]
+            final fun <get-CURRENT>(): com.letta.mobile.data.node.info/StoreFormatVersion // com.letta.mobile.data.node.info/StoreFormatVersion.Companion.CURRENT.<get-CURRENT>|<get-CURRENT>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.node.info/StoreFormatVersion> // com.letta.mobile.data.node.info/StoreFormatVersion.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.notify/ApprovalAttentionMonitor { // com.letta.mobile.data.notify/ApprovalAttentionMonitor|null[0]
     constructor <init>(com.letta.mobile.data.notify/AttentionGate) // com.letta.mobile.data.notify/ApprovalAttentionMonitor.<init>|<init>(com.letta.mobile.data.notify.AttentionGate){}[0]
 
@@ -82123,6 +82441,27 @@ final object com.letta.mobile.data.node.carrier/NodeCarrierWire { // com.letta.m
         final fun <get-TOKEN>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.TOKEN.<get-TOKEN>|<get-TOKEN>(){}[0]
     final const val TYPE // com.letta.mobile.data.node.carrier/NodeCarrierWire.TYPE|{}TYPE[0]
         final fun <get-TYPE>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.TYPE.<get-TYPE>|<get-TYPE>(){}[0]
+}
+
+final object com.letta.mobile.data.node.info/NodeCompatibilityRule { // com.letta.mobile.data.node.info/NodeCompatibilityRule|null[0]
+    final fun evaluate(com.letta.mobile.data.node.info/NodeInfo, com.letta.mobile.data.node.info/NodeInfo? = ..., com.letta.mobile.data.node.info/StoreFormatVersion = ...): com.letta.mobile.data.node.info/NodeCompatibility // com.letta.mobile.data.node.info/NodeCompatibilityRule.evaluate|evaluate(com.letta.mobile.data.node.info.NodeInfo;com.letta.mobile.data.node.info.NodeInfo?;com.letta.mobile.data.node.info.StoreFormatVersion){}[0]
+}
+
+final object com.letta.mobile.data.node.info/NodeInfoWire { // com.letta.mobile.data.node.info/NodeInfoWire|null[0]
+    final const val METHOD // com.letta.mobile.data.node.info/NodeInfoWire.METHOD|{}METHOD[0]
+        final fun <get-METHOD>(): kotlin/String // com.letta.mobile.data.node.info/NodeInfoWire.METHOD.<get-METHOD>|<get-METHOD>(){}[0]
+    final const val SCHEMA // com.letta.mobile.data.node.info/NodeInfoWire.SCHEMA|{}SCHEMA[0]
+        final fun <get-SCHEMA>(): kotlin/Int // com.letta.mobile.data.node.info/NodeInfoWire.SCHEMA.<get-SCHEMA>|<get-SCHEMA>(){}[0]
+    final const val UNKNOWN // com.letta.mobile.data.node.info/NodeInfoWire.UNKNOWN|{}UNKNOWN[0]
+        final fun <get-UNKNOWN>(): kotlin/String // com.letta.mobile.data.node.info/NodeInfoWire.UNKNOWN.<get-UNKNOWN>|<get-UNKNOWN>(){}[0]
+}
+
+final object com.letta.mobile.data.node.info/NodeOs { // com.letta.mobile.data.node.info/NodeOs|null[0]
+    final fun family(kotlin/String?): kotlin/String // com.letta.mobile.data.node.info/NodeOs.family|family(kotlin.String?){}[0]
+}
+
+final object com.letta.mobile.data.node.info/RuntimePatchBootLine { // com.letta.mobile.data.node.info/RuntimePatchBootLine|null[0]
+    final fun parse(kotlin/String): com.letta.mobile.data.node.info/RuntimePatchSet? // com.letta.mobile.data.node.info/RuntimePatchBootLine.parse|parse(kotlin.String){}[0]
 }
 
 final object com.letta.mobile.data.notify/AttentionCopy { // com.letta.mobile.data.notify/AttentionCopy|null[0]
