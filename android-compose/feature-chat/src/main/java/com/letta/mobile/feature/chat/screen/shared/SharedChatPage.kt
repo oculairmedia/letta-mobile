@@ -127,8 +127,14 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
     val presentation by presentationState
+    val target = params.session.target
     // Whether the person has been on the canvas: only then does Back from the full page return to it.
-    val canvasSeen = rememberSaveable { mutableStateOf(presentationState.value.canvasVisible) }
+    // Keyed by the conversation — the scaffold keeps one composition across conversation switches, so
+    // a canvas seen in one conversation must not make Back collapse another's full page onto a
+    // canvas nobody opened.
+    val canvasSeen = rememberSaveable(target.agentId, target.conversationId) {
+        mutableStateOf(presentationState.value.canvasVisible)
+    }
     // Where the docked panel sits; it opens as a full-width bottom panel on a phone.
     var dockGeometry by rememberSaveable(stateSaver = DockGeometrySaver) { mutableStateOf(ChatDockGeometry.Default) }
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
@@ -150,7 +156,6 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         report = params.onHostHeaderHiddenChange,
         headerHidden = hasCanvasSlot && presentation.mode != ChatSurfaceMode.FullScreen,
     )
-    val target = params.session.target
     val canvas = canvasContent(canvasSlot, target, params.topChromeInset)
     val appearance = rememberSharedChatAppearance(params, rememberSharedChatDisplayOptions())
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
