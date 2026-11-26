@@ -19599,10 +19599,6 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyClient {
 public final class com/letta/mobile/data/controller/node/iroh/AdminProxyClient$Companion {
 }
 
-public final class com/letta/mobile/data/controller/node/iroh/AdminProxyHttpException : java/lang/RuntimeException {
-	public fun <init> (ILjava/lang/String;)V
-}
-
 public final class com/letta/mobile/data/controller/node/iroh/AdminProxyRequest {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/AdminProxyRequest$Companion;
 	public final fun url (Ljava/lang/String;)Ljava/lang/String;

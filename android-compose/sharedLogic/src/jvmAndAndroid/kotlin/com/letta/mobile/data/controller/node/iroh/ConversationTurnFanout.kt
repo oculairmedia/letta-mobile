@@ -205,6 +205,11 @@ internal class ConversationTurnFanout(
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
 
+    private val relayedRuns = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** The App Server runs whose deltas this turn relayed. */
+    val relayedRunIds: Set<String> get() = relayedRuns
+
     /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
 
@@ -331,6 +336,7 @@ internal class ConversationTurnFanout(
             return false
         }
         toolProjection.noteRelayed(delta)
+        (delta["run_id"] as? JsonPrimitive)?.contentOrNull?.let(relayedRuns::add)
         broadcastToolDeltaIfNew(delta)
         return deltaIsTerminal(delta)
     }

@@ -42,6 +42,28 @@ class NodeTurnHost internal constructor(
     /** Turns currently running on this host, attached or detached (telemetry/tests). */
     val liveTurnCount: Int get() = live.get()
 
+    /** Client turns running per conversation; a server-started turn is never opened beside one. */
+    private val clientTurns = ConcurrentHashMap<String, AtomicInteger>()
+
+    /** The runs each conversation's finished client turns relayed, so their late frames open no turn. */
+    private val clientRuns = ConcurrentHashMap<String, MutableSet<String>>()
+
+    /**
+     * Whether a client turn answers for [runId] on [conversationId]: one is running there, or a finished one
+     * relayed that run. Frames it does not answer for belong to a turn the App Server started itself.
+     */
+    internal fun clientOwns(conversationId: String, runId: String?): Boolean =
+        (clientTurns[conversationId]?.get() ?: 0) > 0 || (runId != null && clientRuns[conversationId]?.contains(runId) == true)
+
+    private fun noteClientTurnEnded(turn: NodeTurn) {
+        clientTurns[turn.conversationId]?.decrementAndGet()
+        val runs = clientRuns.computeIfAbsent(turn.conversationId) { java.util.Collections.synchronizedSet(LinkedHashSet()) }
+        synchronized(runs) {
+            runs += turn.fanout.relayedRunIds
+            while (runs.size > REMEMBERED_CLIENT_RUNS) runs.remove(runs.first())
+        }
+    }
+
     /** Each conversation's relayed turn whose run is bound and not finished. */
     private val runningTurns = ConcurrentHashMap<String, IrohRelayedTurnProtocol>()
 
@@ -67,10 +89,12 @@ class NodeTurnHost internal constructor(
      */
     internal suspend fun run(turn: NodeTurn) {
         live.incrementAndGet()
+        clientTurns.computeIfAbsent(turn.conversationId) { AtomicInteger() }.incrementAndGet()
         val job = scope.launch {
             try {
                 turn.body()
             } finally {
+                noteClientTurnEnded(turn)
                 turn.journal.close(terminalObserved = turn.fanout.anyTerminalWritten)
             }
         }
@@ -111,6 +135,9 @@ class NodeTurnHost internal constructor(
     }
 
     companion object {
+        /** Runs remembered per conversation for [clientOwns]; a turn rarely binds more than a few. */
+        private const val REMEMBERED_CLIENT_RUNS = 256
+
         private val handler = CoroutineExceptionHandler { _, throwable ->
             Telemetry.event(
                 "IrohNode", "turn.host_crash",
