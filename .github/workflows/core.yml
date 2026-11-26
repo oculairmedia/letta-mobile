@@ -8,12 +8,14 @@ on:
     paths:
       - 'core/**'
       - 'docs/reference/contracts/**'
+      - 'android-compose/sharedLogic/src/jvmAndAndroid/generated/uniffi/**'
       - '.github/workflows/core.yml'
   push:
     branches: [main]
     paths:
       - 'core/**'
       - 'docs/reference/contracts/**'
+      - 'android-compose/sharedLogic/src/jvmAndAndroid/generated/uniffi/**'
       - '.github/workflows/core.yml'
 
 permissions:
@@ -64,3 +66,105 @@ jobs:
         run: cargo build --locked -p core-membership --target wasm32-unknown-unknown
       - name: core-placement builds for wasm32
         run: cargo build --locked -p core-placement --target wasm32-unknown-unknown
+
+  ffi:
+    name: core-ffi library, bindings, size
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: core
+    env:
+      # Report-only for now (ffi-v1 F-23): over budget warns, never fails.
+      FFI_SIZE_BUDGET_BYTES: '16777216'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          key: ffi
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build the combined library (ffi-release)
+        run: cargo build --locked -p core-ffi --lib --profile ffi-release
+      - name: Generated Kotlin bindings match the library
+        run: |
+          out="$RUNNER_TEMP/uniffi"
+          cargo run --locked -p core-ffi --features bindgen --bin uniffi-bindgen -- generate \
+            --library target/ffi-release/libbaken_core.so --language kotlin --no-format --out-dir "$out"
+          diff -ru ../android-compose/sharedLogic/src/jvmAndAndroid/generated/uniffi "$out" \
+            || { echo "::error::Regenerate the bindings (docs/reference/contracts/ffi/ffi-v1.md F-6)"; exit 1; }
+      - name: Size report (report-only)
+        run: |
+          size=$(stat -c %s target/ffi-release/libbaken_core.so)
+          echo "### baken_core size" >> "$GITHUB_STEP_SUMMARY"
+          echo "| target | bytes | MiB | budget MiB |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          awk -v s="$size" -v b="$FFI_SIZE_BUDGET_BYTES" \
+            'BEGIN { printf "| x86_64-unknown-linux-gnu | %d | %.2f | %.0f |\n", s, s / 1048576, b / 1048576 }' \
+            >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt "$FFI_SIZE_BUDGET_BYTES" ]; then
+            echo "::warning::libbaken_core.so is $size bytes, over the $FFI_SIZE_BUDGET_BYTES byte budget"
+          fi
+      - name: Per-crate breakdown (cargo bloat)
+        run: |
+          cargo install --locked cargo-bloat --version 0.12.1
+          # Symbols are needed for the breakdown; the shipped library stays stripped.
+          CARGO_PROFILE_FFI_RELEASE_STRIP=none cargo bloat -p core-ffi --lib --profile ffi-release \
+            --crates -n 30 | tee "$RUNNER_TEMP/bloat.txt"
+          { echo '```'; cat "$RUNNER_TEMP/bloat.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  ffi-android:
+    name: core-ffi for Android (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+          - abi: x86
+            target: i686-linux-android
+          - abi: x86_64
+            target: x86_64-linux-android
+    defaults:
+      run:
+        working-directory: core
+    env:
+      FFI_SIZE_BUDGET_BYTES: '16777216'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.97.1
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core -> target
+          key: ffi-${{ matrix.abi }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install cargo-ndk
+        run: cargo install --locked cargo-ndk --version 4.1.2
+      - name: Build for ${{ matrix.abi }}
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          rustup target add ${{ matrix.target }}
+          cargo ndk --platform 26 -t ${{ matrix.abi }} -o "$RUNNER_TEMP/jniLibs" \
+            build --locked -p core-ffi --lib --profile ffi-release
+      - name: Size report (report-only)
+        run: |
+          lib="$RUNNER_TEMP/jniLibs/${{ matrix.abi }}/libbaken_core.so"
+          size=$(stat -c %s "$lib")
+          echo "### baken_core ${{ matrix.abi }}: $size bytes (budget $FFI_SIZE_BUDGET_BYTES)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt "$FFI_SIZE_BUDGET_BYTES" ]; then
+            echo "::warning::libbaken_core.so (${{ matrix.abi }}) is $size bytes, over the $FFI_SIZE_BUDGET_BYTES byte budget"
+          fi

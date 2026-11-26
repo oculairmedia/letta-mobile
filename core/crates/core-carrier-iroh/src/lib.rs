@@ -166,6 +166,12 @@ impl IrohNode {
         }
     }
 
+    /// Tells the endpoint the network may have changed (a platform's connectivity callback), so it
+    /// re-probes its paths at once instead of waiting to notice. Harmless when nothing changed.
+    pub async fn network_change(&self) {
+        self.endpoint.network_change().await;
+    }
+
     /// Stops accepting, closes every connection and the endpoint.
     pub async fn shutdown(&self) {
         // A protocol handler that panicked is already gone; shutting down still closes the

@@ -47,6 +47,1997 @@ public final class com/letta/mobile/brand/Brand {
 	public static final field NAME Ljava/lang/String;
 }
 
+public final class com/letta/mobile/core/ffi/AddMemberRequest {
+	public static final field Companion Lcom/letta/mobile/core/ffi/AddMemberRequest$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberPreset;Ljava/lang/String;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/core/ffi/MemberPreset;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6-s-VKNKU ()J
+	public final fun copy-CoGd6hE (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberPreset;Ljava/lang/String;J)Lcom/letta/mobile/core/ffi/AddMemberRequest;
+	public static synthetic fun copy-CoGd6hE$default (Lcom/letta/mobile/core/ffi/AddMemberRequest;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberPreset;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/core/ffi/AddMemberRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConstellation ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getParents ()Ljava/util/List;
+	public final fun getPreset ()Lcom/letta/mobile/core/ffi/MemberPreset;
+	public final fun getSubject ()Ljava/lang/String;
+	public final fun getTsMs-s-VKNKU ()J
+	public fun hashCode ()I
+	public final fun setConstellation (Ljava/lang/String;)V
+	public final fun setName (Ljava/lang/String;)V
+	public final fun setParents (Ljava/util/List;)V
+	public final fun setPreset (Lcom/letta/mobile/core/ffi/MemberPreset;)V
+	public final fun setSubject (Ljava/lang/String;)V
+	public final fun setTsMs-VKZWuLQ (J)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/AddMemberRequest$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/AgentRuntimeSpec {
+	public static final field Companion Lcom/letta/mobile/core/ffi/AgentRuntimeSpec$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getBackendDir ()Ljava/lang/String;
+	public final fun getEnv ()Ljava/util/Map;
+	public final fun getHooksDir ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun setAgentId (Ljava/lang/String;)V
+	public final fun setBackendDir (Ljava/lang/String;)V
+	public final fun setEnv (Ljava/util/Map;)V
+	public final fun setHooksDir (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/AgentRuntimeSpec$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/Baken_coreKt {
+	public static final fun nodeIdOfSecretKey ([B)Ljava/lang/String;
+	public static final fun signAddMemberOp ([BLcom/letta/mobile/core/ffi/AddMemberRequest;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public static final fun signGenesisOp ([BLcom/letta/mobile/core/ffi/GenesisRequest;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public static final fun uniffiEnsureInitialized ()V
+	public static final fun uniffiForeignFutureHandleCount ()I
+	public static final fun use (Lcom/letta/mobile/core/ffi/Disposable;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogDocument {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogDocument$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5-s-VKNKU ()J
+	public final fun copy-WQ083AA (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lcom/letta/mobile/core/ffi/CatalogDocument;
+	public static synthetic fun copy-WQ083AA$default (Lcom/letta/mobile/core/ffi/CatalogDocument;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/core/ffi/CatalogDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getClass ()Ljava/lang/String;
+	public final fun getRegisteredAtMs-s-VKNKU ()J
+	public final fun getState ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun setAgentId (Ljava/lang/String;)V
+	public final fun setClass (Ljava/lang/String;)V
+	public final fun setRegisteredAtMs-VKZWuLQ (J)V
+	public final fun setState (Ljava/lang/String;)V
+	public final fun setUrl (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogDocument$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/CatalogEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEvent$Companion;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$Lagged : com/letta/mobile/core/ffi/CatalogEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEvent$Lagged$Companion;
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-s-VKNKU ()J
+	public final fun copy-VKZWuLQ (J)Lcom/letta/mobile/core/ffi/CatalogEvent$Lagged;
+	public static synthetic fun copy-VKZWuLQ$default (Lcom/letta/mobile/core/ffi/CatalogEvent$Lagged;JILjava/lang/Object;)Lcom/letta/mobile/core/ffi/CatalogEvent$Lagged;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMissed-s-VKNKU ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$Lagged$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$LinkClosed : com/letta/mobile/core/ffi/CatalogEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEvent$LinkClosed$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-6VbMDqA ()Lkotlin/ULong;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy-trFcsSw (Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;)Lcom/letta/mobile/core/ffi/CatalogEvent$LinkClosed;
+	public static synthetic fun copy-trFcsSw$default (Lcom/letta/mobile/core/ffi/CatalogEvent$LinkClosed;Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/CatalogEvent$LinkClosed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode-6VbMDqA ()Lkotlin/ULong;
+	public final fun getPrincipal ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$LinkClosed$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$Violation : com/letta/mobile/core/ffi/CatalogEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEvent$Violation$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/core/ffi/CatalogEvent$Violation;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/CatalogEvent$Violation;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/CatalogEvent$Violation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocument ()Ljava/lang/String;
+	public final fun getPrincipal ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEvent$Violation$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/CatalogEventListener {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEventListener$Companion;
+	public abstract fun onEvent (Lcom/letta/mobile/core/ffi/CatalogEvent;)V
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEventListener$Companion {
+}
+
+public class com/letta/mobile/core/ffi/CatalogEventListenerImpl : com/letta/mobile/core/ffi/CatalogEventListener, com/letta/mobile/core/ffi/Disposable, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CatalogEventListenerImpl$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun close ()V
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun onEvent (Lcom/letta/mobile/core/ffi/CatalogEvent;)V
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/CatalogEventListenerImpl$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/CoreException : java/lang/Exception {
+	public static final field ErrorHandler Lcom/letta/mobile/core/ffi/CoreException$ErrorHandler;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$AlreadyRunning : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> ()V
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Catalog : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$ErrorHandler : com/letta/mobile/core/ffi/UniffiRustCallStatusErrorHandler {
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CoreException;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$InvalidArgument : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Log : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$MoveAborted : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$NotRunning : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> ()V
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Platform : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Projection : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Refused : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$RuntimeHost : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Stopped : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> ()V
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Store : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/CoreException$Transport : com/letta/mobile/core/ffi/CoreException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public class com/letta/mobile/core/ffi/CoreNode : com/letta/mobile/core/ffi/CoreNodeInterface, com/letta/mobile/core/ffi/Disposable, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CoreNode$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/NodeOptions;Lcom/letta/mobile/core/ffi/Transport;Lcom/letta/mobile/core/ffi/RuntimeHost;Lcom/letta/mobile/core/ffi/PlatformHooks;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun address ()Lcom/letta/mobile/core/ffi/PeerAddress;
+	public fun catalogDocuments (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun catalogViewJson (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun close ()V
+	public fun connect (Lcom/letta/mobile/core/ffi/PeerAddress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun info ()Lcom/letta/mobile/core/ffi/NodeInfo;
+	public fun isRunning ()Z
+	public fun membership ()Lcom/letta/mobile/core/ffi/MembershipView;
+	public fun nodeId ()Ljava/lang/String;
+	public fun placement (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun runtimeParity ()Ljava/lang/String;
+	public fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun subscribeCatalogEvents (Lcom/letta/mobile/core/ffi/CatalogEventListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public fun subscribeMembership (Lcom/letta/mobile/core/ffi/MembershipListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public fun subscribeNodeEvents (Lcom/letta/mobile/core/ffi/NodeEventListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/CoreNode$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/CoreNodeInterface {
+	public static final field Companion Lcom/letta/mobile/core/ffi/CoreNodeInterface$Companion;
+	public abstract fun address ()Lcom/letta/mobile/core/ffi/PeerAddress;
+	public abstract fun catalogDocuments (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun catalogViewJson (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun connect (Lcom/letta/mobile/core/ffi/PeerAddress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun info ()Lcom/letta/mobile/core/ffi/NodeInfo;
+	public abstract fun isRunning ()Z
+	public abstract fun membership ()Lcom/letta/mobile/core/ffi/MembershipView;
+	public abstract fun nodeId ()Ljava/lang/String;
+	public abstract fun placement (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun runtimeParity ()Ljava/lang/String;
+	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun subscribeCatalogEvents (Lcom/letta/mobile/core/ffi/CatalogEventListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public abstract fun subscribeMembership (Lcom/letta/mobile/core/ffi/MembershipListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public abstract fun subscribeNodeEvents (Lcom/letta/mobile/core/ffi/NodeEventListener;)Lcom/letta/mobile/core/ffi/TaskHandle;
+}
+
+public final class com/letta/mobile/core/ffi/CoreNodeInterface$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/Disposable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/Disposable$Companion;
+	public abstract fun destroy ()V
+}
+
+public final class com/letta/mobile/core/ffi/Disposable$Companion {
+	public final fun destroy ([Ljava/lang/Object;)V
+}
+
+public abstract interface class com/letta/mobile/core/ffi/FfiConverter {
+	public abstract fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public abstract fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public abstract fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public abstract fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public abstract fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverter$DefaultImpls {
+	public static fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/FfiConverter;Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public static fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/FfiConverter;Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterBoolean : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterBoolean;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Z)J
+	public fun lift (B)Ljava/lang/Boolean;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Boolean;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Z)Ljava/lang/Byte;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Z)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Boolean;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (ZLjava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterByteArray : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterByteArray;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI ([B)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)[B
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)[B
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower ([B)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer ([B)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)[B
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write ([BLjava/nio/ByteBuffer;)V
+}
+
+public abstract class com/letta/mobile/core/ffi/FfiConverterCallbackInterface : com/letta/mobile/core/ffi/FfiConverter {
+	public fun <init> ()V
+	public fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Ljava/lang/Object;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterMapStringString : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterMapStringString;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/Map;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/Map;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/Map;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/Map;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/Map;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/Map;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/Map;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterOptionalSequenceString : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterOptionalSequenceString;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/List;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/List;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/List;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterOptionalString : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterOptionalString;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/lang/String;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/String;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/String;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/lang/String;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/lang/String;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterOptionalTypePlacementStatus : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterOptionalTypePlacementStatus;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/PlacementStatus;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/PlacementStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/PlacementStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/PlacementStatus;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterOptionalUInt : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterOptionalUInt;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-hExw-GI (Lkotlin/UInt;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lift-gbq4QnA (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lkotlin/UInt;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer-gbq4QnA (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lkotlin/UInt;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower-ExVfyTY (Lkotlin/UInt;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer-ExVfyTY (Lkotlin/UInt;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read-gbq4QnA (Ljava/nio/ByteBuffer;)Lkotlin/UInt;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write-aPkLuA0 (Lkotlin/UInt;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterOptionalULong : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterOptionalULong;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-pxRGoyM (Lkotlin/ULong;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lift-JlBESG8 (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lkotlin/ULong;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer-JlBESG8 (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lkotlin/ULong;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower-ADd3fzo (Lkotlin/ULong;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer-ADd3fzo (Lkotlin/ULong;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read-JlBESG8 (Ljava/nio/ByteBuffer;)Lkotlin/ULong;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write-S8_Dj7E (Lkotlin/ULong;Ljava/nio/ByteBuffer;)V
+}
+
+public abstract interface class com/letta/mobile/core/ffi/FfiConverterRustBuffer : com/letta/mobile/core/ffi/FfiConverter {
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterRustBuffer$DefaultImpls {
+	public static fun lift (Lcom/letta/mobile/core/ffi/FfiConverterRustBuffer;Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public static fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/FfiConverterRustBuffer;Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public static fun lower (Lcom/letta/mobile/core/ffi/FfiConverterRustBuffer;Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public static fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/FfiConverterRustBuffer;Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterSequenceByteArray : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterSequenceByteArray;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/List;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/List;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/List;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterSequenceString : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterSequenceString;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/List;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/List;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/List;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterSequenceTypeCatalogDocument : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterSequenceTypeCatalogDocument;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/List;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/List;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/List;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterSequenceTypeMember : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterSequenceTypeMember;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/util/List;)J
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/util/List;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/util/List;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/util/List;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/util/List;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterString : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterString;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-I7RO_PI (Ljava/lang/String;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/String;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/String;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read (Ljava/nio/ByteBuffer;)Ljava/lang/String;
+	public final fun toUtf8 (Ljava/lang/String;)Ljava/nio/ByteBuffer;
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write (Ljava/lang/String;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeAddMemberRequest : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeAddMemberRequest;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/AddMemberRequest;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/AddMemberRequest;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/AddMemberRequest;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/AddMemberRequest;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/AddMemberRequest;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/AddMemberRequest;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/AddMemberRequest;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeAgentRuntimeSpec : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeAgentRuntimeSpec;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeCatalogDocument : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeCatalogDocument;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/CatalogDocument;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CatalogDocument;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CatalogDocument;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/CatalogDocument;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/CatalogDocument;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/CatalogDocument;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/CatalogDocument;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeCatalogEvent : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeCatalogEvent;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/CatalogEvent;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CatalogEvent;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CatalogEvent;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/CatalogEvent;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/CatalogEvent;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/CatalogEvent;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/CatalogEvent;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeCatalogEventListener : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeCatalogEventListener;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/CatalogEventListener;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/CatalogEventListener;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CatalogEventListener;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/CatalogEventListener;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/CatalogEventListener;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/CatalogEventListener;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/CatalogEventListener;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeCoreError : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeCoreError;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/CoreException;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CoreException;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CoreException;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/CoreException;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/CoreException;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/CoreException;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/CoreException;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeCoreNode : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeCoreNode;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/CoreNode;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/CoreNode;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/CoreNode;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/CoreNode;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/CoreNode;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/CoreNode;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/CoreNode;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeGenesisRequest : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeGenesisRequest;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/GenesisRequest;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/GenesisRequest;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/GenesisRequest;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/GenesisRequest;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/GenesisRequest;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/GenesisRequest;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/GenesisRequest;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeHostError : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeHostError;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/HostException;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/HostException;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/HostException;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/HostException;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/HostException;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/HostException;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/HostException;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeInProcessNetwork : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeInProcessNetwork;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/InProcessNetwork;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/InProcessNetwork;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/InProcessNetwork;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/InProcessNetwork;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/InProcessNetwork;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/InProcessNetwork;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/InProcessNetwork;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeMember : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeMember;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/Member;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/Member;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/Member;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/Member;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/Member;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/Member;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/Member;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeMemberPreset : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeMemberPreset;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/MemberPreset;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MemberPreset;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MemberPreset;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/MemberPreset;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/MemberPreset;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/MemberPreset;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/MemberPreset;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeMemberStatus : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeMemberStatus;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/MemberStatus;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MemberStatus;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MemberStatus;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/MemberStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/MemberStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/MemberStatus;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/MemberStatus;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeMembershipListener : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeMembershipListener;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/MembershipListener;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/MembershipListener;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MembershipListener;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/MembershipListener;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/MembershipListener;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/MembershipListener;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/MembershipListener;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeMembershipView : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeMembershipView;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/MembershipView;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MembershipView;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/MembershipView;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/MembershipView;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/MembershipView;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/MembershipView;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/MembershipView;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeNodeClass : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeNodeClass;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/NodeClass;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeClass;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeClass;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/NodeClass;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/NodeClass;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/NodeClass;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/NodeClass;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeNodeEvent : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeNodeEvent;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/NodeEvent;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeEvent;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeEvent;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/NodeEvent;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/NodeEvent;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/NodeEvent;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/NodeEvent;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeNodeEventListener : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeNodeEventListener;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/NodeEventListener;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/NodeEventListener;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeEventListener;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/NodeEventListener;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/NodeEventListener;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/NodeEventListener;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/NodeEventListener;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeNodeInfo : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeNodeInfo;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/NodeInfo;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeInfo;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeInfo;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/NodeInfo;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/NodeInfo;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/NodeInfo;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/NodeInfo;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeNodeOptions : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeNodeOptions;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/NodeOptions;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeOptions;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/NodeOptions;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/NodeOptions;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/NodeOptions;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/NodeOptions;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/NodeOptions;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypePeerAddress : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypePeerAddress;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/PeerAddress;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PeerAddress;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PeerAddress;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/PeerAddress;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/PeerAddress;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/PeerAddress;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/PeerAddress;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypePlacementStatus : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypePlacementStatus;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/PlacementStatus;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/PlacementStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/PlacementStatus;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/PlacementStatus;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypePlatformEvents : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypePlatformEvents;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/PlatformEvents;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/PlatformEvents;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlatformEvents;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/PlatformEvents;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/PlatformEvents;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/PlatformEvents;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/PlatformEvents;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypePlatformHooks : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypePlatformHooks;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/PlatformHooks;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/PlatformHooks;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/PlatformHooks;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/PlatformHooks;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/PlatformHooks;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/PlatformHooks;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/PlatformHooks;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeQuiesceOutcome : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeQuiesceOutcome;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/QuiesceOutcome;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/QuiesceOutcome;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/QuiesceOutcome;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/QuiesceOutcome;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeRuntimeHost : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeRuntimeHost;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/RuntimeHost;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/RuntimeHost;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/RuntimeHost;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/RuntimeHost;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/RuntimeHost;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/RuntimeHost;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/RuntimeHost;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeRuntimeInfo : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeRuntimeInfo;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/RuntimeInfo;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/RuntimeInfo;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/RuntimeInfo;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/RuntimeInfo;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeRuntimePatches : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeRuntimePatches;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/RuntimePatches;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/RuntimePatches;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/RuntimePatches;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/RuntimePatches;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeSignedMembershipOp : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeSignedMembershipOp;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/SignedMembershipOp;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/SignedMembershipOp;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/SignedMembershipOp;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/SignedMembershipOp;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeStoreFormat : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeStoreFormat;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/StoreFormat;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/StoreFormat;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/StoreFormat;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/StoreFormat;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/StoreFormat;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/StoreFormat;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/StoreFormat;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeTaskHandle : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeTaskHandle;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/TaskHandle;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (J)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/TaskHandle;)Ljava/lang/Long;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/TaskHandle;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/TaskHandle;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/TaskHandle;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterTypeTransport : com/letta/mobile/core/ffi/FfiConverterRustBuffer {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterTypeTransport;
+	public fun allocationSize-I7RO_PI (Lcom/letta/mobile/core/ffi/Transport;)J
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/Transport;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/Transport;
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun lower (Lcom/letta/mobile/core/ffi/Transport;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lowerIntoRustBuffer (Lcom/letta/mobile/core/ffi/Transport;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun read (Ljava/nio/ByteBuffer;)Lcom/letta/mobile/core/ffi/Transport;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun write (Lcom/letta/mobile/core/ffi/Transport;Ljava/nio/ByteBuffer;)V
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterUInt : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterUInt;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-j8A87jM (I)J
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lift-OGnWXxg (I)I
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer-OGnWXxg (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)I
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower-WZ4Q5Ns (I)Ljava/lang/Integer;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer-WZ4Q5Ns (I)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read-OGnWXxg (Ljava/nio/ByteBuffer;)I
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write-qim9Vi0 (ILjava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/FfiConverterULong : com/letta/mobile/core/ffi/FfiConverter {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/FfiConverterULong;
+	public synthetic fun allocationSize-I7RO_PI (Ljava/lang/Object;)J
+	public fun allocationSize-PUiSbYQ (J)J
+	public synthetic fun lift (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lift-I7RO_PI (J)J
+	public synthetic fun liftFromRustBuffer (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+	public fun liftFromRustBuffer-I7RO_PI (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)J
+	public synthetic fun lower (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun lower-VKZWuLQ (J)Ljava/lang/Long;
+	public synthetic fun lowerIntoRustBuffer (Ljava/lang/Object;)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public fun lowerIntoRustBuffer-VKZWuLQ (J)Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;
+	public synthetic fun read (Ljava/nio/ByteBuffer;)Ljava/lang/Object;
+	public fun read-I7RO_PI (Ljava/nio/ByteBuffer;)J
+	public synthetic fun write (Ljava/lang/Object;Ljava/nio/ByteBuffer;)V
+	public fun write-4PLdz1A (JLjava/nio/ByteBuffer;)V
+}
+
+public final class com/letta/mobile/core/ffi/GenesisRequest {
+	public static final field Companion Lcom/letta/mobile/core/ffi/GenesisRequest$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;[BJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()[B
+	public final fun component4-s-VKNKU ()J
+	public final fun copy-ARK9YDc (Ljava/lang/String;Ljava/lang/String;[BJ)Lcom/letta/mobile/core/ffi/GenesisRequest;
+	public static synthetic fun copy-ARK9YDc$default (Lcom/letta/mobile/core/ffi/GenesisRequest;Ljava/lang/String;Ljava/lang/String;[BJILjava/lang/Object;)Lcom/letta/mobile/core/ffi/GenesisRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCatalogRoot ()[B
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getNodeName ()Ljava/lang/String;
+	public final fun getTsMs-s-VKNKU ()J
+	public fun hashCode ()I
+	public final fun setCatalogRoot ([B)V
+	public final fun setLabel (Ljava/lang/String;)V
+	public final fun setNodeName (Ljava/lang/String;)V
+	public final fun setTsMs-VKZWuLQ (J)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/GenesisRequest$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/HostException : java/lang/Exception {
+	public static final field ErrorHandler Lcom/letta/mobile/core/ffi/HostException$ErrorHandler;
+}
+
+public final class com/letta/mobile/core/ffi/HostException$ErrorHandler : com/letta/mobile/core/ffi/UniffiRustCallStatusErrorHandler {
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/HostException;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/HostException$Failed : com/letta/mobile/core/ffi/HostException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getDetail ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/HostException$NotRunning : com/letta/mobile/core/ffi/HostException {
+	public fun <init> ()V
+	public fun getMessage ()Ljava/lang/String;
+}
+
+public class com/letta/mobile/core/ffi/InProcessNetwork : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/InProcessNetworkInterface, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/InProcessNetwork$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun close ()V
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/InProcessNetwork$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/InProcessNetworkInterface {
+	public static final field Companion Lcom/letta/mobile/core/ffi/InProcessNetworkInterface$Companion;
+}
+
+public final class com/letta/mobile/core/ffi/InProcessNetworkInterface$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/InternalException : java/lang/Exception {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/core/ffi/Member {
+	public static final field Companion Lcom/letta/mobile/core/ffi/Member$Companion;
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberStatus;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/core/ffi/MemberStatus;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberStatus;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/core/ffi/Member;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/Member;Ljava/lang/String;Lcom/letta/mobile/core/ffi/MemberStatus;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/Member;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapabilities ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getNodeId ()Ljava/lang/String;
+	public final fun getRotatedTo ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/core/ffi/MemberStatus;
+	public fun hashCode ()I
+	public final fun setCapabilities (Ljava/util/List;)V
+	public final fun setName (Ljava/lang/String;)V
+	public final fun setNodeId (Ljava/lang/String;)V
+	public final fun setRotatedTo (Ljava/lang/String;)V
+	public final fun setStatus (Lcom/letta/mobile/core/ffi/MemberStatus;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/Member$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/MemberPreset {
+	public static final field Companion Lcom/letta/mobile/core/ffi/MemberPreset$Companion;
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$AlwaysOnLinux : com/letta/mobile/core/ffi/MemberPreset {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/MemberPreset$AlwaysOnLinux;
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$DesktopNode : com/letta/mobile/core/ffi/MemberPreset {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/MemberPreset$DesktopNode;
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$Phone : com/letta/mobile/core/ffi/MemberPreset {
+	public static final field Companion Lcom/letta/mobile/core/ffi/MemberPreset$Phone$Companion;
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lcom/letta/mobile/core/ffi/MemberPreset$Phone;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/MemberPreset$Phone;ZILjava/lang/Object;)Lcom/letta/mobile/core/ffi/MemberPreset$Phone;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExecution ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$Phone$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/MemberPreset$ReadOnly : com/letta/mobile/core/ffi/MemberPreset {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/MemberPreset$ReadOnly;
+}
+
+public final class com/letta/mobile/core/ffi/MemberStatus : java/lang/Enum {
+	public static final field ACTIVE Lcom/letta/mobile/core/ffi/MemberStatus;
+	public static final field Companion Lcom/letta/mobile/core/ffi/MemberStatus$Companion;
+	public static final field REVOKED Lcom/letta/mobile/core/ffi/MemberStatus;
+	public static final field ROTATED Lcom/letta/mobile/core/ffi/MemberStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/MemberStatus;
+	public static fun values ()[Lcom/letta/mobile/core/ffi/MemberStatus;
+}
+
+public final class com/letta/mobile/core/ffi/MemberStatus$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/MembershipListener {
+	public static final field Companion Lcom/letta/mobile/core/ffi/MembershipListener$Companion;
+	public abstract fun onView (Lcom/letta/mobile/core/ffi/MembershipView;)V
+}
+
+public final class com/letta/mobile/core/ffi/MembershipListener$Companion {
+}
+
+public class com/letta/mobile/core/ffi/MembershipListenerImpl : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/MembershipListener, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/MembershipListenerImpl$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun close ()V
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun onView (Lcom/letta/mobile/core/ffi/MembershipView;)V
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/MembershipListenerImpl$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/MembershipView {
+	public static final field Companion Lcom/letta/mobile/core/ffi/MembershipView$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZLjava/util/List;Ljava/util/List;)Lcom/letta/mobile/core/ffi/MembershipView;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/MembershipView;Ljava/lang/String;Ljava/lang/String;ZLjava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/MembershipView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConstellation ()Ljava/lang/String;
+	public final fun getHeads ()Ljava/util/List;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLocked ()Z
+	public final fun getMembers ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun setConstellation (Ljava/lang/String;)V
+	public final fun setHeads (Ljava/util/List;)V
+	public final fun setLabel (Ljava/lang/String;)V
+	public final fun setLocked (Z)V
+	public final fun setMembers (Ljava/util/List;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/MembershipView$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/NoHandle {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/NoHandle;
+}
+
+public final class com/letta/mobile/core/ffi/NodeClass : java/lang/Enum {
+	public static final field ALWAYS_ON Lcom/letta/mobile/core/ffi/NodeClass;
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeClass$Companion;
+	public static final field DESKTOP Lcom/letta/mobile/core/ffi/NodeClass;
+	public static final field PHONE Lcom/letta/mobile/core/ffi/NodeClass;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/NodeClass;
+	public static fun values ()[Lcom/letta/mobile/core/ffi/NodeClass;
+}
+
+public final class com/letta/mobile/core/ffi/NodeClass$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/NodeEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeEvent$Companion;
+}
+
+public final class com/letta/mobile/core/ffi/NodeEvent$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/NodeEvent$ForegroundChanged : com/letta/mobile/core/ffi/NodeEvent {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeEvent$ForegroundChanged$Companion;
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lcom/letta/mobile/core/ffi/NodeEvent$ForegroundChanged;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/NodeEvent$ForegroundChanged;ZILjava/lang/Object;)Lcom/letta/mobile/core/ffi/NodeEvent$ForegroundChanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getForeground ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/NodeEvent$ForegroundChanged$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/NodeEvent$NetworkChanged : com/letta/mobile/core/ffi/NodeEvent {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/NodeEvent$NetworkChanged;
+}
+
+public final class com/letta/mobile/core/ffi/NodeEvent$Stopping : com/letta/mobile/core/ffi/NodeEvent {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/NodeEvent$Stopping;
+}
+
+public abstract interface class com/letta/mobile/core/ffi/NodeEventListener {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeEventListener$Companion;
+	public abstract fun onEvent (Lcom/letta/mobile/core/ffi/NodeEvent;)V
+}
+
+public final class com/letta/mobile/core/ffi/NodeEventListener$Companion {
+}
+
+public class com/letta/mobile/core/ffi/NodeEventListenerImpl : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/NodeEventListener, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeEventListenerImpl$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun close ()V
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun onEvent (Lcom/letta/mobile/core/ffi/NodeEvent;)V
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/NodeEventListenerImpl$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/NodeInfo {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeInfo$Companion;
+	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/StoreFormat;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/core/ffi/RuntimePatches;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-pVg5ArA ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/core/ffi/StoreFormat;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8 ()Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public final fun copy-J7pt5BY (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/StoreFormat;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/core/ffi/RuntimePatches;)Lcom/letta/mobile/core/ffi/NodeInfo;
+	public static synthetic fun copy-J7pt5BY$default (Lcom/letta/mobile/core/ffi/NodeInfo;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/StoreFormat;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/core/ffi/RuntimePatches;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/NodeInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAppVersion ()Ljava/lang/String;
+	public final fun getCapabilities ()Ljava/util/List;
+	public final fun getLettaCodeVersion ()Ljava/lang/String;
+	public final fun getModels ()Ljava/util/List;
+	public final fun getOs ()Ljava/lang/String;
+	public final fun getRuntimePatches ()Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public final fun getSchema-pVg5ArA ()I
+	public final fun getStoreFormat ()Lcom/letta/mobile/core/ffi/StoreFormat;
+	public fun hashCode ()I
+	public final fun setAppVersion (Ljava/lang/String;)V
+	public final fun setCapabilities (Ljava/util/List;)V
+	public final fun setLettaCodeVersion (Ljava/lang/String;)V
+	public final fun setModels (Ljava/util/List;)V
+	public final fun setOs (Ljava/lang/String;)V
+	public final fun setRuntimePatches (Lcom/letta/mobile/core/ffi/RuntimePatches;)V
+	public final fun setSchema-WZ4Q5Ns (I)V
+	public final fun setStoreFormat (Lcom/letta/mobile/core/ffi/StoreFormat;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/NodeInfo$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/NodeOptions {
+	public static final field Companion Lcom/letta/mobile/core/ffi/NodeOptions$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/NodeClass;Ljava/lang/String;ILjava/lang/String;Ljava/util/List;JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/core/ffi/NodeClass;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5-pVg5ArA ()I
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8-s-VKNKU ()J
+	public final fun component9-s-VKNKU ()J
+	public final fun copy-9I3FwQg (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/NodeClass;Ljava/lang/String;ILjava/lang/String;Ljava/util/List;JJ)Lcom/letta/mobile/core/ffi/NodeOptions;
+	public static synthetic fun copy-9I3FwQg$default (Lcom/letta/mobile/core/ffi/NodeOptions;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/core/ffi/NodeClass;Ljava/lang/String;ILjava/lang/String;Ljava/util/List;JJILjava/lang/Object;)Lcom/letta/mobile/core/ffi/NodeOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAppVersion ()Ljava/lang/String;
+	public final fun getBackendDir ()Ljava/lang/String;
+	public final fun getClass ()Lcom/letta/mobile/core/ffi/NodeClass;
+	public final fun getConstellation ()Ljava/lang/String;
+	public final fun getDataDir ()Ljava/lang/String;
+	public final fun getMembershipOps ()Ljava/util/List;
+	public final fun getTickMs-s-VKNKU ()J
+	public final fun getWatchDebounceMs-s-VKNKU ()J
+	public final fun getWorkerThreads-pVg5ArA ()I
+	public fun hashCode ()I
+	public final fun setAppVersion (Ljava/lang/String;)V
+	public final fun setBackendDir (Ljava/lang/String;)V
+	public final fun setClass (Lcom/letta/mobile/core/ffi/NodeClass;)V
+	public final fun setConstellation (Ljava/lang/String;)V
+	public final fun setDataDir (Ljava/lang/String;)V
+	public final fun setMembershipOps (Ljava/util/List;)V
+	public final fun setTickMs-VKZWuLQ (J)V
+	public final fun setWatchDebounceMs-VKZWuLQ (J)V
+	public final fun setWorkerThreads-WZ4Q5Ns (I)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/NodeOptions$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/PeerAddress {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PeerAddress$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/core/ffi/PeerAddress;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/PeerAddress;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/PeerAddress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDirect ()Ljava/util/List;
+	public final fun getNodeId ()Ljava/lang/String;
+	public final fun getRelay ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun setDirect (Ljava/util/List;)V
+	public final fun setNodeId (Ljava/lang/String;)V
+	public final fun setRelay (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/PeerAddress$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/PlacementStatus {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PlacementStatus$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3-s-VKNKU ()J
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6-6VbMDqA ()Lkotlin/ULong;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8-s-VKNKU ()J
+	public final fun copy-2HMSMu8 (Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;J)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public static synthetic fun copy-2HMSMu8$default (Lcom/letta/mobile/core/ffi/PlacementStatus;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/core/ffi/PlacementStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getEpochClaimant ()Ljava/lang/String;
+	public final fun getEpochN-s-VKNKU ()J
+	public final fun getGate ()Ljava/lang/String;
+	public final fun getHolderNodeId ()Ljava/lang/String;
+	public final fun getRetryAfterMs-6VbMDqA ()Lkotlin/ULong;
+	public final fun getState ()Ljava/lang/String;
+	public final fun getTipSeq-s-VKNKU ()J
+	public fun hashCode ()I
+	public final fun setAgentId (Ljava/lang/String;)V
+	public final fun setEpochClaimant (Ljava/lang/String;)V
+	public final fun setEpochN-VKZWuLQ (J)V
+	public final fun setGate (Ljava/lang/String;)V
+	public final fun setHolderNodeId (Ljava/lang/String;)V
+	public final fun setRetryAfterMs-ADd3fzo (Lkotlin/ULong;)V
+	public final fun setState (Ljava/lang/String;)V
+	public final fun setTipSeq-VKZWuLQ (J)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/PlacementStatus$Companion {
+}
+
+public class com/letta/mobile/core/ffi/PlatformEvents : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/PlatformEventsInterface, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PlatformEvents$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun close ()V
+	public fun destroy ()V
+	public fun foregroundChanged (Z)V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun networkChanged ()V
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/PlatformEvents$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/PlatformEventsInterface {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PlatformEventsInterface$Companion;
+	public abstract fun foregroundChanged (Z)V
+	public abstract fun networkChanged ()V
+}
+
+public final class com/letta/mobile/core/ffi/PlatformEventsInterface$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/PlatformHooks {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PlatformHooks$Companion;
+	public abstract fun attach (Lcom/letta/mobile/core/ffi/PlatformEvents;)V
+	public abstract fun detach ()V
+	public abstract fun nodeSecretKey (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/PlatformHooks$Companion {
+}
+
+public class com/letta/mobile/core/ffi/PlatformHooksImpl : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/PlatformHooks, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/PlatformHooksImpl$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun attach (Lcom/letta/mobile/core/ffi/PlatformEvents;)V
+	public fun close ()V
+	public fun destroy ()V
+	public fun detach ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun nodeSecretKey (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/PlatformHooksImpl$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/QuiesceOutcome : java/lang/Enum {
+	public static final field BUSY Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public static final field Companion Lcom/letta/mobile/core/ffi/QuiesceOutcome$Companion;
+	public static final field IDLE Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+	public static fun values ()[Lcom/letta/mobile/core/ffi/QuiesceOutcome;
+}
+
+public final class com/letta/mobile/core/ffi/QuiesceOutcome$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/RuntimeHost {
+	public static final field Companion Lcom/letta/mobile/core/ffi/RuntimeHost$Companion;
+	public abstract fun abortTurn (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun checkpoint (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun endpoint ()Ljava/lang/String;
+	public abstract fun info ()Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public abstract fun quiesce-z13BHRw (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun start (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun stop (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/RuntimeHost$Companion {
+}
+
+public class com/letta/mobile/core/ffi/RuntimeHostImpl : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/RuntimeHost, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/RuntimeHostImpl$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun abortTurn (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun checkpoint (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun close ()V
+	public fun destroy ()V
+	public fun endpoint ()Ljava/lang/String;
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun info ()Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public fun quiesce-z13BHRw (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun start (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun stop (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/RuntimeHostImpl$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/RuntimeInfo {
+	public static final field Companion Lcom/letta/mobile/core/ffi/RuntimeInfo$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Lkotlin/UInt;Lkotlin/UInt;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3-0hXNFcg ()Lkotlin/UInt;
+	public final fun component4-0hXNFcg ()Lkotlin/UInt;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy-vrwA9VM (Ljava/lang/String;Ljava/util/List;Lkotlin/UInt;Lkotlin/UInt;Ljava/util/List;)Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public static synthetic fun copy-vrwA9VM$default (Lcom/letta/mobile/core/ffi/RuntimeInfo;Ljava/lang/String;Ljava/util/List;Lkotlin/UInt;Lkotlin/UInt;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLettaCodeVersion ()Ljava/lang/String;
+	public final fun getModels ()Ljava/util/List;
+	public final fun getPatchIds ()Ljava/util/List;
+	public final fun getPatchesApplied-0hXNFcg ()Lkotlin/UInt;
+	public final fun getPatchesSkipped-0hXNFcg ()Lkotlin/UInt;
+	public fun hashCode ()I
+	public final fun setLettaCodeVersion (Ljava/lang/String;)V
+	public final fun setModels (Ljava/util/List;)V
+	public final fun setPatchIds (Ljava/util/List;)V
+	public final fun setPatchesApplied-ExVfyTY (Lkotlin/UInt;)V
+	public final fun setPatchesSkipped-ExVfyTY (Lkotlin/UInt;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/RuntimeInfo$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/RuntimePatches {
+	public static final field Companion Lcom/letta/mobile/core/ffi/RuntimePatches$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/UInt;Lkotlin/UInt;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-0hXNFcg ()Lkotlin/UInt;
+	public final fun component3-0hXNFcg ()Lkotlin/UInt;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy-CIoXyuU (Ljava/lang/String;Lkotlin/UInt;Lkotlin/UInt;Ljava/lang/String;)Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public static synthetic fun copy-CIoXyuU$default (Lcom/letta/mobile/core/ffi/RuntimePatches;Ljava/lang/String;Lkotlin/UInt;Lkotlin/UInt;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/RuntimePatches;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplied-0hXNFcg ()Lkotlin/UInt;
+	public final fun getPatchIdsSha256 ()Ljava/lang/String;
+	public final fun getSkipped-0hXNFcg ()Lkotlin/UInt;
+	public final fun getSource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun setApplied-ExVfyTY (Lkotlin/UInt;)V
+	public final fun setPatchIdsSha256 (Ljava/lang/String;)V
+	public final fun setSkipped-ExVfyTY (Lkotlin/UInt;)V
+	public final fun setSource (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/RuntimePatches$Companion {
+}
+
+public class com/letta/mobile/core/ffi/RustBuffer : com/sun/jna/Structure {
+	public static final field Companion Lcom/letta/mobile/core/ffi/RustBuffer$Companion;
+	public field capacity J
+	public field data Lcom/sun/jna/Pointer;
+	public field len J
+	public fun <init> ()V
+	public final fun asByteBuffer ()Ljava/nio/ByteBuffer;
+}
+
+public final class com/letta/mobile/core/ffi/RustBuffer$ByReference : com/letta/mobile/core/ffi/RustBuffer, com/sun/jna/Structure$ByReference {
+	public fun <init> ()V
+}
+
+public final class com/letta/mobile/core/ffi/RustBuffer$ByValue : com/letta/mobile/core/ffi/RustBuffer, com/sun/jna/Structure$ByValue {
+	public fun <init> ()V
+}
+
+public final class com/letta/mobile/core/ffi/RustBuffer$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/SignedMembershipOp {
+	public static final field Companion Lcom/letta/mobile/core/ffi/SignedMembershipOp$Companion;
+	public fun <init> (Ljava/lang/String;[B)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()[B
+	public final fun copy (Ljava/lang/String;[B)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/SignedMembershipOp;Ljava/lang/String;[BILjava/lang/Object;)Lcom/letta/mobile/core/ffi/SignedMembershipOp;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnvelope ()[B
+	public final fun getOpId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun setEnvelope ([B)V
+	public final fun setOpId (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/SignedMembershipOp$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/StoreFormat {
+	public static final field Companion Lcom/letta/mobile/core/ffi/StoreFormat$Companion;
+	public synthetic fun <init> (JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-s-VKNKU ()J
+	public final fun component2-s-VKNKU ()J
+	public final fun copy-PWzV0Is (JJ)Lcom/letta/mobile/core/ffi/StoreFormat;
+	public static synthetic fun copy-PWzV0Is$default (Lcom/letta/mobile/core/ffi/StoreFormat;JJILjava/lang/Object;)Lcom/letta/mobile/core/ffi/StoreFormat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMajor-s-VKNKU ()J
+	public final fun getMinor-s-VKNKU ()J
+	public fun hashCode ()I
+	public final fun setMajor-VKZWuLQ (J)V
+	public final fun setMinor-VKZWuLQ (J)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/StoreFormat$Companion {
+}
+
+public class com/letta/mobile/core/ffi/TaskHandle : com/letta/mobile/core/ffi/Disposable, com/letta/mobile/core/ffi/TaskHandleInterface, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/TaskHandle$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/NoHandle;)V
+	public fun <init> (Lcom/letta/mobile/core/ffi/UniffiWithHandle;J)V
+	public fun cancel ()V
+	public fun close ()V
+	public fun destroy ()V
+	protected final fun getCleanable ()Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+	protected final fun getHandle ()J
+	public final fun getUniffiIsDestroyed ()Z
+	public fun isFinished ()Z
+	public final fun uniffiCloneHandle ()J
+}
+
+public final class com/letta/mobile/core/ffi/TaskHandle$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/TaskHandleInterface {
+	public static final field Companion Lcom/letta/mobile/core/ffi/TaskHandleInterface$Companion;
+	public abstract fun cancel ()V
+	public abstract fun isFinished ()Z
+}
+
+public final class com/letta/mobile/core/ffi/TaskHandleInterface$Companion {
+}
+
+public abstract class com/letta/mobile/core/ffi/Transport : com/letta/mobile/core/ffi/Disposable {
+	public static final field Companion Lcom/letta/mobile/core/ffi/Transport$Companion;
+	public fun destroy ()V
+}
+
+public final class com/letta/mobile/core/ffi/Transport$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/Transport$InProcess : com/letta/mobile/core/ffi/Transport {
+	public static final field Companion Lcom/letta/mobile/core/ffi/Transport$InProcess$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/InProcessNetwork;)V
+	public final fun component1 ()Lcom/letta/mobile/core/ffi/InProcessNetwork;
+	public final fun copy (Lcom/letta/mobile/core/ffi/InProcessNetwork;)Lcom/letta/mobile/core/ffi/Transport$InProcess;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/Transport$InProcess;Lcom/letta/mobile/core/ffi/InProcessNetwork;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/Transport$InProcess;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNetwork ()Lcom/letta/mobile/core/ffi/InProcessNetwork;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/Transport$InProcess$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/Transport$Iroh : com/letta/mobile/core/ffi/Transport {
+	public static final field Companion Lcom/letta/mobile/core/ffi/Transport$Iroh$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/core/ffi/Transport$Iroh;
+	public static synthetic fun copy$default (Lcom/letta/mobile/core/ffi/Transport$Iroh;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/core/ffi/Transport$Iroh;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBindAddr ()Ljava/lang/String;
+	public final fun getRelays ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/core/ffi/Transport$Iroh$Companion {
+}
+
+public abstract interface class com/letta/mobile/core/ffi/UniffiCleaner {
+	public static final field Companion Lcom/letta/mobile/core/ffi/UniffiCleaner$Companion;
+	public abstract fun register (Ljava/lang/Object;Ljava/lang/Runnable;)Lcom/letta/mobile/core/ffi/UniffiCleaner$Cleanable;
+}
+
+public abstract interface class com/letta/mobile/core/ffi/UniffiCleaner$Cleanable {
+	public abstract fun clean ()V
+}
+
+public final class com/letta/mobile/core/ffi/UniffiCleaner$Companion {
+}
+
+public final class com/letta/mobile/core/ffi/UniffiNullRustCallStatusErrorHandler : com/letta/mobile/core/ffi/UniffiRustCallStatusErrorHandler {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/UniffiNullRustCallStatusErrorHandler;
+	public fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Lcom/letta/mobile/core/ffi/InternalException;
+	public synthetic fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/core/ffi/UniffiRustCallStatusErrorHandler {
+	public abstract fun lift (Lcom/letta/mobile/core/ffi/RustBuffer$ByValue;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/core/ffi/UniffiWithHandle {
+	public static final field INSTANCE Lcom/letta/mobile/core/ffi/UniffiWithHandle;
+}
+
 public final class com/letta/mobile/data/a2ui/A2uiAction {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/a2ui/A2uiActionOrigin;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/a2ui/A2uiActionOrigin;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -38351,6 +40342,85 @@ public final class com/letta/mobile/data/node/carrier/NodeSession {
 public final class com/letta/mobile/data/node/carrier/NodeSession$Companion {
 	public final fun open (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun open$default (Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+
+public abstract interface class com/letta/mobile/data/node/core/CoreNodeHandle : java/lang/AutoCloseable {
+	public abstract fun address (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun catalogDocuments (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun catalogEvents ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun catalogViewJson (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun connect (Lcom/letta/mobile/core/ffi/PeerAddress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun info (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun isRunning ()Z
+	public abstract fun membership (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun membershipViews ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun nodeEvents ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun placement-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/CorePlatformHooks : com/letta/mobile/core/ffi/PlatformHooks {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;Lcom/letta/mobile/data/node/core/PlatformSignals;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun attach (Lcom/letta/mobile/core/ffi/PlatformEvents;)V
+	public fun detach ()V
+	public fun nodeSecretKey (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/LocalAppServerRuntimeHost : com/letta/mobile/core/ffi/RuntimeHost {
+	public fun <init> (Lcom/letta/mobile/data/runtime/host/LocalAppServerHost;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/node/core/RuntimeTurnControl;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/runtime/host/LocalAppServerHost;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/node/core/RuntimeTurnControl;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun abortTurn (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun checkpoint (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun endpoint ()Ljava/lang/String;
+	public fun info ()Lcom/letta/mobile/core/ffi/RuntimeInfo;
+	public fun quiesce-z13BHRw (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun start (Lcom/letta/mobile/core/ffi/AgentRuntimeSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun stop (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/PlatformSignals {
+	public fun <init> ()V
+	public fun <init> (Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/flow/Flow;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/flow/Flow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getForeground ()Lkotlinx/coroutines/flow/Flow;
+	public final fun getNetworkChanges ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract interface class com/letta/mobile/data/node/core/RuntimeTurnControl {
+	public abstract fun abortTurn-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun checkpoint-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun quiesce-lUFgXSk (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/RuntimeTurnControl$Untracked : com/letta/mobile/data/node/core/RuntimeTurnControl {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/core/RuntimeTurnControl$Untracked;
+	public fun abortTurn-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun checkpoint-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun quiesce-lUFgXSk (Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/UniffiCoreNode : com/letta/mobile/data/node/core/CoreNodeHandle {
+	public static final field Companion Lcom/letta/mobile/data/node/core/UniffiCoreNode$Companion;
+	public fun <init> (Lcom/letta/mobile/core/ffi/CoreNode;Lkotlin/coroutines/CoroutineContext;)V
+	public synthetic fun <init> (Lcom/letta/mobile/core/ffi/CoreNode;Lkotlin/coroutines/CoroutineContext;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun address (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun catalogDocuments (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun catalogEvents ()Lkotlinx/coroutines/flow/Flow;
+	public fun catalogViewJson (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun close ()V
+	public fun connect (Lcom/letta/mobile/core/ffi/PeerAddress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun info (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun isRunning ()Z
+	public fun membership (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun membershipViews ()Lkotlinx/coroutines/flow/Flow;
+	public fun nodeEvents ()Lkotlinx/coroutines/flow/Flow;
+	public fun placement-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/core/UniffiCoreNode$Companion {
+	public final fun create (Lcom/letta/mobile/core/ffi/NodeOptions;Lcom/letta/mobile/core/ffi/Transport;Lcom/letta/mobile/core/ffi/RuntimeHost;Lcom/letta/mobile/core/ffi/PlatformHooks;)Lcom/letta/mobile/data/node/core/UniffiCoreNode;
 }
 
 public final class com/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier : com/letta/mobile/data/node/carrier/NodeCarrier {

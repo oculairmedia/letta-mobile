@@ -1,0 +1,56 @@
+[package]
+name = "core-ffi"
+version = "0.1.0"
+description = "The Baken core's foreign-function boundary: UniFFI (proc-macro scaffolding) over core-node, built as one combined library (baken_core) that links every core crate. Node create/start/stop, connect, node.info, the membership view, catalog read views, placement status, event streams as a listener plus TaskHandle, and the two foreign traits RuntimeHost and PlatformHooks. No logic."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# The one shared library every platform loads (libbaken_core.so, baken_core.dll). cdylib only, so
+# cargo-bloat can measure it; the bridge tests are unit tests inside the crate.
+name = "baken_core"
+crate-type = ["cdylib"]
+
+[[bin]]
+# Generates the Kotlin bindings from the built library: `cargo run -p core-ffi --features bindgen
+# --bin uniffi-bindgen -- generate --library <lib> --language kotlin --out-dir <dir>`.
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli", "uniffi/cargo-metadata"]
+
+[dependencies]
+async-trait.workspace = true
+core-carrier.workspace = true
+core-carrier-iroh = { path = "../core-carrier-iroh" }
+core-catalog = { path = "../core-catalog" }
+core-membership.workspace = true
+core-node = { path = "../core-node" }
+core-placement = { path = "../core-placement" }
+core-proto.workspace = true
+core-store.workspace = true
+core-store-sqlite = { path = "../core-store-sqlite" }
+hex.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "time"] }
+uniffi = { workspace = true, features = ["macro-scaffolding"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "rt-multi-thread", "macros", "time"] }
+
+# Not `workspace = true`: UniFFI's generated scaffolding exports `extern "C"` functions, which the
+# workspace's `unsafe_code = "forbid"` cannot allow. Everything else matches the workspace.
+[lints.rust]
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+doc_markdown = "allow"
