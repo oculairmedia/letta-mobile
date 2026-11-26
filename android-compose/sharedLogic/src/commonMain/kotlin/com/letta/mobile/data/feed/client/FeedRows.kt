@@ -18,9 +18,12 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMutation
 import com.letta.mobile.data.timeline.TimelineReducerState
+import com.letta.mobile.data.timeline.applyPendingToolReturns
 import com.letta.mobile.data.timeline.keyedByOwnRecords
 import com.letta.mobile.data.timeline.reduceLive
 import com.letta.mobile.data.timeline.reduceProductionMutation
+import com.letta.mobile.data.timeline.toTimelinePersistentList
+import com.letta.mobile.data.timeline.toTimelinePersistentMap
 import com.letta.mobile.data.timeline.unresolvedToolCallIds
 import com.letta.mobile.data.timeline.withPromptOwnedRunIds
 import com.letta.mobile.data.transport.WsFrameMapper
@@ -71,7 +74,7 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         return messagesOf(entry, payload).also { messages ->
             messages.forEach { message ->
                 reduction = reduction.reduceLive(message, agent.value)
-                message.emittedToolCallIds().takeIf { it.isNotEmpty() }?.let { toolCallsByTurn.getOrPut(entry.turn) { mutableSetOf() } += it }
+                rememberToolCalls(entry.turn, message.emittedToolCallIds())
             }
         }
     }
@@ -85,11 +88,43 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
      */
     private fun settleClosedTurn(turn: String) {
         val calls = toolCallsByTurn.remove(turn) ?: return
+        attachHeldReturns(calls)
         val unanswered = reduction.timeline.unresolvedToolCallIds().intersect(calls)
         if (unanswered.isEmpty()) return
-        val settle = TimelineMutation.SettleDanglingToolCalls(reduction.danglingSweepGeneration, reduction.lifecycleEpoch, unanswered)
+        val settle = TimelineMutation.SettleDanglingToolCalls(
+            reduction.danglingSweepGeneration,
+            reduction.lifecycleEpoch,
+            unanswered,
+        )
         reduction = reduceProductionMutation(reduction, settle).next
         Telemetry.event(TAG, "turnClosed.settledUnanswered", "turn" attr turn, "count" attr unanswered.size)
+    }
+
+    /**
+     * A row is named by its first call (`tc-<first>`), so the return of a later call in the same message cannot join it
+     * live and is held. The turn is over: show each held return on its call, with its real status.
+     */
+    private fun attachHeldReturns(calls: Set<String>) {
+        if (reduction.pendingToolReturnsByCallId.keys.none { it in calls }) return
+        val held = LinkedHashMap(reduction.pendingToolReturnsByCallId)
+        val events = reduction.timeline.events.map<TimelineEvent, TimelineEvent> { event ->
+            if (event is TimelineEvent.Confirmed && event.toolCalls.any { it.effectiveId in calls }) {
+                applyPendingToolReturns(event, held)
+            } else {
+                event
+            }
+        }
+        reduction = reduction.copy(
+            timeline = reduction.timeline.copy(
+                events = events.toTimelinePersistentList(),
+                stablePrefixVersion = reduction.timeline.stablePrefixVersion + 1,
+            ),
+            pendingToolReturnsByCallId = held.toTimelinePersistentMap(),
+        )
+    }
+
+    private fun rememberToolCalls(turn: String, callIds: List<String>) {
+        if (callIds.isNotEmpty()) toolCallsByTurn.getOrPut(turn) { mutableSetOf() } += callIds
     }
 
     private fun LettaMessage.emittedToolCallIds(): List<String> = when (this) {
