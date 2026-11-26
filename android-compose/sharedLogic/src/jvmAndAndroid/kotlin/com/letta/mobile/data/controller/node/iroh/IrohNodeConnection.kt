@@ -305,30 +305,36 @@ class IrohNodeConnection internal constructor(
         )
     }
 
-    /** Serves the connection until its control lane ends, then closes it. */
-    suspend fun serve() = coroutineScope {
+    /**
+     * Serves the connection until its control lane ends, then closes it. A failure in any of its lanes (the control
+     * lane ending because the link was lost, say) is recorded as `connection.error` here rather than thrown: the
+     * try wraps the whole scope, so a failing child job is caught too.
+     */
+    suspend fun serve() {
         try {
-            // eaczz.3: build this connection's viewer handle up front (its push
-            // lane's writes wait for the lane to open), so both subscription signals
-            // (runtime_start on the control channel, message.list on an admin_rpc
-            // stream) can register it as a conversation viewer.
-            val viewer = ensureSelfViewer(pushSink)
-            connectionRegistry?.let { registry ->
-                val registration = registry.claim(viewer)
-                viewerRegistration = registration
-                viewerSubscription = ConversationViewerSubscription(registry, registration)
-            }
+            coroutineScope {
+                // eaczz.3: build this connection's viewer handle up front (its push
+                // lane's writes wait for the lane to open), so both subscription signals
+                // (runtime_start on the control channel, message.list on an admin_rpc
+                // stream) can register it as a conversation viewer.
+                val viewer = ensureSelfViewer(pushSink)
+                connectionRegistry?.let { registry ->
+                    val registration = registry.claim(viewer)
+                    viewerRegistration = registration
+                    viewerSubscription = ConversationViewerSubscription(registry, registration)
+                }
 
-            val controlJob = launch {
-                serveControlChannel(pushSink)
-            }
+                val controlJob = launch {
+                    serveControlChannel(pushSink)
+                }
 
-            val adminRpcAcceptJob = launch {
-                acceptAdminRpcStreams()
-            }
+                val adminRpcAcceptJob = launch {
+                    acceptAdminRpcStreams()
+                }
 
-            controlJob.join()
-            adminRpcAcceptJob.cancelAndJoin()
+                controlJob.join()
+                adminRpcAcceptJob.cancelAndJoin()
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
