@@ -40,6 +40,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -86,6 +87,8 @@ class DefaultAppServerController(
      * Extra context for the controller-owned router collector. Tests pass
      * [kotlinx.coroutines.Dispatchers.Unconfined] so SharedFlow emissions are
      * observed synchronously (avoids Default-dispatcher races under runTest).
+     * A [kotlinx.coroutines.Job] here is the controller's owner: the controller's collectors run
+     * under a child of it, so cancelling the owner stops them and [close] stops only the child.
      */
     private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
     /**
@@ -109,8 +112,9 @@ class DefaultAppServerController(
      */
     private val turnsSurviveReconnect: Boolean = false,
 ) : AppServerController {
-    @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle owned; cancelled in close().
-    private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
+    @Suppress("NoDetachedCoroutineLifecycle") // Child of the owner's Job, if any; cancelled in close().
+    private val controllerScope =
+        CoroutineScope(parentCoroutineContext + SupervisorJob(parentCoroutineContext[Job]))
     /** Bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
     /** Decisions sent, shared by the router and the turn engine. */

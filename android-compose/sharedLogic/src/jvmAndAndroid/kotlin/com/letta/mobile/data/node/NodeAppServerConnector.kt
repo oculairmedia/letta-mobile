@@ -16,6 +16,7 @@ import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.webSocketBaseUrl
 import io.ktor.client.HttpClient
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
@@ -62,16 +63,19 @@ internal class NodeAppServerConnector(
         if (endpoint != null) live(endpoint, tools) else stub()
 
     private fun live(endpoint: AppServerEndpoint, tools: ExternalToolRegistry): NodeAppServerConnection {
-        val httpClient = ports.httpClients.create(requestTimeoutMs)
+        // Validated before anything is created: a scheme the node cannot dial fails here, not
+        // inside two reconnect loops that would retry it forever.
+        val baseUrl = endpoint.webSocketBaseUrl()
+        val httpClient = ownedHttpClient(requestTimeoutMs)
         val runtimeRegistry = InMemoryRuntimeRegistry()
         var controllerRef: DefaultAppServerController? = null
         var coordinatorRef: ReconnectCoordinator? = null
         val adminClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, endpoint) },
+            connect = { mintGeneration(httpClient, baseUrl, endpoint.bearerToken) },
             telemetryComponent = "AppServerAdminReconnect",
         )
         val runtimeClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, endpoint) },
+            connect = { mintGeneration(httpClient, baseUrl, endpoint.bearerToken) },
             listener = NodeRecoveryListener(
                 log = ports.log,
                 controller = { controllerRef },
@@ -90,6 +94,7 @@ internal class NodeAppServerConnector(
             // An upstream socket blip no longer fails the turns the App Server keeps running;
             // they wait out the reconnect grace window instead.
             turnsSurviveReconnect = true,
+            parentCoroutineContext = scope.coroutineContext.job,
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
@@ -100,28 +105,40 @@ internal class NodeAppServerConnector(
 
     private fun stub(): NodeAppServerConnection {
         val transport = KtorAppServerWebSocketTransport(
-            httpClient = ports.httpClients.create(null),
+            httpClient = ownedHttpClient(null),
             baseUrl = "ws://127.0.0.1:0",
             scope = scope,
             bearerToken = null,
         )
         val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-        return NodeAppServerConnection(DefaultAppServerController(client), null)
+        val controller = DefaultAppServerController(client, parentCoroutineContext = scope.coroutineContext.job)
+        return NodeAppServerConnection(controller, null)
     }
+
+    /**
+     * A client this connection owns for the node's lifetime: every WebSocket generation dials
+     * through it, so it outlives reconnects, and it is closed once, when the node scope ends. The
+     * close is registered before anything else is built, so a startup that throws or a node
+     * stopped mid-connect still releases it; on an already-stopped node it closes at once.
+     */
+    private fun ownedHttpClient(requestTimeoutMs: Long?): HttpClient =
+        ports.httpClients.create(requestTimeoutMs).also { client ->
+            scope.coroutineContext.job.invokeOnCompletion { client.close() }
+        }
 
     /**
      * Mint one connection generation: a fresh WS transport + client on a job child of [scope],
      * closable independently of its successors.
      */
     @Suppress("NoDetachedCoroutineLifecycle")
-    private fun mintGeneration(httpClient: HttpClient, endpoint: AppServerEndpoint): AppServerClientGeneration {
+    private fun mintGeneration(httpClient: HttpClient, baseUrl: String, bearerToken: String?): AppServerClientGeneration {
         val generationJob = Job(scope.coroutineContext.job)
         val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
         val transport = KtorAppServerWebSocketTransport(
             httpClient = httpClient,
-            baseUrl = endpoint.address,
+            baseUrl = baseUrl,
             scope = generationScope,
-            bearerToken = endpoint.bearerToken,
+            bearerToken = bearerToken,
         )
         return AppServerClientGeneration(
             client = DefaultAppServerClient(
