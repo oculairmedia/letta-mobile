@@ -5,6 +5,7 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.plus
 
 /**
  * Appends lines to [file], keeping at most about twice [maxBytes]: when [file] would pass [maxBytes] it becomes `<name>.1`
@@ -61,9 +62,9 @@ internal class FileFlightRecordStore(directory: File, maxBytesPerFile: Long = DE
 }
 
 /**
- * Installs the flight record for [recorder] into `flight-record.log` under [directory]. The writer is a child of [scope], the
- * process-lifetime scope the platform entry point owns, and does its file I/O on the I/O dispatcher. Closing the result
+ * Installs the flight record for [recorder] into `flight-record.log` under [directory]. The writer is a child of [scope] (the
+ * process-lifetime scope the platform entry point owns) and does its file I/O on the I/O dispatcher. Closing the result
  * writes what is waiting and ends the writer.
  */
 fun installFileFlightRecording(recorder: TelemetryRecorder, directory: File, build: String, scope: CoroutineScope): AutoCloseable =
-    FlightRecording.install(recorder, FileFlightRecordStore(directory), scope, build, Dispatchers.IO)
+    FlightRecording.install(recorder, FileFlightRecordStore(directory), scope + Dispatchers.IO, build)

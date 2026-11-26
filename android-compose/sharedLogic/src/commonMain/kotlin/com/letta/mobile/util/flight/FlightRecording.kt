@@ -4,8 +4,6 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.runCatchingCancellable
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -59,13 +57,12 @@ internal class FlightRecorder(
     private val store: FlightRecordStore,
     scope: CoroutineScope,
     private val flushDelayMs: Long = FLUSH_DELAY_MS,
-    writerContext: CoroutineContext = EmptyCoroutineContext,
 ) {
     private val waiting = Channel<Telemetry.Event>(QUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
     private val limiter = FlightRateLimiter()
 
     /** The writer, a child of the owner's scope: it ends after [close] once what was waiting is written, or with the scope. */
-    val writer: Job = scope.launch(writerContext) { drain() }
+    val writer: Job = scope.launch { drain() }
 
     /** Called inside every `Telemetry.event`: a map lookup and a non-blocking queue offer, nothing else. */
     fun offer(event: Telemetry.Event) {
@@ -108,18 +105,17 @@ internal object FlightRecording {
 
     /**
      * Starts recording what [recorder] records into [store] and marks the start with [build] (the app's version or host
-     * name). The writer runs in [scope] (on [writerContext]), which the platform entry point owns for the process (or page)
-     * lifetime. Closing the result detaches it from [recorder] and lets the writer finish: lines already waiting are
-     * written, then the writer ends.
+     * name). The writer runs in [scope], which the platform entry point owns for the process (or page) lifetime; the
+     * dispatcher in [scope]'s context decides which thread the writer's I/O runs on. Closing the result detaches it from
+     * [recorder] and lets the writer finish: lines already waiting are written, then the writer ends.
      */
     fun install(
         recorder: TelemetryRecorder,
         store: FlightRecordStore,
         scope: CoroutineScope,
         build: String,
-        writerContext: CoroutineContext = EmptyCoroutineContext,
     ): AutoCloseable {
-        val flight = FlightRecorder(store, scope, writerContext = writerContext)
+        val flight = FlightRecorder(store, scope)
         recorder.onRecorded = flight::offer
         Telemetry.event(TAG, "process.start", "build" attr build)
         return AutoCloseable {

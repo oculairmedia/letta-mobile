@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.plus
 
 /** The on-disk flight record: bounded, survives a restart in order, keeps the newest, and is written off the caller's thread. */
 class FileFlightRecordStoreTest {
@@ -80,5 +81,5 @@ class FileFlightRecordStoreTest {
 
     /** The production file install's writer context (the I/O dispatcher), over a [store] the test can watch. */
     private fun installFileFlightRecordingInto(recorder: TelemetryRecorder, store: FlightRecordStore, scope: CoroutineScope) =
-        FlightRecording.install(recorder, store, scope, "test", Dispatchers.IO)
+        FlightRecording.install(recorder, store, scope + Dispatchers.IO, "test")
 }
