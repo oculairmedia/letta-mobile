@@ -1,5 +1,6 @@
 """Desktop packaging regression tests: probes."""
 import os
+import struct
 from pathlib import Path
 import subprocess
 import unittest
@@ -13,8 +14,12 @@ class LinuxPackageProbeTests(LinuxPackageFixtures, unittest.TestCase):
         layout = self.inspect()
         writer = self.home_writer()
         writer.write_text(writer.read_text().replace('#!/usr/bin/env python3', '#!' + os.sys.executable))
+        write(self.runtime / 'node_modules/@letta-ai/letta-code/image-resize-worker.js', '// fixture')
+        # The image worker answers like letta-code's: the probe PNG resized to the 2000-pixel limit.
         write(self.node, f'#!/bin/sh\n"{writer}" node "$@"\n'
-              'if [ "$1" = --version ]; then echo v24.13.1; fi\n', True)
+              'if [ "$1" = --version ]; then echo v24.13.1; fi\n'
+              'case "$1" in *image-resize-worker.js) cat >/dev/null; '
+              'echo \'{"data":"","mediaType":"image/png","width":2000,"height":7,"resized":true}\';; esac\n', True)
         write(Path(layout['launcher']), f'#!/bin/sh\n"{writer}" jni "$@"\n', True)
         tools = self.work / 'compiler tools'
         write(tools / 'javac', f'#!/bin/sh\n"{writer}" javac "$@"\n', True)
@@ -27,7 +32,7 @@ class LinuxPackageProbeTests(LinuxPackageFixtures, unittest.TestCase):
             self.assertTrue(Path(rive.call_args.args[1]).is_relative_to(Path(env['TMPDIR'])))
             self.assertNotEqual(rive.call_args.args[2]['HOME'], env['HOME'])
             self.assertEqual(os.environ['HOME'], env['HOME'], 'Inspector changed the caller environment')
-        self.assert_home_isolated(['node', 'node', 'node', 'node', 'javac', 'jni'])
+        self.assert_home_isolated(['node', 'node', 'node', 'node', 'node', 'javac', 'jni'])
 
 
     def test_failed_native_probe_restores_launcher_config_byte_for_byte(self):
@@ -78,3 +83,30 @@ class LinuxPackageProbeTests(LinuxPackageFixtures, unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+class LinuxPackageImageWorkerTests(LinuxPackageFixtures, unittest.TestCase):
+    def worker_layout(self, reply):
+        layout = self.inspect()
+        write(self.runtime / 'node_modules/@letta-ai/letta-code/image-resize-worker.js', '// fixture')
+        write(self.node, f'#!/bin/sh\ncat >/dev/null\necho \'{reply}\'\n', True)
+        return layout
+
+    def test_image_worker_probe_accepts_a_real_resize(self):
+        layout = self.worker_layout('{"data":"","mediaType":"image/png","width":2000,"height":7,"resized":true}')
+        inspector.check_bundled_image_worker(layout, dict(os.environ), self.work)
+
+    def test_image_worker_probe_rejects_an_unresized_or_missing_worker(self):
+        layout = self.worker_layout('{"data":"","mediaType":"image/png","width":3000,"height":10,"resized":false}')
+        with self.assertRaisesRegex(ValueError, 'did not resize'):
+            inspector.check_bundled_image_worker(layout, dict(os.environ), self.work)
+        (self.runtime / 'node_modules/@letta-ai/letta-code/image-resize-worker.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'image worker missing'):
+            inspector.check_bundled_image_worker(layout, dict(os.environ), self.work)
+
+    def test_probe_image_is_a_valid_png_wider_than_the_limit(self):
+        png = inspector.wide_png()
+        self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
+        width, height = struct.unpack('>II', png[16:24])
+        self.assertGreater(width, inspector.IMAGE_MAX_WIDTH)
+        self.assertEqual(height, inspector.WIDE_PNG_HEIGHT)
