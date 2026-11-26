@@ -60,6 +60,7 @@ class IrohNodeConnectionSupportTest {
     fun aHostWithRelaysDisabledIsCreatedAndAdvertisesItsDirectAddresses() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val endpoint = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = scope,
             binding = IrohEndpointBinding(relayConfig = IrohRelayConfig.Disabled),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
