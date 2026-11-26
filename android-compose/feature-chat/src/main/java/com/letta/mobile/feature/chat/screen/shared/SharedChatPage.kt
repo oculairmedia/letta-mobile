@@ -115,8 +115,9 @@ internal data class SharedChatPageParams(
  *
  * With the app's canvas ([LocalChatCanvasSlot]) the conversation opens on its canvas with the
  * chat docked under it; expanding the dock gives the full-screen page, and swipe up on its
- * prompt (or Back) returns to the canvas. Without a canvas slot the page opens full-screen and
- * "open canvas" uses the canvas route.
+ * prompt (or Back) returns to the canvas. A conversation that opened on the full-screen page
+ * leaves on Back until the person has been on its canvas: Back never shows a canvas they did not
+ * open. Without a canvas slot the page opens full-screen and "open canvas" uses the canvas route.
  */
 @Composable
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
@@ -126,6 +127,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
     val presentation by presentationState
+    // Whether the person has been on the canvas: only then does Back from the full page return to it.
+    val canvasSeen = rememberSaveable { mutableStateOf(presentationState.value.canvasVisible) }
     // Where the docked panel sits; it opens as a full-width bottom panel on a phone.
     var dockGeometry by rememberSaveable(stateSaver = DockGeometrySaver) { mutableStateOf(ChatDockGeometry.Default) }
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
@@ -138,8 +141,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     }
     val hasCanvasSlot = canvasSlot != null
     val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
-    // Back from the full-screen page returns to the canvas, the default view.
-    BackHandler(enabled = hasCanvasSlot && presentation.mode == ChatSurfaceMode.FullScreen) {
+    LaunchedEffect(presentation.canvasVisible) { if (presentation.canvasVisible) canvasSeen.value = true }
+    // Back from the full-screen page returns to the canvas the person came from; otherwise the host takes it.
+    BackHandler(enabled = hasCanvasSlot && backCollapsesToCanvas(presentation.mode, canvasSeen.value)) {
         onIntent(ChatSurfaceIntent.Collapse)
     }
     ReportHostHeaderHidden(
@@ -269,6 +273,14 @@ private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
 }
 
 /** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
+/**
+ * Whether the system Back on the page goes back to its canvas: only from the full-screen page, and
+ * only once the person has been on the canvas ([canvasSeen]). A conversation opened straight onto
+ * the full page leaves it on Back instead, so Back never passes through a canvas nobody opened.
+ */
+internal fun backCollapsesToCanvas(mode: ChatSurfaceMode, canvasSeen: Boolean): Boolean =
+    mode == ChatSurfaceMode.FullScreen && canvasSeen
+
 internal fun routesToCanvasNavigation(
     presentation: ChatSurfacePresentation,
     intent: ChatSurfaceIntent,
