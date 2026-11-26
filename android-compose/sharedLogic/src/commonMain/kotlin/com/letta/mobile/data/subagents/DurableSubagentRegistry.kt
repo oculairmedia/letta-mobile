@@ -380,7 +380,7 @@ class DurableSubagentRegistry(
     private fun SubagentChipRecord.withEarlyTerminalApplied(now: Long): SubagentChipRecord {
         val task = taskId ?: return this
         if (earlyTerminals.isEmpty()) return this
-        val early = earlyTerminals.firstOrNull { it.matches(task, subagentAgentId) }
+        val early = earlyTerminals.firstOrNull { it.matches(this) }
         if (early == null || state.isTerminal) return copy(earlyTerminals = emptyList())
         Telemetry.event(
             TAG, "terminal.earlyApplied",

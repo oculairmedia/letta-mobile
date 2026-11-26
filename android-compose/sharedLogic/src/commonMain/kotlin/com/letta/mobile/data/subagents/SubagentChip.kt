@@ -254,9 +254,14 @@ data class SubagentEarlyTerminal(
     @SerialName("subagent_agent_id") val subagentAgentId: String? = null,
     @SerialName("duration_ms") val durationMs: Long? = null,
 ) {
-    /** True when this notification names the child [taskId] / [childAgentId] identifies. */
-    fun matches(taskId: String, childAgentId: String?): Boolean =
-        this.taskId == taskId && (subagentAgentId == null || childAgentId == null || subagentAgentId == childAgentId)
+    /**
+     * True when this notification names the child [record]'s receipt identified: the same task, and
+     * the same child agent when both carry one. A record with no task id yet never matches.
+     */
+    fun matches(record: SubagentChipRecord): Boolean {
+        if (record.taskId == null || taskId != record.taskId) return false
+        return subagentAgentId == null || record.subagentAgentId == null || subagentAgentId == record.subagentAgentId
+    }
 }
 
 /**
