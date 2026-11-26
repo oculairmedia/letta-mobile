@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -25,10 +26,10 @@ import androidx.compose.ui.input.key.type
  * [com.letta.mobile.ui.chat.surface.composer.ComposerPolicy].
  *
  * The system Back is never spent on focus: Compose reads Back as "move focus out", and below this
- * focusable root each press would only walk focus one level up (out of a drawer that has closed,
- * out of the prompt) and never reach the host's Back handlers. Back first takes focus to this root,
- * which has nowhere further out to go, so the press goes on to the host, and the root keeps the
- * focus the window's chords need.
+ * focusable root each press would walk focus one level up (out of a drawer that has closed, out of
+ * the prompt, off the canvas board) and never reach the host's Back handlers. While Back is down
+ * the root stops being a place focus can move out to, so the walk finds nowhere to go: the press
+ * goes on to the host and focus stays where it was (the board keeps its keys).
  */
 @Composable
 fun rememberShellShortcuts(binding: ShellShortcutBinding?): Modifier {
@@ -39,18 +40,35 @@ fun rememberShellShortcuts(binding: ShellShortcutBinding?): Modifier {
     }
     if (binding == null) return Modifier
     val requester = remember { FocusRequester() }
+    // Remembered whole: a fresh focusProperties lambda on a recomposition mid-press would make Compose
+    // re-check the root's focusability and drop its focus.
+    val root = remember(hub, requester) {
+        val back = SystemBackPress()
+        Modifier
+            .onPreviewKeyEvent { event ->
+                back.track(event)
+                hub.dispatch(event.asStroke())
+            }
+            .focusRequester(requester)
+            // Read when Compose looks for where to move focus, so the change needs no recomposition.
+            .focusProperties { canFocus = !back.down }
+    }
     LaunchedEffect(requester) { runCatching { requester.requestFocus() } }
-    return Modifier
-        .onPreviewKeyEvent { event ->
-            if (isSystemBack(event)) runCatching { requester.requestFocus() }
-            hub.dispatch(event.asStroke())
-        }
-        .focusRequester(requester)
-        .focusable()
+    return root.focusable()
 }
 
-/** The system Back going down: the key Compose would otherwise turn into a focus move. */
-internal fun isSystemBack(event: KeyEvent): Boolean = event.key == Key.Back && event.type == KeyEventType.KeyDown
+/**
+ * Whether the system Back is held. A plain field, not snapshot state: it is read while the same key
+ * event is dispatched, and must not invalidate the focused root (which would clear its focus).
+ */
+private class SystemBackPress {
+    var down = false
+        private set
+
+    fun track(event: KeyEvent) {
+        if (event.key == Key.Back) down = event.type == KeyEventType.KeyDown
+    }
+}
 
 internal fun KeyEvent.asStroke(): ShortcutKeystroke = ShortcutKeystroke(
     key = key,

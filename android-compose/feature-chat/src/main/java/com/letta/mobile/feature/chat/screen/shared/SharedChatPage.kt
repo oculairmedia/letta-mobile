@@ -272,7 +272,6 @@ private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
     return drawer.displayOptions.collectAsStateWithLifecycle().value
 }
 
-/** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
 /**
  * Whether the system Back on the page goes back to its canvas: only from the full-screen page, and
  * only once the person has been on the canvas ([canvasSeen]). A conversation opened straight onto
@@ -281,6 +280,7 @@ private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
 internal fun backCollapsesToCanvas(mode: ChatSurfaceMode, canvasSeen: Boolean): Boolean =
     mode == ChatSurfaceMode.FullScreen && canvasSeen
 
+/** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
 internal fun routesToCanvasNavigation(
     presentation: ChatSurfacePresentation,
     intent: ChatSurfaceIntent,
