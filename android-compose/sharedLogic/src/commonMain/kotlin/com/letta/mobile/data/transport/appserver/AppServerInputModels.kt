@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.runtime.LoopPhase
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -155,5 +156,8 @@ data class AppServerLoopStatus(
     val clientMessageIdsByRunId: Map<String, List<String>> = emptyMap(),
     /** Tool call ids executing client-side; populated only while `EXECUTING_CLIENT_SIDE_TOOL`. */
     @SerialName("executing_tool_call_ids") val executingToolCallIds: List<String> = emptyList(),
-)
+) {
+    /** [status] as a [LoopPhase]; a status this client does not know yet is [LoopPhase.Unknown]. */
+    internal val phase: LoopPhase get() = LoopPhase.fromWire(status)
+}
 
