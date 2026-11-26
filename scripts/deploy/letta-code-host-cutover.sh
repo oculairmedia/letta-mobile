@@ -8,8 +8,10 @@
 #     /usr/local/sbin/letta-code-host-cutover.sh <old-version> <new-version> [<node-bin-dir>]
 #   with EXPECTED_PATCHES set (no default): `env EXPECTED_PATCHES=<N> /usr/local/sbin/letta-code-host-cutover.sh ...`.
 #   <N> is the `applied=` count `node scripts/appserver/letta-code-upgrade.mjs survey <new-version>`
-#   prints for the loader being deployed; the script refuses to start without it.
-#   e.g. env EXPECTED_PATCHES=36 ... letta-code-host-cutover.sh 0.34.14 0.34.39 /opt/meridian/node/v22.23.4/bin
+#   prints on its REPO loader line (the host loader line must show the same number); the script
+#   refuses to start without it. That refusal happens before the log file is opened, so under
+#   systemd-run it is in `journalctl -u letta-code-cutover`, not in /var/log/letta-code-cutover-<new>.log.
+#   e.g. env EXPECTED_PATCHES=40 ... letta-code-host-cutover.sh 0.34.39 0.34.70 /opt/meridian/node/v<ver>/bin
 #
 # Changes, all rolled back together on failure:
 #   1. /root/.bun/bin/letta symlink (ExecStart runs it)       -> /root/letta-code-<new>/.../letta.js
@@ -26,7 +28,7 @@ set -u
 case "${EXPECTED_PATCHES:-}" in
   ''|*[!0-9]*|0|0[0-9]*)
     echo "ABORT: EXPECTED_PATCHES must be a positive integer (got '${EXPECTED_PATCHES:-}'); nothing was changed." >&2
-    echo "  Take it from \`node scripts/appserver/letta-code-upgrade.mjs survey <new-version>\`: the loader's applied=N." >&2
+    echo "  Take it from \`node scripts/appserver/letta-code-upgrade.mjs survey <new-version>\`: the REPO loader line's applied=N." >&2
     exit 64;;
 esac
 OLD=${1:?old letta-code version} NEW=${2:?new letta-code version} NODE_DIR=${3:-}

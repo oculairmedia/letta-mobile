@@ -12,8 +12,10 @@
 // order. It exits 1 when any patch skips or fails, a union member was removed, a loader applied
 // no patch, the host loader applied fewer patches than the repo loader on the same bundle, or a
 // host loader named with --host-loader does not exist. Without --host-loader an absent default host
-// loader is only printed as `host loader: absent` (a developer machine has none). The `applied=N`
-// of a READY survey is the number to pass to the host cutover as EXPECTED_PATCHES.
+// loader is only printed as `host loader: absent` (a developer machine has none) and the verdict
+// says `READY (repo loader only ...)`: run the survey again on the host with the loader staged
+// before a cutover. The REPO loader's `applied=N` is the number to pass to the host cutover as
+// EXPECTED_PATCHES, and the host loader's line must show the same number.
 //
 // apply rewrites every version site listed in android-compose/letta-code-runtime/letta-code-version-sites.json
 // (the list LettaCodeVersionPinsTest reads), regenerates desktop/runtime/package-lock.json with npm,
@@ -293,6 +295,14 @@ export function surveyProblems(report) {
   return problems;
 }
 
+/** The last line of the printed survey: why it is not ready, or READY (qualified when no host loader was surveyed). */
+export function surveyVerdict(report) {
+  const problems = surveyProblems(report);
+  if (problems.length) return `NOT READY: ${problems.join("; ")}`;
+  if (report.loaders.host) return "READY";
+  return `READY (repo loader only: no host loader at ${report.hostLoader?.path ?? "the default path"}; run on the host with the staged loader before a cutover)`;
+}
+
 function printSurvey(report) {
   const lines = [
     `letta-code ${report.pinned} -> ${report.version} (${report.packageRoot})`,
@@ -314,8 +324,7 @@ function printSurvey(report) {
   if (report.embedded) {
     lines.push("embedded patches:", ...report.embedded.map((s) => `  ${s.ok ? "ok  " : "FAIL"} ${s.patch}${s.ok ? "" : `: ${s.error}`}`));
   }
-  const problems = surveyProblems(report);
-  lines.push(problems.length ? `NOT READY: ${problems.join("; ")}` : "READY");
+  lines.push(surveyVerdict(report));
   console.log(lines.join("\n"));
 }
 
