@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 
 import {
   SITES_FILE, bumpPinFile, dependencyDiff, dryRunLoader, embeddedPatchOrder, readPin, readSites,
-  replaceGroup, rewriteSites, skippedPatchNames, surveyProblems, unionDiff,
+  hostLoaderRequest, replaceGroup, rewriteSites, skippedPatchNames, surveyProblems, unionDiff,
 } from "./letta-code-upgrade.mjs";
 import { repositoryRoot } from "./verify-contract-baseline.mjs";
 
@@ -128,12 +128,48 @@ test("dryRunLoader runs a scratch copy of the real loader and names each skipped
 test("surveyProblems fails on a removed union member, a skipped patch or a failed embedded patch only", () => {
   const clean = {
     unions: { commands: unionDiff(["a"], ["a"]), messages: unionDiff(["m"], ["m", "n"]) },
-    loaders: { repo: { skipped: 0 }, host: null },
+    loaders: { repo: { applied: 36, skipped: 0 }, host: null },
+    hostLoader: { path: "/opt/host-loader", explicit: false },
     embedded: [{ patch: "p", ok: true }],
   };
   assert.deepEqual(surveyProblems(clean), []);
   assert.deepEqual(surveyProblems({ ...clean, unions: { ...clean.unions, commands: unionDiff(["a", "b"], ["a"]) } }), ["commands union removed b"]);
-  assert.deepEqual(surveyProblems({ ...clean, loaders: { repo: { skipped: 2 }, host: { skipped: 1 } } }),
+  assert.deepEqual(surveyProblems({ ...clean, loaders: { repo: { applied: 34, skipped: 2 }, host: { applied: 35, skipped: 1 } } }),
     ["repo loader skipped 2 patch(es)", "host loader skipped 1 patch(es)"]);
   assert.deepEqual(surveyProblems({ ...clean, embedded: [{ patch: "p", ok: false }] }), ["embedded p failed"]);
+});
+
+test("surveyProblems fails a loader that applied no patch at all, even when none skipped", () => {
+  const report = {
+    unions: {},
+    loaders: { repo: { applied: 0, skipped: 0 }, host: null },
+    hostLoader: { path: "/opt/host-loader", explicit: false },
+  };
+  assert.deepEqual(surveyProblems(report), ["repo loader applied 0 patches"]);
+  assert.deepEqual(surveyProblems({ ...report, loaders: { repo: { applied: 36, skipped: 0 }, host: { applied: 0, skipped: 0 } } }),
+    ["host loader applied 0 patches"]);
+});
+
+test("surveyProblems fails a host loader that applies fewer patches than the repo loader on the same bundle", () => {
+  const report = {
+    unions: {},
+    loaders: { repo: { applied: 36, skipped: 0 }, host: { applied: 28, skipped: 0 } },
+    hostLoader: { path: "/opt/host-loader", explicit: true },
+  };
+  assert.deepEqual(surveyProblems(report), ["host loader applied 28 of the 36 patches the repo loader applies"]);
+  assert.deepEqual(surveyProblems({ ...report, loaders: { repo: { applied: 36, skipped: 0 }, host: { applied: 36, skipped: 0 } } }), []);
+});
+
+test("surveyProblems fails an explicitly requested host loader that is missing and tolerates an absent default", () => {
+  const loaders = { repo: { applied: 36, skipped: 0 }, host: null };
+  assert.deepEqual(surveyProblems({ unions: {}, loaders, hostLoader: { path: "/srv/loader", explicit: false } }), []);
+  assert.deepEqual(surveyProblems({ unions: {}, loaders, hostLoader: { path: "/srv/loader", explicit: true } }),
+    ["host loader /srv/loader was requested with --host-loader and does not exist"]);
+});
+
+test("hostLoaderRequest is explicit only when --host-loader names a directory", () => {
+  assert.deepEqual(hostLoaderRequest(["survey", "0.34.70"]), { dir: undefined, explicit: false });
+  assert.deepEqual(hostLoaderRequest(["survey", "0.34.70", "--host-loader", "/x/y"]), { dir: "/x/y", explicit: true });
+  assert.throws(() => hostLoaderRequest(["survey", "0.34.70", "--host-loader"]), /--host-loader needs a directory/);
+  assert.throws(() => hostLoaderRequest(["survey", "0.34.70", "--host-loader", "--json"]), /--host-loader needs a directory/);
 });

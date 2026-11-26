@@ -6,7 +6,10 @@
 # Usage (as root, detached so the restart cannot kill the caller):
 #   systemd-run --unit=letta-code-cutover --collect --no-block \
 #     /usr/local/sbin/letta-code-host-cutover.sh <old-version> <new-version> [<node-bin-dir>]
-#   e.g. ... letta-code-host-cutover.sh 0.34.14 0.34.39 /opt/meridian/node/v22.23.4/bin
+#   with EXPECTED_PATCHES set (no default): `env EXPECTED_PATCHES=<N> /usr/local/sbin/letta-code-host-cutover.sh ...`.
+#   <N> is the `applied=` count `node scripts/appserver/letta-code-upgrade.mjs survey <new-version>`
+#   prints for the loader being deployed; the script refuses to start without it.
+#   e.g. env EXPECTED_PATCHES=36 ... letta-code-host-cutover.sh 0.34.14 0.34.39 /opt/meridian/node/v22.23.4/bin
 #
 # Changes, all rolled back together on failure:
 #   1. /root/.bun/bin/letta symlink (ExecStart runs it)       -> /root/letta-code-<new>/.../letta.js
@@ -14,12 +17,19 @@
 #   3. optional: a service-only PATH line putting <node-bin-dir> first. /usr/local/bin/node is
 #      shared with other services (steel-mcp) and is never swapped.
 # Success requires: the staged package reports <new-version>; a NEW boot line
-# `lcp-patches applied=<N> skipped=0` with N = EXPECTED_PATCHES (default 28); the live exe is the
+# `lcp-patches applied=<N> skipped=0` with N = EXPECTED_PATCHES (required, no default); the live exe is the
 # expected node; the live env has the new LETTA_CLI_PATH_REAL; the symlink points at the new
 # letta.js; and the 127.0.0.1:4500 listener belongs to the service's cgroup.
 set -u
+# Before the log redirect and before anything is read or changed: a stale or missing count would
+# either roll back a healthy cutover after a restart or accept a short patch count.
+case "${EXPECTED_PATCHES:-}" in
+  ''|*[!0-9]*|0|0[0-9]*)
+    echo "ABORT: EXPECTED_PATCHES must be a positive integer (got '${EXPECTED_PATCHES:-}'); nothing was changed." >&2
+    echo "  Take it from \`node scripts/appserver/letta-code-upgrade.mjs survey <new-version>\`: the loader's applied=N." >&2
+    exit 64;;
+esac
 OLD=${1:?old letta-code version} NEW=${2:?new letta-code version} NODE_DIR=${3:-}
-EXPECTED_PATCHES=${EXPECTED_PATCHES:-28}
 LOG=${LOG:-/var/log/letta-code-cutover-$NEW.log}; exec >>"$LOG" 2>&1
 ENV=${ENV_FILE:-/etc/meridian/appserver.env}
 LINK=${LETTA_LINK:-/root/.bun/bin/letta}

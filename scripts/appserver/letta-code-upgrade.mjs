@@ -9,7 +9,11 @@
 // pinned release, the npm integrity, the full command/message union diff, a dry run of the repo
 // runtime-patch loader and of the host loader (read-only, default /opt/meridian/runtime-patches/current)
 // naming every skipped patch, and a dry run of the Android embedded letta.js patches in pipeline
-// order. It exits 1 when any patch skips or fails, or a union member was removed.
+// order. It exits 1 when any patch skips or fails, a union member was removed, a loader applied
+// no patch, the host loader applied fewer patches than the repo loader on the same bundle, or a
+// host loader named with --host-loader does not exist. Without --host-loader an absent default host
+// loader is only printed as `host loader: absent` (a developer machine has none). The `applied=N`
+// of a READY survey is the number to pass to the host cutover as EXPECTED_PATCHES.
 //
 // apply rewrites every version site listed in android-compose/letta-code-runtime/letta-code-version-sites.json
 // (the list LettaCodeVersionPinsTest reads), regenerates desktop/runtime/package-lock.json with npm,
@@ -222,7 +226,16 @@ function dryRunEmbedded(bundlePath) {
 // ---------------------------------------------------------------------------------------------
 // survey
 
-export async function survey(version, { packageRoot, hostLoader = HOST_LOADER_DIR, embedded = true } = {}) {
+/** The host loader directory a command line asks for; `explicit` when `--host-loader` names it, so a missing one is an error. */
+export function hostLoaderRequest(args) {
+  const index = args.indexOf("--host-loader");
+  if (index < 0) return { dir: undefined, explicit: false };
+  const dir = args[index + 1];
+  if (!dir || dir.startsWith("--")) throw new Error("--host-loader needs a directory");
+  return { dir, explicit: true };
+}
+
+export async function survey(version, { packageRoot, hostLoader = HOST_LOADER_DIR, hostLoaderExplicit = false, embedded = true } = {}) {
   const pinned = readPin();
   const install = installPackage(version, packageRoot);
   try {
@@ -237,6 +250,7 @@ export async function survey(version, { packageRoot, hostLoader = HOST_LOADER_DI
     return {
       version,
       pinned,
+      hostLoader: { path: hostLoaderPath, explicit: hostLoaderExplicit },
       packageRoot: install.root,
       integrity,
       engines: { pinned: before.engines?.node ?? null, candidate: packageJson.engines?.node ?? null },
@@ -261,6 +275,17 @@ export function surveyProblems(report) {
   }
   for (const [name, loader] of Object.entries(report.loaders)) {
     if (loader?.skipped) problems.push(`${name} loader skipped ${loader.skipped} patch(es)`);
+    else if (loader && loader.applied === 0) problems.push(`${name} loader applied 0 patches`);
+  }
+  // The loader does not expose how many patches it defines (a step counts one to five applied sites
+  // and a half-applied step shows up in neither counter), so the repo loader on the same bundle is
+  // the yardstick: a host loader that applies fewer is running with patches missing.
+  const { repo, host } = report.loaders;
+  if (host && repo && host.applied > 0 && !host.skipped && host.applied < repo.applied) {
+    problems.push(`host loader applied ${host.applied} of the ${repo.applied} patches the repo loader applies`);
+  }
+  if (!host && report.hostLoader?.explicit) {
+    problems.push(`host loader ${report.hostLoader.path} was requested with --host-loader and does not exist`);
   }
   for (const step of report.embedded ?? []) {
     if (!step.ok) problems.push(`embedded ${step.patch} failed`);
@@ -380,7 +405,9 @@ async function main(args) {
   }
   const packageRoot = option(args, "--package-root");
   if (mode === "apply") { await apply(version, { packageRoot }); return 0; }
-  const report = await survey(version, { packageRoot, hostLoader: option(args, "--host-loader") ?? HOST_LOADER_DIR, embedded: !args.includes("--no-embedded") });
+  let request;
+  try { request = hostLoaderRequest(args); } catch (error) { console.error(error.message); return 64; }
+  const report = await survey(version, { packageRoot, hostLoader: request.dir ?? HOST_LOADER_DIR, hostLoaderExplicit: request.explicit, embedded: !args.includes("--no-embedded") });
   if (args.includes("--json")) console.log(JSON.stringify({ ...report, problems: surveyProblems(report) }, null, 2));
   else printSurvey(report);
   return surveyProblems(report).length ? 1 : 0;

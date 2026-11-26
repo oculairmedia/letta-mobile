@@ -18,6 +18,10 @@ reports engines, the dependency diff against the pin, the npm integrity, every a
 command/message union member, a dry run of the repo runtime-patch loader and of the host loader
 (`--host-loader`, default `/opt/meridian/runtime-patches/current`, read only) naming each skipped
 patch, and the Android embedded `letta.js` patch pipeline in staging order. `--json` for machines.
+READY needs every loader to apply at least one patch with none skipped and the host loader to apply
+as many as the repo loader on the same bundle. A host loader named with `--host-loader` that does not
+exist is an error; with no `--host-loader` an absent default is printed as `host loader: absent`
+(a developer machine) and does not fail.
 
 `apply` rewrites every listed version site, bumps `assetRevision` and the npm integrity, regenerates
 `desktop/runtime/package-lock.json` with npm, re-captures the contract matrix, inventory, CLI probe
@@ -87,8 +91,9 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    systemd-run --unit=letta-code-cutover --collect --no-block \
      env EXPECTED_PATCHES=40 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
-   Always pass `EXPECTED_PATCHES` (40 for the 0.34.70 loader): the script's default, 28, predates the
-   current loader and would roll back a healthy cutover. Every node that shares agent state must run the
+   `EXPECTED_PATCHES` has no default and the script refuses to start (exit 64, before changing anything)
+   unless it is a positive integer: use the `applied=N` the pre-flight `survey` printed for the
+   loader being deployed (40 for the 0.34.70 loader). Every node that shares agent state must run the
    40-patch loader (with `lcp-system-prompt-tracking`) before replicated prompt tracking is relied on: a node
    without it drops `system_prompt_tracking` from an agent record the next time it saves that agent.
    It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
