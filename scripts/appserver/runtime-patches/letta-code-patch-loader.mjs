@@ -2044,6 +2044,219 @@ function agentTaskStatus(state) {
   state.appliedPatches += 1;
 }
 
+// Host-neutral agent store. Agent state replicates between nodes in both directions, so the
+// bytes the local store writes must mean the same thing on every machine: no counters that
+// two nodes advance independently, no CRLF that depends on the writer's OS, and no absolute
+// host paths. Each patch below is one counted lcp id, matches its anchors exactly once and
+// fails open on drift like every other patch in this file.
+
+// lcp-conversation-uuid: nextConversationId() minted `local-conv-<N>` from a backend-wide
+// counter (the max numeric suffix over every loaded conversation), so two nodes mint the same
+// id for different conversations. `randomUUID8` is node:crypto's randomUUID, imported at module
+// scope, and createEphemeralConversation already mints `local-conv-<uuid>`. The loop still
+// skips an id whose record or directory exists. conversationSeq becomes dead: numericSuffix()
+// of a uuid suffix only ever feeds that counter.
+const CONVERSATION_UUID_TOKEN =
+  "      this.conversationSeq += 1;\n" +
+  "      const conversationId = `${this.conversationIdPrefix}${this.conversationSeq}`;";
+const CONVERSATION_UUID_REPLACEMENT =
+  "      const conversationId = `${this.conversationIdPrefix}${randomUUID8()}`; // lcp-conversation-uuid";
+
+// lcp-ui-msg-uuid: nextLocalMessageId() minted `ui-msg-<N>` from a counter rebuilt only from
+// loaded in_context ids, so after compaction (or on another node) it can reuse an id already in
+// the conversation's history. Readers checked against 0.34.39:
+//  - LocalStore pagination finds before/after cursors by id equality, not by order;
+//  - numericSuffix() only feeds localMessageSeq, now dead;
+//  - numericId()'s /ui-msg-(\d+)$/ (migrateLocalBackendTranscripts) only seeds the counter for
+//    ids it mints while converting pre-pi legacy transcripts. A uuid suffix never matches it
+//    (hyphens), so it reads 0 and the numeric ids it mints cannot collide with uuid ids;
+//  - App Server clients key on the `ui-msg-` prefix only.
+const UI_MSG_UUID_TOKEN =
+  "    this.localMessageSeq += 1;\n" +
+  "    return `${this.localMessageIdPrefix}${this.localMessageSeq}`;";
+const UI_MSG_UUID_REPLACEMENT =
+  "    return `${this.localMessageIdPrefix}${randomUUID8()}`; // lcp-ui-msg-uuid";
+
+// lcp-memory-lf: the memory repo inherits core.autocrlf from the host and has no
+// .gitattributes, so a Windows node's agent Bash tool (PowerShell) commits CRLF blobs that
+// differ byte-for-byte from the same memory on Linux. prepareLocalOnlyMemoryRepoForGitOps runs
+// on every system-prompt compile and every harness memory write, so existing repos converge
+// too. It sets core.autocrlf=false (node-local config), writes `* text=auto eol=lf` when the
+// repo has no .gitattributes, and commits it once through commitMemoryPaths; a repo with no
+// HEAD yet carries it in its init commit instead. Git failures are logged and never block the
+// caller. A memo skips the git calls once a directory has converged in this process.
+const MEMORY_LF_PREPARE_HEAD_TOKEN = "async function prepareLocalOnlyMemoryRepoForGitOps(memoryDir, author) {\n";
+const MEMORY_LF_PREPARE_TAIL_TOKEN =
+  '  if (await getLocalGitConfig(memoryDir, "commit.gpgsign") === null) {\n' +
+  '    await setLocalGitConfig(memoryDir, "commit.gpgsign", "false");\n' +
+  "  }\n" +
+  "}";
+const MEMORY_LF_PREPARE_TAIL_REPLACEMENT =
+  '  if (await getLocalGitConfig(memoryDir, "commit.gpgsign") === null) {\n' +
+  '    await setLocalGitConfig(memoryDir, "commit.gpgsign", "false");\n' +
+  "  }\n" +
+  "  await __lcpEnsureMemoryLineEndings(memoryDir, author);\n" +
+  "}";
+// The fs and path bindings carry minifier suffixes; capture them from initializeLocalMemoryRepo,
+// which lives in the same module, instead of hard-coding them.
+const MEMORY_LF_INIT_FS_PATTERN =
+  /if \(!(existsSync\d*)\((join\d*)\(params\.memoryDir, "\.git"\)\)\) \{\n {4}await runGit\(params\.memoryDir, \["init"\]\);/g;
+const MEMORY_LF_INIT_COMMIT_PATTERN =
+  /(writeFileSync\d*)\(fullPath, file\.content, "utf8"\);\n {4}pathspecs\.push\(relativePath\);\n {2}\}\n {2}await prepareLocalOnlyMemoryRepoForGitOps\(params\.memoryDir, author\);\n {2}if \(pathspecs\.length > 0\) \{/g;
+
+function memoryLfHelper(existsSync, join, writeFileSync) {
+  return (
+    "// lcp-memory-lf: LF line endings for the memory repo, on every host.\n" +
+    "async function __lcpEnsureMemoryLineEndings(memoryDir, author) {\n" +
+    "  const converged = globalThis.__lcpMemoryLineEndingsConverged ??= new Set;\n" +
+    "  if (converged.has(memoryDir)) return;\n" +
+    "  try {\n" +
+    '    if (await getLocalGitConfig(memoryDir, "core.autocrlf") !== "false") {\n' +
+    '      await setLocalGitConfig(memoryDir, "core.autocrlf", "false");\n' +
+    "    }\n" +
+    `    const attributesPath = ${join}(memoryDir, ".gitattributes");\n` +
+    `    if (!${existsSync}(attributesPath)) {\n` +
+    `      ${writeFileSync}(attributesPath, "* text=auto eol=lf\\n", "utf8");\n` +
+    "    }\n" +
+    "    if (!await hasMemoryHead(memoryDir)) return;\n" +
+    "    let tracked = false;\n" +
+    "    try {\n" +
+    '      await runGit(memoryDir, ["cat-file", "-e", "HEAD:.gitattributes"]);\n' +
+    "      tracked = true;\n" +
+    "    } catch {}\n" +
+    "    if (!tracked) {\n" +
+    '      await commitMemoryPaths(memoryDir, [".gitattributes"], "chore: normalize memory line endings to LF", author);\n' +
+    "    }\n" +
+    "    converged.add(memoryDir);\n" +
+    "  } catch (error4) {\n" +
+    '    debugWarn("memfs-git", `lcp-memory-lf: could not normalize line endings in ${memoryDir}: ${error4 instanceof Error ? error4.message : String(error4)}`);\n' +
+    "  }\n" +
+    "}\n"
+  );
+}
+
+// lcp-session-cwd: the messages.jsonl session line recorded the App Server's process.cwd(), an
+// absolute host path. Both writers (the LocalStore header and the transcript migration) now
+// record LETTA_WORKSPACE_ID when the node sets it and omit the field otherwise. No letta-code
+// reader needs it: the only `row.cwd` readers parse other tools' transcripts, and they treat
+// it as optional.
+const SESSION_CWD_SITES = [
+  {
+    token:
+      "    timestamp: conversation.created_at ?? currentIsoTimestamp(),\n" +
+      "    cwd: process.cwd()\n" +
+      "  };",
+    replacement:
+      "    timestamp: conversation.created_at ?? currentIsoTimestamp(),\n" +
+      "    ...process.env.LETTA_WORKSPACE_ID ? { cwd: process.env.LETTA_WORKSPACE_ID } : {} // lcp-session-cwd\n" +
+      "  };",
+  },
+  {
+    token:
+      "      timestamp: input.createdAt ?? new Date().toISOString(),\n" +
+      "      cwd: process.cwd()\n" +
+      "    },",
+    replacement:
+      "      timestamp: input.createdAt ?? new Date().toISOString(),\n" +
+      "      ...process.env.LETTA_WORKSPACE_ID ? { cwd: process.env.LETTA_WORKSPACE_ID } : {} // lcp-session-cwd\n" +
+      "    },",
+  },
+];
+
+// lcp-agent-description: the default description embedded the creating process's cwd, which
+// is persisted in the agent record and echoed in every agent-info reminder.
+const AGENT_DESCRIPTION_TOKEN = "options.description ?? `Letta Code agent created in ${process.cwd()}`;";
+const AGENT_DESCRIPTION_REPLACEMENT = 'options.description ?? "Letta Code agent"; // lcp-agent-description';
+
+// lcp-memory-dir-token: the agent-info reminder, persisted verbatim in messages.jsonl, printed
+// this node's absolute memory root. Emit the literal $MEMORY_DIR, which every node sets for
+// tools and which the memory projections already use. This anchor sits after the region
+// lcp-clr-x rewrites and does not overlap it.
+const MEMORY_DIR_TOKEN =
+  "- **Memory directory (also stored in \\`MEMORY_DIR\\` env var)**: \\`${getScopedMemoryFilesystemRoot(agentInfo.id)}\\``";
+const MEMORY_DIR_REPLACEMENT =
+  "- **Memory directory (also stored in \\`MEMORY_DIR\\` env var)**: \\`$MEMORY_DIR\\``";
+
+/**
+ * One counted patch whose literal sites all match exactly once, applied atomically.
+ *
+ * @param {string} id the lcp id, for the drift warning
+ * @param {{ token: string; replacement: string }[]} sites
+ * @param {string} consequence what running without the patch means
+ */
+function exactOncePatch(id, sites, consequence) {
+  return (state) => {
+    const counts = sites.map(({ token }) => countOccurrences(state.patched, token));
+    if (!counts.every((count) => count === 1)) {
+      state.skippedPatches += 1;
+      if (state.warn) process.stderr.write(
+        `[letta-code-patch] WARN: ${id} anchors matched ${counts.join(",")} (expected 1 each) in ${state.path} — ` +
+        `running without it; ${consequence}\n`,
+      );
+      return;
+    }
+    for (const { token, replacement } of sites) state.patched = state.patched.replace(token, () => replacement);
+    state.appliedPatches += 1;
+  };
+}
+
+const conversationUuid = exactOncePatch(
+  "lcp-conversation-uuid",
+  [{ token: CONVERSATION_UUID_TOKEN, replacement: CONVERSATION_UUID_REPLACEMENT }],
+  "conversation ids stay node-local counters that collide across nodes",
+);
+
+const uiMsgUuid = exactOncePatch(
+  "lcp-ui-msg-uuid",
+  [{ token: UI_MSG_UUID_TOKEN, replacement: UI_MSG_UUID_REPLACEMENT }],
+  "message ids stay node-local counters that can repeat across nodes",
+);
+
+const sessionCwd = exactOncePatch(
+  "lcp-session-cwd",
+  SESSION_CWD_SITES,
+  "messages.jsonl session lines keep the App Server's absolute cwd",
+);
+
+const agentDescription = exactOncePatch(
+  "lcp-agent-description",
+  [{ token: AGENT_DESCRIPTION_TOKEN, replacement: AGENT_DESCRIPTION_REPLACEMENT }],
+  "new agents keep a description that names the creating host's cwd",
+);
+
+const memoryDirToken = exactOncePatch(
+  "lcp-memory-dir-token",
+  [{ token: MEMORY_DIR_TOKEN, replacement: MEMORY_DIR_REPLACEMENT }],
+  "the agent-info reminder keeps printing this node's absolute memory root",
+);
+
+function memoryLineEndings(state) {
+  const fsMatch = matchOnce(state.patched, MEMORY_LF_INIT_FS_PATTERN);
+  const commitMatch = matchOnce(state.patched, MEMORY_LF_INIT_COMMIT_PATTERN);
+  const counts = [MEMORY_LF_PREPARE_HEAD_TOKEN, MEMORY_LF_PREPARE_TAIL_TOKEN]
+    .map((token) => countOccurrences(state.patched, token));
+  if (!fsMatch || !commitMatch || !counts.every((count) => count === 1)) {
+    state.skippedPatches += 1;
+    if (state.warn) process.stderr.write(
+      `[letta-code-patch] WARN: lcp-memory-lf anchors matched initFs=${fsMatch ? 1 : "!1"} ` +
+      `initCommit=${commitMatch ? 1 : "!1"} prepare=${counts.join(",")} (expected 1 each) in ${state.path} — ` +
+      `running without it; memory repos keep host line endings\n`,
+    );
+    return;
+  }
+  const [, existsSync, join] = fsMatch;
+  const [commitSite, writeFileSync] = commitMatch;
+  state.patched = state.patched
+    .replace(MEMORY_LF_PREPARE_HEAD_TOKEN, () => memoryLfHelper(existsSync, join, writeFileSync) + MEMORY_LF_PREPARE_HEAD_TOKEN)
+    .replace(MEMORY_LF_PREPARE_TAIL_TOKEN, () => MEMORY_LF_PREPARE_TAIL_REPLACEMENT)
+    .replace(commitSite, () => commitSite.replace(
+      "  if (pathspecs.length > 0) {",
+      `  if (${existsSync}(${join}(params.memoryDir, ".gitattributes"))) pathspecs.push(".gitattributes"); // lcp-memory-lf\n` +
+      "  if (pathspecs.length > 0) {",
+    ));
+  state.appliedPatches += 1;
+}
+
 // Patch order is significant: each step receives the previous step's output.
 const PATCH_STEPS = [
   agentTaskStatus,
@@ -2072,6 +2285,12 @@ const PATCH_STEPS = [
   contextCap,
   reflectionHide,
   subagentErrorLog,
+  conversationUuid,
+  uiMsgUuid,
+  memoryLineEndings,
+  sessionCwd,
+  agentDescription,
+  memoryDirToken,
 ];
 
 /**

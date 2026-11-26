@@ -32,3 +32,21 @@ cd scripts/appserver/runtime-patches
 LETTA_CLI_PATH_REAL=/root/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js \
   node --import tsx/esm --test --test-concurrency=1 test/*.test.ts
 ```
+
+## Host-neutral agent store
+
+Agent state replicates between nodes in both directions, so these patches make the local store
+write the same bytes on every machine, with no translation step:
+
+| Patch | Effect |
+| --- | --- |
+| `lcp-conversation-uuid` | `LocalStore.nextConversationId` mints `local-conv-<uuid>` instead of a backend-wide counter. |
+| `lcp-ui-msg-uuid` | `nextLocalMessageId` mints `ui-msg-<uuid>`. Readers match ids by equality or by the `ui-msg-` prefix; the only numeric parser, in the pre-pi transcript migration, reads a uuid suffix as 0. |
+| `lcp-memory-lf` | Every memory-repo prepare sets `core.autocrlf=false` and, if the repo has no `.gitattributes`, writes `* text=auto eol=lf` and commits it once (new repos carry it in the init commit). Git failures are logged, never fatal. |
+| `lcp-session-cwd` | The `messages.jsonl` session line records `LETTA_WORKSPACE_ID` instead of the App Server's absolute cwd, and leaves `cwd` out when the variable is unset. |
+| `lcp-agent-description` | The default agent description is `Letta Code agent`, without the creating host's path. |
+| `lcp-memory-dir-token` | The agent-info reminder shows the literal `$MEMORY_DIR` instead of this node's absolute memory root. |
+
+`LETTA_WORKSPACE_ID` (optional) is a host-neutral name for the node's workspace, set in the App
+Server environment next to `NODE_OPTIONS`. They add six to the boot count. The tests are in
+`test/patch-loader-host-neutral.test.ts`.
