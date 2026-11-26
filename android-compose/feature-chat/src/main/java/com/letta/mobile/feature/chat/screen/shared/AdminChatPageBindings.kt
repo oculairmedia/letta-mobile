@@ -38,38 +38,44 @@ internal class AdminChatPageBindings private constructor(
         return SharedChatPageSession(this, voiceSessions, workspaceFiles, target)
     }
 
+    /**
+     * What every binding is built over: the screen's [viewModel], the page's [scope] (which ends on
+     * rotation) and the Hilt host's workspace [files], null in previews and tests.
+     */
+    class Host(
+        val viewModel: AdminChatViewModel,
+        val scope: CoroutineScope,
+        val files: WorkspaceFilesViewModel?,
+    )
+
     companion object {
         /** The view model's session port; [navigation] is read when used, so the latest screen's callbacks answer. */
         fun sessionPort(
-            viewModel: AdminChatViewModel,
-            scope: CoroutineScope,
+            host: Host,
             navigation: () -> ChatScreenNavigationCallbacks,
             canOpenConversation: Boolean,
-            files: WorkspaceFilesViewModel?,
         ): AdminChatSessionPort = AdminChatSessionPort(
-            viewModel = viewModel,
-            scope = scope,
+            viewModel = host.viewModel,
+            scope = host.scope,
             onOpenBugReport = { navigation().onBugCommand?.invoke() },
             onOpenConversation = if (canOpenConversation) {
                 { agentId, conversationId -> navigation().onOpenConversation?.invoke(agentId, conversationId) }
             } else {
                 null
             },
-            fileMentions = files?.mentionablesFor(viewModel.agentId.value) ?: flowOf(emptyList()),
+            fileMentions = host.files?.mentionablesFor(host.viewModel.agentId.value) ?: flowOf(emptyList()),
         )
 
         /** [port] with the composer's command layers; [commands] is read when a command runs. */
         fun create(
-            viewModel: AdminChatViewModel,
-            scope: CoroutineScope,
+            host: Host,
             port: AdminChatSessionPort,
             commands: () -> AndroidClientCommands?,
             offered: Set<ClientSlashCommand>?,
-            files: WorkspaceFilesViewModel?,
-        ): AdminChatPageBindings {
+        ): AdminChatPageBindings = with(host) {
             val commandPort = offered?.let { ClientCommandSessionPort(port, clientRouting(viewModel, scope, commands, it), scope) } ?: port
             val surface = SlashCommandSessionPort(commandPort, scope, AdminSlashCommandBinding(viewModel))
-            return AdminChatPageBindings(surface, AndroidVoiceChatSessions(viewModel, port), files?.let(::workspaceFiles))
+            AdminChatPageBindings(surface, AndroidVoiceChatSessions(viewModel, port), files?.let(::workspaceFiles))
         }
 
         /** The phone knows no working directory: a relative path cannot be opened (memory entries open in the Memory view). */

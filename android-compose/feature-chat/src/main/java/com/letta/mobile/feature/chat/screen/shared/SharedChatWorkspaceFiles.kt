@@ -36,11 +36,10 @@ internal fun rememberAdminChatPageSession(viewModel: AdminChatViewModel, navigat
     val currentCommands by rememberUpdatedState(commands)
     val canOpen = navigation.onOpenConversation != null
     val scope = rememberCoroutineScope()
-    val port = remember(viewModel, scope, canOpen, files) {
-        AdminChatPageBindings.sessionPort(viewModel, scope, { currentNavigation }, canOpen, files)
-    }
+    val host = remember(viewModel, scope, files) { AdminChatPageBindings.Host(viewModel, scope, files) }
+    val port = remember(host, canOpen) { AdminChatPageBindings.sessionPort(host, { currentNavigation }, canOpen) }
     val page = remember(port, commands?.offered) {
-        AdminChatPageBindings.create(viewModel, scope, port, { currentCommands }, commands?.offered, files)
+        AdminChatPageBindings.create(host, port, { currentCommands }, commands?.offered)
     }
     return page.session(viewModel)
 }
