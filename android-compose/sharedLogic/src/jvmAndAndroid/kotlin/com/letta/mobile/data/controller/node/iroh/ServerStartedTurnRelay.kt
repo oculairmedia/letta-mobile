@@ -37,7 +37,8 @@ import java.util.UUID
  * running client turn's prompt, or the runtime's idle loop status, which the server sends when a turn ends and
  * replays on every sync. Whether an idle status counts is decided by the same [TurnBoundaryGate] a client turn uses
  * (waiting on input, no active run, the turn produced evidence, and its latest round did not stop for an approval
- * continuation). The idle status comes before the server's `turn_finished`, and
+ * continuation). Only that idle decision is borrowed: `turn_finished` closes the turn directly here, and the gate is
+ * always told no approval is outstanding. The idle status comes before the server's `turn_finished`, and
  * when a turn is aborted it comes while the turn is still settling, so it does not close the turn at once: it ends
  * the tool/approval exemption and restarts the silence clock, and a delta of another run (the server's next turn)
  * then closes it at once. Otherwise a turn closes once it has shown no sign of life for [SERVER_TURN_SILENCE_MS], but
@@ -190,7 +191,7 @@ internal class ServerStartedTurnRelay(
 
     private fun AppServerReceivedFrame.ownRunOf(key: AppServerRuntimeScope): Boolean {
         val run = when (val f = frame) {
-            is AppServerInboundFrame.StreamDelta -> (f.delta as? JsonObject)?.runOrNull()
+            is AppServerInboundFrame.StreamDelta -> f.parentRunOrNull()
             is AppServerInboundFrame.TurnFinished -> f.runId?.takeIf { it.isNotBlank() }?.let(::RunId)
             else -> null
         }
@@ -248,9 +249,13 @@ internal class ServerStartedTurnRelay(
 private fun JsonObject.runOrNull(): RunId? =
     (this["run_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::RunId)
 
-/** A delta naming a run; checked after the turn's own runs, so it names another run than the turn's own. */
+/** The run a delta of the parent agent names; a child agent's delta (its own runs) names none, so it never speaks for the turn. */
+private fun AppServerInboundFrame.StreamDelta.parentRunOrNull(): RunId? =
+    if (subagentId != null) null else (delta as? JsonObject)?.runOrNull()
+
+/** A parent delta naming a run; checked after the turn's own runs, so it names another run than the turn's own. */
 private fun AppServerReceivedFrame.namesARun(): Boolean =
-    ((frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject)?.runOrNull() != null
+    (frame as? AppServerInboundFrame.StreamDelta)?.parentRunOrNull() != null
 
 /** A server-started turn has no lease run to compare against and, here, no approval registry. */
 private fun AppServerReceivedFrame.boundaryInput(): TurnBoundaryInput =
