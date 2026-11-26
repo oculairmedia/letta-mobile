@@ -175,6 +175,8 @@ internal class NodeAppServerConnector(
  *   escaping it is logged by name and stops only that restore, never the node scope.
  * - One restore at a time: a new generation cancels and waits out the previous generation's
  *   restore before starting its own, so two passes never write the shared account cache at once.
+ *   [onDisconnected] cancels without dropping the handle, because cancellation is cooperative and
+ *   a restore already in its final cache write runs to the end.
  * - A dead generation's restore stops with it: [onDisconnected] cancels it, and so does
  *   [onGaveUp], since a terminal close reaches give-up with no disconnect callback first.
  *
@@ -202,8 +204,9 @@ internal class NodeRecoveryListener(
 
     override suspend fun onDisconnected(reason: String?) {
         log.info("App Server connection lost: ${reason ?: "unknown"}")
-        // The restore was bound to the generation that just failed; its socket is gone.
-        channelRestore.getAndSet(null)?.cancel()
+        // The restore was bound to the generation that just failed; its socket is gone. The handle
+        // stays so the next launch can join it: a restore past its last suspension point still runs.
+        channelRestore.value?.cancel()
         controller()?.onTransportDisconnected(reason)
     }
 
