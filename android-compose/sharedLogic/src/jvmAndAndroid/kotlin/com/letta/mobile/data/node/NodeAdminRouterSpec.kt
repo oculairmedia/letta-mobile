@@ -32,7 +32,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.coroutines.CoroutineScope
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * The inputs of a node's admin_rpc router. [build] assembles the router; every null input leaves
@@ -164,7 +164,7 @@ class NodeAdminRouterSpec(
 
     private fun nativeSubagentSource(): ControllerSubagentRegistrySource {
         val subagentStore = subagentRegistryFile
-            ?.let { FileSubagentRegistryStore(Path.of(it)) }
+            ?.let { FileSubagentRegistryStore(Paths.get(it)) }
             ?: InMemorySubagentRegistryStore()
         return ControllerSubagentRegistrySource(
             DurableSubagentRegistry(store = subagentStore, processIdentity = appServerProcessIdentity),
@@ -195,7 +195,7 @@ class NodeAdminRouterSpec(
     )
 
     private fun wrapperRecords() = FileWrapperRecordStore(
-        runRecordsFile?.let { Path.of(it) }
+        runRecordsFile?.let { Paths.get(it) }
             ?: modelExposureFile?.let { modelFile ->
                 File(File(modelFile).absoluteFile.parentFile, "run-records.json").toPath()
             },

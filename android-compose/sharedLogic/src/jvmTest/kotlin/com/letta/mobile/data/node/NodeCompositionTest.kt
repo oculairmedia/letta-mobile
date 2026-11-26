@@ -69,6 +69,8 @@ class NodeCompositionTest {
             controller = controller,
             eventScope = scope,
             subagentPublisher = { source: ControllerSubagentRegistrySource -> SubagentRegistryPublisher(scope, source) },
+            // Production registers subagent.dismiss only over a durable store with a listener, as the host does.
+            subagentRegistryFile = File(stateDir, "subagent-registry.json").path,
         ).build()
         assertTrue(AdminRpcRegistry.subagentMethods.all { it in router.registeredMethods })
         assertTrue(ControllerSubagentRegistrySource.PUSH_CAPABILITY in router.featureCapabilities)
