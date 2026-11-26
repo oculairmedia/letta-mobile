@@ -178,6 +178,37 @@ class NodeRecoveryChannelRestoreTest {
     }
 
     /**
+     * A generation that reached Ready and then ends terminally (policy or auth close) goes straight
+     * to give-up with no disconnect callback, so give-up must stop that generation's restore too.
+     */
+    @Test
+    fun aTerminalCloseCancelsTheRestoreInFlightForTheDeadGeneration() = runTest {
+        val server = ListenModeAppServer()
+        val (client, generations) = runtimeLane(server)
+
+        client.start(backgroundScope)
+        client.awaitReady()
+        runCurrent()
+        assertEquals(1, server.droppedChannelCommands.size, "the restore is in flight on the unanswered channels_list")
+        generations[0].connectionState.value =
+            AppServerConnectionState.Failed(terminal = true, reason = "policy violation")
+        runCurrent()
+        assertTrue(client.state.value is ReconnectingClientState.GaveUp, "${client.state.value}")
+        advanceTimeBy(RESTORE_SETTLES_WITHIN_MS)
+        runCurrent()
+
+        assertEquals(1, server.droppedChannelCommands.size, "no channel command after give-up")
+        assertTrue(
+            lines.none { it.startsWith("error: channel restore failed") },
+            "a restore of a dead generation must be cancelled, not left to time out: $lines",
+        )
+        assertTrue(
+            recorder.snapshot().none { it.name == "list_channels_failed" },
+            "give-up must cancel the enumeration before its bound reports a failure",
+        )
+    }
+
+    /**
      * A failure the coordinator does not turn into a restore result (here the account cache
      * throwing) stops that restore and is logged by name; it must not cancel the node scope, which
      * in production is a plain, non-supervisor scope that also runs the Iroh endpoint.

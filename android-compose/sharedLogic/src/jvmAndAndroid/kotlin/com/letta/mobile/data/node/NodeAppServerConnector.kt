@@ -158,7 +158,11 @@ internal class NodeAppServerConnector(
  *   escaping it is logged by name and stops only that restore, never the node scope.
  * - One restore at a time: a new generation cancels and waits out the previous generation's
  *   restore before starting its own, so two passes never write the shared account cache at once.
- * - A dead generation's restore stops with it: [onDisconnected] cancels it.
+ * - A dead generation's restore stops with it: [onDisconnected] cancels it, and so does
+ *   [onGaveUp], since a terminal close reaches give-up with no disconnect callback first.
+ *
+ * The callbacks are invoked from the reconnecting client's single supervise loop, never
+ * concurrently, and the one-restore-at-a-time guarantee relies on that.
  *
  * The controller and coordinator are read through suppliers because both are constructed
  * after the reconnecting client they are wired into.
@@ -210,6 +214,8 @@ internal class NodeRecoveryListener(
 
     override suspend fun onGaveUp(reason: String?) {
         log.error("App Server reconnect gave up: ${reason ?: "unknown"}")
+        // A terminal close ends the generation with no onDisconnected first; its restore is dead too.
+        channelRestore.getAndSet(null)?.cancel()
     }
 
     /**
