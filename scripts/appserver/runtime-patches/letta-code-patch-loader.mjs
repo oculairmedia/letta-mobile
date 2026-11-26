@@ -2235,6 +2235,33 @@ const MEMORY_DIR_TOKEN =
 const MEMORY_DIR_REPLACEMENT =
   "- **Memory directory (also stored in \\`MEMORY_DIR\\` env var)**: \\`$MEMORY_DIR\\``";
 
+// lcp-model-profile: replicated agent and conversation records store a model profile handle
+// (`profile/<id>`), never a provider handle. resolvePiModelForAgent is the one turn-time site
+// where a stored handle becomes a provider, model and auth (turns, context preflight,
+// compaction and summaries all call it), so the node's binding is applied here and nothing is
+// written back. The binding comes from globalThis.__lcpResolveModelProfile, which the node-local
+// profile-provider mod installs (mods/profile-provider.mjs). A profile handle with no resolver,
+// or one the resolver does not bind, throws: it never falls through to another provider.
+const MODEL_PROFILE_PREFIX = "profile/";
+const MODEL_PROFILE_TOKEN =
+  "async function resolvePiModelForAgent(modelHandle, modelSettings = {}, options = {}) {\n" +
+  "  const concreteModelHandle = ";
+const MODEL_PROFILE_REPLACEMENT =
+  "async function resolvePiModelForAgent(modelHandle, modelSettings = {}, options = {}) {\n" +
+  `  if (typeof modelHandle === "string" && modelHandle.startsWith(${JSON.stringify(MODEL_PROFILE_PREFIX)})) { // lcp-model-profile\n` +
+  "    const resolveModelProfile = globalThis.__lcpResolveModelProfile;\n" +
+  '    if (typeof resolveModelProfile !== "function") {\n' +
+  "      throw new Error(`Model profile ${modelHandle} cannot be resolved: the profile-provider mod is not installed on this node.`);\n" +
+  "    }\n" +
+  "    const bound = resolveModelProfile(modelHandle, modelSettings);\n" +
+  `    if (!bound || typeof bound.handle !== "string" || !bound.handle || bound.handle.startsWith(${JSON.stringify(MODEL_PROFILE_PREFIX)})) {\n` +
+  "      throw new Error(`Model profile ${modelHandle} is not bound to a provider handle on this node. Add it to LETTA_MODEL_PROFILE_BINDINGS.`);\n" +
+  "    }\n" +
+  "    modelHandle = bound.handle;\n" +
+  "    modelSettings = bound.modelSettings ?? {};\n" +
+  "  }\n" +
+  "  const concreteModelHandle = ";
+
 /**
  * One counted patch whose literal sites all match exactly once, applied atomically.
  *
@@ -2286,6 +2313,12 @@ const memoryDirToken = exactOncePatch(
   "lcp-memory-dir-token",
   [{ token: MEMORY_DIR_TOKEN, replacement: MEMORY_DIR_REPLACEMENT }],
   "the agent-info reminder keeps printing this node's absolute memory root",
+);
+
+const modelProfile = exactOncePatch(
+  "lcp-model-profile",
+  [{ token: MODEL_PROFILE_TOKEN, replacement: MODEL_PROFILE_REPLACEMENT }],
+  "profile/<id> handles are not resolved through this node's bindings; their turns fail against the profile provider's unbound endpoint",
 );
 
 function memoryLineEndings(state) {
@@ -2349,6 +2382,7 @@ const PATCH_STEPS = [
   sessionCwd,
   agentDescription,
   memoryDirToken,
+  modelProfile,
 ];
 
 /**

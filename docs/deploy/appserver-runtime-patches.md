@@ -22,6 +22,8 @@ ln -sfn "$REL" /opt/meridian/runtime-patches/current
 systemctl restart meridian-appserver   # then confirm `lcp-patches applied=N skipped=0`
 ```
 
+Model profiles also need the mod in the node's config dir, see [Model profiles](#model-profiles).
+
 ## Tests
 
 The tests verify the patches against the deployed bundle (`LETTA_CLI_PATH_REAL`, else the newest
@@ -50,3 +52,67 @@ write the same bytes on every machine, with no translation step:
 `LETTA_WORKSPACE_ID` (optional) is a host-neutral name for the node's workspace, set in the App
 Server environment next to `NODE_OPTIONS`. They add six to the boot count. The tests are in
 `test/patch-loader-host-neutral.test.ts`.
+
+## Model profiles
+
+Replicated agent and conversation records store a model profile handle, `profile/<id>`, never a
+provider handle. Each node maps the profile to its own provider handle at turn time; nothing is
+written back. Two pieces do this:
+
+| Piece | Where it lives | Replicates? |
+| --- | --- | --- |
+| `mods/profile-provider.mjs` (letta-code mod) | `$LETTA_CONFIG_DIR/mods/profile-provider.mjs` on every node | No: node-local |
+| `lcp-model-profile` (runtime patch, one anchor) | in `letta-code-patch-loader.mjs` | No: node-local |
+| Profile catalog, `LETTA_MODEL_PROFILES` | any path, named in the App Server environment | Yes: shared, the same on every node |
+| Profile bindings, `LETTA_MODEL_PROFILE_BINDINGS` | any node-local path, named in the App Server environment | No: node-local, never replicated |
+
+The mod registers a pi provider named `profile` with one model per catalog entry, so
+`profile/<id>` passes letta-code's handle normalisation, persists as written, shows in
+`list_models`, and gets its write-time defaults from the catalog. It also installs the resolver
+that `lcp-model-profile` calls at the head of `resolvePiModelForAgent`, the single site where a
+stored handle becomes a provider, model and auth (turns, context preflight, compaction and
+summaries). The bound real handle then resolves in-process, with that provider's own auth,
+quirks and real model id. Install the mod only in the node-local `$LETTA_CONFIG_DIR/mods`, never
+in an agent's memfs `mods/` directory: that one replicates, and its mods do not get the
+providers capability.
+
+Catalog (shared):
+
+```json
+{
+  "main": { "name": "Main", "contextWindow": 200000, "maxTokens": 16000, "reasoning": false, "input": ["text"] },
+  "fast": { "name": "Fast", "contextWindow": 64000, "maxTokens": 4096 }
+}
+```
+
+Every field but the key is optional (defaults: name = id, contextWindow 128000, maxTokens 8192,
+reasoning false, input `["text"]`).
+
+Bindings (node-local):
+
+```json
+{
+  "main": { "handle": "anthropic/claude-opus-5-5" },
+  "fast": { "handle": "lmstudio/qwen3-30b", "model_settings": { "context_window_limit": 32000 } }
+}
+```
+
+`handle` is a provider handle this node can serve. `model_settings` (optional) is laid over the
+stored settings for this node only. The stored `provider_type`, `context_window_limit` and
+`max_tokens` are write-time defaults for the profile provider, so they are dropped before the
+overlay and the real provider derives its own; other stored settings (reasoning, temperature)
+are profile-level intent and are kept.
+
+Failure is loud, never a silent fallback to another provider: a `profile/<id>` turn throws when
+the mod is not installed (no resolver), when the profile has no binding on this node, or when a
+binding points at another profile. If the patch itself fails open, the mod's provider points at a
+dead address and the turn fails there.
+
+**Write profile handles only through the App Server** (`runtime_start` `create_agent`,
+`update_model`). The App Server loads mods before it handles any model write. `letta model set`
+and `letta model list` do not load mods and reject the handle, and headless mode (`letta -m
+profile/<id>`) loads mods after it handles `-m`, so it persists a mangled handle
+(`openai/profile/<id>` with `provider_type: "openai"`).
+
+`lcp-model-profile` adds one to the boot count. The tests, including a two-node App Server
+contract test with fake upstreams, are in `test/patch-loader-model-profile.test.ts`.
