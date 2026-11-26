@@ -41,7 +41,7 @@ object IrohSecretKeyStores {
         val generated = generateKeyBytes()
         file.parentFile?.mkdirs()
         val tmp = java.io.File(file.parentFile ?: java.io.File("."), ".${file.name}.tmp-${java.util.UUID.randomUUID()}")
-        tmp.createNewFile()
+        createOwnerOnlyFile(tmp.toPath())
         restrictKeyFilePermissions(tmp)
         tmp.writeBytes(generated)
         runCatching {
@@ -80,16 +80,18 @@ object IrohSecretKeyStores {
 
     /**
      * Writes [text] to [path] in a file only the host's user may read (POSIX `rw-------`, else an ACL
-     * naming only the owner), the way the host keeps its secrets. The file is restricted before the text
-     * is written into it and replaced by a rename; where neither restriction applies this throws, so a
-     * secret is never written into a file others may read (unlike [restrictKeyFilePermissions], there is
-     * no best-effort fallback).
+     * naming only the owner), the way the host keeps its secrets. The temp file is created by
+     * [createOwnerOnlyFile] and restricted again before the text is written into it, then replaced by a
+     * rename; where neither restriction applies this throws, so a secret is never written into a file
+     * others may read (unlike [restrictKeyFilePermissions], there is no best-effort fallback).
+     * [onTempCreated] sees the temp file right after its creation, before anything else touches it.
      */
-    internal fun writeOwnerOnly(path: java.nio.file.Path, text: String) {
+    internal fun writeOwnerOnly(path: java.nio.file.Path, text: String, onTempCreated: (java.nio.file.Path) -> Unit = {}) {
         path.parent?.let(java.nio.file.Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
         try {
-            java.nio.file.Files.createFile(temp)
+            createOwnerOnlyFile(temp)
+            onTempCreated(temp)
             restrictToOwnerOnly(temp)
             writeAndSync(temp, text.toByteArray(Charsets.UTF_8))
             runCatching {
@@ -128,6 +130,34 @@ object IrohSecretKeyStores {
             channel.force(true)
         }
     }
+
+    /**
+     * Creates the new, empty file [path] (failing if anything, a symlink included, is already there) so that it is
+     * not readable by others from the moment it exists, where the platform allows that. Callers still restrict it
+     * afterwards ([restrictToOwnerOnly] / [restrictKeyFilePermissions]) before writing a secret into it.
+     *
+     * POSIX: the mode `rw-------` is passed to the creating call itself (`open(O_CREAT | O_EXCL, 0600)`); the umask
+     * can only remove bits, so the file starts at 0600 or stricter and no window exists.
+     *
+     * ACL file systems (Windows): created with default security, so a short window remains until the caller
+     * restricts it, in which the directory's inheritable entries apply. The JDK does accept an initial `acl:acl`
+     * attribute on create, but it would not close that window: it builds the descriptor with
+     * `InitializeSecurityDescriptor` and `SetSecurityDescriptorDacl` only, never setting `SE_DACL_PROTECTED`, and
+     * Windows merges the directory's inheritable entries into a creator-supplied DACL unless that bit is set. The
+     * same entries would be on the file either way, so on Windows the directory's own ACL guards the window.
+     */
+    internal fun createOwnerOnlyFile(path: java.nio.file.Path) {
+        if (POSIX_VIEW in path.fileSystem.supportedFileAttributeViews()) {
+            java.nio.file.Files.createFile(path, OWNER_READ_WRITE)
+        } else {
+            java.nio.file.Files.createFile(path)
+        }
+    }
+
+    private const val POSIX_VIEW = "posix"
+    private val OWNER_READ_WRITE = java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+        java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+    )
 
     /** Owner-only access (POSIX `rw-------`, else an ACL naming only the owner), or a thrown error. */
     private fun restrictToOwnerOnly(file: java.nio.file.Path) {

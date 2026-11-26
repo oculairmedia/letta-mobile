@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime.host
 
+import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.runtime.supervisor.RuntimeCrashPolicy
 import com.letta.mobile.data.runtime.supervisor.RuntimeCrashPolicyConfig
 import com.letta.mobile.data.transport.appserver.AppServerDiscovery
@@ -8,9 +9,6 @@ import io.ktor.client.engine.cio.CIO
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -109,15 +107,14 @@ private fun InputStream.lines(): Flow<String> = flow {
     }
 }.flowOn(Dispatchers.IO)
 
-/** Writes [secret] to [file], created readable and writable by this user only where POSIX allows. */
+/**
+ * Writes [secret] to [file] readable by this user only: POSIX `rw-------`, else an ACL naming only the owner (Windows),
+ * through the host's shared secret-file writer. Where neither applies nothing is written and this fails as an [IOException].
+ */
 private fun writeOwnerOnly(file: File, secret: String) {
-    file.absoluteFile.parentFile?.mkdirs()
-    val path = file.toPath()
-    Files.deleteIfExists(path)
-    if ("posix" in FileSystems.getDefault().supportedFileAttributeViews()) {
-        Files.createFile(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
-    } else {
-        Files.createFile(path)
+    try {
+        IrohSecretKeyStores.writeOwnerOnly(file.absoluteFile.toPath(), secret)
+    } catch (e: IllegalArgumentException) {
+        throw IOException("cannot make ${file.name} owner-only: ${e.message}", e)
     }
-    Files.writeString(path, secret)
 }
