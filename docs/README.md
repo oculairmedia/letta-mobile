@@ -269,6 +269,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [canvas.mount.resolve: Canvas Mount v1](reference/contracts/canvas.mount.resolve/canvas-mount-v1.md)
 
+### reference/contracts/catalog-v1
+
+- [catalog-v1: catalog documents and per-document authorization](reference/contracts/catalog-v1/catalog-v1.md)
+
 ### reference/contracts/conversation.list
 
 - [conversation.list: Visible Recents v1](reference/contracts/conversation.list/visible-recents-v1.md)
