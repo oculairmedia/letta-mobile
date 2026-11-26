@@ -1,0 +1,641 @@
+{
+  "contract": "log/scenarios",
+  "version": 1,
+  "generator": "core/crates/core-log/tests/fixtures.rs (BAKEN_REGEN_FIXTURES=1 cargo test -p core-log --test fixtures)",
+  "notes": "Chain and divergence scenarios (placement-eval subset that needs no membership: the judge applies only the structural reason rules). Deliver the entries in any order that respects parents; every replica must reach `expect`. Divergence inputs are the values C2's catalog node id is built from.",
+  "scenarios": [
+    {
+      "name": "genesis-and-appends",
+      "notes": "One segment; the canonical line is the whole log.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "a2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0101000000000000000003ea000000000000002a37d8ebd5288dbb88f2b8af1da8a5104b2c86c3d73dd4ded425e7b4f6892c9acfb2620e4f42d811c9f72dadddd810290b7cf061f2eb00273fc0894384d932de64da3b4ae316f9704ab916342916109378aa32457f9d1b75e52b485cc04fb70609",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010302436d320a"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "tip": {
+          "seq": 2,
+          "hash": "4ed0a2e16a1e6e3212db69df5c20e24c4132e97e1a1d41d48293307a15f07851"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 2,
+            "state": "open"
+          }
+        ],
+        "divergences": []
+      }
+    },
+    {
+      "name": "clean-move",
+      "notes": "N1 checkpoints and seals to (2, N2); N2 opens with reason move. No divergence.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "cp",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0003000000000000000003ea00000000000000695fb321dc8039f3a99276d2ffeda4907219ee913f1c2ae68298a14b35cee0cc68e85cdcfcd665160a31179adc3ecf2a82c8b345fe9a90e4a643f53a8eb4cd0c7779817a9202b8621c2e3c098019092b040a55f40fa11fcf1e18c414441a4f170b",
+          "payload_hex": "a6008183781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c58207b14e2d92338aed25808bbc74dabe3a37da6be8f335f2106d11aa36e5e31f7ea0301800280030104776c657474612d636f646540302e302e302b6c63703a30300580"
+        },
+        {
+          "name": "seal",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000003afe8d372cccbe8026c8026845262b314ba749551b3b4785c66688b2d8032b4740002000000000000000003eb000000000000004de2a67f5e70ad7b3ae41ec1bced43da81c3016b86f5651a6458db085a398ba074dadc07d9bfe1a216f85c64a55bbaa97ec25a21e83b8cc59d532a4425b21732605db300303b616604902a4ede1c51757d7c320f8445bb3b27a5e5f337b4ec6f00",
+          "payload_hex": "a200820258208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39401a20002015820afe8d372cccbe8026c8026845262b314ba749551b3b4785c66688b2d8032b474"
+        },
+        {
+          "name": "open_n2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000000000000403cec3f3ef50e799628be459cb64286fec3cba6a02c482d82f7623d221f6ced40001000000000000000003ec0000000000000043ac82989e1522b8d5c80643d1efe0fa6f35c3078f1898fc17cf49fd1b04db8ee441731e947ee32d0d1026c646f1cd74c27223aeb72f3ba1688ecbc921b65d0d6559ce1812efe2771521db979690aa15ae3b8dfdde3ab10b7c6cb2bd9507fcd504",
+          "payload_hex": "a4010102820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "b1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000005e99580e39dbaa99bf5e926712c05ab19bc83b7541daa552e094b35af1964f7e00101000000000000000003ed000000000000002a37d8ebd5288dbb88f2b8af1da8a5104b2c86c3d73dd4ded425e7b4f6892c9acf9fbc5e8ef35d207f2c2081d74c7fb757369a94d0dba34e00577d5700a949980c05b613d2c73350aab40532f2c5168cbd91c8b4635c222e7682905088336eff05",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010302436d320a"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 2,
+          "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        },
+        "tip": {
+          "seq": 5,
+          "hash": "ce1b24bb211f52604761e097f71a7d986d8d2b3ecec59926da52a7ed35997c27"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 2,
+          "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 3,
+            "state": "canonical_ancestor"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+            },
+            "start_seq": 4,
+            "head_seq": 5,
+            "state": "open"
+          }
+        ],
+        "divergences": []
+      }
+    },
+    {
+      "name": "failover-partition",
+      "notes": "N2 fails over from a1 while N1, partitioned, writes a2 and a3: a cross-epoch divergence, stranded (1, N1), fork at seq 1.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "a2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0101000000000000000003ea000000000000002a37d8ebd5288dbb88f2b8af1da8a5104b2c86c3d73dd4ded425e7b4f6892c9acfb2620e4f42d811c9f72dadddd810290b7cf061f2eb00273fc0894384d932de64da3b4ae316f9704ab916342916109378aa32457f9d1b75e52b485cc04fb70609",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010302436d320a"
+        },
+        {
+          "name": "open_n2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0001000000000000000007d00000000000000043a37fc2a00fe59f2faf9658185e3157ab07c4e838791f47f59dd4ac6dd964c050e1b43d58eb705b71325ef24b0fc5fcd2af8a9b19bbe79c2bfc9101f9209d17c185d81da1b3399519d59ac1134e843c93a05b6a0dcffa9c2af3a22c7d62d64606",
+          "payload_hex": "a4010202820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "b1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000003d5e5078819a26f6e7da6384a031da4a983f6ad8d84ebaa7768483fffe453114b0101000000000000000007d1000000000000002a5720c4f83b45b0f3708559073a729dd72b7e95cf7db47060368adde1ea28700249d85b07bfbc5f3afea65821a826c580ee8b931303b57695a5260590e3ab7bcbae9aeea670498d3faed33e68aafb4bfe91388b83676df510b5bab767942c3a0c",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c0103024362310a"
+        },
+        {
+          "name": "a3",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c00000000000000034ed0a2e16a1e6e3212db69df5c20e24c4132e97e1a1d41d48293307a15f078510101000000000000000003eb000000000000002a53a998ee8b5dc8f28b803e06ccb8d3716d9a9006efb398d3dd43bfc35dc3df8ff3a7b4d460c19ccb39cd0595d5abee04a1c15c51ed9264af8904c7f4c403f68cfdf2a0b82f4505d03e8d761e0ee387b5b496846743a7b426424b842c18e92c0c",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010602436d330a"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 2,
+          "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        },
+        "tip": {
+          "seq": 3,
+          "hash": "5e8c929694242f42589baa44064d80ba2c25904d19edf700110903309f2a2566"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 2,
+          "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 3,
+            "state": "canonical_ancestor"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+            },
+            "start_seq": 2,
+            "head_seq": 3,
+            "state": "open"
+          }
+        ],
+        "divergences": [
+          {
+            "divergence_id": "d397d27c9f068fd87b71274d467128e9245c8b928cb30437227021cd92b4093d",
+            "inputs": {
+              "agent_id": "agent-alpha",
+              "fork_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "fork_seq": 1,
+              "fork_hash": "844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec",
+              "competing": [
+                "4ed0a2e16a1e6e3212db69df5c20e24c4132e97e1a1d41d48293307a15f07851",
+                "d5e5078819a26f6e7da6384a031da4a983f6ad8d84ebaa7768483fffe453114b"
+              ],
+              "stranded_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "winning_epoch": {
+                "n": 2,
+                "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+              },
+              "equivocation": false
+            },
+            "tail_head": {
+              "seq": 3,
+              "hash": "2544439ae14e64936da89d0e4b8c3bc38aa0d8c3c08797fb816c90b03db8f399"
+            },
+            "tail": [
+              "4ed0a2e16a1e6e3212db69df5c20e24c4132e97e1a1d41d48293307a15f07851",
+              "2544439ae14e64936da89d0e4b8c3bc38aa0d8c3c08797fb816c90b03db8f399"
+            ],
+            "c2_catalog_node_id_for_c1": "7ba83233-f1ac-85fa-985f-b383df6587cf",
+            "branch_conversation_id_for_c1": "local-conv-7ba83233-f1ac-85fa-985f-b383df6587cf",
+            "memfs_branch_for_main": "refs/heads/divergence/1-8a88e3dd/main"
+          }
+        ]
+      }
+    },
+    {
+      "name": "simultaneous-claims",
+      "notes": "N2 and N3 both claim n = 2 from a1; the higher claimant id wins on every node, the other is a divergence.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "open_n2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec000100000000000000000bb80000000000000043a37fc2a00fe59f2faf9658185e3157ab07c4e838791f47f59dd4ac6dd964c0506fa77a5f979aee4d7614e16f5714af97e0c488c504d72cf490010866875445439abf04607d437dc956b67b7ef870c52cd2381af70c73febad1df78d29cf93e0e",
+          "payload_hex": "a4010202820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "open_n3",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa8960000000000000002ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d10000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec000100000000000000000bb80000000000000043a37fc2a00fe59f2faf9658185e3157ab07c4e838791f47f59dd4ac6dd964c05030e53cb3da16b947c66906bcf3cf312f49207d3ada3e09cd4418215ec6d123a4e7d8ca9181865307f5beef508dc6e316b0a9cc96919cc80d19f46d4db357e306",
+          "payload_hex": "a4010202820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "x_n2",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000000000000031a6e725610030ae255ccc70f2d78c8aaa07f55384443525469c592c2e3b93f54010100000000000000000bb900000000000000291aa167b020a696abfb21887596d1b066a56e3ca7c77f019927b388de1349444c6eb2136cfa8a34c898bda07992dad7c6f2da565668f7e0a3d6798b4735d6b0b0910bc0be2a0353d28cb7e6426a47808c3c71deb59d5d74ea8932d0e5b5ab8308",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c01030242780a"
+        },
+        {
+          "name": "x_n3",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa8960000000000000002ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d100000000000000031ef05439c325e185096dd74058852ef48dc76f4f6373a2e0ec156b5b3f09edbb010100000000000000000bb9000000000000002995524c7c770d2ce1d826248d97fa9c886ddab7c8d5972159c490cea1fe267d5cbcec8d6e13254b20ada0c5d8175696d43ad222ba6d7dffea8c7c797d186e4330ad79d7927c9b7b8a02236a48f6ca57d623d48031def8c28b62f1d10a708e9a0b",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c01030242790a"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 2,
+          "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        },
+        "tip": {
+          "seq": 3,
+          "hash": "d14a78d6a9d9c41a26c65a9794898ac32c32b5bda406949b356b78a6b72943f9"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 2,
+          "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 1,
+            "state": "canonical_ancestor"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+            },
+            "start_seq": 2,
+            "head_seq": 3,
+            "state": "divergent"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+            },
+            "start_seq": 2,
+            "head_seq": 3,
+            "state": "open"
+          }
+        ],
+        "divergences": [
+          {
+            "divergence_id": "130686e403ff20c957ade19bad874896009618179fed6a7fc075c0dab82db209",
+            "inputs": {
+              "agent_id": "agent-alpha",
+              "fork_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "fork_seq": 1,
+              "fork_hash": "844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec",
+              "competing": [
+                "1a6e725610030ae255ccc70f2d78c8aaa07f55384443525469c592c2e3b93f54",
+                "1ef05439c325e185096dd74058852ef48dc76f4f6373a2e0ec156b5b3f09edbb"
+              ],
+              "stranded_epoch": {
+                "n": 2,
+                "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+              },
+              "winning_epoch": {
+                "n": 2,
+                "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+              },
+              "equivocation": false
+            },
+            "tail_head": {
+              "seq": 3,
+              "hash": "e3aec4667587eb522fe63ebb6f7a3ca3def56f1e83c35a9bea45ac3d2c6c6b83"
+            },
+            "tail": [
+              "1a6e725610030ae255ccc70f2d78c8aaa07f55384443525469c592c2e3b93f54",
+              "e3aec4667587eb522fe63ebb6f7a3ca3def56f1e83c35a9bea45ac3d2c6c6b83"
+            ],
+            "c2_catalog_node_id_for_c1": "b864536b-a9a4-8e91-a906-eb2fb294a5e3",
+            "branch_conversation_id_for_c1": "local-conv-b864536b-a9a4-8e91-a906-eb2fb294a5e3",
+            "memfs_branch_for_main": "refs/heads/divergence/2-8139770e/main"
+          }
+        ]
+      }
+    },
+    {
+      "name": "equivocation",
+      "notes": "N1 (restored from a backup) writes two entries at seq 2; the lower entry hash stays, the other is a divergent tail with equivocation = true.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "high",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec010100000000000000000fa0000000000000002d597653968c8d6f969b170fab6deba3dfd0225c627b9fb086a46c62ab640add101c8508fa951c0ea0bb9dc7324a2c956f1d21a994fcbbbec50dd513142c14bde67cde2f0648ea467ed8b79bbe965af0417e253c3db758f66bf68415acc23f0303",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c0103024672696768740a"
+        },
+        {
+          "name": "low",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec010100000000000000000fa0000000000000002c36006a84af23c1e3b8fac4836c152fde694422cec547633cf04a5f720cf204ec49fe331a9cf108f7d225bb126ab68fa41d7ea14bef836c1a7ef58dc6095a6bda14d8ccc7a873d62a9bd58e954c259dfa38f4598212e4f72ee179b2de25a33303",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010302456c6566740a"
+        },
+        {
+          "name": "low_next",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c00000000000000031c03b12c8f10ac9ce35546783ee655b2a1e6ea3d454e3dfe33a5d84f0b30d920010100000000000000000fa1000000000000002c8c30557e8f27c6e8aac8b06d5a25b6ad3ecd784cd7a8bf1a9ff3579880cf2be686393d2b5d1de836e7579f6003d85c56a0c48250b07fe033ae110df008673da19df489dcf483f5fa259521b7d482977d42bdf481ec30229d0f53c0e240976008",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010802456d6f72650a"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "tip": {
+          "seq": 3,
+          "hash": "23f0607b6f6a0b841e9cfd563a73d491756abdad8c93a30fc8eb7edaf118fb41"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 3,
+            "state": "open"
+          }
+        ],
+        "divergences": [
+          {
+            "divergence_id": "d397d27c9f068fd87b71274d467128e9245c8b928cb30437227021cd92b4093d",
+            "inputs": {
+              "agent_id": "agent-alpha",
+              "fork_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "fork_seq": 1,
+              "fork_hash": "844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec",
+              "competing": [
+                "1c03b12c8f10ac9ce35546783ee655b2a1e6ea3d454e3dfe33a5d84f0b30d920",
+                "bcc5504e209d8e40d7ccb6d91efddd5a486c36b28508442de3137013f9a0f1b6"
+              ],
+              "stranded_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "winning_epoch": {
+                "n": 1,
+                "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+              },
+              "equivocation": true
+            },
+            "tail_head": {
+              "seq": 2,
+              "hash": "bcc5504e209d8e40d7ccb6d91efddd5a486c36b28508442de3137013f9a0f1b6"
+            },
+            "tail": [
+              "bcc5504e209d8e40d7ccb6d91efddd5a486c36b28508442de3137013f9a0f1b6"
+            ],
+            "c2_catalog_node_id_for_c1": "7ba83233-f1ac-85fa-985f-b383df6587cf",
+            "branch_conversation_id_for_c1": "local-conv-7ba83233-f1ac-85fa-985f-b383df6587cf",
+            "memfs_branch_for_main": "refs/heads/divergence/1-8a88e3dd/main"
+          }
+        ]
+      }
+    },
+    {
+      "name": "superseded-unknown",
+      "notes": "A claim whose n exceeds its ancestry by more than EPOCH_N_MAX_STEP is invalid; a higher n is known, so nobody holds the agent.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "too_far",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000001000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0001000000000000000013880000000000000043a37fc2a00fe59f2faf9658185e3157ab07c4e838791f47f59dd4ac6dd964c050e382cdf2a25b95c224e334e1bc049167b294d8c60aaf23d69b9ecb6a65c80e043a8a1feffa71ff5b1046eda48b9de2b37d45789fbe974c599bd6fada4ef6b206",
+          "payload_hex": "a4010202820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "tip": {
+          "seq": 1,
+          "hash": "844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec"
+        },
+        "placement": {
+          "state": "superseded_unknown"
+        },
+        "placement_row_epoch": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 1,
+            "state": "open"
+          },
+          {
+            "epoch": {
+              "n": 1048578,
+              "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+            },
+            "start_seq": 2,
+            "head_seq": 2,
+            "state": "invalid"
+          }
+        ],
+        "divergences": []
+      }
+    },
+    {
+      "name": "move-without-seal",
+      "notes": "A move whose parent is not a seal naming it is not claim-valid: stored, not canonical, superseded_unknown.",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "bad_move",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000028139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3940000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec0001000000000000000017700000000000000043ac82989e1522b8d5c80643d1efe0fa6f35c3078f1898fc17cf49fd1b04db8ee47a913eb0f675d6b6c67a39b291631361e391b450d8bc4744ef86f736235965c190c103fcd26761c49a4312bc6e4e920a48dd80b6de81c73afe14129526a79b06",
+          "payload_hex": "a4010102820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "tip": {
+          "seq": 1,
+          "hash": "844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec"
+        },
+        "placement": {
+          "state": "superseded_unknown"
+        },
+        "placement_row_epoch": {
+          "n": 1,
+          "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 1,
+            "state": "open"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+            },
+            "start_seq": 2,
+            "head_seq": 2,
+            "state": "divergent"
+          }
+        ],
+        "divergences": []
+      }
+    },
+    {
+      "name": "seal-target-never-opened",
+      "notes": "N1 seals to (2, N2), which never opens; N3 fails over from the seal at (2, N3).",
+      "entries": [
+        {
+          "name": "g",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000003e8000000000000002b2d8689ef34ced7de510348201f5ab7b42fa76f607f8a6377fac793ec6623ffdeb86ce314b324529e8da7a5d8c0584454a28e893aa0b1544ba3c5646728f52bbdf4a523d91673faff7abefc7682eceed97a9061d545a026b828be08de95723505",
+          "payload_hex": "a4006b6167656e742d616c7068610100040105776c657474612d636f646540302e302e302b6c63703a3030"
+        },
+        {
+          "name": "a1",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000000000000166e69a97049ed82f3503deea681616aced5744f506f2a3183f745ed73ff0cf3b0101000000000000000003e9000000000000002affca92263cf9a5f4990eded01e2a06f81b80412118dd277fd075353d2c3d617377d3b7a167d0503948da69ae1ff425c5026814176b03a8d37b409c9eb95ffaa4c2bf3503fc3e991f869bf487a8474e748fd3835143dd572456d981ca5036bf0f",
+          "payload_hex": "a300781f636f6e766572736174696f6e732f63312f6d657373616765732e6a736f6e6c010002436d310a"
+        },
+        {
+          "name": "seal",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa89600000000000000018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000000000002844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec000200000000000000001b58000000000000004d8f87b4a87dd8596972af459eb8282a7062caa6859e1af144eefbd7bc9c865af7d9e8965b0c0a9fd5c41ad760050fc70bb86bad3455ef92523e7e4f9b4e281b6806084fa93a8226b8c49ad95dffe9a1bf44f8436009ff5f8ccf8fb50b01c3c903",
+          "payload_hex": "a200820258208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39401a20001015820844209de32481a235db7527f10766b251e132b65bbf3f39a2550a864830382ec"
+        },
+        {
+          "name": "open_n3",
+          "signed_hex": "424b4c312f7ae4db7e82afb3e311f0a59f9c234fbce2c55a02cd74f68f312e564c0aa8960000000000000002ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d10000000000000003bce910caf1bbcc705313f6bef98d6fecfaa2c10ba9f9946b1ada654e84371d93000100000000000000001bbc0000000000000043a37fc2a00fe59f2faf9658185e3157ab07c4e838791f47f59dd4ac6dd964c050516d7002ac23132f13ca957da3827a4cb93c2a5a0065ba0be53347231599c99d651728669018a20f649b6dc6ff6cdbcb21b10e2dc0e649ff88c359c2620ace0e",
+          "payload_hex": "a4010202820158208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c040105776c657474612d636f646540302e302e302b6c63703a3030"
+        }
+      ],
+      "expect": {
+        "canonical": {
+          "n": 2,
+          "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        },
+        "tip": {
+          "seq": 3,
+          "hash": "345e346b5b35d407253bdf15062d3d90a9f69fb9db39b04dda13b48eec043b08"
+        },
+        "placement": {
+          "state": "active"
+        },
+        "placement_row_epoch": {
+          "n": 2,
+          "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        },
+        "segments": [
+          {
+            "epoch": {
+              "n": 1,
+              "claimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+            },
+            "start_seq": 0,
+            "head_seq": 2,
+            "state": "canonical_ancestor"
+          },
+          {
+            "epoch": {
+              "n": 2,
+              "claimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+            },
+            "start_seq": 3,
+            "head_seq": 3,
+            "state": "open"
+          }
+        ],
+        "divergences": []
+      }
+    }
+  ]
+}

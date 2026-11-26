@@ -11,12 +11,18 @@
 //! - [`auth`]: the auth error vocabulary, limits and the per-NodeId failure limiter.
 //! - [`frames`]: control-lane frames, error frames and denial frames as serde types.
 //! - [`capability`]: transport capability strings exchanged in `auth` / `auth_response`.
+//! - [`bcbor`]: the deterministic CBOR profile every signed body uses; decoding rejects every
+//!   non-canonical input.
+//! - [`crypto`]: BLAKE3 derive-key with a caller's context, plain BLAKE3, and strict Ed25519 over a
+//!   32-byte id.
 
 pub mod alpn;
 pub mod auth;
+pub mod bcbor;
 pub mod capability;
 pub mod closure;
 pub mod codec;
+pub mod crypto;
 pub mod epoch;
 pub mod frames;
 pub mod ids;

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log"]
 
 [workspace.package]
 edition = "2024"
@@ -22,6 +22,12 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 rusqlite_migration = "=2.3.0"
 storekey = { version = "=0.11.0", default-features = false }
 tempfile = "3"
+blake3 = { version = "1.8", default-features = false }
+ed25519-dalek = { version = "3", default-features = false, features = ["fast", "zeroize"] }
+core-log = { path = "crates/core-log" }
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+sha1 = { version = "0.10", default-features = false }
+sha2 = { version = "0.10", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,25 @@
+[package]
+name = "core-log"
+version = "0.1.0"
+description = "The replicated agent-state log (R1): signed hash-chained segments per epoch, payload kinds, divergence evidence, pruning, and the baken/log/1 replicator with an async driver. Pure state machines; wasm-safe."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+core-proto.workspace = true
+core-store.workspace = true
+futures.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+core-testkit.workspace = true
+futures = { version = "0.3", features = ["executor"] }
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
