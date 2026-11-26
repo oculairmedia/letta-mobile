@@ -1,0 +1,65 @@
+{
+  "spec": "store-v1.md",
+  "generator": "hand-written; read by core/crates/core-store/tests/store_vectors.rs and core/crates/core-store-sqlite/tests/on_disk_codes.rs",
+  "schema": {
+    "version": 1,
+    "application_id": 1112231473,
+    "tables": [
+      "binding",
+      "blob",
+      "catalog_doc",
+      "divergence",
+      "feed_row",
+      "kv",
+      "log_entry",
+      "membership_op",
+      "membership_parent",
+      "placement",
+      "segment",
+      "vote_promise"
+    ]
+  },
+  "codes": {
+    "payload_state": { "missing": 0, "stored": 1, "pruned": 2 },
+    "segment_state": {
+      "open": 0,
+      "sealed": 1,
+      "canonical_ancestor": 2,
+      "divergent": 3,
+      "invalid": 4,
+      "quarantined": 5
+    },
+    "placement_state": { "active": 0, "sealed_to": 1, "placeless": 2, "superseded_unknown": 3 },
+    "doc_state": { "live": "live", "superseded": "superseded", "retired": "retired" }
+  },
+  "key_paths": [
+    { "name": "empty path", "components": [], "hex": "" },
+    { "name": "one empty component", "components": [""], "hex": "00" },
+    { "name": "document prefix", "components": ["doc1"], "hex": "646f633100" },
+    {
+      "name": "samod chunk key",
+      "components": ["doc1", "incremental", "h1"],
+      "hex": "646f633100696e6372656d656e74616c00683100"
+    },
+    { "name": "NUL is escaped", "components": ["a\u0000b"], "hex": "6101016200" },
+    { "name": "the escape byte is escaped", "components": ["\u0001"], "hex": "010200" },
+    { "name": "non-ASCII", "components": ["é"], "hex": "c3a900" }
+  ],
+  "invalid_key_paths": [
+    { "name": "no terminator", "hex": "616263" },
+    { "name": "bad escape", "hex": "010700" },
+    { "name": "dangling escape", "hex": "01" },
+    { "name": "not UTF-8", "hex": "ff00" }
+  ],
+  "binding_keys": [
+    { "kind": "model_profile", "name": "profile/default", "encoded": "model_profile:profile/default" },
+    { "kind": "workspace_path", "name": "ws-7f3a", "encoded": "workspace_path:ws-7f3a" },
+    { "kind": "hooks_dir", "encoded": "hooks_dir" }
+  ],
+  "invalid_binding_keys": [
+    { "name": "unknown kind", "encoded": "provider_secret:openai" },
+    { "name": "empty profile name", "encoded": "model_profile:" },
+    { "name": "control character", "encoded": "workspace_path:a\nb" },
+    { "name": "hooks_dir takes no name", "encoded": "hooks_dir:x" }
+  ]
+}
