@@ -4,13 +4,25 @@ EXTENDS Naturals, TLC
 Bounded executable abstraction of origin/main edb652dae4 plus the lifecycle fixes in this change,
 NOT a Kotlin implementation. Recheck this code map when updating the source.
 
-Expected results (main / fixed / fixed-disciplined):
-  P1 EventuallyTerminal: PASS / PASS / PASS   (early completion kept, applied on receipt)
-  P2 NoResurrection (including eviction): PASS / PASS / PASS   (evicted tombstones)
+What each config models: the Receipt, RunningSnapshot and Close actions below encode the
+fixed code (early completion applied on receipt, evicted tombstones refuse RUNNING,
+turn_closed settles unanswered rows) in EVERY config, so no config models the tree before
+these fixes; the before-state is reproduced only by the Break mutations in able-to-fail.sh
+(forgetEarly, resurrect, pending). The configs differ in:
+  main              Fixed=FALSE: foreign-identity frames admitted (frame admission not modelled
+                    as fixed), replay environment.
+  fixed             Fixed=TRUE: foreign-identity frames refused, replay environment.
+  fixed-disciplined Fixed=TRUE, disciplined environment (no eviction or replayed RUNNING;
+                    parent result precedes normal close): the positive baseline for Breaks.
+Expected results (main / fixed / fixed-disciplined), with this PR's transitions:
+  P1 EventuallyTerminal: PASS / PASS / PASS
+  P2 NoResurrection (including eviction): PASS / PASS / PASS
      RetainedTerminalNeverRuns: PASS / PASS / PASS
   P3 ParentIsolation: FAIL / PASS / PASS
-  P4 NoPendingRow: PASS / PASS / PASS   (turn_closed settles unanswered calls)
-     NoPendingChildRow: PASS / PASS / PASS (close settles any unanswered row it holds)
+  P4 NoPendingRow: PASS / PASS / PASS
+     NoPendingChildRow: PASS / PASS / PASS
+Approvals left pending by a non-terminal close are not modelled: the single parent row is
+a plain call.
 Run ./check.sh, ./able-to-fail.sh; trace.py out/<config>.<property>.out
 prints one transition per line. Break mutations disable expiry, terminal guards,
 foreign-identity suppression, and close settlement (with the disciplined premise).

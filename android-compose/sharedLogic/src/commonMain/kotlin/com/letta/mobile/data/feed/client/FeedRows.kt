@@ -33,6 +33,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 /**
@@ -46,10 +47,17 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
     private val conversationId = conversation.value
 
     /**
-     * The parent tool calls each still-open turn emitted. A turn's entry is dropped when its
-     * `turn_closed` arrives, so this holds only turns the journal has not closed yet.
+     * The parent tool calls each still-open turn emitted, oldest turn first. A turn's entry is dropped when its
+     * `turn_closed` arrives; turns of one conversation can overlap (the host counts running turns), so a turn whose
+     * close never arrives is forgotten once [MAX_OPEN_TURNS] newer turns are open.
      */
-    private val toolCallsByTurn = mutableMapOf<String, MutableSet<String>>()
+    private val toolCallsByTurn = LinkedHashMap<String, OpenTurnCalls>()
+
+    /** Approvals left pending by a non-terminal close, oldest first, at most [MAX_CARRIED_APPROVALS]. */
+    private val carriedApprovals = LinkedHashSet<String>()
+
+    /** Turns tracked as open (their `turn_closed` not yet seen). */
+    val openTurnCount: Int get() = toolCallsByTurn.size
 
     /** Entries that were pointers (too large to carry): they name a row that is not loaded, and draw nothing yet. */
     var pointerEntries: Int = 0
@@ -59,11 +67,12 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         reduction = empty
         pointerEntries = 0
         toolCallsByTurn.clear()
+        carriedApprovals.clear()
     }
 
     /** Folds [entry] into the rows and returns the messages it carried (for a consumer that ingests them itself). */
     fun apply(entry: FeedDelta): List<LettaMessage> {
-        if (entry.kind == ConversationFeedWire.KIND_TURN_CLOSED) settleClosedTurn(entry.turn)
+        if (entry.kind == ConversationFeedWire.KIND_TURN_CLOSED) settleClosedTurn(entry.turn, entry.payload.endedTheTurn())
         if (entry.kind != ConversationFeedWire.KIND_STREAM_DELTA) return emptyList()
         val payload = entry.payload
         if (payload == null) {
@@ -74,7 +83,7 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         return messagesOf(entry, payload).also { messages ->
             messages.forEach { message ->
                 reduction = reduction.reduceLive(message, agent.value)
-                rememberToolCalls(entry.turn, message.emittedToolCallIds())
+                rememberToolCalls(entry.turn, message)
             }
         }
     }
@@ -85,11 +94,22 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
      * turn, whether the turn ended normally or not. A conversation read through the feed runs no ledger sweep, so
      * the shared projection settles each such call visibly, as the ledger's dangling sweep would ("No tool result
      * recorded", an error). A real result journaled later (an async tool answering in a later turn) still replaces it.
+     *
+     * An approval request is the exception when [turnEnded] is false: a `turn_closed` with `terminal_observed: false`
+     * only says the host stopped watching (it restarted or lost the turn), while the App Server may still be holding the
+     * approval for the person. Settling it would hide its approve/deny controls (the UI offers them only while a call has
+     * no result). So it stays pending and answerable, and is carried over: the next terminal close in this conversation
+     * settles it if it is still unanswered then (the App Server answered it or dropped it by the time a turn ends).
      */
-    private fun settleClosedTurn(turn: String) {
-        val calls = toolCallsByTurn.remove(turn) ?: return
+    private fun settleClosedTurn(turn: String, turnEnded: Boolean) {
+        val open = toolCallsByTurn.remove(turn) ?: OpenTurnCalls()
+        val calls = open.all()
         attachHeldReturns(calls)
-        val unanswered = reduction.timeline.unresolvedToolCallIds().intersect(calls)
+        val unresolved = reduction.timeline.unresolvedToolCallIds()
+        val settleable = if (turnEnded) calls + carriedApprovals else open.plain
+        if (turnEnded) carriedApprovals.clear() else carriedApprovals += open.approvals.intersect(unresolved)
+        while (carriedApprovals.size > MAX_CARRIED_APPROVALS) carriedApprovals.remove(carriedApprovals.first())
+        val unanswered = unresolved.intersect(settleable)
         if (unanswered.isEmpty()) return
         val settle = TimelineMutation.SettleDanglingToolCalls(
             reduction.danglingSweepGeneration,
@@ -123,15 +143,29 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         )
     }
 
-    private fun rememberToolCalls(turn: String, callIds: List<String>) {
-        if (callIds.isNotEmpty()) toolCallsByTurn.getOrPut(turn) { mutableSetOf() } += callIds
+    private fun rememberToolCalls(turn: String, message: LettaMessage) {
+        val calls = when (message) {
+            is ToolCallMessage -> message.effectiveToolCalls
+            is ApprovalRequestMessage -> message.effectiveToolCalls
+            else -> return
+        }.map { it.effectiveId }.filter { it.isNotBlank() }
+        if (calls.isEmpty()) return
+        val open = toolCallsByTurn.getOrPut(turn) { OpenTurnCalls() }
+        if (message is ApprovalRequestMessage) open.approvals += calls else open.plain += calls
+        while (toolCallsByTurn.size > MAX_OPEN_TURNS) toolCallsByTurn.remove(toolCallsByTurn.keys.first())
     }
 
-    private fun LettaMessage.emittedToolCallIds(): List<String> = when (this) {
-        is ToolCallMessage -> effectiveToolCalls
-        is ApprovalRequestMessage -> effectiveToolCalls
-        else -> emptyList()
-    }.map { it.effectiveId }.filter { it.isNotBlank() }
+    /** Whether a `turn_closed` payload says the turn really ended (a terminal went through), not that the host stopped watching. */
+    private fun JsonObject?.endedTheTurn(): Boolean =
+        (this?.get(TERMINAL_OBSERVED) as? JsonPrimitive)?.booleanOrNull ?: true
+
+    /** One open turn's calls; approvals are kept apart because only a terminal close may settle them. */
+    private class OpenTurnCalls {
+        val plain = mutableSetOf<String>()
+        val approvals = mutableSetOf<String>()
+
+        fun all(): Set<String> = plain + approvals
+    }
 
     private fun messagesOf(entry: FeedDelta, payload: JsonObject): List<LettaMessage> = RuntimeEventServerFrameMapper.map(
         payload = RuntimeEventPayload.RemoteStreamFrame(
@@ -157,8 +191,15 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
 
     private fun JsonObject.text(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull
 
-    private companion object {
-        const val TAG = "FeedRows"
+    companion object {
+        private const val TAG = "FeedRows"
+        private const val TERMINAL_OBSERVED = "terminal_observed"
+
+        /** Most approvals carried over non-terminal closes; the oldest is forgotten past it. */
+        private const val MAX_CARRIED_APPROVALS = 64
+
+        /** Most open turns tracked for close settlement; the oldest is forgotten past it. */
+        const val MAX_OPEN_TURNS = 16
     }
 }
 
