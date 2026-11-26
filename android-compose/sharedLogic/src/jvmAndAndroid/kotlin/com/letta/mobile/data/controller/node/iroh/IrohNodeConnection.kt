@@ -110,7 +110,7 @@ class IrohNodeConnection internal constructor(
         turnHost: NodeTurnHost = NodeTurnHost.SHARED,
         turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
     ) : this(
-        wire = irohConnectionWire(connection, authentication.remoteEndpointId),
+        wire = irohConnectionWire(connection, authentication),
         controller = controller,
         adminRpcRouter = adminRpcRouter,
         authentication = authentication,
@@ -120,7 +120,8 @@ class IrohNodeConnection internal constructor(
         turnIdentity = turnIdentity,
     )
 
-    private val remoteEndpointId = authentication.remoteEndpointId
+    /** The peer this connection serves, as its transport verified it. */
+    internal val remoteEndpointId: String = authentication.remoteEndpointId
 
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
     // base — replaces the shared mutable companion var that raced across

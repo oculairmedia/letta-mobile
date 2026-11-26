@@ -554,13 +554,18 @@ class IrohNodeEndpoint(
             connection = connection,
             controller = controller,
             adminRpcRouter = adminRpcRouter,
-            authentication = peerAuthentication(remoteId),
+            authentication = IrohConnectionAuthentication(
+                authPolicy = authPolicy,
+                authVerifier = authVerifier,
+                pairingService = pairingService,
+                remoteEndpointId = remoteId,
+            ),
             connectionRegistry = connectionRegistry,
             clientMessageDedupe = clientMessageDedupe,
             turnHost = turnHost,
             turnIdentity = turnIdentity,
         )
-        serveNodeConnection(nodeConnection, remoteId)
+        serveNodeConnection(nodeConnection)
     }
 
     /**
@@ -589,7 +594,13 @@ class IrohNodeEndpoint(
                 remoteEndpointId = wire.peerId,
             )
         } else {
-            peerAuthentication(wire.peerId)
+            // A remote peer: this endpoint's policy, its shared verifier (so redials keep their failure budget), pairing.
+            IrohConnectionAuthentication(
+                authPolicy = authPolicy,
+                authVerifier = authVerifier,
+                pairingService = pairingService,
+                remoteEndpointId = wire.peerId,
+            )
         }
         val nodeConnection = IrohNodeConnection(
             wire = wire,
@@ -600,19 +611,12 @@ class IrohNodeEndpoint(
             turnHost = host,
             turnIdentity = turnIdentity,
         )
-        serveNodeConnection(nodeConnection, wire.peerId)
+        serveNodeConnection(nodeConnection)
     }
 
-    /** A remote peer's auth: this endpoint's policy, its shared verifier (so redials keep their failure budget), pairing. */
-    private fun peerAuthentication(remoteId: String) = IrohConnectionAuthentication(
-        authPolicy = authPolicy,
-        authVerifier = authVerifier,
-        pairingService = pairingService,
-        remoteEndpointId = remoteId,
-    )
-
     /** Serves [nodeConnection] with its app tool relay link, tracked by peer for revocation and canvas admission. */
-    private suspend fun serveNodeConnection(nodeConnection: IrohNodeConnection, remoteId: String) {
+    private suspend fun serveNodeConnection(nodeConnection: IrohNodeConnection) {
+        val remoteId = nodeConnection.remoteEndpointId
         val relayLink = appToolRelay?.link(send = nodeConnection::writeAppToolFrame, ready = { nodeConnection.acceptsAppToolCalls })
         nodeConnection.appToolRelayLink = relayLink
         // Add and remove inside compute, so a peer's entry lives exactly as long as one of its connections:

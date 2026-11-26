@@ -14,9 +14,9 @@ import computer.iroh.SendStream
  * One accepted Iroh [connection] as the node's wire: the first bi-stream the peer opens is the control lane, the
  * second the push lane (the peer's readiness byte arrives on its receive half), and every later one an admin call.
  * Frames are length-prefixed by [IrohFrameCodec] and split into `frame_part`s only where the node allows it.
- * [remoteEndpointId] is the peer's endpoint id as the QUIC handshake proved it.
+ * [peer] carries the endpoint id the QUIC handshake proved.
  */
-internal fun irohConnectionWire(connection: Connection, remoteEndpointId: String): NodeConnectionWire =
+internal fun irohConnectionWire(connection: Connection, peer: IrohConnectionAuthentication): NodeConnectionWire =
     object : NodeConnectionWire {
         @Volatile
         private var control: BiStream? = null
@@ -33,15 +33,15 @@ internal fun irohConnectionWire(connection: Connection, remoteEndpointId: String
         @Volatile
         private var pushSink: ViewerFrameSink? = null
 
-        override val peerId: String = remoteEndpointId
+        override val peerId: String = peer.remoteEndpointId
 
         override val localShell: Boolean = false
 
         override suspend fun openLanes() {
             val controlBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" attr remoteEndpointId)
+            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" attr peerId)
             val streamBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" attr remoteEndpointId)
+            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" attr peerId)
             val streamSend = streamBiStream.send()
             control = controlBiStream
             controlSend = controlBiStream.send()
@@ -102,7 +102,7 @@ internal fun irohConnectionWire(connection: Connection, remoteEndpointId: String
         }
 
         override fun recordClosed() {
-            recordConnectionClosed("remoteEndpointId" attr remoteEndpointId, connection)
+            recordConnectionClosed("remoteEndpointId" attr peerId, connection)
         }
 
         override fun closeAfterServe() {
