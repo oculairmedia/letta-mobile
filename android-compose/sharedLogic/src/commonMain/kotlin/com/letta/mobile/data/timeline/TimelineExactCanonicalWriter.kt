@@ -121,14 +121,12 @@ class TimelineExactCanonicalWriter(
         val body = fold.contentByCallId[callId] ?: ""
         val enriched = ownerEvent.copy(
             approvalDecided = ownerEvent.approvalDecided || ownerEvent.willCompleteWith(callId),
-            toolReturnContent = body.ifBlank { ownerEvent.toolReturnContent ?: body },
-            toolReturnIsError = returned.isErr == true || returned.status == "error",
             toolReturnContentByCallId = (fold.contentByCallId + (callId to body)).toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = (ownerEvent.toolReturnIsErrorByCallId +
                 (callId to (returned.isErr == true || returned.status == "error"))).toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
             attachments = ownerEvent.attachments.mergeIncomingImages(returned.attachments).toTimelinePersistentList(),
-        )
+        ).withRowReturnOfFirstCall(listOf(callId))
         val merged = mergeEvent(transaction, enriched)
         return CanonicalToolIndex.observe(transaction, callId, owner, true) || merged
     }
@@ -176,17 +174,14 @@ class TimelineExactCanonicalWriter(
                 merged.toolReturnTruncationByCallId,
                 listOf(callId to deferred.message),
             )
-            val body = fold.contentByCallId[callId] ?: ""
             merged = merged.copy(
                 approvalDecided = merged.approvalDecided || merged.willCompleteWith(callId),
-                toolReturnContent = body.ifBlank { merged.toolReturnContent ?: body },
-                toolReturnIsError = deferred.message.isErr == true || deferred.message.status == "error",
                 toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
                 toolReturnIsErrorByCallId = (merged.toolReturnIsErrorByCallId +
                     (callId to (deferred.message.isErr == true || deferred.message.status == "error"))).toTimelinePersistentMap(),
                 toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
                 attachments = merged.attachments.mergeIncomingImages(deferred.message.attachments).toTimelinePersistentList(),
-            )
+            ).withRowReturnOfFirstCall(listOf(callId))
             transaction.deleteEvidence(deferredReturnKey(callId))
         }
         // The echo and optimistic removal share the caller's transaction, even on replay.

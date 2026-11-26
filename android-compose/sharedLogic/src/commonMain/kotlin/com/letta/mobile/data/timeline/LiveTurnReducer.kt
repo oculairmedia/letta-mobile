@@ -94,20 +94,33 @@ private fun TimelineEvent.Confirmed.advancedBy(incoming: TimelineEvent.Confirmed
 
 /**
  * A tool call is emitted more than once (the second copy can carry empty arguments); it moves
- * forward only when the copy holds more argument text than the row, and keeps what the row has
- * already learned about its return and approval.
+ * forward when the copy holds more argument text than the row, or lists a call the row does not
+ * (whatever its argument text: dropping it would leave that call unlisted and its return parked),
+ * and keeps what the row has already learned about its return and approval.
  */
 private fun TimelineEvent.Confirmed.withRicherToolCalls(incoming: TimelineEvent.Confirmed): TimelineEvent.Confirmed? {
-    if (messageType != TimelineMessageType.TOOL_CALL || incoming.argumentLength() <= argumentLength()) return null
+    if (messageType != TimelineMessageType.TOOL_CALL) return null
+    val calls = when {
+        incoming.argumentLength() > argumentLength() -> incoming.toolCalls
+        incoming.listsCallMissingFrom(this) -> toolCalls + incoming.toolCalls.filter { it.effectiveId !in callIds() }
+        else -> return null
+    }
     return copy(
-        content = incoming.content,
-        toolCalls = incoming.toolCalls,
+        content = if (calls === incoming.toolCalls) incoming.content else renderToolCallContent(calls),
+        toolCalls = calls.toTimelinePersistentList(),
         approvalRequestId = incoming.approvalRequestId ?: approvalRequestId,
         seqId = latestSeqId(seqId, incoming.seqId),
     )
 }
 
 private fun TimelineEvent.Confirmed.argumentLength(): Int = toolCalls.sumOf { it.arguments?.length ?: 0 }
+
+private fun TimelineEvent.Confirmed.callIds(): Set<String> = toolCalls.mapTo(HashSet()) { it.effectiveId }
+
+private fun TimelineEvent.Confirmed.listsCallMissingFrom(row: TimelineEvent.Confirmed): Boolean {
+    val held = row.callIds()
+    return toolCalls.any { it.effectiveId.isNotBlank() && it.effectiveId !in held }
+}
 
 private fun TimelineReducerInput.dropStale(
     existing: TimelineEvent.Confirmed,

@@ -367,28 +367,24 @@ object TimelineHydrationReducer {
         val matchingReturns = matchingToolReturns(evidence)
         val byReturn = if (approvalRequestId == null) matchingReturns.isNotEmpty()
             else allApprovalCallsReturned(matchingReturns)
-        val matchingReturn = matchingReturns.firstOrNull()?.second
         // letta-mobile-fe51r: shared fold keeps projected previews from
         // clobbering full bodies and tracks truncation markers per call id.
         val fold = foldToolReturnBodies(toolReturnContentByCallId, toolReturnTruncationByCallId, matchingReturns)
         val returnIsErrorByCallId = toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
             callId to (toolReturn.isErr == true || toolReturn.status == "error")
         }
-        val firstCallId = matchingReturns.firstOrNull()?.first
         return copy(
             approvalDecided = byResponse || byReturn || approvalDecided,
             // letta-mobile-c49of: thread an explicit decision from hydration
             // evidence so a REJECTED request projects Rejected after reload.
             approvalDecision = approvalOutcomeFromEvidence(evidence) ?: approvalDecision,
-            toolReturnContent = firstCallId?.let { fold.contentByCallId[it] } ?: toolReturnContent,
-            toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: toolReturnIsError,
             toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
             attachments = attachments.mergeIncomingImages(
                 matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
             ).toTimelinePersistentList(),
-        )
+        ).withRowReturnOfFirstCall(matchingReturns.map { it.first })
     }
 }
 

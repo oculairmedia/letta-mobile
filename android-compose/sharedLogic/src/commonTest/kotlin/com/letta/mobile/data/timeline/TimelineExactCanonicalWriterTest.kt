@@ -143,6 +143,33 @@ class TimelineExactCanonicalWriterTest {
         assertEquals("deferred result", owner.toolReturnContentByCallId["call-deferred"])
     }
 
+    /**
+     * A later call's return, folded into its stored owner row and as deferred evidence the owner collects, never
+     * becomes the row's single return: the chat list shows that on call 0.
+     */
+    @Test fun aLaterCallsStoredReturnStaysOffTheFirstCall() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        fun returned(id: String, body: String) = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "ui-return-$id", toolCallId = id, date = "2026-01-01T00:00:02Z", status = "error",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive(body),
+        )
+        val calls = listOf("call-a", "call-b", "call-c")
+            .map { com.letta.mobile.data.model.ToolCall(id = it, name = "exec_command", arguments = "{}") }
+        val call = com.letta.mobile.data.model.ToolCallMessage(id = "ui-call", toolCalls = calls, date = "2026-01-01T00:00:01Z")
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(returned("call-c", "deferred"))))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(call)))
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(returned("call-b", "owned"))))
+        val reopened = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val reopenedSelection = assertIs<TimelineEngineOpen.Opened>(reopened.open(scope)).selection
+        val owner = reopened.preparePage(reopenedSelection, TimelineReadPosition.Tail, 8, null)
+            .projectionInput.records.mapNotNull { it.event }.single { it.toolCalls.size == 3 }
+        assertEquals(mapOf("call-b" to "owned", "call-c" to "deferred"), owner.toolReturnContentByCallId.toMap())
+        assertNull(owner.toolReturnContent, "call-a has not returned")
+        assertFalse(owner.toolReturnIsError, "another call's error is not call-a's")
+    }
+
     /** As above, for a return the server projected down to a preview (letta-mobile-fe51r). */
     @Test fun reconcilingAnUnchangedTruncatedToolTurnKeepsTheDurableRevision() = runTest {
         val store = InMemoryTimelineStore()

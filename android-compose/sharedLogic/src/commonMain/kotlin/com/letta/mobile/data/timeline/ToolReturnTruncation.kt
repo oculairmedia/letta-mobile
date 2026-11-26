@@ -44,6 +44,23 @@ internal data class ToolReturnFoldResult(
  */
 const val DEFAULT_MAX_INBOUND_TOOL_RETURN_BYTES: Int = 128 * 1024
 
+/**
+ * The row's single return (`toolReturnContent` / `toolReturnIsError`) belongs to its FIRST call: the
+ * chat projection shows it only on call 0, as a fallback when call 0 has no entry of its own. Every
+ * writer updates the per-call maps for the calls in [answered] and then calls this, so a later call's
+ * return never shows on call 0. A first call with a blank id can never be answered (no writer matches
+ * a blank id), so its row keeps the single field it already had.
+ */
+internal fun TimelineEvent.Confirmed.withRowReturnOfFirstCall(answered: Collection<String>): TimelineEvent.Confirmed {
+    val first = toolCalls.firstOrNull()?.effectiveId?.takeIf { it.isNotBlank() } ?: return this
+    if (first !in answered) return this
+    val body = toolReturnContentByCallId[first] ?: return this
+    return copy(
+        toolReturnContent = body.ifBlank { toolReturnContent ?: body },
+        toolReturnIsError = toolReturnIsErrorByCallId[first] ?: toolReturnIsError,
+    )
+}
+
 internal fun foldToolReturnBodies(
     existingContent: Map<String, String>,
     existingTruncation: Map<String, ToolReturnTruncation>,
