@@ -1,0 +1,266 @@
+{
+  "contract": "node-carrier",
+  "version": 1,
+  "spec": "docs/reference/contracts/node-carrier-v1.md",
+  "note": "Synthetic ids and tokens only. Each scenario is a script of steps run in order by NodeCarrierContractSuite over the carrier under test, against ScriptedContractNode, which serves the same script from the node's end. Sessions are named by label; the node maps the n-th link it accepts to the n-th session the scenario opens. A session's request ids are <label>-1, <label>-2, ... in the order the session mints them (the auth frame is always <label>-1). Every frame a step lists is matched exactly, as a JSON object, at the end that receives it.",
+  "scenarios": [
+    {
+      "name": "auth",
+      "summary": "The first control frame is auth. A refused credential fails the open with the node's reason; a node that closes after refusing fails it with either the reason or the closure; an accepted one yields the node's capabilities; a carrier-verified identity authenticates without a token.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "wrong-token"},
+          "peer_name": "contract-shell",
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "wrong-token", "peer_name": "contract-shell", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": false, "error": "denied"}}
+          ],
+          "expect": {"auth_rejected": "denied"}
+        },
+        {
+          "op": "open", "session": "b",
+          "credential": {"kind": "token", "token": "wrong-token"},
+          "expect_frame": {"type": "auth", "request_id": "b-1", "token": "wrong-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "b-1", "success": false, "error": "rate_limited"}}
+          ],
+          "node_close": {"code": 4429, "reason": "auth_rate_limited"},
+          "expect": {"auth_rejected": "rate_limited", "or_closed": {"code": 4429, "reason": "auth_rate_limited"}}
+        },
+        {
+          "op": "open", "session": "c",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "c-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "c-1", "success": true, "paired": true, "capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part", "ordered_event_seq_v1"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part", "ordered_event_seq_v1"], "paired": true}
+        },
+        {"op": "close", "session": "c"},
+        {
+          "op": "open", "session": "d",
+          "credential": {"kind": "carrier_identity"},
+          "expect_frame": {"type": "auth", "request_id": "d-1", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "d-1", "success": true, "capabilities": ["conversation_feed_v1", "frame_part"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_v1", "frame_part"], "paired": false}
+        },
+        {"op": "close", "session": "d"}
+      ]
+    },
+    {
+      "name": "capability_gate",
+      "summary": "The node gates every admin_rpc method and every runtime command by the peer's grants before any side effect, on both lanes, and answers a denial as an ordinary response naming the missing capability. A permitted call on the same session still succeeds.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "contract-reader-token"},
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-reader-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "paired": true, "capabilities": ["conversation_feed_v1", "frame_part"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_v1", "frame_part"], "paired": true, "supports": {"conversation_feed_v1": true, "plugins_v1": false}}
+        },
+        {
+          "op": "call", "session": "a",
+          "method": "conversation.delete", "params": {"conversation_id": "conv-1"},
+          "expect_frame": {"type": "admin_rpc", "request_id": "a-2", "method": "conversation.delete", "params": {"conversation_id": "conv-1"}},
+          "response": {"type": "admin_rpc_response", "request_id": "a-2", "success": false, "error": "forbidden", "capability": "conversation.manage"}
+        },
+        {
+          "op": "request", "session": "a",
+          "frame": {"type": "runtime_start", "request_id": "a-3", "agent_id": "agent-a", "conversation_id": "conv-1", "mode": "bypassPermissions"},
+          "replies": [
+            {"lane": "control", "frame": {"type": "error", "request_id": "a-3", "message": "forbidden", "capability": "conversation.manage"}}
+          ]
+        },
+        {
+          "op": "call", "session": "a",
+          "method": "health.check", "params": null,
+          "expect_frame": {"type": "admin_rpc", "request_id": "a-4", "method": "health.check"},
+          "response": {"type": "admin_rpc_response", "request_id": "a-4", "success": true, "result": {"status": "ok"}}
+        },
+        {"op": "close", "session": "a"}
+      ]
+    },
+    {
+      "name": "admin_rpc",
+      "summary": "Each admin_rpc rides its own call lane and is answered on it, so concurrent calls resolve independently even when the node answers them out of order. A refused or unknown method is an ordinary response, not a carrier failure.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["frame_part"]}}
+          ],
+          "expect": {"capabilities": ["frame_part"], "paired": false}
+        },
+        {
+          "op": "calls", "session": "a",
+          "calls": [
+            {
+              "method": "health.check", "params": null,
+              "expect_frame": {"type": "admin_rpc", "request_id": "a-2", "method": "health.check"},
+              "answer_after": ["a-3"],
+              "response": {"type": "admin_rpc_response", "request_id": "a-2", "success": true, "result": {"status": "ok"}}
+            },
+            {
+              "method": "agent.list", "params": {"limit": 1},
+              "expect_frame": {"type": "admin_rpc", "request_id": "a-3", "method": "agent.list", "params": {"limit": 1}},
+              "response": {"type": "admin_rpc_response", "request_id": "a-3", "success": true, "result": {"agents": [{"id": "agent-a", "name": "Contract agent"}]}}
+            }
+          ]
+        },
+        {
+          "op": "call", "session": "a",
+          "method": "nope.nope", "params": {},
+          "expect_frame": {"type": "admin_rpc", "request_id": "a-4", "method": "nope.nope", "params": {}},
+          "response": {"type": "admin_rpc_response", "request_id": "a-4", "success": false, "error": "Unknown method: nope.nope"}
+        },
+        {"op": "close", "session": "a"}
+      ]
+    },
+    {
+      "name": "turn",
+      "summary": "A turn is runtime_start then input on the control lane; the node acknowledges input with input_accepted on the control lane and streams the turn's frames on the push lane, in order.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["frame_part", "ordered_event_seq_v1"]}}
+          ],
+          "expect": {"capabilities": ["frame_part", "ordered_event_seq_v1"], "paired": false}
+        },
+        {
+          "op": "request", "session": "a",
+          "frame": {"type": "runtime_start", "request_id": "a-2", "agent_id": "agent-a", "conversation_id": "conv-1"},
+          "replies": [
+            {"lane": "control", "frame": {"type": "runtime_start_response", "request_id": "a-2", "success": true, "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}}}
+          ]
+        },
+        {
+          "op": "request", "session": "a",
+          "frame": {"type": "input", "request_id": "a-3", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "payload": {"kind": "create_message", "messages": [{"role": "user", "content": "hello", "client_message_id": "cm-1"}]}},
+          "replies": [
+            {"lane": "control", "frame": {"type": "input_accepted", "request_id": "a-3", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "accepted": true}},
+            {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 1, "emitted_at": "2026-01-01T00:00:00Z", "delta": {"message_type": "assistant_message", "id": "msg-1", "content": "Hi", "turn_id": "cm-1"}}},
+            {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 2, "emitted_at": "2026-01-01T00:00:01Z", "delta": {"message_type": "assistant_message", "id": "msg-1", "content": "Hi there", "turn_id": "cm-1"}}},
+            {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 3, "emitted_at": "2026-01-01T00:00:02Z", "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "turn_id": "cm-1"}}}
+          ]
+        },
+        {"op": "close", "session": "a"}
+      ]
+    },
+    {
+      "name": "detach",
+      "summary": "Closing a session mid-turn detaches it: the node sees an orderly close, the turn keeps running on the node, and a new session reads the rest of the turn from the feed, from the cursor the first session last applied.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part"], "paired": false}
+        },
+        {
+          "op": "request", "session": "a",
+          "frame": {"type": "input", "request_id": "a-2", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "payload": {"kind": "create_message", "messages": [{"role": "user", "content": "long job", "client_message_id": "cm-2"}]}},
+          "replies": [
+            {"lane": "control", "frame": {"type": "input_accepted", "request_id": "a-2", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "accepted": true}},
+            {"lane": "push", "frame": {"type": "feed_delta", "conversation": "conv-1", "agent_id": "agent-a", "epoch": 1000, "seq": 2, "after_seq": 0, "entries": [
+              {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-2", "payload": {}},
+              {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-2", "payload": {"message_type": "assistant_message", "id": "msg-2", "content": "Working", "turn_id": "cm-2"}}
+            ]}}
+          ]
+        },
+        {"op": "close", "session": "a"},
+        {
+          "op": "open", "session": "b",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "b-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "b-1", "success": true, "capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_push_v1", "conversation_feed_v1", "frame_part"], "paired": false}
+        },
+        {
+          "op": "resume", "session": "b",
+          "conversation_id": "conv-1", "agent_id": "agent-a", "from": {"epoch": 1000, "seq": 2},
+          "calls": [
+            {
+              "expect_frame": {"type": "admin_rpc", "request_id": "b-2", "method": "feed.subscribe", "params": {"conversation_id": "conv-1", "agent_id": "agent-a", "from": {"epoch": 1000, "seq": 2}}},
+              "response": {"type": "admin_rpc_response", "request_id": "b-2", "success": true, "result": {
+                "mode": "replay", "cursor": {"epoch": 1000, "seq": 4}, "base_seq": 0, "head_seq": 4, "has_more": false,
+                "entries": [
+                  {"epoch": 1000, "seq": 3, "kind": "stream_delta", "turn": "cm-2", "payload": {"message_type": "stop_reason", "stop_reason": "end_turn", "turn_id": "cm-2"}},
+                  {"epoch": 1000, "seq": 4, "kind": "turn_closed", "turn": "cm-2", "payload": {"terminal_observed": true}}
+                ]
+              }}
+            }
+          ]
+        },
+        {"op": "close", "session": "b"}
+      ]
+    },
+    {
+      "name": "feed_resume",
+      "summary": "Resume reads feed.subscribe from the caller's cursor and keeps reading from each page's cursor while has_more. A cursor from an earlier node start is answered with a snapshot; a refused read fails the resume with the node's error.",
+      "steps": [
+        {
+          "op": "open", "session": "a",
+          "credential": {"kind": "token", "token": "contract-admin-token"},
+          "expect_frame": {"type": "auth", "request_id": "a-1", "token": "contract-admin-token", "capabilities": ["frame_part"]},
+          "replies": [
+            {"lane": "control", "frame": {"type": "auth_response", "request_id": "a-1", "success": true, "capabilities": ["conversation_feed_v1", "frame_part"]}}
+          ],
+          "expect": {"capabilities": ["conversation_feed_v1", "frame_part"], "paired": false}
+        },
+        {
+          "op": "resume", "session": "a",
+          "conversation_id": "conv-1", "agent_id": "agent-a", "from": {"epoch": 999, "seq": 7},
+          "calls": [
+            {
+              "expect_frame": {"type": "admin_rpc", "request_id": "a-2", "method": "feed.subscribe", "params": {"conversation_id": "conv-1", "agent_id": "agent-a", "from": {"epoch": 999, "seq": 7}}},
+              "response": {"type": "admin_rpc_response", "request_id": "a-2", "success": true, "result": {
+                "mode": "snapshot", "resync_reason": "epoch_changed", "cursor": {"epoch": 1000, "seq": 2}, "base_seq": 0, "head_seq": 4, "has_more": true,
+                "entries": [
+                  {"epoch": 1000, "seq": 1, "kind": "turn_open", "turn": "cm-1", "payload": {}},
+                  {"epoch": 1000, "seq": 2, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "assistant_message", "id": "msg-1", "content": "Hi", "turn_id": "cm-1"}}
+                ]
+              }}
+            },
+            {
+              "expect_frame": {"type": "admin_rpc", "request_id": "a-3", "method": "feed.subscribe", "params": {"conversation_id": "conv-1", "agent_id": "agent-a", "from": {"epoch": 1000, "seq": 2}}},
+              "response": {"type": "admin_rpc_response", "request_id": "a-3", "success": true, "result": {
+                "mode": "replay", "cursor": {"epoch": 1000, "seq": 4}, "base_seq": 0, "head_seq": 4, "has_more": false,
+                "entries": [
+                  {"epoch": 1000, "seq": 3, "kind": "stream_delta", "turn": "cm-1", "payload": {"message_type": "stop_reason", "stop_reason": "end_turn", "turn_id": "cm-1"}},
+                  {"epoch": 1000, "seq": 4, "kind": "turn_closed", "turn": "cm-1", "payload": {"terminal_observed": true}}
+                ]
+              }}
+            }
+          ]
+        },
+        {
+          "op": "resume", "session": "a",
+          "conversation_id": "conv-other", "agent_id": "agent-b", "from": null,
+          "calls": [
+            {
+              "expect_frame": {"type": "admin_rpc", "request_id": "a-4", "method": "feed.subscribe", "params": {"conversation_id": "conv-other", "agent_id": "agent-b"}},
+              "response": {"type": "admin_rpc_response", "request_id": "a-4", "success": false, "error": "forbidden: agent not in this device's scope"}
+            }
+          ],
+          "expect": {"refused": "forbidden: agent not in this device's scope"}
+        },
+        {"op": "close", "session": "a"}
+      ]
+    }
+  ]
+}
