@@ -21,8 +21,11 @@ client (`@letta-ai/letta-code@0.34.14`). `desktop/scripts/npm-ci.ps1` installs i
   bundled runtime; its own dependencies (`@letta-ai/letta-client`, `ajv`) sit one level up.
 - An npm `overrides` entry was evaluated for 0.33.6 and does **not** dedupe these copies (the
   dependency is circular through the SDK, and the shrinkwrap wins); the lock is left as resolved.
-- `@janhapke/sharp-electron@0.35.3-electron.1` is a third-party sharp build by an individual
-  maintainer and a direct dependency of letta-code 0.34.x (about 23 optional platform binaries).
+- Images: letta-code resizes each image in a child process (`image-resize-worker.js`) that imports
+  plain `sharp` (0.35 since letta-code 0.34.70, which dropped the third-party
+  `@janhapke/sharp-electron` build). The staging scripts keep only this platform's sharp binary
+  (`@img/sharp-win32-x64`, which carries its own libvips; on Linux `@img/sharp-linux-x64` plus
+  `@img/sharp-libvips-linux-x64`) and fail if it is missing.
 - `npm-ci.ps1` deliberately keeps install scripts enabled: `node-pty` (`install`: prebuild
   selection / node-gyp fallback, `postinstall`), `sharp` (`install/check.js`) and letta-code's
   own `postinstall` (vendored-Ink patches) all run at build time, and skipping them could break

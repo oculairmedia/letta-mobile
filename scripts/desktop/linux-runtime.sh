@@ -74,8 +74,9 @@ WRAPPER
     chmod 755 "$dest/node"
     for name in package.json package-lock.json runtime-manifest.json; do cp -f "$install/$name" "$dest/"; done
     cp -a "$install/node_modules" "$dest/"
-    # npm 11 can install every nested optional sharp platform. Keep glibc x64 only;
-    # sharp-electron's Linux implementation is REQUIRED here, unlike on Windows.
+    # npm 11 can install every nested optional sharp platform. Keep glibc x64 only: letta-code's
+    # image worker (image-resize-worker.js) imports plain "sharp", which loads @img/sharp-linux-x64
+    # and its libvips.
     while IFS= read -r -d '' dir; do
       [[ ${dir%/*} == */@img ]] || continue
       case "${dir##*/}" in sharp-linux-x64|sharp-libvips-linux-x64) ;; *) rm -rf "$dir" ;; esac
@@ -118,9 +119,11 @@ PYTHON
     # node_modules/.bin/rg points at @cursor/sdk-darwin-arm64/bin/rg, removed above, and the
     # packaging copy (prepareAppResources) refuses to follow a dangling link. Drop only broken links.
     find "$dest/node_modules" -xtype l -delete
-    [[ -n $(find "$dest/node_modules" -type d -path '*/@img/sharp-linux-x64' -print -quit) ]] || {
-      echo 'sharp-linux-x64 missing from staged runtime' >&2; exit 1;
-    }
+    for package in sharp-linux-x64 sharp-libvips-linux-x64; do
+      [[ -n $(find "$dest/node_modules" -type d -path "*/@img/$package" -print -quit) ]] || {
+        echo "$package missing from staged runtime" >&2; exit 1;
+      }
+    done
     find "$dest/node_modules" -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete
     ;;
   *) echo "Unknown mode: $mode" >&2; exit 1 ;;

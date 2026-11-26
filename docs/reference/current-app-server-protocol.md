@@ -11,31 +11,33 @@ Regenerate with `node scripts/appserver/generate-protocol-reference.mjs --write`
 | Field | Pinned value |
 | --- | --- |
 | Package | @letta-ai/letta-code |
-| Version | 0.34.39 |
+| Version | 0.34.70 |
 | Node | v24.18.0 |
 | Upstream source Git SHA | Unavailable: the inventory fixture does not record an upstream source Git SHA. |
-| Capture date (contract baseline) | 2026-11-04 |
+| Capture date (contract baseline) | 2026-11-26 |
 | Public declaration export | dist/types/types/app-server-protocol.d.ts |
 | Protocol declaration | dist/types/types/protocol&#95;v2.d.ts |
-| Protocol SHA-256 | 6c50a2345e42d6b9521127cd07c1e175c73f320b5e5724a2a0782fe963eb8881 |
-| Declaration corpus SHA-256 | 12203bda8d79504ea99db8144d01579f046d37fd506867a4995f520aea389ab0 |
+| Protocol SHA-256 | 2568073ad0f1f18e3bb4b1635b065f0a75d5dcb62a5fca493d3cae8a7725f2f9 |
+| Declaration corpus SHA-256 | f13642da6979e4ec2e6d65c8e3dbb20c4676df5127895b80bb766b497363c658 |
 | Upstream recapture command | scripts/appserver/verify-contract-baseline.mjs --package-root &lt;installed-package-root-or-npm-prefix&gt; |
 
 The upstream source commit is distinct from the Git blob identities below. Hashes use UTF-8 fixture bytes with CRLF normalized to LF, matching Git text normalization, so Windows and CI render identical provenance. They include historical notes but do not identify the upstream package commit or a deployed release. No current checkout HEAD is embedded, so regeneration remains deterministic across commits.
 
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 8497018ab5029688fb39e12649cb23eb590579e4089d23c953f7328f43e7dd48 | 084ee402a409222c1fddc297f3a9e2f2af1bbb0d |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 63528bef8639a3ce3aace2a6b83177ef2a35258d7bc7d7b6459f9c098584dbd9 | 6037b48e26e5e4a5583e3337dbb6c396b962d813 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 114a04ad06da980a98306e1b8c7c6e19426a2bd614686f74a853a73fc7002fe4 | 398a627051a461afcef93062d5d6a7fceefda3ca |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 68d58b33f8c43e2f576c401895964a7ba3c0b9a2c4f0feef05ce769c063bcfc1 | ab8544019a9bc743793d7405cb93d4c1248e465d |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 8b56983a48cf380cd51e7a54d3c852d3ac70b93300468170af6037a2bdc6179b | 0e17045be62c5513c09d719781721d382d5f2bba |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
 
-## Declaration corpus (27 files)
+## Declaration corpus (30 files)
 
 | Package-relative file |
 | --- |
 | dist/types/backend/api/ephemeral-conversations.d.ts |
+| dist/types/experiments/types.d.ts |
+| dist/types/permissions/mode.d.ts |
 | dist/types/runtime-execution-settings.d.ts |
 | dist/types/types/app-server-info.d.ts |
 | dist/types/types/app-server-protocol.d.ts |
@@ -51,6 +53,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | dist/types/types/input-command.d.ts |
 | dist/types/types/input-create-message.d.ts |
 | dist/types/types/loop-status-protocol.d.ts |
+| dist/types/types/protocol.d.ts |
 | dist/types/types/protocol&#95;v2.d.ts |
 | dist/types/types/provider-oauth-config.d.ts |
 | dist/types/types/queue-update-protocol.d.ts |
@@ -174,7 +177,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file |
 | write&#95;memory&#95;file |
 
-## Upstream messages (116)
+## Upstream messages (117)
 
 | Discriminant |
 | --- |
@@ -242,6 +245,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | edit&#95;file&#95;response |
 | enable&#95;memfs&#95;response |
 | execute&#95;command&#95;response |
+| external&#95;tool&#95;call&#95;cancel |
 | external&#95;tool&#95;call&#95;request |
 | file&#95;changed |
 | file&#95;ops |
