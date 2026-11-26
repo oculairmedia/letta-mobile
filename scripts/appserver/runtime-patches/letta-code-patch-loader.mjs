@@ -2297,7 +2297,8 @@ const MEMORY_DIR_EXPAND_REPLACEMENT =
 // $MEMORY_DIR/<relative path>, which shells expand on every node and file tools expand through
 // lcp-memory-dir-expand (a precondition site below, so the two never apply apart). Skills found
 // anywhere else (bundled, global, project) keep their install path. The resource list already
-// holds paths relative to the skill dir.
+// holds paths relative to the skill dir. The dir is inserted through a replacer function, so `$&`,
+// `$1` or `$$` in a directory name stay literal (stock passed it as a replacement string).
 const SKILL_DIR_HELPER_TOKEN = "function renderSkillContent(skillName, skillContent, skillPath, options = {}) {";
 const SKILL_DIR_HELPER_REPLACEMENT =
   "// lcp-skill-dir: a skill under this agent's memory root is addressed as $MEMORY_DIR/<path>.\n" +
@@ -2319,7 +2320,7 @@ const SKILL_DIR_SUBSTITUTE_TOKEN =
   "  const withSkillDir = skillContent.replace(/<SKILL_DIR>/g, skillDir).replace(/\\$\\{CLAUDE_SKILL_DIR\\}/g, skillDir);";
 const SKILL_DIR_SUBSTITUTE_REPLACEMENT =
   "  const lcpSkillDir = __lcpHostNeutralSkillDir(skillDir, options.agentId); // lcp-skill-dir\n" +
-  "  const withSkillDir = skillContent.replace(/<SKILL_DIR>/g, lcpSkillDir).replace(/\\$\\{CLAUDE_SKILL_DIR\\}/g, lcpSkillDir);";
+  "  const withSkillDir = skillContent.replace(/<SKILL_DIR>/g, () => lcpSkillDir).replace(/\\$\\{CLAUDE_SKILL_DIR\\}/g, () => lcpSkillDir);";
 const SKILL_DIR_FOOTER_TOKEN =
   "Skill directory: ${skillDir}\nRelative paths in this skill are relative to the skill directory.";
 const SKILL_DIR_FOOTER_REPLACEMENT =
@@ -2333,8 +2334,10 @@ const SKILL_DIR_FOOTER_REPLACEMENT =
 // node that had it upgraded the prompt. The tracking now lives in the agent record, which
 // replicates, as system_prompt_tracking { preset, hash?, version? }. The getters read the record
 // first and fall back to settings.json for agents that predate this (copying the entry into the
-// record the first time). The setters still write settings.json, then the record. Local backend
-// only; any other backend keeps settings.json as before.
+// record the first time, and only while the refreshed record is still untracked, so it never
+// overwrites tracking a peer wrote meanwhile). The setters still write settings.json, then the
+// record. A record write that throws puts the previous in-memory record back, so an identical
+// retry is not mistaken for a no-op. Local backend only; any other backend keeps settings.json.
 const SYSTEM_PROMPT_TRACKING_CLASS_TOKEN = "\nclass SettingsManager {\n";
 const SYSTEM_PROMPT_TRACKING_HELPERS =
   "\n// lcp-system-prompt-tracking: per-agent system prompt tracking lives in the agent record.\n" +
@@ -2347,21 +2350,27 @@ const SYSTEM_PROMPT_TRACKING_HELPERS =
   "    return null;\n" +
   "  }\n" +
   "}\n" +
-  "function __lcpWriteSystemPromptTracking(agentId, settings) {\n" +
+  "function __lcpWriteSystemPromptTracking(agentId, settings, onlyIfUntracked = false) {\n" +
   "  const store = __lcpLocalAgentStore();\n" +
   "  if (!store) return;\n" +
+  "  let previous;\n" +
+  "  let next;\n" +
   "  try {\n" +
   "    const record = store.refreshAgentRecordFromStorage(agentId);\n" +
   "    if (!record) return;\n" +
+  "    if (onlyIfUntracked && record.system_prompt_tracking !== undefined) return;\n" +
   "    const tracking = {\n" +
   '      preset: settings?.systemPromptPreset ?? "",\n' +
   "      ...settings?.systemPromptHash ? { hash: settings.systemPromptHash } : {},\n" +
   "      ...settings?.systemPromptVersion ? { version: settings.systemPromptVersion } : {}\n" +
   "    };\n" +
   "    if (JSON.stringify(record.system_prompt_tracking ?? null) === JSON.stringify(tracking)) return;\n" +
-  "    store.agents.set(agentId, { ...record, system_prompt_tracking: tracking });\n" +
+  "    previous = record;\n" +
+  "    next = { ...record, system_prompt_tracking: tracking };\n" +
+  "    store.agents.set(agentId, next);\n" +
   "    store.persistAgent(agentId);\n" +
   "  } catch (error4) {\n" +
+  "    if (next && store.agents.get(agentId) === next) store.agents.set(agentId, previous);\n" +
   '    debugWarn("settings", `lcp-system-prompt-tracking: could not record system prompt tracking for ${agentId}: ${error4 instanceof Error ? error4.message : String(error4)}`);\n' +
   "  }\n" +
   "}\n" +
@@ -2384,7 +2393,7 @@ const SYSTEM_PROMPT_TRACKING_HELPERS =
   "    };\n" +
   "  }\n" +
   "  if (settings?.systemPromptPreset || settings?.systemPromptHash || settings?.systemPromptVersion) {\n" +
-  "    __lcpWriteSystemPromptTracking(agentId, settings);\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, settings, true);\n" +
   "  }\n" +
   "  return settings;\n" +
   "}\n" +
