@@ -1,6 +1,7 @@
 package com.letta.mobile.data.node
 
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.channels.ChannelAccountCache
 import com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator
 import com.letta.mobile.data.controller.channels.InMemoryChannelAccountCache
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -66,10 +67,13 @@ internal class NodeAppServerConnector(
         )
         val runtimeClient = ReconnectingAppServerClient(
             connect = { mintGeneration(httpClient, endpoint) },
-            listener = recoveryListener(
+            listener = NodeRecoveryListener(
+                log = ports.log,
                 controller = { controllerRef },
                 coordinator = { coordinatorRef },
                 adminState = adminClient.state,
+                channelAccountCache = channelAccountCache,
+                restoreScope = scope,
             ),
         )
         val routedClient = DualLaneAppServerClient(runtime = runtimeClient, admin = adminClient)
@@ -126,48 +130,56 @@ internal class NodeAppServerConnector(
             close = { reason -> generationJob.cancel(CancellationException(reason)) },
         )
     }
+}
 
-    /**
-     * Post-connect recovery sequence, run on every generation-ready: reattach runtimes, then
-     * restore channel accounts, then mark connected.
-     *
-     * The controller and coordinator are read through suppliers because both are constructed
-     * after the reconnecting client they are wired into.
-     */
-    private fun recoveryListener(
-        controller: () -> DefaultAppServerController?,
-        coordinator: () -> ReconnectCoordinator?,
-        adminState: Flow<ReconnectingClientState>,
-    ): ReconnectingClientListener = object : ReconnectingClientListener {
-        override suspend fun onDisconnected(reason: String?) {
-            ports.log.info("App Server connection lost: ${reason ?: "unknown"}")
-            controller()?.onTransportDisconnected(reason)
-        }
+/**
+ * Post-connect recovery sequence, run on every generation-ready: reattach runtimes, then
+ * restore channel accounts, then mark connected.
+ *
+ * The controller and coordinator are read through suppliers because both are constructed
+ * after the reconnecting client they are wired into.
+ *
+ * @param channelAccountCache one cache of the last-known enabled channel accounts for the node's
+ *   lifetime, so every reconnect can re-wire channel ingress in its first round trip instead of
+ *   after a full enumeration. A fresh restore coordinator is built per generation.
+ * @param restoreScope the node's lifecycle scope.
+ */
+internal class NodeRecoveryListener(
+    private val log: NodeLog,
+    private val controller: () -> DefaultAppServerController?,
+    private val coordinator: () -> ReconnectCoordinator?,
+    private val adminState: Flow<ReconnectingClientState>,
+    private val channelAccountCache: ChannelAccountCache,
+    private val restoreScope: CoroutineScope,
+) : ReconnectingClientListener {
+    override suspend fun onDisconnected(reason: String?) {
+        log.info("App Server connection lost: ${reason ?: "unknown"}")
+        controller()?.onTransportDisconnected(reason)
+    }
 
-        override suspend fun onRecovered(client: AppServerClient) {
-            awaitManagementLaneReady(adminState)
-            val result = coordinator()?.reconnect()
-            result?.errors?.forEach {
-                ports.log.error("reattach failed: ${it.message}")
-            }
-            // Restore channel accounts on THIS generation's client. Must run on every
-            // generation-ready (not just the first): a repeat channel_start re-wires ingress to the
-            // live socket, which a reconnect otherwise leaves pointed at the dead one.
-            restoreChannels(client)
-            // Recovery work can take long enough for the independent management lane to roll
-            // generations. Re-check at the readiness boundary so the runtime supervisor never
-            // advertises a half-usable startup.
-            awaitManagementLaneReady(adminState)
-            controller()?.markConnected()
-            ports.log.info(
-                "App Server connection recovered " +
-                    "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-            )
+    override suspend fun onRecovered(client: AppServerClient) {
+        awaitManagementLaneReady(adminState)
+        val result = coordinator()?.reconnect()
+        result?.errors?.forEach {
+            log.error("reattach failed: ${it.message}")
         }
+        // Restore channel accounts on THIS generation's client. Must run on every
+        // generation-ready (not just the first): a repeat channel_start re-wires ingress to the
+        // live socket, which a reconnect otherwise leaves pointed at the dead one.
+        restoreChannels(client)
+        // Recovery work can take long enough for the independent management lane to roll
+        // generations. Re-check at the readiness boundary so the runtime supervisor never
+        // advertises a half-usable startup.
+        awaitManagementLaneReady(adminState)
+        controller()?.markConnected()
+        log.info(
+            "App Server connection recovered " +
+                "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+        )
+    }
 
-        override suspend fun onGaveUp(reason: String?) {
-            ports.log.error("App Server reconnect gave up: ${reason ?: "unknown"}")
-        }
+    override suspend fun onGaveUp(reason: String?) {
+        log.error("App Server reconnect gave up: ${reason ?: "unknown"}")
     }
 
     /**
@@ -178,17 +190,17 @@ internal class NodeAppServerConnector(
     private suspend fun restoreChannels(client: AppServerClient) {
         val result = ChannelRestoreCoordinator(
             client = client,
-            log = { ports.log.error(it) },
+            log = { log.error(it) },
             accountCache = channelAccountCache,
         ).restore()
         // Identifiers and counts only: channel account config carries cleartext plugin
         // credentials and must never reach a log sink.
-        ports.log.info(
+        log.info(
             "channels-host restore: channels=${result.channelIds.size} " +
                 "started=${result.startedAccounts} failed=${result.failures.size}",
         )
         result.failures.forEach {
-            ports.log.error(
+            log.error(
                 "channel restore failed: " +
                     "${it.channelId ?: "-"}/${it.accountId ?: "-"} phase=${it.phase} reason=${it.reason}",
             )
