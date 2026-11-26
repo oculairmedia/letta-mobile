@@ -338,61 +338,14 @@ class IrohNodeConnectionRuntimeStartModeCapabilityTest {
     private data class StartCall(val mode: AppServerPermissionMode?)
 }
 
-private suspend fun IrohNodeConnection.invokeRuntimeStart(frame: JsonObject): String =
+/** Calls a private suspend member of [IrohNodeConnection] by [name] with [arguments]; the tests reach three of them. */
+private suspend fun IrohNodeConnection.invokeSuspending(name: String, vararg arguments: Any): String? =
     suspendCoroutine { continuation ->
-        val method = IrohNodeConnection::class.java.getDeclaredMethod(
-            "handleRuntimeStart",
-            JsonObject::class.java,
-            String::class.java,
-            Continuation::class.java,
-        )
+        val types = arguments.map { if (it is JsonObject) JsonObject::class.java else it.javaClass } + Continuation::class.java
+        val method = IrohNodeConnection::class.java.getDeclaredMethod(name, *types.toTypedArray())
         method.isAccessible = true
         try {
-            val response = method.invoke(this, frame, "runtime-start", continuation)
-            if (response !== COROUTINE_SUSPENDED) {
-                continuation.resume(requireNotNull(response as? String))
-            }
-        } catch (failure: InvocationTargetException) {
-            continuation.resumeWithException(failure.targetException)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            continuation.resumeWithException(failure)
-        }
-    }
-
-private suspend fun IrohNodeConnection.invokeControlAdminRpc(frame: JsonObject): String =
-    suspendCoroutine { continuation ->
-        val method = IrohNodeConnection::class.java.getDeclaredMethod(
-            "handleControlAdminRpc",
-            JsonObject::class.java,
-            Continuation::class.java,
-        )
-        method.isAccessible = true
-        try {
-            val response = method.invoke(this, frame, continuation)
-            if (response !== COROUTINE_SUSPENDED) {
-                continuation.resume(requireNotNull(response as? String))
-            }
-        } catch (failure: InvocationTargetException) {
-            continuation.resumeWithException(failure.targetException)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            continuation.resumeWithException(failure)
-        }
-    }
-
-private suspend fun IrohNodeConnection.invokeConversationScopeViolation(frame: JsonObject): String? =
-    suspendCoroutine { continuation ->
-        val method = IrohNodeConnection::class.java.getDeclaredMethod(
-            "scopeViolation",
-            JsonObject::class.java,
-            Continuation::class.java,
-        )
-        method.isAccessible = true
-        try {
-            val response = method.invoke(this, frame, continuation)
+            val response = method.invoke(this, *arguments, continuation)
             if (response !== COROUTINE_SUSPENDED) continuation.resume(response as? String)
         } catch (failure: InvocationTargetException) {
             continuation.resumeWithException(failure.targetException)
@@ -402,5 +355,14 @@ private suspend fun IrohNodeConnection.invokeConversationScopeViolation(frame: J
             continuation.resumeWithException(failure)
         }
     }
+
+private suspend fun IrohNodeConnection.invokeRuntimeStart(frame: JsonObject): String =
+    requireNotNull(invokeSuspending("handleRuntimeStart", frame, "runtime-start"))
+
+private suspend fun IrohNodeConnection.invokeControlAdminRpc(frame: JsonObject): String =
+    requireNotNull(invokeSuspending("handleControlAdminRpc", frame))
+
+private suspend fun IrohNodeConnection.invokeConversationScopeViolation(frame: JsonObject): String? =
+    invokeSuspending("scopeViolation", frame)
 
 private fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull

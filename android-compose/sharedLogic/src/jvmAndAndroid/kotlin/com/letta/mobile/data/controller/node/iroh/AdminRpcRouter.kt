@@ -168,6 +168,34 @@ class AdminRpcRouter(
         return AgentScopeGuard.conversationIdsOf(invocation.params).all(context::canAccessConversation)
     }
 
+    /**
+     * Dispatches a preauthorized [invocation] through [dispatch] (the transport's own coroutine context) and lets the
+     * transport observe it: [observe] registers the connection as the call's viewer and answers how to settle that,
+     * or null when it observed nothing. It runs before dispatch when [mayObserveBeforeDispatch] allows, otherwise only
+     * once the handler answered successfully. The handler always runs on the invocation's own context, as it was
+     * before any viewer change. [settle] applies the outcome, and a failure when dispatch throws or is cancelled.
+     */
+    internal suspend fun dispatchObserving(
+        invocation: AdminRpcInvocation,
+        observe: suspend () -> (suspend (Boolean) -> Unit)?,
+        dispatch: suspend (AdminRpcInvocation) -> String,
+        settle: suspend ((suspend (Boolean) -> Unit)?, Boolean) -> Unit,
+    ): String {
+        val observesFirst = mayObserveBeforeDispatch(invocation)
+        val early = if (observesFirst) observe() else null
+        var answered = false
+        val response = try {
+            dispatch(invocation).also { answered = true }
+        } finally {
+            // Thrown or cancelled: an observation made first is rolled back before the failure propagates.
+            if (!answered) settle(early, false)
+        }
+        val succeeded = !isAdminRpcFailureEnvelope(response)
+        val late = if (!observesFirst && succeeded) observe() else null
+        settle(early ?: late, succeeded)
+        return response
+    }
+
     /** The streamed handler of [invocation]'s method, or null when it answers with a single response. */
     internal fun streamedHandler(invocation: AdminRpcInvocation): AdminRpcStreamedHandler? = streamedHandlers[invocation.method]
 

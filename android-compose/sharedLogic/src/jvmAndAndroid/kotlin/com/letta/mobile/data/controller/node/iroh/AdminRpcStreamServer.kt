@@ -382,45 +382,31 @@ internal class AdminRpcStreamServer(
         return dispatchObserved(method, params, invocation)
     }
 
-    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String {
-        // letta-mobile-wisqe.2 F2: the handler runs on the context as authorized BEFORE any viewer change. A call is
-        // observed first (so no hydrating turn frame is missed) only when already authorized for its conversation;
-        // otherwise only the handler can authorize it, and it is observed once it has succeeded.
-        val observesFirst = router.mayObserveBeforeDispatch(invocation)
-        val settleObservation: suspend ((suspend (Boolean) -> Unit)?, Boolean) -> Unit = { settle, succeeded ->
-            if (settle != null) {
-                withContext(NonCancellable) {
-                    runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
-                        Telemetry.event(
-                            "IrohNode", "admin_rpc.method_observer.rollback_failed",
-                            "remoteEndpointId" attr remoteEndpointId,
-                            "method" attr method,
-                            "error" attr (rollbackError.message ?: rollbackError.toString()),
-                            level = Telemetry.Level.WARN,
-                        )
+    /**
+     * Dispatches on the owning connection's context, observed through [AdminRpcRouter.dispatchObserving]. The call's
+     * outcome is applied to its observation; a failing rollback is reported, never raised.
+     */
+    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String =
+        router.dispatchObserving(
+            invocation,
+            observe = { notifyMethodObserved(method, params) },
+            dispatch = { withContext(connection) { router.dispatch(it) } },
+            settle = { settle, succeeded ->
+                if (settle != null) {
+                    withContext(NonCancellable) {
+                        runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
+                            Telemetry.event(
+                                "IrohNode", "admin_rpc.method_observer.rollback_failed",
+                                "remoteEndpointId" attr remoteEndpointId,
+                                "method" attr method,
+                                "error" attr (rollbackError.message ?: rollbackError.toString()),
+                                level = Telemetry.Level.WARN,
+                            )
+                        }
                     }
                 }
-            }
-        }
-        val settle = if (observesFirst) notifyMethodObserved(method, params) else null
-        val response = try {
-            withContext(connection) { router.dispatch(invocation) }
-        } catch (cancelled: CancellationException) {
-            settleObservation(settle, false)
-            throw cancelled
-        } catch (error: Exception) {
-            settleObservation(settle, false)
-            throw error
-        }
-        val succeeded = !isAdminRpcFailureEnvelope(response)
-        val observation = when {
-            observesFirst -> settle
-            succeeded -> notifyMethodObserved(method, params)
-            else -> null
-        }
-        settleObservation(observation, succeeded)
-        return response
-    }
+            },
+        )
 
     /**
      * Let the owning connection observe a preauthorized method call

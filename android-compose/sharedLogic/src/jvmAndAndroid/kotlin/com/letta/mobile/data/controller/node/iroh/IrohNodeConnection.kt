@@ -421,31 +421,16 @@ class IrohNodeConnection(
             params = params,
             context = currentAdminRpcRequestContext(),
         )
-        // letta-mobile-wisqe.2 F2: the whole pre-handler authorization (capability above; agent scope and the
-        // owning agent of every named conversation here) runs before any viewer change, and the handler runs on
-        // that same pre-observation context, so becoming a conversation's viewer never grants access to it.
+        // The whole pre-handler authorization (capability above; agent scope and the owning agent of every named
+        // conversation here) runs before any viewer change, and the handler runs on that same pre-observation
+        // context, so becoming a conversation's viewer never grants access to it.
         adminRpcRouter.preauthorize(invocation)?.let { return it }
-        // Observe first (so no hydrating turn frame is missed) only when already authorized for the conversation;
-        // otherwise only the handler can authorize the call, and it is observed once it has succeeded.
-        val observesFirst = adminRpcRouter.mayObserveBeforeDispatch(invocation)
-        val settle = if (observesFirst) observeAdminMethod(method, params) else null
-        val response = try {
-            adminRpcRouter.dispatch(invocation)
-        } catch (cancelled: CancellationException) {
-            settleObservedAdminMethod(settle, succeeded = false)
-            throw cancelled
-        } catch (error: Exception) {
-            settleObservedAdminMethod(settle, succeeded = false)
-            throw error
-        }
-        val succeeded = !isAdminRpcFailureEnvelope(response)
-        val observation = when {
-            observesFirst -> settle
-            succeeded -> observeAdminMethod(method, params)
-            else -> null
-        }
-        settleObservedAdminMethod(observation, succeeded = succeeded)
-        return response
+        return adminRpcRouter.dispatchObserving(
+            invocation,
+            observe = { observeAdminMethod(method, params) },
+            dispatch = adminRpcRouter::dispatch,
+            settle = { settle, succeeded -> settleObservedAdminMethod(settle, succeeded = succeeded) },
+        )
     }
 
     /**
