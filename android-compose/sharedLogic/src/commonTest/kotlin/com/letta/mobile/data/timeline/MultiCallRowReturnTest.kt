@@ -161,9 +161,12 @@ class MultiCallRowReturnTest {
         }
 
         assertTrue(state.pendingToolReturnsByCallId.isEmpty())
-        val answered = state.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-            .flatMap { it.toolReturnContentByCallId.entries }.associate { it.key to it.value }
-        assertEquals(mapOf("a" to "A", "b" to "B"), answered)
+        val answeredByRow = state.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .associate { it.logicalId to it.toolReturnContentByCallId.toMap() }
+        assertEquals(
+            mapOf("tc-a" to mapOf("a" to "A"), "tc-b" to mapOf("b" to "B")),
+            answeredByRow,
+        )
     }
 
     /**
