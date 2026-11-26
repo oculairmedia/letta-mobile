@@ -62,3 +62,5 @@ jobs:
         run: cargo build --locked -p core-proto --target wasm32-unknown-unknown
       - name: core-membership builds for wasm32
         run: cargo build --locked -p core-membership --target wasm32-unknown-unknown
+      - name: core-placement builds for wasm32
+        run: cargo build --locked -p core-placement --target wasm32-unknown-unknown

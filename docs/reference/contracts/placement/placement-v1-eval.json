@@ -1,0 +1,2189 @@
+{
+ "version": 1,
+ "description": "Placement evaluation fixtures: claim verdicts and the canonical segment under a membership view, and the failover evaluator. See placement-v1.md.",
+ "keys": "Nk is the Ed25519 key whose RFC 8032 seed is the byte k repeated 32 times; N1 founds the constellation with every capability",
+ "judge": [
+  {
+   "name": "clean_move",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "s1",
+     "seal": "a1",
+     "next": [
+      2,
+      "N2"
+     ]
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "s1",
+     "reason": "move"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N2"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid"
+    }
+   }
+  },
+  {
+   "name": "move_without_matching_seal",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "s1",
+     "seal": "a1",
+     "next": [
+      2,
+      "N2"
+     ]
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 2,
+     "parent": "s1",
+     "reason": "move"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o3": "structure"
+    }
+   }
+  },
+  {
+   "name": "failover_without_seal",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N2"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid"
+    }
+   }
+  },
+  {
+   "name": "higher_n_invalid_claim",
+   "note": "N5 executes but lacks node.takeover: its higher n leaves the agent superseded_unknown",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N5",
+     "preset": "phone_exec"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o5",
+     "open": "N5",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o5": "no_takeover"
+    },
+    "divergent": [
+     "o5"
+    ]
+   }
+  },
+  {
+   "name": "claimant_without_execute",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N4",
+     "preset": "phone"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o4",
+     "open": "N4",
+     "n": 2,
+     "parent": "a1",
+     "reason": "takeover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o4": "no_execute"
+    }
+   }
+  },
+  {
+   "name": "non_member_claim",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o9",
+     "open": "N9",
+     "n": 2,
+     "parent": "a1",
+     "reason": "takeover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o9": "not_active"
+    }
+   }
+  },
+  {
+   "name": "simultaneous_equal_n",
+   "note": "P6: equal n, the higher claimant id wins on every replica; the other segment is divergent",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "HIGHER_N2_N3"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid",
+     "o3": "valid"
+    },
+    "divergent": [
+     "OPEN_OF_LOWER_N2_N3"
+    ]
+   }
+  },
+  {
+   "name": "revoked_tip_claimant",
+   "note": "P8: revoking the tip's claimant falls back to the highest valid segment below",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    },
+    {
+     "id": "b2",
+     "append": "o2"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N2"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid"
+    }
+   },
+   "then": {
+    "members": [
+     {
+      "op": "revoke",
+      "node": "N2"
+     }
+    ],
+    "expect": {
+     "canonical": [
+      1,
+      "N1"
+     ],
+     "state": "superseded_unknown",
+     "verdicts": {
+      "o2": "not_active"
+     },
+     "divergent": [
+      "o2"
+     ]
+    }
+   }
+  },
+  {
+   "name": "ratified_after_revoke",
+   "note": "P8: a revoked node's segment with a valid descendant stays valid by ratification",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    },
+    {
+     "id": "b2",
+     "append": "o2"
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 3,
+     "parent": "b2",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     3,
+     "N3"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid",
+     "o3": "valid"
+    }
+   },
+   "then": {
+    "members": [
+     {
+      "op": "revoke",
+      "node": "N2"
+     }
+    ],
+    "expect": {
+     "canonical": [
+      3,
+      "N3"
+     ],
+     "state": "active",
+     "verdicts": {
+      "o2": "not_active",
+      "o3": "valid"
+     },
+     "ancestors": [
+      "o2"
+     ]
+    }
+   }
+  },
+  {
+   "name": "quorum_certificate_present",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover",
+     "votes": [
+      "N3",
+      "N6"
+     ]
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N2"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid"
+    }
+   }
+  },
+  {
+   "name": "quorum_certificate_missing",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o2": "bad_certificate"
+    }
+   }
+  },
+  {
+   "name": "quorum_certificate_wrong_parent",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover",
+     "votes": [
+      "N3",
+      "N6"
+     ],
+     "vote_parent": "g"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o2": "bad_certificate"
+    }
+   }
+  },
+  {
+   "name": "quorum_certificate_non_voter",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover",
+     "votes": [
+      "N3",
+      "N2"
+     ]
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o2": "bad_certificate"
+    }
+   }
+  },
+  {
+   "name": "quorum_certificate_duplicate_voter",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover",
+     "votes": [
+      "N3",
+      "N3"
+     ]
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o2": "bad_certificate"
+    }
+   }
+  },
+  {
+   "name": "quorum_takeover_needs_certificate",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "takeover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "superseded_unknown",
+    "verdicts": {
+     "o2": "bad_certificate"
+    }
+   }
+  },
+  {
+   "name": "forced_takeover",
+   "note": "takeover_forced needs node.takeover and admin.full, and no certificate",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N7",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "quorum": {
+       "voters": [
+        "N3",
+        "N6",
+        "N7"
+       ],
+       "required": 2
+      }
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover",
+     "votes": [
+      "N6",
+      "N7"
+     ]
+    },
+    {
+     "id": "b2",
+     "append": "o2"
+    },
+    {
+     "id": "o1",
+     "open": "N1",
+     "n": 3,
+     "parent": "b2",
+     "reason": "takeover_forced"
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 3,
+     "parent": "b2",
+     "reason": "takeover_forced"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     3,
+     "N1"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "valid",
+     "o1": "valid",
+     "o3": "no_admin"
+    }
+   }
+  },
+  {
+   "name": "manual_mode",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "mode": "manual"
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 2,
+     "parent": "a1",
+     "reason": "takeover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N3"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "manual_mode",
+     "o3": "valid"
+    }
+   }
+  },
+  {
+   "name": "explicit_candidates",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "candidates": [
+       "N3"
+      ]
+     }
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 2,
+     "parent": "a1",
+     "reason": "failover"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N3"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o2": "not_candidate",
+     "o3": "valid"
+    }
+   }
+  },
+  {
+   "name": "rekey",
+   "note": "the rotated key's genesis segment stays valid by ratification",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "rotate",
+     "node": "N1",
+     "to": "N8"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "o8",
+     "open": "N8",
+     "n": 2,
+     "parent": "a1",
+     "reason": "rekey"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "a1",
+     "reason": "rekey"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     2,
+     "N8"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o8": "valid",
+     "o2": "not_rotated"
+    }
+   }
+  },
+  {
+   "name": "seal_target_never_opened_then_failover",
+   "note": "a failover over a seal goes above the sealed-to epoch, so the target's late open is a divergent tail",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "s1",
+     "seal": "a1",
+     "next": [
+      2,
+      "N2"
+     ]
+    },
+    {
+     "id": "o3",
+     "open": "N3",
+     "n": 3,
+     "parent": "s1",
+     "reason": "failover"
+    },
+    {
+     "id": "o2",
+     "open": "N2",
+     "n": 2,
+     "parent": "s1",
+     "reason": "move"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     3,
+     "N3"
+    ],
+    "state": "active",
+    "verdicts": {
+     "o3": "valid",
+     "o2": "valid"
+    },
+    "divergent": [
+     "o2"
+    ]
+   }
+  },
+  {
+   "name": "sealed_to_until_opened",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "s1",
+     "seal": "a1",
+     "next": [
+      2,
+      "N2"
+     ]
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "sealed_to",
+    "verdicts": {}
+   }
+  },
+  {
+   "name": "release_is_placeless",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "log": [
+    {
+     "id": "g",
+     "genesis": "N1"
+    },
+    {
+     "id": "a1",
+     "append": "g"
+    },
+    {
+     "id": "s1",
+     "seal": "a1"
+    }
+   ],
+   "expect": {
+    "canonical": [
+     1,
+     "N1"
+    ],
+    "state": "placeless",
+    "verdicts": {}
+   }
+  }
+ ],
+ "failover": [
+  {
+   "name": "before_the_window",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 300000,
+    "rank": 0
+   }
+  },
+  {
+   "name": "second_rank_staggers",
+   "note": "always-on ranks first, so the desktop waits one stagger more",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N2",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 330000,
+    "rank": 1
+   }
+  },
+  {
+   "name": "window_passed_without_dial_failure",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "probe",
+    "rank": 0
+   }
+  },
+  {
+   "name": "window_passed_and_dial_failed",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 290000
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "claim",
+    "rank": 0
+   }
+  },
+  {
+   "name": "dial_failure_too_old",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 200000
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "probe",
+    "rank": 0
+   }
+  },
+  {
+   "name": "peer_heard_the_holder",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 290000,
+    "peer_heard_ms": 250000
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 550000,
+    "rank": 0
+   }
+  },
+  {
+   "name": "indirect_probe_off",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "indirect_probe": false
+     }
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 290000,
+    "peer_heard_ms": 250000
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "claim",
+    "rank": 0
+   }
+  },
+  {
+   "name": "manual_mode",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "mode": "manual"
+     }
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 899000
+   },
+   "parity_matches": true,
+   "now_ms": 900000,
+   "expect": {
+    "decision": "idle",
+    "reason": "manual_mode"
+   }
+  },
+  {
+   "name": "phone_is_manual_only",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N5",
+     "preset": "desktop_node"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on",
+    "N5": "phone"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N5",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 899000
+   },
+   "parity_matches": true,
+   "now_ms": 900000,
+   "expect": {
+    "decision": "idle",
+    "reason": "phone_manual_only"
+   }
+  },
+  {
+   "name": "only_candidate_is_a_phone",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N5",
+     "preset": "desktop_node"
+    }
+   ],
+   "classes": {
+    "N5": "phone"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N5",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 899000
+   },
+   "parity_matches": true,
+   "now_ms": 900000,
+   "expect": {
+    "decision": "idle",
+    "reason": "no_candidate"
+   }
+  },
+  {
+   "name": "phone_allowed",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N5",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "allow_phone_auto": true
+     }
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on",
+    "N5": "phone"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N5",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 399000
+   },
+   "parity_matches": true,
+   "now_ms": 400000,
+   "expect": {
+    "decision": "claim",
+    "rank": 2
+   }
+  },
+  {
+   "name": "unknown_class_is_not_derived",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N2",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 900000,
+   "expect": {
+    "decision": "idle",
+    "reason": "not_candidate"
+   }
+  },
+  {
+   "name": "explicit_order_wins",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "candidates": [
+       "N2",
+       "N3"
+      ]
+     }
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N2",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 300000,
+    "rank": 0
+   }
+  },
+  {
+   "name": "complete_seq_breaks_ties",
+   "note": "equal class: the higher complete seq ranks first",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "add",
+     "node": "N6",
+     "preset": "desktop_node"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N6": "desktop"
+   },
+   "complete": {
+    "N2": 40,
+    "N6": 10
+   },
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N6",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 330000,
+    "rank": 1
+   }
+  },
+  {
+   "name": "runtime_mismatch",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 290000
+   },
+   "parity_matches": false,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "idle",
+    "reason": "runtime_mismatch"
+   }
+  },
+  {
+   "name": "runtime_mismatch_allowed",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    },
+    {
+     "op": "policy",
+     "policy": {
+      "runtime_mismatch_failover": true
+     }
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 290000
+   },
+   "parity_matches": false,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "claim",
+    "rank": 0
+   }
+  },
+  {
+   "name": "self_holder",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N1",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "idle",
+    "reason": "self_holder"
+   }
+  },
+  {
+   "name": "placeless",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "placeless"
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "idle",
+    "reason": "placeless"
+   }
+  },
+  {
+   "name": "superseded",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active",
+    "max_n": 2
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "idle",
+    "reason": "superseded"
+   }
+  },
+  {
+   "name": "sealed_target_unreachable",
+   "note": "a seal whose target never opened: candidates watch the target",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "sealed_to",
+    "next": [
+     2,
+     "N2"
+    ]
+   },
+   "me": "N3",
+   "liveness": {
+    "last_heard_ms": 0,
+    "dial_failure_ms": 299000
+   },
+   "parity_matches": true,
+   "now_ms": 300000,
+   "expect": {
+    "decision": "claim",
+    "rank": 0
+   }
+  },
+  {
+   "name": "sealed_target_is_me",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "sealed_to",
+    "next": [
+     2,
+     "N2"
+    ]
+   },
+   "me": "N2",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "idle",
+    "reason": "self_holder"
+   }
+  },
+  {
+   "name": "holder_is_not_a_candidate",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 2,
+    "holder": "N3",
+    "state": "active"
+   },
+   "me": "N2",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "wait",
+    "until_ms": 300000,
+    "rank": 0
+   }
+  },
+  {
+   "name": "non_member_is_not_a_candidate",
+   "members": [
+    {
+     "op": "add",
+     "node": "N2",
+     "preset": "desktop_node"
+    },
+    {
+     "op": "add",
+     "node": "N3",
+     "preset": "always_on_linux"
+    }
+   ],
+   "classes": {
+    "N2": "desktop",
+    "N3": "always_on"
+   },
+   "complete": {},
+   "placement": {
+    "n": 1,
+    "holder": "N1",
+    "state": "active"
+   },
+   "me": "N9",
+   "liveness": {
+    "last_heard_ms": 0
+   },
+   "parity_matches": true,
+   "now_ms": 100000,
+   "expect": {
+    "decision": "idle",
+    "reason": "not_candidate"
+   }
+  }
+ ]
+}

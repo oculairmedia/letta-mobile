@@ -184,7 +184,9 @@ membership and by these fixtures, checks only: genesis only at seq 0 with `n = 1
 - **R-51 Append** takes `seq = head + 1`, `prev = head`, the kind's flags (section 3), signs and stores entry, payload
   and segment head in one transaction. An `epoch_seal` also moves the placement to `sealed_to` / `placeless`; after it
   the claimant never writes in that epoch again.
-- **R-52 Claim.** `n = max(max_n_seen, parent.n) + 1`, `prev` = the named fork point, at most `EPOCH_N_MAX_STEP` above
+- **R-52 Claim.** `n = max(max_n_seen, parent.n, s) + 1`, where `s` is the sealed-to `n` when the parent is an
+  `epoch_seal` naming a next epoch and the claim is not that move (else 0), so a late open by the seal's target is a
+  divergent tail, never a tie on `n`; `prev` = the named fork point, at most `EPOCH_N_MAX_STEP` above
   the parent. The judge is asked first; a refused claim is not stored. A valid claim becomes canonical in its
   transaction, and the old line past the fork point becomes a divergent tail.
 - **R-53** The holder records a divergence with `record_divergence`: the `divergence` entry (section 8.4) and the
