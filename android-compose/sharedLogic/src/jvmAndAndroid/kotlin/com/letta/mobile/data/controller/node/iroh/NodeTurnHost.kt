@@ -76,7 +76,7 @@ class NodeTurnHost internal constructor(
     }
 
     /** Client turns running per conversation; an entry exists only while one runs. */
-    private val clientTurns = ConcurrentHashMap<ConversationId, MutableList<NodeTurn>>()
+    private val clientTurns = ConcurrentHashMap<ConversationId, List<NodeTurn>>()
 
     /** The runs finished client turns relayed, for the most recently used conversations. */
     private val clientRuns = object : LinkedHashMap<ConversationId, LinkedHashSet<RunId>>(INITIAL_CAPACITY, LOAD_FACTOR, true) {
@@ -94,10 +94,11 @@ class NodeTurnHost internal constructor(
 
     /** Whether a running client turn of [conversation] sent one of [clientMessageIds]. */
     internal fun clientSent(conversation: ConversationId, clientMessageIds: Collection<String>): Boolean =
-        clientTurns[conversation]?.toList()?.any { it.clientMessageId in clientMessageIds } == true
+        clientTurns[conversation]?.any { it.clientMessageId in clientMessageIds } == true
 
     private fun noteClientTurnStarted(turn: NodeTurn) {
-        clientTurns.compute(ConversationId(turn.conversationId)) { _, running -> (running ?: mutableListOf()).apply { add(turn) } }
+        // Lists are immutable and replaced inside compute, so a reader never sees one being changed.
+        clientTurns.compute(ConversationId(turn.conversationId)) { _, running -> running.orEmpty() + turn }
     }
 
     /** Remembers the turn's runs BEFORE it stops counting as running, so its late frames never look unowned. */
@@ -110,7 +111,7 @@ class NodeTurnHost internal constructor(
                 relayed.forEach { runs.rememberRecent(it, REMEMBERED_CLIENT_RUNS) }
             }
         }
-        clientTurns.computeIfPresent(conversation) { _, running -> running.apply { remove(turn) }.takeIf { it.isNotEmpty() } }
+        clientTurns.computeIfPresent(conversation) { _, running -> (running - turn).takeIf { it.isNotEmpty() } }
     }
 
     /** Each conversation's relayed turn whose run is bound and not finished. */
