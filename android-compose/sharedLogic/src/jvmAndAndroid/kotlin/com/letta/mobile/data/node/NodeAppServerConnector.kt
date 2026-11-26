@@ -17,13 +17,16 @@ import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 
 /**
  * The node's controller and the App Server client it relays through.
@@ -133,8 +136,27 @@ internal class NodeAppServerConnector(
 }
 
 /**
- * Post-connect recovery sequence, run on every generation-ready: reattach runtimes, then
- * restore channel accounts, then mark connected.
+ * Post-connect recovery sequence, run on every generation-ready: reattach runtimes, start the
+ * channel-account restore for this generation, then mark connected.
+ *
+ * ## Channel restore does not hold readiness
+ *
+ * The restore is launched on [restoreScope] and recovery returns without waiting for it, so the
+ * supervisor reports `generation.ready` as soon as runtimes are reattached and the management
+ * lane is usable. An App Server started as `letta server --listen` never answers a `channel_*`
+ * command at all: its socket router only forwards them to a channel service that this mode never
+ * starts, and drops them without a reply otherwise. Waiting on the restore therefore delayed
+ * readiness on every boot by the full request timeout and bought nothing.
+ *
+ * What the old ordering protected, and why it still holds:
+ * - The restore runs on THIS generation's client (the one handed to [onRecovered]), so a repeat
+ *   `channel_start` still re-wires ingress to the live socket. That client is the generation's
+ *   own, not the reconnecting facade, so its calls are admitted whatever the supervisor's state.
+ * - Nothing in recovery reads the restore's outcome: it never failed recovery, and a failure
+ *   escaping it now is logged inside the launched job instead of reaching the node scope.
+ * - One restore at a time: a new generation cancels and waits out the previous generation's
+ *   restore before starting its own, so two passes never write the shared account cache at once.
+ * - A dead generation's restore stops with it: [onDisconnected] cancels it.
  *
  * The controller and coordinator are read through suppliers because both are constructed
  * after the reconnecting client they are wired into.
@@ -142,7 +164,7 @@ internal class NodeAppServerConnector(
  * @param channelAccountCache one cache of the last-known enabled channel accounts for the node's
  *   lifetime, so every reconnect can re-wire channel ingress in its first round trip instead of
  *   after a full enumeration. A fresh restore coordinator is built per generation.
- * @param restoreScope the node's lifecycle scope.
+ * @param restoreScope the node's lifecycle scope; the channel restore runs here.
  */
 internal class NodeRecoveryListener(
     private val log: NodeLog,
@@ -152,8 +174,13 @@ internal class NodeRecoveryListener(
     private val channelAccountCache: ChannelAccountCache,
     private val restoreScope: CoroutineScope,
 ) : ReconnectingClientListener {
+    /** The current generation's channel restore, if one is still running. */
+    private val channelRestore = atomic<Job?>(null)
+
     override suspend fun onDisconnected(reason: String?) {
         log.info("App Server connection lost: ${reason ?: "unknown"}")
+        // The restore was bound to the generation that just failed; its socket is gone.
+        channelRestore.getAndSet(null)?.cancel()
         controller()?.onTransportDisconnected(reason)
     }
 
@@ -165,8 +192,9 @@ internal class NodeRecoveryListener(
         }
         // Restore channel accounts on THIS generation's client. Must run on every
         // generation-ready (not just the first): a repeat channel_start re-wires ingress to the
-        // live socket, which a reconnect otherwise leaves pointed at the dead one.
-        restoreChannels(client)
+        // live socket, which a reconnect otherwise leaves pointed at the dead one. Launched, not
+        // awaited: readiness must not wait on a command the App Server may never answer.
+        launchChannelRestore(client)
         // Recovery work can take long enough for the independent management lane to roll
         // generations. Re-check at the readiness boundary so the runtime supervisor never
         // advertises a half-usable startup.
@@ -180,6 +208,20 @@ internal class NodeRecoveryListener(
 
     override suspend fun onGaveUp(reason: String?) {
         log.error("App Server reconnect gave up: ${reason ?: "unknown"}")
+    }
+
+    private suspend fun launchChannelRestore(client: AppServerClient) {
+        channelRestore.getAndSet(null)?.cancelAndJoin()
+        channelRestore.value = restoreScope.launch {
+            // The node scope is not a supervisor: an escaping failure would cancel the whole node.
+            try {
+                restoreChannels(client)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("channel restore failed: ${e::class.simpleName}: ${e.message}")
+            }
+        }
     }
 
     /**
