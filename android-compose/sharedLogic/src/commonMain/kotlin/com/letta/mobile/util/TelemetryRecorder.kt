@@ -1,5 +1,6 @@
 package com.letta.mobile.util
 
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,8 +11,16 @@ class TelemetryRecorder {
     private val mutableEvents = MutableStateFlow<List<Telemetry.Event>>(emptyList())
     val events: StateFlow<List<Telemetry.Event>> = mutableEvents.asStateFlow()
 
+    /**
+     * Also told of every recorded event, on the recording thread: the host's on-disk flight record attaches here. It must
+     * return at once (no I/O, no locks held for long), because it runs inside every `Telemetry.event` call.
+     */
+    @Volatile
+    var onRecorded: ((Telemetry.Event) -> Unit)? = null
+
     fun record(event: Telemetry.Event) {
         mutableEvents.update { current -> (listOf(event) + current).take(CAPACITY) }
+        onRecorded?.invoke(event)
     }
 
     fun clear() {

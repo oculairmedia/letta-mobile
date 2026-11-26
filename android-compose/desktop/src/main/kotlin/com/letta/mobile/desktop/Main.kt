@@ -49,7 +49,7 @@ private val DESKTOP_DENSITY_SCALE: Float =
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
 internal const val DESKTOP_APP_NAME = com.letta.mobile.data.model.DisplayNames.PRODUCT
 fun main(args: Array<String>) {
-    com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
+    com.letta.mobile.util.flight.installDesktopTelemetry(DESKTOP_APP_NAME).use {
         installBeamShaderTelemetry()
         LinuxAwtScale().run()
         DesktopCrashReporter.installGlobalHandler()
