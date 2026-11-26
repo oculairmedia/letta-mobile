@@ -16,11 +16,7 @@ import com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -34,7 +30,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.junit.Assume.assumeTrue
 
 /**
  * The app-tool relay over real loopback QUIC: an in-process [IrohNodeEndpoint] with the relay
@@ -42,20 +37,12 @@ import org.junit.Assume.assumeTrue
  * auth, runtime_start). A host call to `shell_layout` reaches the app's tool with the host's caller
  * and comes back; an app built without the relay is never sent one.
  *
- * OPT-IN like the other live-QUIC suites: `-DrunIrohLiveE2E=true`.
+ * Relays are disabled on both ends, so the dial never leaves this machine: it runs in the default jvmTest.
  */
 class IrohAppToolRelayEndToEndTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val caller = verifiedToolCaller(ToolCallScope(agentId = AGENT, conversationId = CONVERSATION, toolCallId = "tc-e2e"))
     private val input = buildJsonObject { put("action", "get") }
-
-    @BeforeTest
-    fun requireOptIn() {
-        assumeTrue(
-            "Live-QUIC Iroh E2E is opt-in; pass -DrunIrohLiveE2E=true to run it.",
-            System.getProperty("runIrohLiveE2E") == "true",
-        )
-    }
 
     @AfterTest
     fun tearDown() {
@@ -100,7 +87,11 @@ class IrohAppToolRelayEndToEndTest {
     }
 
     private suspend fun startHost(relay: AppToolRelayHost): String {
-        val server = IrohNodeEndpoint(scope = scope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
+        val server = IrohNodeEndpoint(
+            binding = loopbackHostBinding(),
+            scope = scope,
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
         server.attachAppToolRelay(relay)
         server.create()
         // A host whose runtimes start and run nothing: the relay is what is under test.
@@ -110,7 +101,7 @@ class IrohAppToolRelayEndToEndTest {
 
     /** Dials, signs in and starts the conversation's runtime, which makes this app its viewer. */
     private suspend fun connectApp(ticket: String, responder: AppToolRelayResponder?) {
-        val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val endpoint = bindLoopbackEndpoint()
         val transport = IrohAppServerTransportAdapter(endpoint, appToolRelay = responder).createTransport(
             endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
             scope = scope,

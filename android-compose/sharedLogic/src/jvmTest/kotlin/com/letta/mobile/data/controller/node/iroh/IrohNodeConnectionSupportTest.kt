@@ -37,6 +37,29 @@ class IrohNodeConnectionSupportTest {
     }
 
 
+    /**
+     * A direct-only host never gets a home relay, so creating it must not wait for one: it is
+     * ready once it has a direct address, and its ticket carries that address so a client can dial.
+     */
+    @Test
+    fun aHostWithRelaysDisabledIsCreatedAndAdvertisesItsDirectAddresses() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val endpoint = IrohNodeEndpoint(
+            scope = scope,
+            binding = IrohEndpointBinding(relayConfig = IrohRelayConfig.Disabled),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
+        try {
+            val created = kotlinx.coroutines.withTimeoutOrNull(RELAYLESS_CREATE_TIMEOUT_MS) { endpoint.create() }
+            assertTrue(created != null, "create() must not wait for a home relay that relays-disabled never gets")
+            assertTrue(endpoint.addr().directAddresses().isNotEmpty(), "the host must advertise a direct address")
+            assertEquals(null, endpoint.addr().relayUrl(), "a relays-disabled host advertises no relay")
+        } finally {
+            endpoint.shutdown()
+            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        }
+    }
+
     @Test
     fun endpointRefusesUnregisteredOutboundProtocol() = runBlocking {
         val endpoint = IrohNodeEndpoint(
@@ -71,28 +94,41 @@ class IrohNodeConnectionSupportTest {
     @Test
     fun dedupeMarksFirstSeenNewAndDuplicatesHandled() {
         val dedupe = ProcessScopedClientMessageDedupe()
-        assertTrue(dedupe.markHandled("a"), "first sight is new")
-        assertFalse(dedupe.markHandled("a"), "second sight is a duplicate")
-        assertTrue(dedupe.markHandled("b"))
-        assertTrue(dedupe.contains("a"))
-        assertTrue(dedupe.contains("b"))
+        assertTrue(dedupe.markHandled(DEDUPE_AGENT, DEDUPE_CONVERSATION, "a"), "first sight is new")
+        assertFalse(dedupe.markHandled(DEDUPE_AGENT, DEDUPE_CONVERSATION, "a"), "second sight is a duplicate")
+        assertTrue(dedupe.markHandled(DEDUPE_AGENT, DEDUPE_CONVERSATION, "b"))
+        assertTrue(dedupe.contains(DEDUPE_AGENT, DEDUPE_CONVERSATION, "a"))
+        assertTrue(dedupe.contains(DEDUPE_AGENT, DEDUPE_CONVERSATION, "b"))
+    }
+
+    @Test
+    fun theSameClientMessageIdInAnotherConversationOrAgentIsAnotherTurn() {
+        val dedupe = ProcessScopedClientMessageDedupe()
+        val otherConversation = com.letta.mobile.data.model.ConversationId("conv-dedupe-other")
+        val otherAgent = com.letta.mobile.data.model.AgentId("agent-dedupe-other")
+        assertTrue(dedupe.markHandled(DEDUPE_AGENT, DEDUPE_CONVERSATION, "otid-1"))
+        assertTrue(dedupe.markHandled(DEDUPE_AGENT, otherConversation, "otid-1"), "another conversation's turn runs")
+        assertTrue(dedupe.markHandled(otherAgent, DEDUPE_CONVERSATION, "otid-1"), "another agent's turn runs")
+        assertFalse(dedupe.markHandled(DEDUPE_AGENT, otherConversation, "otid-1"), "a re-send there is still a duplicate")
     }
 
     @Test
     fun dedupeTrimsOldestWhenOverCapacity() {
         val dedupe = ProcessScopedClientMessageDedupe(maxIds = 4, trimCount = 2)
+        fun mark(id: String) = dedupe.markHandled(DEDUPE_AGENT, DEDUPE_CONVERSATION, id)
+        fun seen(id: String) = dedupe.contains(DEDUPE_AGENT, DEDUPE_CONVERSATION, id)
         // Fill to capacity.
-        listOf("1", "2", "3", "4").forEach { assertTrue(dedupe.markHandled(it)) }
+        listOf("1", "2", "3", "4").forEach { assertTrue(mark(it)) }
         assertEquals(4, dedupe.size())
         // One more triggers a trim of the 2 oldest (1, 2), then adds 5.
-        assertTrue(dedupe.markHandled("5"))
+        assertTrue(mark("5"))
         assertEquals(3, dedupe.size())
-        assertFalse(dedupe.contains("1"))
-        assertFalse(dedupe.contains("2"))
-        assertTrue(dedupe.contains("3"))
-        assertTrue(dedupe.contains("5"))
+        assertFalse(seen("1"))
+        assertFalse(seen("2"))
+        assertTrue(seen("3"))
+        assertTrue(seen("5"))
         // A trimmed id can be re-added (the reconnect-window trade-off).
-        assertTrue(dedupe.markHandled("1"))
+        assertTrue(mark("1"))
     }
 
     // ---- ConnectionEventSeq / IrohEventSeqAllocator (P3-4 race) -----------
@@ -247,5 +283,8 @@ class IrohNodeConnectionSupportTest {
 
     private companion object {
         const val FRESH_PEERS = 200
+        const val RELAYLESS_CREATE_TIMEOUT_MS = 15_000L
+        val DEDUPE_AGENT = com.letta.mobile.data.model.AgentId("agent-dedupe")
+        val DEDUPE_CONVERSATION = com.letta.mobile.data.model.ConversationId("conv-dedupe")
     }
 }

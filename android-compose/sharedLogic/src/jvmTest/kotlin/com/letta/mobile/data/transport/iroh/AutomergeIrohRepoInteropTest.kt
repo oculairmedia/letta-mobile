@@ -3,9 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
 import computer.iroh.RecvStream
-import computer.iroh.RelayMode
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -39,8 +37,6 @@ import org.automerge.repo.RepoConfig
 import org.automerge.repo.Transport
 import org.automerge.repo.storage.FileSystemStorage
 import org.junit.After
-import org.junit.Assume.assumeTrue
-import org.junit.Before
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
@@ -50,19 +46,14 @@ import kotlin.time.Duration.Companion.seconds
  *
  * This proves Automerge Java's Samod repository can synchronize and persist a
  * document over the same `computer.iroh` endpoint API already shipped by the
- * Android and desktop clients. It intentionally remains opt-in with the other
- * live-QUIC tests; normal CI does not depend on loopback networking.
+ * Android and desktop clients. Relays are disabled on both ends, so the dial never leaves this
+ * machine: it runs in the default jvmTest.
  */
 class AutomergeIrohRepoInteropTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val closeables = CopyOnWriteArrayList<AutoCloseable>()
     private lateinit var clientEndpoint: Endpoint
     private lateinit var serverEndpoint: Endpoint
-
-    @Before
-    fun requireOptIn() {
-        assumeTrue("set -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
-    }
 
     @After
     fun tearDown() = runBlocking {
@@ -216,12 +207,7 @@ class AutomergeIrohRepoInteropTest {
             error("unreachable")
         }
 
-    private suspend fun bindEndpoint(): Endpoint = Endpoint.bind(
-        EndpointOptions(
-            relayMode = RelayMode.disabled(),
-            alpns = listOf(AUTOMERGE_REPO_ALPN),
-        ),
-    )
+    private suspend fun bindEndpoint(): Endpoint = bindLoopbackEndpoint(alpns = listOf(AUTOMERGE_REPO_ALPN))
 
     private fun loadRepo(path: Path, peerId: PeerId): Repo = Repo.load(
         RepoConfig.builder()

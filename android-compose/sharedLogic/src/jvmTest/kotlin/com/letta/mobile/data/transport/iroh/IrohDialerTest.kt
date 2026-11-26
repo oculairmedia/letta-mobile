@@ -3,8 +3,6 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import computer.iroh.Connection
 import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import java.nio.file.Files
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +11,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import org.junit.Assume.assumeTrue
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -85,10 +82,9 @@ class IrohDialerTest {
 
     @Test
     fun inboundNotebookUsesIndependentPolicyAndStopsOnClose(): Unit = runBlocking {
-        assumeTrue("Live Iroh requires -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
-        val allowed = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
-        val denied = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
-        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled(), alpns = listOf(AUTOMERGE_REPO_ALPN)))
+        val allowed = bindLoopbackEndpoint()
+        val denied = bindLoopbackEndpoint()
+        val client = bindLoopbackEndpoint(alpns = listOf(AUTOMERGE_REPO_ALPN))
         val accepted = CompletableDeferred<String>()
         val deniedId = IrohDiagnostics.endpointIdHex(denied.addr().id())
         val allowedId = IrohDiagnostics.endpointIdHex(allowed.addr().id())
@@ -123,9 +119,8 @@ class IrohDialerTest {
 
     @Test
     fun notebookSurvivesFailedDialAndIsBoundOnlyOnce(): Unit = runBlocking {
-        assumeTrue("Live Iroh requires -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val peer = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val peer = bindLoopbackEndpoint()
         val peerId = IrohDiagnostics.endpointIdHex(peer.addr().id())
         val accepted = CompletableDeferred<Unit>()
         val acceptedAfterFailure = CompletableDeferred<Unit>()
@@ -148,7 +143,7 @@ class IrohDialerTest {
             },
             bindEndpoint = { key, alpns ->
                 binds++
-                Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled(), secretKey = key, alpns = alpns))
+                bindLoopbackEndpoint(alpns = alpns, secretKey = key)
             },
         )
         try {

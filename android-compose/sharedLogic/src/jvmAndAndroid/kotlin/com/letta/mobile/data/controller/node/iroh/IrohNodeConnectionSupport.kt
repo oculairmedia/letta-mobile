@@ -1,6 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId as ModelConversationId
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
@@ -15,7 +17,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Server-process-scoped dedupe for client message ids.
+ * Dedupe for client message ids, shared by every connection of one [IrohNodeEndpoint] (the
+ * server process binds one).
  *
  * Moving this off a per-[IrohNodeConnection] set means a redial that re-delivers
  * the SAME `client_message_id` on a fresh connection is still recognised as a
@@ -24,6 +27,10 @@ import kotlinx.serialization.json.put
  * [maxIds] entries can slip through, which is acceptable for the reconnect
  * window this guards.
  *
+ * A turn is identified the way the durable [TurnJournal] identifies it: by its owning agent,
+ * its conversation and its client message id. The same id in another conversation is another
+ * turn, so it runs.
+ *
  * Thread-safe: several connections in one process may mark ids concurrently.
  */
 class ProcessScopedClientMessageDedupe(
@@ -31,11 +38,14 @@ class ProcessScopedClientMessageDedupe(
     private val trimCount: Int = DEFAULT_TRIM_COUNT,
 ) {
     private val lock = Any()
-    private val ids = LinkedHashSet<String>()
+    private val ids = LinkedHashSet<Triple<AgentId, ModelConversationId, String>>()
 
-    /** Returns true when [id] is seen for the first time, false when duplicate. */
-    fun markHandled(id: String): Boolean = synchronized(lock) {
-        if (!ids.add(id)) return false
+    /**
+     * Returns true when turn [turn] (its client message id) of [conversation], owned by [agent],
+     * is seen for the first time, false when it is a duplicate.
+     */
+    fun markHandled(agent: AgentId, conversation: ModelConversationId, turn: String): Boolean = synchronized(lock) {
+        if (!ids.add(Triple(agent, conversation, turn))) return false
         if (ids.size > maxIds) {
             val iterator = ids.iterator()
             var removed = 0
@@ -48,7 +58,9 @@ class ProcessScopedClientMessageDedupe(
         true
     }
 
-    fun contains(id: String): Boolean = synchronized(lock) { ids.contains(id) }
+    /** Whether turn [turn] of [conversation], owned by [agent], is currently remembered as handled. */
+    fun contains(agent: AgentId, conversation: ModelConversationId, turn: String): Boolean =
+        synchronized(lock) { ids.contains(Triple(agent, conversation, turn)) }
 
     fun size(): Int = synchronized(lock) { ids.size }
 

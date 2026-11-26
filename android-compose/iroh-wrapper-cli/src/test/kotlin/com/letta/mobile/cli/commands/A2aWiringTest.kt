@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test
  * wiring helper. Validates the contract the live [AppServerServeIrohCommand]
  * depends on without bringing up a full controller / app-server.
  *
- * The live iroh-ffi loopback tests (`runIrohLiveE2E=true`) cover end-to-end
+ * The live iroh-ffi loopback tests cover end-to-end
  * envelope delivery in `sharedLogic` (IrohAgentMessageReceiveE2ETest, which
  * serves the receiver on a host IrohNodeEndpoint next to the App Server ALPN);
  * this layer stays hermetic and tests:
