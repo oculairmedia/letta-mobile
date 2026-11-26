@@ -183,6 +183,10 @@ internal class IrohCallLane(
  * Reads the application close code and reason out of the text the Iroh binding gives for a closed connection
  * (`closed by peer: auth_failures (code 4401)`). Only a close by the other end's application carries a numeric code;
  * anything else (a timeout, a reset, a transport error, a local endpoint shutdown) is [NodeLinkClosure.LOST].
+ *
+ * Text is all there is: the binding (`computer.iroh` 1.2.0, where these patterns were read) exposes a closed
+ * connection only as `closed(): String` and `closeReason(): String`, with no code or reason values. A version bump
+ * re-checks these patterns against `IrohCloseReasonsTest`, which covers every close the node makes.
  */
 internal object IrohCloseReasons {
     private val withReason = Regex("""(?:closed|aborted) by peer: (.*) \(code (\d+)\)\s*$""", RegexOption.DOT_MATCHES_ALL)

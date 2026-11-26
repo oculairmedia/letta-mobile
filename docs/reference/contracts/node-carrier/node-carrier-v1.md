@@ -221,11 +221,16 @@ running the real node behind the in-process carrier (next slice) and by the exis
   `acceptBi` is control, second is push (wait for the peer's readiness as `serveStreamReadiness` does), every later
   `acceptBi` is a call lane. `peer` is the authenticated remote endpoint id. Writes use `frame_part` only after
   `onPeerCapabilities` reported it, as `peerSupportsFrameParts()` does now. Keep `IrohFrameCodec`'s frame limits.
+  Nothing is read ahead of the node without bound: control frames, each call lane's frames and call lanes not yet
+  taken wait in a small fixed buffer (8), and a full buffer stops the read, so QUIC flow control holds a peer that has
+  not authenticated. A frame that is not a JSON object ends the link as `4400 malformed_frame`, so a request is never
+  dropped silently.
 - **Wraps**: `IrohFrameCodec`, the dial path of `IrohAppServerTransport` / `IrohDialer`, `IrohNodeEndpoint`'s accept
   loop, `IrohDiagnostics`. It must not change `IrohNodeConnection` (the in-process slice owns that refactor).
 - **Suite**: a `jvmTest` subclass binds two loopback Iroh endpoints, wraps each accepted connection as a
   `NodePeerLink` handed to the suite's acceptor, and dials with the carrier. `unreachable` is a well-formed address of a
-  node id nobody binds.
+  node id nobody binds. It passes `sever = null`: every way a test can end an Iroh connection is an application
+  close, never a silent loss.
 
 ## Out of scope for v1
 

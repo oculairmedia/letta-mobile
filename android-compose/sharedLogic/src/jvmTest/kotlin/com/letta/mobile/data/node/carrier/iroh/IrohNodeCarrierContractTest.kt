@@ -32,6 +32,10 @@ class IrohNodeCarrierContractTest : NodeCarrierContractSuite() {
                 shell.release()
                 node.stop()
             },
+            // No sever: every way a test can end an Iroh connection is an application close (closing a connection or
+            // the endpoint sends CONNECTION_CLOSE with a code), never a silent loss. A real loss needs the network cut
+            // under QUIC until its idle timeout, which a loopback test cannot do quickly.
+            sever = null,
         )
     }
 
