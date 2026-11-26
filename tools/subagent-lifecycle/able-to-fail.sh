@@ -8,7 +8,8 @@ trap 'rm -rf "$work"; rm -f "$here/$mine"-*.cfg' EXIT
 status=0
 while read -r prop brk; do
   cfg="$mine-$brk"
-  sed "s/Break = {}/Break = {\"$brk\"}/" "$here/fixed-disciplined.cfg" > "$here/$cfg.cfg"
+  # A comma-separated break names several surgical mutations applied together.
+  sed "s/Break = {}/Break = {\"${brk//,/\\\",\\\"}\"}/" "$here/fixed-disciplined.cfg" > "$here/$cfg.cfg"
   rc=0
   RAW=1 KEEP=1 OUT="$work/out" PROPS="$prop" "$here/check.sh" "$cfg" > "$work/result" 2>&1 || rc=$?
   # check.sh fails closed on parse/type errors; require a genuine named violation.
@@ -21,11 +22,11 @@ while read -r prop brk; do
   fi
   rm -f "$here/$cfg.cfg"
 done <<'MATRIX'
-EventuallyTerminal skipExpiry
+EventuallyTerminal skipExpiry,forgetEarly
 NoResurrection resurrect
 RetainedTerminalNeverRuns resurrect
 ParentIsolation leak
 NoPendingRow pending
-NoPendingChildRow leak
+NoPendingChildRow leak,pending
 MATRIX
 exit "$status"

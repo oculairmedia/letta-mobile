@@ -68,6 +68,13 @@ class DurableSubagentRegistry(
     /** Insertion-ordered so eviction and snapshots are deterministic. */
     private val entries = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
 
+    /**
+     * The terminal state of keys capacity eviction dropped, oldest first and bounded by
+     * [MAX_EVICTED_TOMBSTONES]. Persisted beside [entries] so a replayed RUNNING snapshot for an
+     * evicted key is refused, also after a restart, instead of being inserted as a new live chip.
+     */
+    private val evictedTombstones = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
+
     init {
         rehydrate()
         retirePreviousProcess()
@@ -176,7 +183,14 @@ class DurableSubagentRegistry(
         }
         synchronized(lock) {
             entries.clear()
-            loaded.forEach { entries[it.key] = it }
+            evictedTombstones.clear()
+            loaded.forEach { record ->
+                if (record.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED) {
+                    evictedTombstones[record.key] = record
+                } else {
+                    entries[record.key] = record
+                }
+            }
             restartUnobserved.addAll(loaded.filter {
                 !it.state.isTerminal && (startupProcessIdentity == null || it.appServerProcessIdentity == null)
             }.map { it.key })
@@ -256,7 +270,8 @@ class DurableSubagentRegistry(
         val now = clock()
         val observedProcessIdentity = readProcessIdentity()
         val existing = entries[observation.key]
-            ?: return ObserveResult.Accepted(insertLocked(observation, now, observedProcessIdentity))
+            ?: return evictedTombstones[observation.key]?.let { tombstone -> refuseEvicted(tombstone, observation) }
+                ?: ObserveResult.Accepted(insertLocked(observation, now, observedProcessIdentity))
 
         // letta-mobile-7vs4s: precedence is checked BEFORE the lifecycle edge so
         // a stale weak source can neither advance nor rewind a strong fact.
@@ -271,7 +286,7 @@ class DurableSubagentRegistry(
 
         val merged = existing.mergedWith(observation, now).copy(
             appServerProcessIdentity = existing.appServerProcessIdentity ?: observedProcessIdentity,
-        )
+        ).withEarlyTerminalApplied(now).keepingSilenceWhileCompletionPending(existing, observation)
         entries[observation.key] = merged
         // Any accepted sighting, even from an incomplete snapshot, is positive evidence of life.
         snapshotAbsence.seen(observation.key)
@@ -285,6 +300,15 @@ class DurableSubagentRegistry(
         enforceCapacityLocked()
         persistLocked()
         return ObserveResult.Accepted(merged)
+    }
+
+    /**
+     * An evicted key keeps its terminal fact: replaying it is a no-op, and any other edge (notably
+     * RUNNING) is illegal, exactly as it would be for a retained terminal record.
+     */
+    private fun refuseEvicted(tombstone: SubagentChipRecord, observation: SubagentChipObservation): ObserveResult {
+        if (tombstone.state.canAdvanceTo(observation.state)) return ObserveResult.Accepted(tombstone)
+        return ObserveResult.IllegalTransition(tombstone, observation)
     }
 
     private fun insertLocked(
@@ -347,6 +371,67 @@ class DurableSubagentRegistry(
             lastActivityEpochMs = activityAt,
         )
     }
+
+    /**
+     * Once the receipt has named this dispatch's task, a completion that
+     * arrived before it is applied by exact task identity, and every other remembered early
+     * notification is dropped (the receipt proved it belongs to another task).
+     */
+    private fun SubagentChipRecord.withEarlyTerminalApplied(now: Long): SubagentChipRecord {
+        val task = taskId ?: return this
+        if (earlyTerminals.isEmpty()) return this
+        val early = earlyTerminals.firstOrNull { it.matches(this) }
+        if (early == null || state.isTerminal) return copy(earlyTerminals = emptyList())
+        Telemetry.event(
+            TAG, "terminal.earlyApplied",
+            "conversationId" attr conversationId,
+            "toolCallId" attr toolCallId,
+            "taskId" attr task,
+            "state" attr early.state.name,
+        )
+        return copy(
+            state = early.state,
+            terminalAtEpochMs = terminalAtEpochMs ?: now,
+            lastActivityEpochMs = now,
+            progress = progress.copy(durationMs = early.durationMs ?: progress.durationMs),
+            earlyTerminals = emptyList(),
+        )
+    }
+
+    /**
+     * A completion this dispatch may own has been seen, so a live sighting is
+     * not evidence of life; replayed RUNNING snapshots must not keep resetting the stale TTL.
+     */
+    private fun SubagentChipRecord.keepingSilenceWhileCompletionPending(
+        existing: SubagentChipRecord,
+        observation: SubagentChipObservation,
+    ): SubagentChipRecord {
+        val stillLive = !state.isTerminal && !observation.state.isTerminal
+        return if (stillLive && existing.earlyTerminals.isNotEmpty()) copy(lastSeenEpochMs = existing.lastSeenEpochMs) else this
+    }
+
+    /**
+     * Remember a terminal notification for each live dispatch in [candidates] that has no task id
+     * yet. Changes neither lifecycle nor last-seen: it is not a sighting of
+     * the dispatch, only a fact to correlate once its receipt names its task.
+     */
+    internal fun rememberEarlyTerminal(candidates: Collection<SubagentChipKey>, early: SubagentEarlyTerminal): Int {
+        synchronized(lock) {
+            val updated = candidates.mapNotNull { key -> entries[key]?.withEarlyTerminal(early) }
+            updated.forEach { entries[it.key] = it }
+            if (updated.isNotEmpty()) persistLocked()
+            return updated.size
+        }
+    }
+
+    /** The record holding [early] too, or null when it is no longer awaiting a receipt or holds it already. */
+    private fun SubagentChipRecord.withEarlyTerminal(early: SubagentEarlyTerminal): SubagentChipRecord? {
+        if (!awaitsReceipt() || early in earlyTerminals) return null
+        return copy(earlyTerminals = (earlyTerminals + early).takeLast(MAX_EARLY_TERMINALS))
+    }
+
+    /** Live, and no receipt has named its task yet. */
+    private fun SubagentChipRecord.awaitsReceipt(): Boolean = !state.isTerminal && taskId == null
 
     /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
     private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
@@ -566,7 +651,7 @@ class DurableSubagentRegistry(
                 terminalAtEpochMs = clock(),
             )
             // A failed write must not acknowledge a mutation that will be lost on restart.
-            store.save(entries.values.map { if (it.key == key) dismissed else it })
+            store.save(entries.values.map { if (it.key == key) dismissed else it } + evictedTombstones.values)
             entries[key] = dismissed
             listOf(dismissed)
         }
@@ -641,6 +726,7 @@ class DurableSubagentRegistry(
             // A later chip reusing this key must not inherit the evicted one's absence clock.
             snapshotAbsence.forget(victim.key)
             restartUnobserved.remove(victim.key)
+            rememberEvictedLocked(victim)
             evicted += victim
         }
         evicted.forEach { victim ->
@@ -665,13 +751,32 @@ class DurableSubagentRegistry(
         }
     }
 
+    /** Keep only the evicted key's terminal fact; the oldest tombstone goes past the bound. */
+    private fun rememberEvictedLocked(victim: SubagentChipRecord) {
+        evictedTombstones.remove(victim.key)
+        evictedTombstones[victim.key] = SubagentChipRecord(
+            conversationId = victim.conversationId,
+            agentId = victim.agentId,
+            toolCallId = victim.toolCallId,
+            state = victim.state,
+            source = victim.source,
+            firstSeenEpochMs = victim.firstSeenEpochMs,
+            lastSeenEpochMs = victim.lastSeenEpochMs,
+            terminalAtEpochMs = victim.terminalAtEpochMs,
+            terminalReason = SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED,
+        )
+        while (evictedTombstones.size > MAX_EVICTED_TOMBSTONES) {
+            evictedTombstones.remove(evictedTombstones.keys.first())
+        }
+    }
+
     private fun evictionCandidates(): List<SubagentChipRecord> = entries.values
         .filter { it.state.isTerminal }
         .filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
         .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
 
     private fun persistLocked() {
-        runCatching { store.save(entries.values.toList()) }
+        runCatching { store.save(entries.values.toList() + evictedTombstones.values) }
             .onFailure { Telemetry.error(TAG, "persist.failed", it) }
     }
 
@@ -679,6 +784,7 @@ class DurableSubagentRegistry(
     fun clear() {
         synchronized(lock) {
             entries.clear()
+            evictedTombstones.clear()
             restartUnobserved.clear()
             snapshotAbsence.retainKeys(emptySet())
             persistLocked()
@@ -699,6 +805,16 @@ class DurableSubagentRegistry(
          * eviction is recorded at WARN because it means chip history was lost.
          */
         const val MAX_ENTRIES = 512
+
+        /**
+         * Evicted keys whose terminal fact is retained. A tombstone is identity plus state only
+         * (well under 300 bytes), so the bound costs at most about 1 MiB on disk. A key evicted
+         * more than this many evictions ago is forgotten and could be inserted again.
+         */
+        const val MAX_EVICTED_TOMBSTONES = 4096
+
+        /** Early (pre-receipt) terminal notifications retained per dispatch; oldest dropped first. */
+        const val MAX_EARLY_TERMINALS = 8
 
         /**
          * Fallback for a live chip unobserved this long. Silence alone is not

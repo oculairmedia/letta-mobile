@@ -65105,8 +65105,12 @@ final class com.letta.mobile.data.subagents/DurableSubagentRegistry { // com.let
     }
 
     final object Companion { // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion|null[0]
+        final const val MAX_EARLY_TERMINALS // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_EARLY_TERMINALS|{}MAX_EARLY_TERMINALS[0]
+            final fun <get-MAX_EARLY_TERMINALS>(): kotlin/Int // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_EARLY_TERMINALS.<get-MAX_EARLY_TERMINALS>|<get-MAX_EARLY_TERMINALS>(){}[0]
         final const val MAX_ENTRIES // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_ENTRIES|{}MAX_ENTRIES[0]
             final fun <get-MAX_ENTRIES>(): kotlin/Int // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_ENTRIES.<get-MAX_ENTRIES>|<get-MAX_ENTRIES>(){}[0]
+        final const val MAX_EVICTED_TOMBSTONES // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_EVICTED_TOMBSTONES|{}MAX_EVICTED_TOMBSTONES[0]
+            final fun <get-MAX_EVICTED_TOMBSTONES>(): kotlin/Int // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.MAX_EVICTED_TOMBSTONES.<get-MAX_EVICTED_TOMBSTONES>|<get-MAX_EVICTED_TOMBSTONES>(){}[0]
         final const val STALE_RUNNING_AFTER_MS // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.STALE_RUNNING_AFTER_MS|{}STALE_RUNNING_AFTER_MS[0]
             final fun <get-STALE_RUNNING_AFTER_MS>(): kotlin/Long // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.STALE_RUNNING_AFTER_MS.<get-STALE_RUNNING_AFTER_MS>|<get-STALE_RUNNING_AFTER_MS>(){}[0]
         final const val TAG // com.letta.mobile.data.subagents/DurableSubagentRegistry.Companion.TAG|{}TAG[0]
@@ -65208,7 +65212,7 @@ final class com.letta.mobile.data.subagents/SubagentChipObservation { // com.let
 }
 
 final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mobile.data.subagents/SubagentChipRecord|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String, com.letta.mobile.data.subagents/SubagentChipState, com.letta.mobile.data.subagents/SubagentChipSource, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.subagents/SubagentProgress = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? = ..., kotlin/Int = ..., kotlin/String? = ...) // com.letta.mobile.data.subagents/SubagentChipRecord.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;com.letta.mobile.data.subagents.SubagentChipSource;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.String?;com.letta.mobile.data.subagents.SubagentProgress;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.SubagentTodo>?;kotlin.Int;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String, com.letta.mobile.data.subagents/SubagentChipState, com.letta.mobile.data.subagents/SubagentChipSource, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.subagents/SubagentProgress = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.subagents/SubagentEarlyTerminal> = ...) // com.letta.mobile.data.subagents/SubagentChipRecord.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;com.letta.mobile.data.subagents.SubagentChipSource;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.String?;com.letta.mobile.data.subagents.SubagentProgress;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.SubagentTodo>?;kotlin.Int;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.subagents.SubagentEarlyTerminal>){}[0]
 
     final val activity // com.letta.mobile.data.subagents/SubagentChipRecord.activity|{}activity[0]
         final fun <get-activity>(): com.letta.mobile.data.model/SubagentActivitySnapshot? // com.letta.mobile.data.subagents/SubagentChipRecord.activity.<get-activity>|<get-activity>(){}[0]
@@ -65220,6 +65224,8 @@ final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mo
         final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
     final val description // com.letta.mobile.data.subagents/SubagentChipRecord.description|{}description[0]
         final fun <get-description>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.description.<get-description>|<get-description>(){}[0]
+    final val earlyTerminals // com.letta.mobile.data.subagents/SubagentChipRecord.earlyTerminals|{}earlyTerminals[0]
+        final fun <get-earlyTerminals>(): kotlin.collections/List<com.letta.mobile.data.subagents/SubagentEarlyTerminal> // com.letta.mobile.data.subagents/SubagentChipRecord.earlyTerminals.<get-earlyTerminals>|<get-earlyTerminals>(){}[0]
     final val firstSeenEpochMs // com.letta.mobile.data.subagents/SubagentChipRecord.firstSeenEpochMs|{}firstSeenEpochMs[0]
         final fun <get-firstSeenEpochMs>(): kotlin/Long // com.letta.mobile.data.subagents/SubagentChipRecord.firstSeenEpochMs.<get-firstSeenEpochMs>|<get-firstSeenEpochMs>(){}[0]
     final val generation // com.letta.mobile.data.subagents/SubagentChipRecord.generation|{}generation[0]
@@ -65275,6 +65281,7 @@ final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mo
     final fun component21(): kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? // com.letta.mobile.data.subagents/SubagentChipRecord.component21|component21(){}[0]
     final fun component22(): kotlin/Int // com.letta.mobile.data.subagents/SubagentChipRecord.component22|component22(){}[0]
     final fun component23(): kotlin/String? // com.letta.mobile.data.subagents/SubagentChipRecord.component23|component23(){}[0]
+    final fun component24(): kotlin.collections/List<com.letta.mobile.data.subagents/SubagentEarlyTerminal> // com.letta.mobile.data.subagents/SubagentChipRecord.component24|component24(){}[0]
     final fun component3(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.subagents/SubagentChipState // com.letta.mobile.data.subagents/SubagentChipRecord.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.subagents/SubagentChipSource // com.letta.mobile.data.subagents/SubagentChipRecord.component5|component5(){}[0]
@@ -65282,7 +65289,7 @@ final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mo
     final fun component7(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.component7|component7(){}[0]
     final fun component8(): kotlin/String? // com.letta.mobile.data.subagents/SubagentChipRecord.component8|component8(){}[0]
     final fun component9(): kotlin/String? // com.letta.mobile.data.subagents/SubagentChipRecord.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., com.letta.mobile.data.subagents/SubagentChipState = ..., com.letta.mobile.data.subagents/SubagentChipSource = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.subagents/SubagentProgress = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? = ..., kotlin/Int = ..., kotlin/String? = ...): com.letta.mobile.data.subagents/SubagentChipRecord // com.letta.mobile.data.subagents/SubagentChipRecord.copy|copy(kotlin.String;kotlin.String?;kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;com.letta.mobile.data.subagents.SubagentChipSource;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.String?;com.letta.mobile.data.subagents.SubagentProgress;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.SubagentTodo>?;kotlin.Int;kotlin.String?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., com.letta.mobile.data.subagents/SubagentChipState = ..., com.letta.mobile.data.subagents/SubagentChipSource = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/String? = ..., com.letta.mobile.data.subagents/SubagentProgress = ..., kotlin/Long? = ..., kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>? = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.subagents/SubagentEarlyTerminal> = ...): com.letta.mobile.data.subagents/SubagentChipRecord // com.letta.mobile.data.subagents/SubagentChipRecord.copy|copy(kotlin.String;kotlin.String?;kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;com.letta.mobile.data.subagents.SubagentChipSource;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.String?;com.letta.mobile.data.subagents.SubagentProgress;kotlin.Long?;kotlin.collections.List<com.letta.mobile.data.model.SubagentTodo>?;kotlin.Int;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.subagents.SubagentEarlyTerminal>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentChipRecord.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.subagents/SubagentChipRecord.hashCode|hashCode(){}[0]
     final fun toEntry(kotlin.time/Instant? = ...): com.letta.mobile.data.model/SubagentEntry // com.letta.mobile.data.subagents/SubagentChipRecord.toEntry|toEntry(kotlin.time.Instant?){}[0]
@@ -65298,6 +65305,8 @@ final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mo
     }
 
     final object Companion { // com.letta.mobile.data.subagents/SubagentChipRecord.Companion|null[0]
+        final const val TERMINAL_REASON_CAPACITY_EVICTED // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_CAPACITY_EVICTED|{}TERMINAL_REASON_CAPACITY_EVICTED[0]
+            final fun <get-TERMINAL_REASON_CAPACITY_EVICTED>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_CAPACITY_EVICTED.<get-TERMINAL_REASON_CAPACITY_EVICTED>|<get-TERMINAL_REASON_CAPACITY_EVICTED>(){}[0]
         final const val TERMINAL_REASON_STALE // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_STALE|{}TERMINAL_REASON_STALE[0]
             final fun <get-TERMINAL_REASON_STALE>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_STALE.<get-TERMINAL_REASON_STALE>|<get-TERMINAL_REASON_STALE>(){}[0]
         final const val TERMINAL_REASON_USER_DISMISSED // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_USER_DISMISSED|{}TERMINAL_REASON_USER_DISMISSED[0]
@@ -65359,6 +65368,44 @@ final class com.letta.mobile.data.subagents/SubagentDualViewState { // com.letta
     final object Companion { // com.letta.mobile.data.subagents/SubagentDualViewState.Companion|null[0]
         final val Closed // com.letta.mobile.data.subagents/SubagentDualViewState.Companion.Closed|{}Closed[0]
             final fun <get-Closed>(): com.letta.mobile.data.subagents/SubagentDualViewState // com.letta.mobile.data.subagents/SubagentDualViewState.Companion.Closed.<get-Closed>|<get-Closed>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.subagents/SubagentEarlyTerminal { // com.letta.mobile.data.subagents/SubagentEarlyTerminal|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.subagents/SubagentChipState, kotlin/String? = ..., kotlin/Long? = ...) // com.letta.mobile.data.subagents/SubagentEarlyTerminal.<init>|<init>(kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;kotlin.String?;kotlin.Long?){}[0]
+
+    final val durationMs // com.letta.mobile.data.subagents/SubagentEarlyTerminal.durationMs|{}durationMs[0]
+        final fun <get-durationMs>(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentEarlyTerminal.durationMs.<get-durationMs>|<get-durationMs>(){}[0]
+    final val state // com.letta.mobile.data.subagents/SubagentEarlyTerminal.state|{}state[0]
+        final fun <get-state>(): com.letta.mobile.data.subagents/SubagentChipState // com.letta.mobile.data.subagents/SubagentEarlyTerminal.state.<get-state>|<get-state>(){}[0]
+    final val subagentAgentId // com.letta.mobile.data.subagents/SubagentEarlyTerminal.subagentAgentId|{}subagentAgentId[0]
+        final fun <get-subagentAgentId>(): kotlin/String? // com.letta.mobile.data.subagents/SubagentEarlyTerminal.subagentAgentId.<get-subagentAgentId>|<get-subagentAgentId>(){}[0]
+    final val taskId // com.letta.mobile.data.subagents/SubagentEarlyTerminal.taskId|{}taskId[0]
+        final fun <get-taskId>(): kotlin/String // com.letta.mobile.data.subagents/SubagentEarlyTerminal.taskId.<get-taskId>|<get-taskId>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.subagents/SubagentEarlyTerminal.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.subagents/SubagentChipState // com.letta.mobile.data.subagents/SubagentEarlyTerminal.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.subagents/SubagentEarlyTerminal.component3|component3(){}[0]
+    final fun component4(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentEarlyTerminal.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.subagents/SubagentChipState = ..., kotlin/String? = ..., kotlin/Long? = ...): com.letta.mobile.data.subagents/SubagentEarlyTerminal // com.letta.mobile.data.subagents/SubagentEarlyTerminal.copy|copy(kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;kotlin.String?;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentEarlyTerminal.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.subagents/SubagentEarlyTerminal.hashCode|hashCode(){}[0]
+    final fun matches(com.letta.mobile.data.subagents/SubagentChipRecord): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentEarlyTerminal.matches|matches(com.letta.mobile.data.subagents.SubagentChipRecord){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.subagents/SubagentEarlyTerminal.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.subagents/SubagentEarlyTerminal> { // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.subagents/SubagentEarlyTerminal // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.subagents/SubagentEarlyTerminal) // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.subagents.SubagentEarlyTerminal){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.subagents/SubagentEarlyTerminal.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.subagents/SubagentEarlyTerminal.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.subagents/SubagentEarlyTerminal> // com.letta.mobile.data.subagents/SubagentEarlyTerminal.Companion.serializer|serializer(){}[0]
     }
 }
 

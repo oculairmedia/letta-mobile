@@ -247,4 +247,18 @@ class DurableSubagentRegistryTtlTest {
         assertEquals(0, restarted.liveCount())
         assertEquals(SubagentChipRecord.TERMINAL_REASON_STALE, store.load().single().terminalReason)
     }
+
+    /** Replayed RUNNING snapshots cannot keep a chip whose completion was seen alive. */
+    @Test
+    fun runningSightingsDoNotRenewAChipHoldingAnEarlyCompletion() {
+        val reg = registry()
+        reg.observe(running("tool-early"))
+        val key = SubagentChipKey("conv-a", "agent-1", "tool-early")
+        assertEquals(1, reg.rememberEarlyTerminal(listOf(key), SubagentEarlyTerminal("task_28", SubagentChipState.COMPLETED)))
+        repeat(4) {
+            now += DurableSubagentRegistry.STALE_RUNNING_AFTER_MS / 3
+            reg.observe(running("tool-early"))
+        }
+        assertEquals(listOf("tool-early"), reg.expireStale().map { it.toolCallId })
+    }
 }
