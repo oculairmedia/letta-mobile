@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import computer.iroh.Connection
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +49,20 @@ class IrohNodeConnectionSupportTest {
         assertFailsWith<IllegalArgumentException> {
             endpoint.connect(remote, "/letta/notebook/0".encodeToByteArray())
         }
+        Unit
+    }
+
+    @Test
+    fun peersThatConnectAndLeaveLeaveNoEntryBehind() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val endpoint = IrohNodeEndpoint(scope = scope, authPolicy = IrohAuthPolicy.PairedPeersOnly)
+        val turnHost = NodeTurnHost.childOf(scope)
+        repeat(FRESH_PEERS) { i ->
+            // A handle-less connection fails its first stream accept, as one whose peer hung up at once does.
+            endpoint.serveAppServer(Connection(computer.iroh.NoHandle), "%064x".format(i), FakeAppServerController(), turnHost)
+        }
+        assertEquals(0, endpoint.appServerPeerCount, "a peer with no live connection keeps no entry")
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
     }
 
@@ -229,4 +244,8 @@ class IrohNodeConnectionSupportTest {
         assertEquals(raw, retagStreamDeltaFrameForOptimisticDedup(raw))
     }
 
+
+    private companion object {
+        const val FRESH_PEERS = 200
+    }
 }

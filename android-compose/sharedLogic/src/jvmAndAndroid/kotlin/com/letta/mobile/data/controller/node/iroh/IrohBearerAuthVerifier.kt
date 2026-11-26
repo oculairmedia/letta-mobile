@@ -12,6 +12,13 @@ import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
  * Rate-limit state is scoped to the verifier instance; production shares one
  * instance per endpoint (every accepted connection of an [IrohNodeEndpoint]),
  * so redialing cannot reset a peer's failure budget.
+ *
+ * At most [MAX_TRACKED_PEERS] NodeIds hold failure state, so a flood of fresh
+ * NodeIds cannot grow memory. A full table never evicts a NodeId whose failures
+ * are still inside the window (that would lift its lockout or refund its
+ * budget): expired entries are dropped first, and when none are, a failure
+ * from a NodeId that cannot be tracked is answered [Outcome.RateLimited] at
+ * once. A valid credential is still accepted from an untracked NodeId.
  */
 class IrohBearerAuthVerifier(
     private val policy: IrohAuthPolicy,
@@ -29,7 +36,7 @@ class IrohBearerAuthVerifier(
         data object RateLimited : Outcome
     }
 
-    private val failureTimestamps = mutableMapOf<String, ArrayDeque<Long>>()
+    private val failureTimestamps = LinkedHashMap<String, ArrayDeque<Long>>()
     private val lock = Any()
 
     fun verify(remoteEndpointId: String, providedToken: String?): Outcome {
@@ -74,7 +81,7 @@ class IrohBearerAuthVerifier(
      * budget, so invite guessing is rate limited exactly like bearer guessing.
      */
     fun deny(remoteEndpointId: String, reason: String): Outcome {
-        recordFailure(remoteEndpointId)
+        if (!recordFailure(remoteEndpointId)) return Outcome.RateLimited
         return if (isRateLimited(remoteEndpointId)) Outcome.RateLimited else Outcome.Denied(reason)
     }
 
@@ -86,19 +93,46 @@ class IrohBearerAuthVerifier(
         failures.size >= maxFailuresPerWindow
     }
 
-    private fun recordFailure(remoteEndpointId: String) {
-        synchronized(lock) {
-            val failures = failureTimestamps.getOrPut(remoteEndpointId) { ArrayDeque() }
-            failures.addLast(nowMs())
-            // Bound memory per peer: older entries beyond the limit can never
-            // matter once the window check has run.
-            while (failures.size > maxFailuresPerWindow) failures.removeFirst()
+    /** How many NodeIds currently hold failure state; for tests and diagnostics. */
+    internal fun trackedPeerCount(): Int = synchronized(lock) { failureTimestamps.size }
+
+    /**
+     * Counts one failure; false when it could not be counted because every tracked NodeId is still inside the
+     * window. A NodeId is re-inserted at the tail on each failure, so the table stays ordered by newest failure
+     * and expired NodeIds lead it.
+     */
+    private fun recordFailure(remoteEndpointId: String): Boolean = synchronized(lock) {
+        val failures = failureTimestamps.remove(remoteEndpointId)
+            ?: ArrayDeque<Long>().takeIf { hasRoomLocked() }
+            ?: return false
+        failures.addLast(nowMs())
+        // Bound memory per peer: older entries beyond the limit can never
+        // matter once the window check has run.
+        while (failures.size > maxFailuresPerWindow) failures.removeFirst()
+        failureTimestamps[remoteEndpointId] = failures
+        true
+    }
+
+    /**
+     * Whether a new NodeId fits, after dropping the leading NodeIds whose newest failure has left the window:
+     * they are no longer limited and hold no budget. A NodeId still inside the window is never dropped.
+     */
+    private fun hasRoomLocked(): Boolean {
+        val cutoff = nowMs() - lockoutWindowMs
+        val oldestFirst = failureTimestamps.values.iterator()
+        while (failureTimestamps.size >= MAX_TRACKED_PEERS && oldestFirst.hasNext()) {
+            if (oldestFirst.next().lastOrNull()?.let { it >= cutoff } == true) break
+            oldestFirst.remove()
         }
+        return failureTimestamps.size < MAX_TRACKED_PEERS
     }
 
     companion object {
         const val MAX_FAILURES_PER_WINDOW = 5
         const val LOCKOUT_WINDOW_MS = 60_000L
+
+        /** Ceiling on the NodeIds holding failure state at once. */
+        internal const val MAX_TRACKED_PEERS = 4_096
 
         /** Consecutive per-connection denials after which the connection is closed. */
         const val MAX_FAILURES_BEFORE_CLOSE = 3
