@@ -2196,6 +2196,18 @@ final enum class com.letta.mobile.data.model/UiToolApprovalDecision : kotlin/Enu
     final fun values(): kotlin/Array<com.letta.mobile.data.model/UiToolApprovalDecision> // com.letta.mobile.data.model/UiToolApprovalDecision.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.node.carrier/NodeLane : kotlin/Enum<com.letta.mobile.data.node.carrier/NodeLane> { // com.letta.mobile.data.node.carrier/NodeLane|null[0]
+    enum entry CALL // com.letta.mobile.data.node.carrier/NodeLane.CALL|null[0]
+    enum entry CONTROL // com.letta.mobile.data.node.carrier/NodeLane.CONTROL|null[0]
+    enum entry PUSH // com.letta.mobile.data.node.carrier/NodeLane.PUSH|null[0]
+
+    final val entries // com.letta.mobile.data.node.carrier/NodeLane.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.node.carrier/NodeLane> // com.letta.mobile.data.node.carrier/NodeLane.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.node.carrier/NodeLane // com.letta.mobile.data.node.carrier/NodeLane.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.node.carrier/NodeLane> // com.letta.mobile.data.node.carrier/NodeLane.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.notify/AttentionSuppression : kotlin/Enum<com.letta.mobile.data.notify/AttentionSuppression> { // com.letta.mobile.data.notify/AttentionSuppression|null[0]
     enum entry ApprovalsDisabled // com.letta.mobile.data.notify/AttentionSuppression.ApprovalsDisabled|null[0]
     enum entry Attended // com.letta.mobile.data.notify/AttentionSuppression.Attended|null[0]
@@ -5327,6 +5339,10 @@ abstract fun interface com.letta.mobile.data.model.provider.rpc/ProviderRpcTrans
     abstract suspend fun execute(com.letta.mobile.data.model.provider.rpc/ProviderRpcTransportRequest): com.letta.mobile.data.model.provider.rpc/ProviderRpcTransportResponse // com.letta.mobile.data.model.provider.rpc/ProviderRpcTransport.execute|execute(com.letta.mobile.data.model.provider.rpc.ProviderRpcTransportRequest){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.node.carrier/NodePeerAcceptor { // com.letta.mobile.data.node.carrier/NodePeerAcceptor|null[0]
+    abstract suspend fun serve(com.letta.mobile.data.node.carrier/NodePeerLink) // com.letta.mobile.data.node.carrier/NodePeerAcceptor.serve|serve(com.letta.mobile.data.node.carrier.NodePeerLink){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.notify/AttentionFocus { // com.letta.mobile.data.notify/AttentionFocus|null[0]
     abstract fun isAttending(kotlin/String): kotlin/Boolean // com.letta.mobile.data.notify/AttentionFocus.isAttending|isAttending(kotlin.String){}[0]
 }
@@ -6460,6 +6476,47 @@ abstract interface com.letta.mobile.data.memory/MemoryParitySource : kotlin/Auto
 abstract interface com.letta.mobile.data.model/RecentModelsPersistence { // com.letta.mobile.data.model/RecentModelsPersistence|null[0]
     abstract fun load(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.model/RecentModelsPersistence.load|load(){}[0]
     abstract fun save(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.model/RecentModelsPersistence.save|save(kotlin.collections.List<kotlin.String>){}[0]
+}
+
+abstract interface com.letta.mobile.data.node.carrier/NodeCallLane { // com.letta.mobile.data.node.carrier/NodeCallLane|null[0]
+    abstract val incoming // com.letta.mobile.data.node.carrier/NodeCallLane.incoming|{}incoming[0]
+        abstract fun <get-incoming>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeFrame> // com.letta.mobile.data.node.carrier/NodeCallLane.incoming.<get-incoming>|<get-incoming>(){}[0]
+
+    abstract suspend fun finishSending() // com.letta.mobile.data.node.carrier/NodeCallLane.finishSending|finishSending(){}[0]
+    abstract suspend fun send(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodeCallLane.send|send(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+}
+
+abstract interface com.letta.mobile.data.node.carrier/NodeCarrier { // com.letta.mobile.data.node.carrier/NodeCarrier|null[0]
+    abstract suspend fun dial(com.letta.mobile.data.node.carrier/NodeAddress): com.letta.mobile.data.node.carrier/NodeLink // com.letta.mobile.data.node.carrier/NodeCarrier.dial|dial(com.letta.mobile.data.node.carrier.NodeAddress){}[0]
+}
+
+abstract interface com.letta.mobile.data.node.carrier/NodeLink { // com.letta.mobile.data.node.carrier/NodeLink|null[0]
+    abstract val closure // com.letta.mobile.data.node.carrier/NodeLink.closure|{}closure[0]
+        abstract fun <get-closure>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.node.carrier/NodeLinkClosure?> // com.letta.mobile.data.node.carrier/NodeLink.closure.<get-closure>|<get-closure>(){}[0]
+    abstract val inbound // com.letta.mobile.data.node.carrier/NodeLink.inbound|{}inbound[0]
+        abstract fun <get-inbound>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeInbound> // com.letta.mobile.data.node.carrier/NodeLink.inbound.<get-inbound>|<get-inbound>(){}[0]
+    abstract val node // com.letta.mobile.data.node.carrier/NodeLink.node|{}node[0]
+        abstract fun <get-node>(): com.letta.mobile.data.node.carrier/NodePeerIdentity // com.letta.mobile.data.node.carrier/NodeLink.node.<get-node>|<get-node>(){}[0]
+
+    abstract suspend fun close(com.letta.mobile.data.node.carrier/NodeLinkClosure = ...) // com.letta.mobile.data.node.carrier/NodeLink.close|close(com.letta.mobile.data.node.carrier.NodeLinkClosure){}[0]
+    abstract suspend fun openCall(com.letta.mobile.data.node.carrier/NodeFrame): com.letta.mobile.data.node.carrier/NodeCallLane // com.letta.mobile.data.node.carrier/NodeLink.openCall|openCall(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+    abstract suspend fun sendControl(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodeLink.sendControl|sendControl(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+}
+
+abstract interface com.letta.mobile.data.node.carrier/NodePeerLink { // com.letta.mobile.data.node.carrier/NodePeerLink|null[0]
+    abstract val calls // com.letta.mobile.data.node.carrier/NodePeerLink.calls|{}calls[0]
+        abstract fun <get-calls>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeCallLane> // com.letta.mobile.data.node.carrier/NodePeerLink.calls.<get-calls>|<get-calls>(){}[0]
+    abstract val closure // com.letta.mobile.data.node.carrier/NodePeerLink.closure|{}closure[0]
+        abstract fun <get-closure>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.node.carrier/NodeLinkClosure?> // com.letta.mobile.data.node.carrier/NodePeerLink.closure.<get-closure>|<get-closure>(){}[0]
+    abstract val control // com.letta.mobile.data.node.carrier/NodePeerLink.control|{}control[0]
+        abstract fun <get-control>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeFrame> // com.letta.mobile.data.node.carrier/NodePeerLink.control.<get-control>|<get-control>(){}[0]
+    abstract val peer // com.letta.mobile.data.node.carrier/NodePeerLink.peer|{}peer[0]
+        abstract fun <get-peer>(): com.letta.mobile.data.node.carrier/NodePeerIdentity // com.letta.mobile.data.node.carrier/NodePeerLink.peer.<get-peer>|<get-peer>(){}[0]
+
+    abstract fun onPeerCapabilities(kotlin.collections/Set<kotlin/String>) // com.letta.mobile.data.node.carrier/NodePeerLink.onPeerCapabilities|onPeerCapabilities(kotlin.collections.Set<kotlin.String>){}[0]
+    abstract suspend fun close(com.letta.mobile.data.node.carrier/NodeLinkClosure = ...) // com.letta.mobile.data.node.carrier/NodePeerLink.close|close(com.letta.mobile.data.node.carrier.NodeLinkClosure){}[0]
+    abstract suspend fun push(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodePeerLink.push|push(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+    abstract suspend fun sendControl(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodePeerLink.sendControl|sendControl(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
 }
 
 abstract interface com.letta.mobile.data.notify/AttentionPrefsRepository { // com.letta.mobile.data.notify/AttentionPrefsRepository|null[0]
@@ -14045,6 +14102,80 @@ sealed interface com.letta.mobile.data.model/LettaMessage { // com.letta.mobile.
     final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.model/LettaMessage.Companion|null[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.model/LettaMessage.Companion.serializer|serializer(){}[0]
         final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.model/LettaMessage.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure|null[0]
+    final class AuthRejected : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.AuthRejected.toString|toString(){}[0]
+    }
+
+    final class Closed : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed|null[0]
+        constructor <init>(com.letta.mobile.data.node.carrier/NodeLinkClosure) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.<init>|<init>(com.letta.mobile.data.node.carrier.NodeLinkClosure){}[0]
+
+        final val closure // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.closure|{}closure[0]
+            final fun <get-closure>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.closure.<get-closure>|<get-closure>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.node.carrier/NodeLinkClosure = ...): com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.copy|copy(com.letta.mobile.data.node.carrier.NodeLinkClosure){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.toString|toString(){}[0]
+    }
+
+    final class Refused : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused|null[0]
+        constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+        final val error // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.error|{}error[0]
+            final fun <get-error>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.error.<get-error>|<get-error>(){}[0]
+        final val method // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.method|{}method[0]
+            final fun <get-method>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.method.<get-method>|<get-method>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.copy|copy(kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.toString|toString(){}[0]
+    }
+
+    final class Unreachable : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.<init>|<init>(kotlin.String){}[0]
+
+        final val detail // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.detail|{}detail[0]
+            final fun <get-detail>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.detail.<get-detail>|<get-detail>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Unreachable.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.node.carrier/NodeCredential { // com.letta.mobile.data.node.carrier/NodeCredential|null[0]
+    final class Token : com.letta.mobile.data.node.carrier/NodeCredential { // com.letta.mobile.data.node.carrier/NodeCredential.Token|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.node.carrier/NodeCredential.Token.<init>|<init>(kotlin.String){}[0]
+
+        final val secret // com.letta.mobile.data.node.carrier/NodeCredential.Token.secret|{}secret[0]
+            final fun <get-secret>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCredential.Token.secret.<get-secret>|<get-secret>(){}[0]
+
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCredential.Token.toString|toString(){}[0]
+    }
+
+    final object CarrierIdentity : com.letta.mobile.data.node.carrier/NodeCredential { // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCredential.CarrierIdentity.toString|toString(){}[0]
     }
 }
 
@@ -55029,6 +55160,122 @@ final class com.letta.mobile.data.model/VibesyncStatsResponse { // com.letta.mob
     }
 }
 
+final class com.letta.mobile.data.node.carrier/NodeCapabilities { // com.letta.mobile.data.node.carrier/NodeCapabilities|null[0]
+    constructor <init>(kotlin.collections/Set<kotlin/String>, kotlin/Boolean) // com.letta.mobile.data.node.carrier/NodeCapabilities.<init>|<init>(kotlin.collections.Set<kotlin.String>;kotlin.Boolean){}[0]
+
+    final val host // com.letta.mobile.data.node.carrier/NodeCapabilities.host|{}host[0]
+        final fun <get-host>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.node.carrier/NodeCapabilities.host.<get-host>|<get-host>(){}[0]
+    final val paired // com.letta.mobile.data.node.carrier/NodeCapabilities.paired|{}paired[0]
+        final fun <get-paired>(): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCapabilities.paired.<get-paired>|<get-paired>(){}[0]
+
+    final fun component1(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.node.carrier/NodeCapabilities.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCapabilities.component2|component2(){}[0]
+    final fun copy(kotlin.collections/Set<kotlin/String> = ..., kotlin/Boolean = ...): com.letta.mobile.data.node.carrier/NodeCapabilities // com.letta.mobile.data.node.carrier/NodeCapabilities.copy|copy(kotlin.collections.Set<kotlin.String>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCapabilities.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCapabilities.hashCode|hashCode(){}[0]
+    final fun supports(kotlin/String): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCapabilities.supports|supports(kotlin.String){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCapabilities.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.node.carrier/NodeCarrierException : kotlin/Exception { // com.letta.mobile.data.node.carrier/NodeCarrierException|null[0]
+    constructor <init>(com.letta.mobile.data.node.carrier/NodeCarrierFailure) // com.letta.mobile.data.node.carrier/NodeCarrierException.<init>|<init>(com.letta.mobile.data.node.carrier.NodeCarrierFailure){}[0]
+
+    final val failure // com.letta.mobile.data.node.carrier/NodeCarrierException.failure|{}failure[0]
+        final fun <get-failure>(): com.letta.mobile.data.node.carrier/NodeCarrierFailure // com.letta.mobile.data.node.carrier/NodeCarrierException.failure.<get-failure>|<get-failure>(){}[0]
+}
+
+final class com.letta.mobile.data.node.carrier/NodeInbound { // com.letta.mobile.data.node.carrier/NodeInbound|null[0]
+    constructor <init>(com.letta.mobile.data.node.carrier/NodeLane, com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodeInbound.<init>|<init>(com.letta.mobile.data.node.carrier.NodeLane;com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+
+    final val frame // com.letta.mobile.data.node.carrier/NodeInbound.frame|{}frame[0]
+        final fun <get-frame>(): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeInbound.frame.<get-frame>|<get-frame>(){}[0]
+    final val lane // com.letta.mobile.data.node.carrier/NodeInbound.lane|{}lane[0]
+        final fun <get-lane>(): com.letta.mobile.data.node.carrier/NodeLane // com.letta.mobile.data.node.carrier/NodeInbound.lane.<get-lane>|<get-lane>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.node.carrier/NodeLane // com.letta.mobile.data.node.carrier/NodeInbound.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeInbound.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.node.carrier/NodeLane = ..., com.letta.mobile.data.node.carrier/NodeFrame = ...): com.letta.mobile.data.node.carrier/NodeInbound // com.letta.mobile.data.node.carrier/NodeInbound.copy|copy(com.letta.mobile.data.node.carrier.NodeLane;com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeInbound.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeInbound.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeInbound.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.node.carrier/NodeLinkClosure { // com.letta.mobile.data.node.carrier/NodeLinkClosure|null[0]
+    constructor <init>(kotlin/Long, kotlin/String) // com.letta.mobile.data.node.carrier/NodeLinkClosure.<init>|<init>(kotlin.Long;kotlin.String){}[0]
+
+    final val code // com.letta.mobile.data.node.carrier/NodeLinkClosure.code|{}code[0]
+        final fun <get-code>(): kotlin/Long // com.letta.mobile.data.node.carrier/NodeLinkClosure.code.<get-code>|<get-code>(){}[0]
+    final val reason // com.letta.mobile.data.node.carrier/NodeLinkClosure.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeLinkClosure.reason.<get-reason>|<get-reason>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.node.carrier/NodeLinkClosure.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.node.carrier/NodeLinkClosure.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/String = ...): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.copy|copy(kotlin.Long;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeLinkClosure.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeLinkClosure.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeLinkClosure.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion|null[0]
+        final val AUTH_FAILURES // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.AUTH_FAILURES|{}AUTH_FAILURES[0]
+            final fun <get-AUTH_FAILURES>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.AUTH_FAILURES.<get-AUTH_FAILURES>|<get-AUTH_FAILURES>(){}[0]
+        final val AUTH_RATE_LIMITED // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.AUTH_RATE_LIMITED|{}AUTH_RATE_LIMITED[0]
+            final fun <get-AUTH_RATE_LIMITED>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.AUTH_RATE_LIMITED.<get-AUTH_RATE_LIMITED>|<get-AUTH_RATE_LIMITED>(){}[0]
+        final val LOST // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.LOST|{}LOST[0]
+            final fun <get-LOST>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.LOST.<get-LOST>|<get-LOST>(){}[0]
+        final val NORMAL // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.NORMAL|{}NORMAL[0]
+            final fun <get-NORMAL>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.NORMAL.<get-NORMAL>|<get-NORMAL>(){}[0]
+        final val PEER_REVOKED // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.PEER_REVOKED|{}PEER_REVOKED[0]
+            final fun <get-PEER_REVOKED>(): com.letta.mobile.data.node.carrier/NodeLinkClosure // com.letta.mobile.data.node.carrier/NodeLinkClosure.Companion.PEER_REVOKED.<get-PEER_REVOKED>|<get-PEER_REVOKED>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.node.carrier/NodeOpenRequest { // com.letta.mobile.data.node.carrier/NodeOpenRequest|null[0]
+    constructor <init>(com.letta.mobile.data.node.carrier/NodeAddress, com.letta.mobile.data.node.carrier/NodeCredential, kotlin/String? = ..., kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.node.carrier/NodeOpenRequest.<init>|<init>(com.letta.mobile.data.node.carrier.NodeAddress;com.letta.mobile.data.node.carrier.NodeCredential;kotlin.String?;kotlin.collections.Set<kotlin.String>){}[0]
+
+    final val address // com.letta.mobile.data.node.carrier/NodeOpenRequest.address|{}address[0]
+        final fun <get-address>(): com.letta.mobile.data.node.carrier/NodeAddress // com.letta.mobile.data.node.carrier/NodeOpenRequest.address.<get-address>|<get-address>(){}[0]
+    final val clientCapabilities // com.letta.mobile.data.node.carrier/NodeOpenRequest.clientCapabilities|{}clientCapabilities[0]
+        final fun <get-clientCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.node.carrier/NodeOpenRequest.clientCapabilities.<get-clientCapabilities>|<get-clientCapabilities>(){}[0]
+    final val credential // com.letta.mobile.data.node.carrier/NodeOpenRequest.credential|{}credential[0]
+        final fun <get-credential>(): com.letta.mobile.data.node.carrier/NodeCredential // com.letta.mobile.data.node.carrier/NodeOpenRequest.credential.<get-credential>|<get-credential>(){}[0]
+    final val peerName // com.letta.mobile.data.node.carrier/NodeOpenRequest.peerName|{}peerName[0]
+        final fun <get-peerName>(): kotlin/String? // com.letta.mobile.data.node.carrier/NodeOpenRequest.peerName.<get-peerName>|<get-peerName>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.node.carrier/NodeAddress // com.letta.mobile.data.node.carrier/NodeOpenRequest.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.node.carrier/NodeCredential // com.letta.mobile.data.node.carrier/NodeOpenRequest.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.node.carrier/NodeOpenRequest.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.node.carrier/NodeOpenRequest.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.node.carrier/NodeAddress = ..., com.letta.mobile.data.node.carrier/NodeCredential = ..., kotlin/String? = ..., kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.node.carrier/NodeOpenRequest // com.letta.mobile.data.node.carrier/NodeOpenRequest.copy|copy(com.letta.mobile.data.node.carrier.NodeAddress;com.letta.mobile.data.node.carrier.NodeCredential;kotlin.String?;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeOpenRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeOpenRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeOpenRequest.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.node.carrier/NodeSession { // com.letta.mobile.data.node.carrier/NodeSession|null[0]
+    final val capabilities // com.letta.mobile.data.node.carrier/NodeSession.capabilities|{}capabilities[0]
+        final fun <get-capabilities>(): com.letta.mobile.data.node.carrier/NodeCapabilities // com.letta.mobile.data.node.carrier/NodeSession.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
+    final val closure // com.letta.mobile.data.node.carrier/NodeSession.closure|{}closure[0]
+        final fun <get-closure>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.node.carrier/NodeLinkClosure?> // com.letta.mobile.data.node.carrier/NodeSession.closure.<get-closure>|<get-closure>(){}[0]
+    final val inbound // com.letta.mobile.data.node.carrier/NodeSession.inbound|{}inbound[0]
+        final fun <get-inbound>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeInbound> // com.letta.mobile.data.node.carrier/NodeSession.inbound.<get-inbound>|<get-inbound>(){}[0]
+    final val node // com.letta.mobile.data.node.carrier/NodeSession.node|{}node[0]
+        final fun <get-node>(): com.letta.mobile.data.node.carrier/NodePeerIdentity // com.letta.mobile.data.node.carrier/NodeSession.node.<get-node>|<get-node>(){}[0]
+
+    final fun nextRequestId(): kotlin/String // com.letta.mobile.data.node.carrier/NodeSession.nextRequestId|nextRequestId(){}[0]
+    final suspend fun adminRpc(kotlin/String, kotlinx.serialization.json/JsonObject?): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeSession.adminRpc|adminRpc(kotlin.String;kotlinx.serialization.json.JsonObject?){}[0]
+    final suspend fun close() // com.letta.mobile.data.node.carrier/NodeSession.close|close(){}[0]
+    final suspend fun request(com.letta.mobile.data.node.carrier/NodeFrame): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeSession.request|request(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+    final suspend fun resumeFeed(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.feed.wire/FeedCursor?): kotlin.collections/List<com.letta.mobile.data.feed.wire/FeedPage> // com.letta.mobile.data.node.carrier/NodeSession.resumeFeed|resumeFeed(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.feed.wire.FeedCursor?){}[0]
+    final suspend fun send(com.letta.mobile.data.node.carrier/NodeFrame) // com.letta.mobile.data.node.carrier/NodeSession.send|send(com.letta.mobile.data.node.carrier.NodeFrame){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.carrier/NodeSession.Companion|null[0]
+        final const val MAX_RESUME_PAGES // com.letta.mobile.data.node.carrier/NodeSession.Companion.MAX_RESUME_PAGES|{}MAX_RESUME_PAGES[0]
+            final fun <get-MAX_RESUME_PAGES>(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeSession.Companion.MAX_RESUME_PAGES.<get-MAX_RESUME_PAGES>|<get-MAX_RESUME_PAGES>(){}[0]
+
+        final suspend fun open(com.letta.mobile.data.node.carrier/NodeCarrier, com.letta.mobile.data.node.carrier/NodeOpenRequest, kotlinx.coroutines/CoroutineScope, kotlin/Function0<kotlin/String> = ...): com.letta.mobile.data.node.carrier/NodeSession // com.letta.mobile.data.node.carrier/NodeSession.Companion.open|open(com.letta.mobile.data.node.carrier.NodeCarrier;com.letta.mobile.data.node.carrier.NodeOpenRequest;kotlinx.coroutines.CoroutineScope;kotlin.Function0<kotlin.String>){}[0]
+    }
+}
+
 final class com.letta.mobile.data.notify/ApprovalAttentionMonitor { // com.letta.mobile.data.notify/ApprovalAttentionMonitor|null[0]
     constructor <init>(com.letta.mobile.data.notify/AttentionGate) // com.letta.mobile.data.notify/ApprovalAttentionMonitor.<init>|<init>(com.letta.mobile.data.notify.AttentionGate){}[0]
 
@@ -76535,6 +76782,53 @@ final value class com.letta.mobile.data.model.provider.composer/CatalogSessionSc
     }
 }
 
+final value class com.letta.mobile.data.node.carrier/NodeAddress { // com.letta.mobile.data.node.carrier/NodeAddress|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.node.carrier/NodeAddress.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.node.carrier/NodeAddress.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeAddress.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeAddress.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeAddress.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeAddress.toString|toString(){}[0]
+}
+
+final value class com.letta.mobile.data.node.carrier/NodeFrame { // com.letta.mobile.data.node.carrier/NodeFrame|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject) // com.letta.mobile.data.node.carrier/NodeFrame.<init>|<init>(kotlinx.serialization.json.JsonObject){}[0]
+
+    final val json // com.letta.mobile.data.node.carrier/NodeFrame.json|{}json[0]
+        final fun <get-json>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.node.carrier/NodeFrame.json.<get-json>|<get-json>(){}[0]
+    final val requestId // com.letta.mobile.data.node.carrier/NodeFrame.requestId|{}requestId[0]
+        final fun <get-requestId>(): kotlin/String? // com.letta.mobile.data.node.carrier/NodeFrame.requestId.<get-requestId>|<get-requestId>(){}[0]
+    final val type // com.letta.mobile.data.node.carrier/NodeFrame.type|{}type[0]
+        final fun <get-type>(): kotlin/String? // com.letta.mobile.data.node.carrier/NodeFrame.type.<get-type>|<get-type>(){}[0]
+
+    final fun encode(): kotlin/String // com.letta.mobile.data.node.carrier/NodeFrame.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeFrame.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeFrame.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeFrame.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.carrier/NodeFrame.Companion|null[0]
+        final fun decode(kotlin/String): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeFrame.Companion.decode|decode(kotlin.String){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.node.carrier/NodePeerIdentity { // com.letta.mobile.data.node.carrier/NodePeerIdentity|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.node.carrier/NodePeerIdentity.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.node.carrier/NodePeerIdentity.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.node.carrier/NodePeerIdentity.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodePeerIdentity.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodePeerIdentity.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodePeerIdentity.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.carrier/NodePeerIdentity.Companion|null[0]
+        final val LOCAL_SHELL // com.letta.mobile.data.node.carrier/NodePeerIdentity.Companion.LOCAL_SHELL|{}LOCAL_SHELL[0]
+            final fun <get-LOCAL_SHELL>(): com.letta.mobile.data.node.carrier/NodePeerIdentity // com.letta.mobile.data.node.carrier/NodePeerIdentity.Companion.LOCAL_SHELL.<get-LOCAL_SHELL>|<get-LOCAL_SHELL>(){}[0]
+    }
+}
+
 final value class com.letta.mobile.data.projects/ProjectKey { // com.letta.mobile.data.projects/ProjectKey|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.projects/ProjectKey.<init>|<init>(kotlin.String){}[0]
 
@@ -81762,6 +82056,43 @@ final object com.letta.mobile.data.modelvalidation/ModelHandleValidator { // com
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.modelvalidation/ModelHandleValidator.Request.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.modelvalidation/ModelHandleValidator.Request.toString|toString(){}[0]
     }
+}
+
+final object com.letta.mobile.data.node.carrier/NodeCarrierWire { // com.letta.mobile.data.node.carrier/NodeCarrierWire|null[0]
+    final const val ADMIN_RPC // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC|{}ADMIN_RPC[0]
+        final fun <get-ADMIN_RPC>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC.<get-ADMIN_RPC>|<get-ADMIN_RPC>(){}[0]
+    final const val ADMIN_RPC_CANCEL // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC_CANCEL|{}ADMIN_RPC_CANCEL[0]
+        final fun <get-ADMIN_RPC_CANCEL>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC_CANCEL.<get-ADMIN_RPC_CANCEL>|<get-ADMIN_RPC_CANCEL>(){}[0]
+    final const val ADMIN_RPC_RESPONSE // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC_RESPONSE|{}ADMIN_RPC_RESPONSE[0]
+        final fun <get-ADMIN_RPC_RESPONSE>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.ADMIN_RPC_RESPONSE.<get-ADMIN_RPC_RESPONSE>|<get-ADMIN_RPC_RESPONSE>(){}[0]
+    final const val AUTH // com.letta.mobile.data.node.carrier/NodeCarrierWire.AUTH|{}AUTH[0]
+        final fun <get-AUTH>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.AUTH.<get-AUTH>|<get-AUTH>(){}[0]
+    final const val AUTH_RESPONSE // com.letta.mobile.data.node.carrier/NodeCarrierWire.AUTH_RESPONSE|{}AUTH_RESPONSE[0]
+        final fun <get-AUTH_RESPONSE>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.AUTH_RESPONSE.<get-AUTH_RESPONSE>|<get-AUTH_RESPONSE>(){}[0]
+    final const val CAPABILITIES // com.letta.mobile.data.node.carrier/NodeCarrierWire.CAPABILITIES|{}CAPABILITIES[0]
+        final fun <get-CAPABILITIES>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.CAPABILITIES.<get-CAPABILITIES>|<get-CAPABILITIES>(){}[0]
+    final const val ERROR // com.letta.mobile.data.node.carrier/NodeCarrierWire.ERROR|{}ERROR[0]
+        final fun <get-ERROR>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.ERROR.<get-ERROR>|<get-ERROR>(){}[0]
+    final const val FRAME_PART_CAPABILITY // com.letta.mobile.data.node.carrier/NodeCarrierWire.FRAME_PART_CAPABILITY|{}FRAME_PART_CAPABILITY[0]
+        final fun <get-FRAME_PART_CAPABILITY>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.FRAME_PART_CAPABILITY.<get-FRAME_PART_CAPABILITY>|<get-FRAME_PART_CAPABILITY>(){}[0]
+    final const val METHOD // com.letta.mobile.data.node.carrier/NodeCarrierWire.METHOD|{}METHOD[0]
+        final fun <get-METHOD>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.METHOD.<get-METHOD>|<get-METHOD>(){}[0]
+    final const val PAIRED // com.letta.mobile.data.node.carrier/NodeCarrierWire.PAIRED|{}PAIRED[0]
+        final fun <get-PAIRED>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.PAIRED.<get-PAIRED>|<get-PAIRED>(){}[0]
+    final const val PARAMS // com.letta.mobile.data.node.carrier/NodeCarrierWire.PARAMS|{}PARAMS[0]
+        final fun <get-PARAMS>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.PARAMS.<get-PARAMS>|<get-PARAMS>(){}[0]
+    final const val PEER_NAME // com.letta.mobile.data.node.carrier/NodeCarrierWire.PEER_NAME|{}PEER_NAME[0]
+        final fun <get-PEER_NAME>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.PEER_NAME.<get-PEER_NAME>|<get-PEER_NAME>(){}[0]
+    final const val REQUEST_ID // com.letta.mobile.data.node.carrier/NodeCarrierWire.REQUEST_ID|{}REQUEST_ID[0]
+        final fun <get-REQUEST_ID>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.REQUEST_ID.<get-REQUEST_ID>|<get-REQUEST_ID>(){}[0]
+    final const val RESULT // com.letta.mobile.data.node.carrier/NodeCarrierWire.RESULT|{}RESULT[0]
+        final fun <get-RESULT>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.RESULT.<get-RESULT>|<get-RESULT>(){}[0]
+    final const val SUCCESS // com.letta.mobile.data.node.carrier/NodeCarrierWire.SUCCESS|{}SUCCESS[0]
+        final fun <get-SUCCESS>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.SUCCESS.<get-SUCCESS>|<get-SUCCESS>(){}[0]
+    final const val TOKEN // com.letta.mobile.data.node.carrier/NodeCarrierWire.TOKEN|{}TOKEN[0]
+        final fun <get-TOKEN>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.TOKEN.<get-TOKEN>|<get-TOKEN>(){}[0]
+    final const val TYPE // com.letta.mobile.data.node.carrier/NodeCarrierWire.TYPE|{}TYPE[0]
+        final fun <get-TYPE>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierWire.TYPE.<get-TYPE>|<get-TYPE>(){}[0]
 }
 
 final object com.letta.mobile.data.notify/AttentionCopy { // com.letta.mobile.data.notify/AttentionCopy|null[0]
