@@ -49,17 +49,16 @@ class MeridianToolsSocketServer(
             coroutineScope {
                 while (true) {
                     slots.acquire()
+                    var accepted = false
                     val connection = try {
-                        runInterruptible(Dispatchers.IO) { server.accept() }
+                        runInterruptible(Dispatchers.IO) { server.accept() }.also { accepted = true }
                     } catch (e: ClosedChannelException) {
-                        slots.release()
                         // Cancelling interrupts accept(), which closes the channel: that is the
                         // cancellation, not a failure to report.
                         currentCoroutineContext().ensureActive()
                         throw e
-                    } catch (e: Throwable) {
-                        slots.release()
-                        throw e
+                    } finally {
+                        if (!accepted) slots.release()
                     }
                     launch(Dispatchers.IO) {
                         try {
@@ -117,14 +116,18 @@ class MeridianToolsSocketServer(
         internal fun readLine(input: InputStream, maxBytes: Int = MeridianToolsWire.MAX_REQUEST_LINE_BYTES): String? {
             val out = ByteArrayOutputStream()
             val chunk = ByteArray(CHUNK)
-            while (true) {
+            var done = false
+            while (!done) {
                 val read = input.read(chunk)
-                if (read < 0) break
-                val newline = (0 until read).firstOrNull { chunk[it] == NEWLINE }
-                val take = newline ?: read
-                if (out.size() + take > maxBytes) return null
-                out.write(chunk, 0, take)
-                if (newline != null) break
+                if (read < 0) {
+                    done = true
+                } else {
+                    val newline = (0 until read).firstOrNull { chunk[it] == NEWLINE }
+                    val take = newline ?: read
+                    if (out.size() + take > maxBytes) return null
+                    out.write(chunk, 0, take)
+                    done = newline != null
+                }
             }
             return out.toString(Charsets.UTF_8)
         }
@@ -141,13 +144,21 @@ class MeridianToolsSocketServer(
             val server = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
             try {
                 server.bind(UnixDomainSocketAddress.of(path))
-                runCatching { Files.setPosixFilePermissions(path, SOCKET_MODE) }
-                    .onFailure { if (it !is UnsupportedOperationException) throw it }
+                restrictSocketMode(path)
             } catch (e: IOException) {
                 server.close()
                 throw e
             }
             return server
+        }
+
+        /** Mode 0660 on the socket file; a filesystem with no POSIX modes keeps its own. */
+        private fun restrictSocketMode(path: Path) {
+            try {
+                Files.setPosixFilePermissions(path, SOCKET_MODE)
+            } catch (_: UnsupportedOperationException) {
+                // No POSIX modes (Windows): nothing to restrict here.
+            }
         }
 
         /** Binds loopback TCP on [port] (0 = OS-assigned); never a routable address. */
