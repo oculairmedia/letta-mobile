@@ -1,11 +1,27 @@
-# Smoke: launch a configured install and assert the Conversations home.
+# Smoke: launch a configured install and assert the Home shell renders.
 # Pixel 2 XL (USB) or any device with com.letta.mobile.dev already configured.
 # For a fresh-install Settings path, use smoke-first-run.yaml instead.
+#
+# Selectors are resource-ids (Compose testTags), not display text: Home's page, greeting, recents
+# section and composer, plus the shell header's title and menu. Every assertion is required.
 appId: com.letta.mobile.dev
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: "Conversations"
+    visible:
+      id: "home_page"
     timeout: 20000
-- assertVisible: "Search conversations"
+- assertVisible:
+    id: "home_greeting"
+- assertVisible:
+    id: "home_recents"
+- assertVisible:
+    id: "home_composer"
+- assertVisible:
+    id: "shell-header-title"
+- assertVisible:
+    id: "shell-header-menu"
+# A Home that failed to load its data shows the error panel instead of the sections above.
+- assertNotVisible:
+    id: "home_error"
 - takeScreenshot: smoke-launch-ok

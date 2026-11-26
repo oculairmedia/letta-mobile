@@ -22,6 +22,21 @@ sha256() { sha256sum "$1" | awk '{print $1}'; }
 version_of() { [[ -n "$1" ]] && "$1" --version 2>&1 | tr '\n' ' ' | cut -c1-500 || printf unavailable; }
 prop() { [[ -n "$ADB_PATH" ]] && "$ADB_PATH" -s "$DEVICE_SERIAL" shell getprop "$1" 2>/dev/null | tr -d '\r' || true; }
 
+# Names given to the flow's takeScreenshot steps (one per line, quotes stripped).
+expected_screenshot_names() {
+  sed -nE "s/^[[:space:]]*-[[:space:]]*takeScreenshot:[[:space:]]*['\"]?([^'\"#]*[^'\"#[:space:]])['\"]?[[:space:]]*(#.*)?$/\1/p" "$1"
+}
+
+# Copy the images Maestro wrote for takeScreenshot steps out of its output directory ($1) into $2.
+collect_maestro_screenshots() {
+  local out_dir="$1" dest="$2" shots_dir
+  [[ -n "$out_dir" && -d "$out_dir" ]] || return 0
+  while IFS= read -r shots_dir; do
+    mkdir -p "$dest"
+    cp -- "$shots_dir"/*.png "$dest"/ 2>/dev/null || true
+  done < <(find "$out_dir" -type d -name takeScreenshot)
+}
+
 if [[ $# -gt 0 ]]; then
   FLOWS=("$@")
 else
@@ -107,6 +122,7 @@ for flow in "${FLOWS[@]}"; do
   LOGCAT="$FLOW_DIR/logcat.txt"
   HIERARCHY="$FLOW_DIR/hierarchy.xml"
   SCREENSHOTS="$FLOW_DIR/screenshots"
+  MAESTRO_OUT_DIR=""
   STATUS="FAIL"
   REASON=""
   FLOW_HASH=""
@@ -138,13 +154,21 @@ for flow in "${FLOWS[@]}"; do
     if [[ -z "$REASON" ]]; then
       MAESTRO_RAN=1
       EXECUTED_COUNT=$((EXECUTED_COUNT + 1))
+      # Maestro 2.x writes takeScreenshot images only under its own output directory, so tell it
+      # where that is instead of guessing: <dir>/<timestamp>/<flow name>/takeScreenshot/<name>.png.
+      MAESTRO_OUT_DIR="$(mktemp -d)" || MAESTRO_OUT_DIR=""
+      if [[ -z "$MAESTRO_OUT_DIR" ]]; then
+        add_reason "unable to create maestro output directory"
+      fi
       if [[ "$VERBOSE" == "1" ]]; then
-        (cd "$FLOW_DIR" && "$MAESTRO_BIN" test --device "$DEVICE_SERIAL" "$FLOW_PATH") > >(tee "$OUT") 2> >(tee "$ERR" >&2)
+        (cd "$FLOW_DIR" && "$MAESTRO_BIN" test --device "$DEVICE_SERIAL" --test-output-dir "$MAESTRO_OUT_DIR" "$FLOW_PATH") > >(tee "$OUT") 2> >(tee "$ERR" >&2)
       else
-        (cd "$FLOW_DIR" && "$MAESTRO_BIN" test --device "$DEVICE_SERIAL" "$FLOW_PATH") >"$OUT" 2>"$ERR"
+        (cd "$FLOW_DIR" && "$MAESTRO_BIN" test --device "$DEVICE_SERIAL" --test-output-dir "$MAESTRO_OUT_DIR" "$FLOW_PATH") >"$OUT" 2>"$ERR"
       fi
       MAESTRO_STATUS=$?
       [[ $MAESTRO_STATUS -eq 0 ]] || add_reason "maestro failed (status=$MAESTRO_STATUS)"
+      collect_maestro_screenshots "$MAESTRO_OUT_DIR" "$SCREENSHOTS"
+      [[ -z "$MAESTRO_OUT_DIR" ]] || rm -rf "$MAESTRO_OUT_DIR"
     fi
     if [[ $MAESTRO_RAN -eq 1 ]]; then
       "$ADB_PATH" -s "$DEVICE_SERIAL" shell dumpsys gfxinfo "$PKG_UNDER_TEST" >"$GFX" 2>/dev/null || add_reason "gfxinfo capture failed"
@@ -160,11 +184,10 @@ for flow in "${FLOWS[@]}"; do
       [[ -s "$OUT" ]] || add_reason "mandatory evidence empty: $(basename "$OUT")"
       [[ -s "$GFX" ]] || add_reason "mandatory evidence empty: $(basename "$GFX")"
       [[ -s "$LOGCAT" ]] || add_reason "mandatory evidence empty: $(basename "$LOGCAT")"
-      if grep -Eq '^[[:space:]]*-[[:space:]]*takeScreenshot:' "$FLOW_PATH"; then
-        if [[ ! -d "$SCREENSHOTS" ]] || ! find "$SCREENSHOTS" -type f -size +0c -print -quit | grep -q .; then
-          add_reason "expected screenshot evidence missing"
-        fi
-      fi
+      # Fail closed: every takeScreenshot step must have produced its own non-empty image.
+      while IFS= read -r shot_name || [[ -n "$shot_name" ]]; do
+        [[ -s "$SCREENSHOTS/$shot_name.png" ]] || add_reason "expected screenshot evidence missing: $shot_name"
+      done < <(expected_screenshot_names "$FLOW_PATH")
       if [[ "$CAPTURE_SENSITIVE_EVIDENCE" != "1" ]]; then
         rm -f "$HIERARCHY"
         if [[ -d "$SCREENSHOTS" ]]; then

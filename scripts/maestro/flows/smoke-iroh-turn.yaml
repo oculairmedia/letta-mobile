@@ -1,0 +1,86 @@
+# Smoke: one real turn against the Iroh mini's mini-bench agent, end to end.
+#
+# Pre-conditions: mini wrapper up on Iroh, the phone paired to it, the mini-bench agent present
+# (its model is the deterministic bench-model: every plain message is answered "DONE", the reply
+# painting for ~2s before the turn settles; only the benchmark conversation core-loop-harness
+# also calls the slow bench_wait tool, so this flow opens a FRESH conversation via "New chat").
+#
+# Flow: Home -> header menu -> mini-bench orb -> header menu -> panel "New chat" -> type a unique line ->
+# send -> the user row and the agent reply row appear -> the run settles and the composer is idle.
+# Text is used where there is no id: the panel's "New chat" row, the reply content "DONE" (the
+# fixture's fixed answer) and the unique line the flow itself typed. Every assertion is required.
+appId: com.letta.mobile.dev
+---
+- evalScript: ${output.line = 'smoke turn ' + Date.now()}
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home_page"
+    timeout: 20000
+- tapOn:
+    id: "shell-header-menu"
+- extendedWaitUntil:
+    visible:
+      id: "shell-agent-rail-orb-mini-bench"
+    timeout: 10000
+- tapOn:
+    id: "shell-agent-rail-orb-mini-bench"
+# The orb opens the agent's last chat and closes the drawer; reopen the menu for that agent's panel.
+- extendedWaitUntil:
+    visible:
+      id: "composer-input"
+    timeout: 20000
+- tapOn:
+    id: "shell-header-menu"
+- extendedWaitUntil:
+    visible: "New chat"
+    timeout: 10000
+- tapOn: "New chat"
+- extendedWaitUntil:
+    visible:
+      id: "chat-timeline-welcome"
+    timeout: 10000
+- tapOn:
+    id: "composer-input"
+- inputText: ${output.line}
+# With the keyboard up the touch bar hides Send; dismiss it so the Send button is shown.
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "composer-send"
+    timeout: 10000
+- takeScreenshot: smoke-iroh-turn-before
+- tapOn:
+    id: "composer-send"
+# The user's row, then the agent's reply row (bench-model answers DONE).
+- extendedWaitUntil:
+    visible:
+      id: "chat-user-prompt"
+    timeout: 15000
+# The typed line must be on the sent row itself (the composer's draft could also show it).
+- assertVisible:
+    text: ${output.line}
+    childOf:
+      id: "chat-user-prompt"
+- extendedWaitUntil:
+    visible:
+      id: "chat-agent-text"
+    timeout: 90000
+- assertVisible: "DONE"
+# Idle again: no Stop button once the run settles, and the composer's draft is empty (the input
+# shows its "Type a message" placeholder only when empty) and no longer holds the typed line.
+- extendedWaitUntil:
+    notVisible:
+      id: "composer-stop"
+    timeout: 60000
+- assertVisible:
+    id: "composer-input"
+- assertVisible:
+    text: "Type a message…"
+    childOf:
+      id: "composer-input"
+- assertNotVisible:
+    text: ${output.line}
+    childOf:
+      id: "composer-input"
+- takeScreenshot: smoke-iroh-turn-after
