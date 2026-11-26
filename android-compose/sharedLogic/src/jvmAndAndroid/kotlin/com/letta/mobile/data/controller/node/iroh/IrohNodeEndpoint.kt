@@ -74,6 +74,9 @@ class IrohNodeEndpoint(
     private val appServerConnections =
         java.util.concurrent.ConcurrentHashMap<String, MutableSet<IrohNodeConnection>>()
 
+    /** How many peers hold an entry in the live App Server connection table; for tests. */
+    internal val appServerPeerCount: Int get() = appServerConnections.size
+
     // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
@@ -512,7 +515,7 @@ class IrohNodeEndpoint(
         handler.accept(connection, remoteId)
     }
 
-    private suspend fun serveAppServer(
+    internal suspend fun serveAppServer(
         connection: Connection,
         remoteId: String,
         controller: AppServerController,
@@ -534,14 +537,17 @@ class IrohNodeEndpoint(
         )
         val relayLink = appToolRelay?.link(send = nodeConnection::writeAppToolFrame, ready = { nodeConnection.acceptsAppToolCalls })
         nodeConnection.appToolRelayLink = relayLink
-        val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
-            java.util.concurrent.ConcurrentHashMap.newKeySet()
+        // Add and remove inside compute, so a peer's entry lives exactly as long as one of its connections:
+        // a peer that connects and leaves (any number of fresh NodeIds) keeps nothing here.
+        appServerConnections.compute(remoteId) { _, live ->
+            (live ?: java.util.concurrent.ConcurrentHashMap.newKeySet()).apply { add(nodeConnection) }
         }
-        peerConnections.add(nodeConnection)
         try {
             nodeConnection.serve()
         } finally {
-            peerConnections.remove(nodeConnection)
+            appServerConnections.computeIfPresent(remoteId) { _, live ->
+                live.apply { remove(nodeConnection) }.takeIf { it.isNotEmpty() }
+            }
             relayLink?.close()
         }
     }
