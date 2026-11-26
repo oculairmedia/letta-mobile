@@ -286,6 +286,168 @@ class ServerStartedTurnFeedTest {
         )
     }
 
+    /** A turn running a client-side tool: its prompt, the tool call, and the server's EXECUTING_CLIENT_SIDE_TOOL. */
+    private fun busyTurn(): List<AppServerReceivedFrame> = listOf(
+        serverStartedTurn()[0],
+        decode(frame(delta(mapOf("message_type" to "tool_call_message", "run_id" to RUN, "id" to "tool-call-toolu_lost")))),
+        decode(serverLoopStatus(RUN, "EXECUTING_CLIENT_SIDE_TOOL")),
+    )
+
+    /**
+     * A busy turn loses its `turn_finished`. Silence alone never closes it (the tool may legitimately run for hours),
+     * but the App Server's idle loop status for the runtime (WAITING_ON_INPUT, no active run: it sends one right before
+     * `turn_finished` when its turn ends, and replays one on every sync) ends the tool exemption: the turn closes within
+     * the silence bound after it, as not truly ended.
+     */
+    @Test
+    fun aBusyTurnWhoseFinishIsLostClosesOnTheServersIdleLoopStatus() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        runCurrent()
+
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+        assertStillOpen(node)
+
+        node.frames.emit(decode(toolReturn()))
+        node.frames.emit(decode(idleLoopStatus()))
+        advanceTimeBy(SERVER_TURN_SILENCE_MS + SILENCE_CHECK_SLACK_MS)
+        runCurrent()
+
+        val closed = entries(node.journal).last()
+        assertEquals("turn_closed", closed.kind, "${entries(node.journal).map { it.kind }}")
+        assertEquals("false", closed.payload?.get("terminal_observed").toString(), "no terminal was seen")
+    }
+
+    /**
+     * A busy turn's tool returns, its `turn_finished` is lost, the server says the runtime went idle, and the server's
+     * next turn starts at once: that turn's first delta (a new run) closes the lost one, as not truly ended, and opens
+     * its own turn instead of being folded into the lost one.
+     */
+    @Test
+    fun aBusyTurnWhoseFinishIsLostClosesWhenTheNextServerTurnStartsAfterIdle() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+        assertStillOpen(node)
+
+        node.frames.emit(decode(toolReturn()))
+        node.frames.emit(decode(idleLoopStatus()))
+        node.frames.emit(decode(assistant("Next notification handled.", run = NEXT_RUN)))
+        runCurrent()
+
+        val journal = entries(node.journal)
+        val turns = journal.map { it.turn }.distinct()
+        assertEquals(2, turns.size, "${journal.map { it.turn to it.kind }}")
+        val first = journal.filter { it.turn == turns[0] }
+        assertEquals("turn_closed", first.last().kind)
+        assertEquals("false", first.last().payload?.get("terminal_observed").toString())
+        assertEquals(listOf("turn_open", "stream_delta"), journal.filter { it.turn == turns[1] }.map { it.kind })
+    }
+
+    /**
+     * The App Server sends its idle loop status just BEFORE `turn_finished` when a turn ends (letta-code
+     * finishListenerTurn: emitRuntimeStateUpdates, then emitDurableTurnFinished). A turn that ends normally still
+     * closes on its `turn_finished`, as truly ended, with no second turn.
+     */
+    @Test
+    fun anIdleLoopStatusRightBeforeTurnFinishedStillEndsTheTurnAsTrulyEnded() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(serverLoopStatus(RUN, "PROCESSING_API_RESPONSE")))
+        node.frames.emit(decode(idleLoopStatus()))
+        node.frames.emit(turnFinished())
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_closed" }, "${journal.map { it.kind }}")
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
+    /**
+     * An aborted turn: the server says idle as soon as the abort is requested (letta-code requestCancellation) and
+     * sends the turn's remaining frames and `turn_finished` once the cancelled tool settled. Those stay one turn, closed
+     * as truly ended, when they arrive within the silence bound after the idle status, however long the tool ran.
+     */
+    @Test
+    fun anAbortedBusyTurnSettlingAfterItsIdleStatusStaysOneTurn() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        node.frames.emit(decode(idleLoopStatus()))
+        runCurrent()
+
+        advanceTimeBy(SERVER_TURN_SILENCE_MS / 2)
+        listOf(decode(toolReturn()), decode(stop(RUN, reason = "cancelled")), turnFinished()).forEach { node.frames.emit(it) }
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_open" }, "${journal.map { it.kind }}")
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
+    /** A pending approval is a wait too: silence alone keeps the turn open. */
+    @Test
+    fun anApprovalWaitKeepsABusyTurnOpenThroughSilence() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(serverLoopStatus(RUN, "WAITING_ON_APPROVAL")))
+        runCurrent()
+
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+
+        assertTrue(entries(node.journal).none { it.kind == "turn_closed" }, "${entries(node.journal).map { it.kind }}")
+    }
+
+    /**
+     * A busy turn whose App Server connection was replaced: the new generation shows on a frame of another runtime
+     * (this runtime sends nothing again), and that alone closes the turn, as not truly ended. Silence before it does not.
+     */
+    @Test
+    fun aBusyTurnWhoseFinishIsLostClosesWhenAnyFrameShowsANewConnectionGeneration() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it.copy(connectionGeneration = 1L)) }
+        runCurrent()
+
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+        assertStillOpen(node)
+
+        node.frames.emit(decode(otherRuntimeLoopStatus()).copy(connectionGeneration = 2L))
+        runCurrent()
+
+        val closed = entries(node.journal).last()
+        assertEquals("turn_closed", closed.kind, "${entries(node.journal).map { it.kind }}")
+        assertEquals("false", closed.payload?.get("terminal_observed").toString())
+    }
+
+    /** A loop status this relay does not know is "not waiting" (the silence bound applies) and is logged once by name. */
+    @Test
+    fun anUnknownLoopStatusIsNotWaitingAndIsLoggedOnceByName() = runTest {
+        val recorder = com.letta.mobile.util.TelemetryRecorder()
+        com.letta.mobile.util.Telemetry.installRecorder(recorder).use {
+            val node = node { emptySet() }
+            busyTurn().forEach { node.frames.emit(it) }
+            node.frames.emit(decode(serverLoopStatus(RUN, FUTURE_STATUS)))
+            node.frames.emit(decode(serverLoopStatus(RUN, FUTURE_STATUS)))
+            runCurrent()
+
+            advanceTimeBy(SERVER_TURN_SILENCE_MS + SILENCE_CHECK_SLACK_MS)
+            runCurrent()
+
+            val closed = entries(node.journal).last()
+            assertEquals("turn_closed", closed.kind, "an unknown status does not exempt the turn: ${entries(node.journal).map { it.kind }}")
+            assertEquals("false", closed.payload?.get("terminal_observed").toString())
+            val logged = recorder.snapshot().filter {
+                it.name == "turn.server_started_unknown_loop_status" && it.attrs["status"]?.toString() == FUTURE_STATUS
+            }
+            assertEquals(1, logged.size, "logged once by name: ${recorder.snapshot().map { it.name }}")
+        }
+    }
+
     /** A later frame on the open turn's own run proves it alive even after a quiet stretch with no loop status. */
     @Test
     fun aFrameOnTheOpenRunAfterSilenceKeepsTheTurn() = runTest {
@@ -501,6 +663,11 @@ class ServerStartedTurnFeedTest {
         assertEquals(4, viewer.frames.size)
     }
 
+    private fun assertStillOpen(node: Node) {
+        val kinds = entries(node.journal).map { it.kind }
+        assertTrue("turn_closed" !in kinds, "silence alone keeps a busy turn: $kinds")
+    }
+
     private fun entries(journal: FeedJournalStore): List<FeedDelta> =
         journal.page(JournalKey.of(AGENT, CONVERSATION), from = null, limit = 200).entries
 
@@ -523,6 +690,7 @@ class ServerStartedTurnFeedTest {
         const val CLIENT_TURN = "e39d7e74-e18c-406f-8045-c15ec1ef31ff"
         const val RUN = "local-run-1207"
         const val CLIENT_RUN = "local-run-1208"
+        const val NEXT_RUN = "local-run-1209"
         val RUNTIME_SCOPE = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(AGENT.value, CONVERSATION.value)
         const val REPLY = "task_42 finished; dispatching the review."
         private val RUNTIME_JSON = AppServerProtocol.json.encodeToJsonElement(
@@ -596,6 +764,29 @@ class ServerStartedTurnFeedTest {
         fun serverLoopStatus(run: String, status: String): String = envelope("update_loop_status") {
             put("loop_status", Json.parseToJsonElement("""{"status":"$status","active_run_ids":["$run"]}"""))
         }
+
+        /** What the App Server says when no turn runs on the runtime: waiting for input, no active run. */
+        fun idleLoopStatus(): String = envelope("update_loop_status") {
+            put("loop_status", Json.parseToJsonElement("""{"status":"WAITING_ON_INPUT","active_run_ids":[]}"""))
+        }
+
+        /** A loop status of another conversation of the same agent. */
+        fun otherRuntimeLoopStatus(): String {
+            val other = Json.parseToJsonElement(idleLoopStatus()).jsonObject.toMutableMap()
+            other["runtime"] = AppServerProtocol.json.encodeToJsonElement(
+                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope.serializer(),
+                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(AGENT.value, "local-conv-other"),
+            )
+            return JsonObject(other).toString()
+        }
+
+        /** The result of the busy turn's tool, on its run. */
+        fun toolReturn(): String = frame(
+            delta(mapOf("message_type" to "tool_return_message", "run_id" to RUN, "type" to "message", "tool_call_id" to "toolu_lost")),
+        )
+
+        /** A loop status no App Server sent yet. */
+        const val FUTURE_STATUS = "SOME_FUTURE_STATUS"
 
         /** Past the client relay's 5 s post-turn queue window; bounded, because the relay's silence timer never idles. */
         const val POST_TURN_WINDOW_SLACK_MS = 10_000L
