@@ -369,9 +369,10 @@ class AppServerTurnEngine(
         }
     }
 
-    private fun suppressChildFrame(received: AppServerReceivedFrame): Boolean {
+    private fun suppressChildFrame(received: AppServerReceivedFrame, scope: AppServerRuntimeScope): Boolean {
         val childDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return false
-        val subagentId = childDelta.subagentId ?: return false
+        val subagentId = childDelta.subagentId ?: return (childDelta.delta as? JsonObject)
+            ?.let { !admitsParentStreamDelta(it, scope) } ?: false
         val activity = com.letta.mobile.data.subagents.SubagentParentProjection.activityLine(childDelta.delta)
         Telemetry.event(
             "AppServerTurnEngine", "subagent.frame_suppressed",
@@ -1116,6 +1117,7 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (!admitFrame(received, context)) return
+        if (suppressChildFrame(received, context.runtimeScope)) return
         (received.frame as? AppServerInboundFrame.UpdateDeviceStatus)?.snapshot?.currentPermissionMode
             ?.let { onPermissionModeInForce(context.runtimeScope, it) }
         // letta-mobile-qygvv.8: a run bound to another client_message_id never reaches this lease.
@@ -1133,7 +1135,6 @@ class AppServerTurnEngine(
         // qygvv.8 binding already proved the frame's run is this input's own.
         if (ownership != RunOwnership.Own && context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
-        if (suppressChildFrame(received)) return
         val projected = projectAtBoundary(received, context, budget)
         // The update_queue passthrough draft still reaches viewers; only then
         // settle a lease whose queued input the server dropped.

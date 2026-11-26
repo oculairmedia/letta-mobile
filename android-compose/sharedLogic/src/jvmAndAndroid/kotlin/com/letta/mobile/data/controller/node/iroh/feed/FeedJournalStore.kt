@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh.feed
 
+import com.letta.mobile.data.runtime.admitsParentStreamDelta
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+
 import com.letta.mobile.data.controller.node.iroh.InitiatorReplay
 import com.letta.mobile.data.controller.node.iroh.TurnJournal
 import com.letta.mobile.data.controller.node.iroh.TurnJournalWriter
@@ -114,6 +117,8 @@ class FeedJournalStore internal constructor(
 
         override fun append(deltaJson: String) {
             val delta = parseDelta(deltaJson) ?: return
+            val scope = AppServerRuntimeScope(key.agentId.value, key.conversationId.value)
+            if (!admitsParentStreamDelta(delta, scope)) return
             guarded("append") {
                 val before = synchronized(lock) {
                     val head = heldLog().headSeq.value

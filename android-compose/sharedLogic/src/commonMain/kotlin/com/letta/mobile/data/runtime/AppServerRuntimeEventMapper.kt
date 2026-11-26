@@ -95,7 +95,7 @@ open class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.TurnFinished ->
                 listOfNotNull(received.toExternalTransportDraft(command), frame.toTerminalDraft(command))
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
-            is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
+            is AppServerInboundFrame.StreamDelta -> frame.toScopedStreamDeltaDraft(command, received.raw)
             is AppServerInboundFrame.UpdateLoopStatus -> frame.toLoopStatusDraft(command)
             is AppServerInboundFrame.UpdateDeviceStatus,
             is AppServerInboundFrame.UpdateQueue,
@@ -150,6 +150,15 @@ open class AppServerRuntimeEventMapper {
                 raw = raw,
             ).toExternalTransportDraft(command),
         )
+    }
+
+    private fun AppServerInboundFrame.StreamDelta.toScopedStreamDeltaDraft(
+        command: TurnCommand,
+        raw: JsonObject,
+    ): List<RuntimeEventDraft> {
+        val deltaObject = delta as? JsonObject ?: return unprojectableDelta(command, raw)
+        if (!admitsParentStreamDelta(deltaObject, runtime)) return emptyList()
+        return toStreamDeltaDraft(command, raw)
     }
 
     private fun AppServerInboundFrame.StreamDelta.toStreamDeltaDraft(

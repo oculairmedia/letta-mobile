@@ -28,6 +28,20 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class FeedJournalStoreTest : FeedJournalTestBase() {
     @Test
+    fun childTailWithoutSubagentIdNeverEntersTheDurableFeed() {
+        val store = start(directory())
+        val writer = store.writerFor(Conv.default, TurnName("cm-child-tail"))
+        val entries = requireNotNull(javaClass.getResource("/appserver/child-tail.jsonl"))
+            .readText().lineSequence().filter { it.isNotBlank() }
+            .map { Json.parseToJsonElement(it).jsonObject }.toList()
+        entries.dropLast(1).forEach { writer.append(Delta(it.getValue("p").toString())) }
+        writer.play(emptyList(), Ending.Terminal)
+        val kinds = store.drainOf(Conv.default, null).flatMap { it.entries }
+            .mapNotNull { it.payload?.text("message_type") }
+        assertEquals(listOf("stop_reason"), kinds)
+    }
+
+    @Test
     fun aFinishedTurnSurvivesAWrapperRestartUnderANewEpoch() {
         val dir = directory()
         val first = start(dir)
