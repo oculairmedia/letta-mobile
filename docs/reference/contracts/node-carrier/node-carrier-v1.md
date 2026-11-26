@@ -191,6 +191,14 @@ running the real node behind the in-process carrier (next slice) and by the exis
   own Iroh endpoint id (so the shell sees the same node either way).
 - **Frames**: a `JsonObject` may wrap a map its builder still holds, so the in-process carrier hands the other end a
   deep snapshot of each frame (no re-encoding), never the sender's tree; nothing else may cross.
+- **Backpressure**: none. Every lane is an unbounded channel, so the node's writes never suspend on a slow shell; the
+  shell keeps collecting `inbound` for the link's whole life (`NodeSession` does). A carrier that serializes, when the
+  node moves out of process, bounds its lanes instead. The in-process node end does not apply the Iroh frame limits.
+- **Admission**: the local shell is admitted by how its link was made, never by its peer label. Only the in-process
+  carrier's own acceptor (`NodeComposition.inProcessCarrier`) serves links as the local shell; a link that reports
+  `LOCAL_SHELL` through the general acceptor (`NodeComposition.peerAcceptor`) meets the endpoint's policy.
+- **A node that goes away**: a node that stops serving a link the shell had not closed closes it as `LOST`, so the
+  shell never mistakes it for its own detach. In the suite, stopping the node is this carrier's transport loss.
 - **The node side is the real work**: `IrohNodeConnection` serves `computer.iroh.Connection` directly (control =
   first `acceptBi`, push = second, calls via `AdminRpcStreamServer` over later ones). Generalize it to serve a
   `NodePeerLink`: control frames from `link.control`, writes to `link.sendControl`/`link.push`, admin calls from

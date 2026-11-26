@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -11,12 +12,16 @@ import kotlinx.coroutines.test.runTest
 /** The contract suite against the in-process carrier, plus what is particular to it: identities and a stopped node. */
 class InProcessNodeCarrierContractTest : NodeCarrierContractSuite() {
     override fun harness(): NodeCarrierHarness = NodeCarrierHarness { acceptor, scope ->
-        val carrier = InProcessNodeCarrier(NAME, NODE, acceptor, scope)
+        // The node runs in a scope of its own, so stopping it is the in-process carrier's transport loss: there is no
+        // transport under the link but the node itself.
+        val node = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+        val carrier = InProcessNodeCarrier(NAME, NODE, acceptor, node)
         NodeCarrierEndpoint(
             carrier = carrier,
             address = carrier.address,
             unreachable = NodeAddress(InProcessNodeCarrier.SCHEME + "nowhere"),
             stop = {},
+            sever = { node.cancel() },
         )
     }
 
