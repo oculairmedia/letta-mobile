@@ -34,7 +34,7 @@ esac
 EOF
   cat > "$TMP/bin/maestro" <<'EOF'
 #!/usr/bin/env bash
-[[ "$1" == --version ]] && { printf 'maestro fake\n'; exit 0; }
+[[ "$1" == --version ]] && { printf '%s\n' "${MAESTRO_FAKE_VERSION:-2.8.0}"; exit 0; }
 printf 'maestro output\n'
 printf '%s\n' "${MAESTRO_SECRET_OUTPUT:-}"
 printf 'maestro error\n' >&2
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do [[ "$1" == --test-output-dir ]] && out_dir="$2"; shift;
 if [[ "${MAESTRO_SKIP_SCREENSHOT:-0}" != 1 && -n "$out_dir" ]]; then
   shots="$out_dir/2026-01-01_000000/flow/takeScreenshot"
   mkdir -p "$shots"
-  sed -nE 's/^- takeScreenshot: (.*)$/\1/p' "$flow" | while read -r name; do
+  { sed -nE 's/^- takeScreenshot: (.*)$/\1/p' "$flow"; sed -nE 's/^    path: (.*)$/\1/p' "$flow"; } | while read -r name; do
     name="${name//\"/}"
     printf 'fake png' > "$shots/${MAESTRO_WRONG_SCREENSHOT_NAME:-$name}.png"
   done
@@ -117,6 +117,26 @@ printf 'appId: com.example\n---\n- launchApp\n- takeScreenshot: "smoke-a"\n- tak
 status="$(CAPTURE_SENSITIVE_EVIDENCE=1 run_case screenshot-two bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-two-shots.yaml)"
 [[ "$status" == 0 ]] || fail "two named screenshots case failed"
 [[ -s "$(ls -d "$TMP/screenshot-two"/*/ | head -n1)/smoke-two-shots/screenshots/smoke-b.png" ]] || fail "screenshot not collected into the flow report"
+
+printf 'appId: com.example\n---\n- launchApp\n- takeScreenshot:\n    path: "smoke-mapped"\n' > "$TMP/flows/smoke-mapped.yaml"
+status="$(CAPTURE_SENSITIVE_EVIDENCE=1 run_case screenshot-mapped bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-mapped.yaml)"
+[[ "$status" == 0 ]] || fail "mapping-form screenshot case failed"
+[[ -s "$(ls -d "$TMP/screenshot-mapped"/*/ | head -n1)/smoke-mapped/screenshots/smoke-mapped.png" ]] || fail "mapping-form screenshot not collected"
+status="$(MAESTRO_SKIP_SCREENSHOT=1 run_case screenshot-mapped-missing bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-mapped.yaml)"
+[[ "$status" != 0 ]] || fail "missing mapping-form screenshot passed"
+report="$(ls -d "$TMP/screenshot-mapped-missing"/*/ | head -n1)"
+assert_json "$report/results.json" '"expected screenshot evidence missing: smoke-mapped" in data["flows"][0]["reason"]'
+
+printf 'appId: com.example\n---\n- launchApp\n- takeScreenshot: {path: smoke-flow}\n' > "$TMP/flows/smoke-unparsed.yaml"
+status="$(run_case screenshot-unparsed bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-unparsed.yaml)"
+[[ "$status" != 0 ]] || fail "a takeScreenshot step the parser cannot name passed"
+report="$(ls -d "$TMP/screenshot-unparsed"/*/ | head -n1)"
+assert_json "$report/results.json" '"takeScreenshot step not understood" in data["flows"][0]["reason"]'
+
+status="$(MAESTRO_FAKE_VERSION=2.0.0 run_case maestro-too-old bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-pass.yaml)"
+[[ "$status" != 0 ]] || fail "a Maestro older than the supported minimum passed"
+report="$(ls -d "$TMP/maestro-too-old"/*/ | head -n1)"
+assert_json "$report/results.json" 'data["flows"][0]["reason"].startswith("maestro 2.8.0 or newer required")'
 
 status="$(ADB_PACKAGE_STATUS=1 run_case package-missing bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-pass.yaml)"
 [[ "$status" != 0 ]] || fail "missing package passed"

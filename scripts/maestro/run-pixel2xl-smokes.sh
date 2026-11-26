@@ -22,9 +22,56 @@ sha256() { sha256sum "$1" | awk '{print $1}'; }
 version_of() { [[ -n "$1" ]] && "$1" --version 2>&1 | tr '\n' ' ' | cut -c1-500 || printf unavailable; }
 prop() { [[ -n "$ADB_PATH" ]] && "$ADB_PATH" -s "$DEVICE_SERIAL" shell getprop "$1" 2>/dev/null | tr -d '\r' || true; }
 
-# Names given to the flow's takeScreenshot steps (one per line, quotes stripped).
+# The collector below reads the <test-output-dir>/<timestamp>/<flow>/takeScreenshot/ layout, which
+# was verified on Maestro 2.8.0; older releases are not known to write it, so they are refused.
+MAESTRO_MIN_VERSION="2.8.0"
+
+# Succeeds when the X.Y.Z version printed by `maestro --version` ($1) is at least the minimum.
+maestro_version_supported() {
+  local found
+  found="$(printf '%s\n' "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+  [[ -n "$found" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "$MAESTRO_MIN_VERSION" "$found" | sort -V | head -n1)" == "$MAESTRO_MIN_VERSION" ]]
+}
+
+# Names given to the flow's takeScreenshot steps (one per line, quotes stripped). Understands the
+# scalar form (`- takeScreenshot: name`) and the mapping form (`- takeScreenshot:` then an indented
+# `path: name`). Any other takeScreenshot command prints `!unparsed <line>` and makes the function
+# return 1, so a step the parser cannot name fails the flow instead of being skipped.
 expected_screenshot_names() {
-  sed -nE "s/^[[:space:]]*-[[:space:]]*takeScreenshot:[[:space:]]*['\"]?([^'\"#]*[^'\"#[:space:]])['\"]?[[:space:]]*(#.*)?$/\1/p" "$1"
+  awk '
+    function unquote(v) {
+      sub(/[[:space:]]+#.*$/, "", v); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v)
+      if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+      return v
+    }
+    function indent_of(line) { match(line, /^[[:space:]]*/); return RLENGTH }
+    function close_mapping() {
+      if (pending) { print "!unparsed takeScreenshot at line " pending_line " has no path"; bad = 1 }
+      pending = 0
+    }
+    {
+      if (pending) {
+        if ($0 ~ /^[[:space:]]*(#.*)?$/) next
+        if (indent_of($0) > pending_indent) {
+          if ($0 ~ /^[[:space:]]*path:/) {
+            value = $0; sub(/^[[:space:]]*path:/, "", value); value = unquote(value)
+            if (value == "") { print "!unparsed empty path at line " NR; bad = 1 } else print value
+            pending = 0
+          }
+          next
+        }
+        close_mapping()
+      }
+      if ($0 !~ /takeScreenshot/ || $0 ~ /^[[:space:]]*#/) next
+      if ($0 !~ /^[[:space:]]*-[[:space:]]*takeScreenshot:/) { print "!unparsed line " NR ": " $0; bad = 1; next }
+      rest = $0; sub(/^[[:space:]]*-[[:space:]]*takeScreenshot:/, "", rest); rest = unquote(rest)
+      if (rest == "") { pending = 1; pending_line = NR; pending_indent = indent_of($0); next }
+      if (rest ~ /^[{[]/ || rest ~ /[:'"'"'"]/) { print "!unparsed line " NR ": " $0; bad = 1; next }
+      print rest
+    }
+    END { close_mapping(); exit bad }
+  ' "$1"
 }
 
 # Copy the images Maestro wrote for takeScreenshot steps out of its output directory ($1) into $2.
@@ -68,6 +115,8 @@ PACKAGE_PATHS=()
 APK_ARTIFACTS=""
 if [[ -z "$MAESTRO_BIN" ]]; then
   PRECHECK_REASON="maestro not found"
+elif ! maestro_version_supported "$("$MAESTRO_BIN" --version 2>/dev/null)"; then
+  PRECHECK_REASON="maestro $MAESTRO_MIN_VERSION or newer required (found: $(version_of "$MAESTRO_BIN"))"
 elif [[ -z "$ADB_PATH" ]]; then
   PRECHECK_REASON="adb not found"
 elif ! "$ADB_PATH" -s "$DEVICE_SERIAL" wait-for-device >/dev/null 2>&1; then
@@ -186,6 +235,10 @@ for flow in "${FLOWS[@]}"; do
       [[ -s "$LOGCAT" ]] || add_reason "mandatory evidence empty: $(basename "$LOGCAT")"
       # Fail closed: every takeScreenshot step must have produced its own non-empty image.
       while IFS= read -r shot_name || [[ -n "$shot_name" ]]; do
+        if [[ "$shot_name" == '!unparsed '* ]]; then
+          add_reason "takeScreenshot step not understood (${shot_name#!unparsed })"
+          continue
+        fi
         [[ -s "$SCREENSHOTS/$shot_name.png" ]] || add_reason "expected screenshot evidence missing: $shot_name"
       done < <(expected_screenshot_names "$FLOW_PATH")
       if [[ "$CAPTURE_SENSITIVE_EVIDENCE" != "1" ]]; then
