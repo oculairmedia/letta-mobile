@@ -35,8 +35,10 @@ import java.io.File
 import java.nio.file.Paths
 
 /**
- * The inputs of a node's admin_rpc router. [build] assembles the router; every null input leaves
- * its methods unregistered or failing closed.
+ * The inputs of a node's admin_rpc router. [build] assembles the router. What a null input means
+ * depends on the input, as each property says: most leave their methods unregistered or failing
+ * closed, but a null [skillsDir] uses the host's default skills discovery and a null
+ * [subagentRegistryFile] serves an in-memory registry.
  *
  * @property controller the runtime controller the router's runtime and agent methods act through.
  * @property subagentRegistrySource replaces the controller-native subagent registry when set.
