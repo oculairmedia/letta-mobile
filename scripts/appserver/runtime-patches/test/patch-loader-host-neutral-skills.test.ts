@@ -357,3 +357,74 @@ test("lcp-system-prompt-tracking: a settings-only entry is copied into the recor
   assert.deepEqual(out.after, { preset: "default", hash: "sha256:legacy", version: "0.0.1" });
   assert.deepEqual(out.afterUpdate, out.after);
 });
+
+test("lcp-skill-dir: a skill directory name with replacement tokens ($&, $1, $$) is inserted literally", (t) => {
+  if (!deployedBundleOrSkip(t)) return;
+  const workDir = workDirFor(t);
+  const out = runChild(t, workDir, `
+    const skillBody = "---\\nname: tidy\\ndescription: d\\n---\\nRun <SKILL_DIR>/run.sh, then read \${CLAUDE_SKILL_DIR}/ref.md.\\n";
+    const dir = join(workDir, "store", "memfs", ${JSON.stringify(AGENT)}, "memory", "skills", "t$&i$1d$$y");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(join(dir, "SKILL.md"), skillBody);
+    out.memfs = bundle.renderSkillContent("tidy", skillBody, join(dir, "SKILL.md"), { agentId: ${JSON.stringify(AGENT)} });
+  `);
+  const dir = "$MEMORY_DIR/skills/t$&i$1d$$y";
+  assert.ok(out.memfs.includes(`Run ${dir}/run.sh, then read ${dir}/ref.md.`), out.memfs);
+  assert.ok(out.memfs.includes(`Skill directory: ${dir}\n`), out.memfs);
+});
+
+test("lcp-system-prompt-tracking: a failed record write is retried by the next identical write", (t) => {
+  if (!deployedBundleOrSkip(t)) return;
+  const workDir = workDirFor(t);
+  const out = runChild(t, workDir, `
+    ${TRACKING_SETUP}
+    const agent = store.createAgent({ name: "retry", system: "OLD MANAGED PROMPT", tags: ["memfs:disabled"] });
+    process.env.LCP_AGENT_ID = agent.id;
+    sm.setManagedSystemPrompt(agent.id, { preset: "default", hash: "sha256:managed", version: "0.0.1" });
+    const recordFile = fs.readdirSync(agentsDir).map((name) => join(agentsDir, name))
+      .find((file) => JSON.parse(fs.readFileSync(file, "utf8")).id === agent.id);
+    out.before = readRecord().system_prompt_tracking;
+    // The real persistAgent write fails (EISDIR) while the record path is a directory.
+    fs.rmSync(recordFile);
+    fs.mkdirSync(recordFile);
+    sm.setSystemPromptCustom(agent.id);
+    fs.rmdirSync(recordFile);
+    out.afterFailure = fs.existsSync(recordFile);
+    sm.setSystemPromptCustom(agent.id);
+    out.afterRetry = fs.existsSync(recordFile) ? JSON.parse(fs.readFileSync(recordFile, "utf8")).system_prompt_tracking ?? null : "missing";
+  `);
+  assert.deepEqual(out.before, { preset: "default", hash: "sha256:managed", version: "0.0.1" });
+  assert.equal(out.afterFailure, false, "the failed write left no record file");
+  assert.deepEqual(out.afterRetry, { preset: "custom" }, "the identical retry reaches the file");
+});
+
+test("lcp-system-prompt-tracking: the settings.json migration never overwrites tracking a peer wrote meanwhile", (t) => {
+  if (!deployedBundleOrSkip(t)) return;
+  const workDir = workDirFor(t);
+  const out = runChild(t, workDir, `
+    ${TRACKING_SETUP}
+    const agent = store.createAgent({ name: "race", system: "OLD MANAGED PROMPT", tags: ["memfs:disabled"] });
+    process.env.LCP_AGENT_ID = agent.id;
+    sm.upsertAgentSettings(agent.id, { systemPromptPreset: "default", systemPromptHash: "sha256:stale", systemPromptVersion: "0.0.1" });
+    const recordFile = fs.readdirSync(agentsDir).map((name) => join(agentsDir, name))
+      .find((file) => JSON.parse(fs.readFileSync(file, "utf8")).id === agent.id);
+    // Another node replicates tracking into the record right after this node's first read.
+    const realRefresh = store.refreshAgentRecordFromStorage.bind(store);
+    let reads = 0;
+    store.refreshAgentRecordFromStorage = (id) => {
+      const record = realRefresh(id);
+      if (++reads === 1) {
+        const peer = { ...JSON.parse(fs.readFileSync(recordFile, "utf8")), system_prompt_tracking: { preset: "custom" } };
+        fs.writeFileSync(recordFile, JSON.stringify(peer, null, 2) + "\\n");
+        const later = new Date(Date.now() + 60_000);
+        fs.utimesSync(recordFile, later, later);
+      }
+      return record;
+    };
+    out.preset = sm.getSystemPromptPreset(agent.id);
+    out.reads = reads;
+    out.file = JSON.parse(fs.readFileSync(recordFile, "utf8")).system_prompt_tracking ?? null;
+  `);
+  assert.ok(out.reads >= 2, `the migration re-reads the record before writing (reads=${out.reads})`);
+  assert.deepEqual(out.file, { preset: "custom" }, "the peer's tracking survives the lazy migration");
+});
