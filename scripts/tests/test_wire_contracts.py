@@ -171,6 +171,20 @@ class WireContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "baseline grew"):
             self.module.require_no_growth({"a.method", "new.method"}, previous)
 
+    def test_core_protocol_spec_with_fixtures_beside_it_is_not_an_orphan(self):
+        self.pair()
+        spec = self.root / self.module.SPECS / "node-protocol/node-protocol-v1.md"
+        spec.parent.mkdir(parents=True)
+        spec.write_text("# node protocol v1\n")
+        (spec.parent / "codec-vectors-v1.json").write_text("{}")
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+        # The exemption is the directory, not any spec: another directory's spec without a fixture is still an orphan.
+        other = self.root / self.module.SPECS / "node-other/node-other-v1.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("# other\n")
+        with self.assertRaisesRegex(ValueError, "without fixture"):
+            self.module.contracts(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

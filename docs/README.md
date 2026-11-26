@@ -309,6 +309,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Node carrier v1: one client stack over any transport](reference/contracts/node-carrier/node-carrier-v1.md)
 
+### reference/contracts/node-protocol
+
+- [Node protocol v1: endpoint, session, auth, control lane and framing](reference/contracts/node-protocol/node-protocol-v1.md)
+
 ### reference/contracts/pins.get
 
 - [pins.get: pins v1](reference/contracts/pins.get/pins-v1.md)

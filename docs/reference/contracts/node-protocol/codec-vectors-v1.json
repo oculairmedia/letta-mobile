@@ -1,0 +1,260 @@
+{
+  "contract": "node-protocol-codec",
+  "version": 1,
+  "spec": "docs/reference/contracts/node-protocol/node-protocol-v1.md",
+  "default_limits": {"max_frame_bytes": 1048576, "max_reassembled_bytes": 33554432},
+  "notation": "A byte vector is an array of segments concatenated in order: {\"hex\": \"..\"}, {\"utf8\": \"..\"} or {\"repeat_hex\": \"..\", \"count\": N}. limits defaults to default_limits. encode names the encoder (plain: one frame; parts: frame_part encoding) whose output for payload is wire_parts, one byte vector per buffer. A decoder fed wire (or the concatenated wire_parts) yields frames, or fails with error.kind on push or on finish; error.frames_before are the frames a decoder fed one byte at a time delivers first.",
+  "vectors": [
+    {
+      "name": "plain_hello",
+      "summary": "A plain frame: u32 big-endian length, then the bytes.",
+      "encode": "plain",
+      "payload": [{"utf8": "hello"}],
+      "wire_parts": [[{"hex": "0000000568656c6c6f"}]],
+      "frames": [[{"utf8": "hello"}]]
+    },
+    {
+      "name": "plain_auth_frame",
+      "summary": "A whole auth frame as a client sends it.",
+      "encode": "plain",
+      "payload": [{"utf8": "{\"type\":\"auth\",\"request_id\":\"node-1\",\"token\":\"0123456789abcdef\",\"capabilities\":[\"frame_part\"]}"}],
+      "wire_parts": [[{"hex": "0000005e7b2274797065223a2261757468222c22726571756573745f6964223a226e6f64652d31222c22746f6b656e223a2230313233343536373839616263646566222c226361706162696c6974696573223a5b226672616d655f70617274225d7d"}]],
+      "frames": [[{"utf8": "{\"type\":\"auth\",\"request_id\":\"node-1\",\"token\":\"0123456789abcdef\",\"capabilities\":[\"frame_part\"]}"}]]
+    },
+    {
+      "name": "plain_empty",
+      "summary": "A zero-length plain frame decodes to an empty payload.",
+      "encode": "plain",
+      "payload": [{"utf8": ""}],
+      "wire_parts": [[{"hex": "00000000"}]],
+      "frames": [[{"utf8": ""}]]
+    },
+    {
+      "name": "plain_multibyte_utf8",
+      "summary": "Lengths count UTF-8 bytes, not characters.",
+      "encode": "plain",
+      "payload": [{"utf8": "é✓"}],
+      "wire_parts": [[{"hex": "00000005c3a9e29c93"}]],
+      "frames": [[{"utf8": "é✓"}]]
+    },
+    {
+      "name": "parts_encoder_leaves_a_fitting_frame_plain",
+      "summary": "frame_part encoding of a payload that fits one frame is the plain frame.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"utf8": "12345678"}],
+      "wire_parts": [[{"hex": "000000083132333435363738"}]],
+      "frames": [[{"utf8": "12345678"}]]
+    },
+    {
+      "name": "parts_one_byte_over",
+      "summary": "One byte over the frame limit: a full part 0 and a one-byte FIN part 1.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"utf8": "abcdefghi"}],
+      "wire_parts": [[{"hex": "7fffffff0000000000000000086162636465666768"}], [{"hex": "7fffffff01000000010000000169"}]],
+      "frames": [[{"utf8": "abcdefghi"}]]
+    },
+    {
+      "name": "parts_exact_multiple",
+      "summary": "A payload of exactly two frames: two full parts, the second flagged FIN.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"utf8": "abcdefghijklmnop"}],
+      "wire_parts": [[{"hex": "7fffffff0000000000000000086162636465666768"}], [{"hex": "7fffffff010000000100000008696a6b6c6d6e6f70"}]],
+      "frames": [[{"utf8": "abcdefghijklmnop"}]]
+    },
+    {
+      "name": "parts_split_mid_character",
+      "summary": "A part boundary may split a UTF-8 character; only the reassembled frame is decoded.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"utf8": "aaaaaaaé"}],
+      "wire_parts": [[{"hex": "7fffffff00000000000000000861616161616161c3"}], [{"hex": "7fffffff010000000100000001a9"}]],
+      "frames": [[{"utf8": "aaaaaaaé"}]]
+    },
+    {
+      "name": "parts_at_the_reassembly_limit",
+      "summary": "A logical frame exactly at the reassembly limit is accepted.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"utf8": "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"}],
+      "wire_parts": [[{"hex": "7fffffff0000000000000000084142434445464748"}], [{"hex": "7fffffff000000000100000008494a4b4c4d4e4f50"}], [{"hex": "7fffffff0000000002000000085152535455565758"}], [{"hex": "7fffffff010000000300000008595a5b5c5d5e5f60"}]],
+      "frames": [[{"utf8": "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"}]]
+    },
+    {
+      "name": "default_largest_plain_frame",
+      "summary": "With the default limits a 1 MiB payload is still one plain frame.",
+      "encode": "parts",
+      "payload": [{"repeat_hex": "78", "count": 1048576}],
+      "wire_parts": [[{"hex": "00100000"}, {"repeat_hex": "78", "count": 1048576}]],
+      "frames": [[{"repeat_hex": "78", "count": 1048576}]]
+    },
+    {
+      "name": "default_one_byte_over_a_frame",
+      "summary": "With the default limits 1 MiB + 1 bytes go out as a full 1 MiB part 0 and a one-byte FIN part 1.",
+      "encode": "parts",
+      "payload": [{"repeat_hex": "78", "count": 1048577}],
+      "wire_parts": [[{"hex": "7fffffff000000000000100000"}, {"repeat_hex": "78", "count": 1048576}], [{"hex": "7fffffff01000000010000000178"}]],
+      "frames": [[{"repeat_hex": "78", "count": 1048577}]]
+    },
+    {
+      "name": "encode_plain_too_large",
+      "summary": "The plain encoder refuses a payload over the frame limit.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "plain",
+      "payload": [{"utf8": "abcdefghi"}],
+      "encode_error": "frame_too_large"
+    },
+    {
+      "name": "encode_parts_over_the_reassembly_limit",
+      "summary": "The part encoder refuses a payload over the reassembly limit.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "encode": "parts",
+      "payload": [{"repeat_hex": "61", "count": 33}],
+      "encode_error": "logical_frame_too_large"
+    },
+    {
+      "name": "back_to_back_frames",
+      "summary": "Two plain frames in one chunk decode in order.",
+      "wire": [{"hex": "0000000c7b2274797065223a2261227d0000000c7b2274797065223a2262227d"}],
+      "frames": [[{"utf8": "{\"type\":\"a\"}"}], [{"utf8": "{\"type\":\"b\"}"}]]
+    },
+    {
+      "name": "plain_parts_plain",
+      "summary": "Plain frames before and after a part sequence decode in order.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "000000066265666f72657fffffff00000000000000000873706c69742061637fffffff000000000100000008726f7373207061727fffffff0100000002000000027473000000056166746572"}],
+      "frames": [[{"utf8": "before"}], [{"utf8": "split across parts"}], [{"utf8": "after"}]]
+    },
+    {
+      "name": "part_indexes_restart_per_logical_frame",
+      "summary": "Each logical frame's parts start again at index 0.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000000000000000086669727374206c6f7fffffff010000000100000005676963616c7fffffff0000000000000000087365636f6e64206c7fffffff0100000001000000066f676963616c"}],
+      "frames": [[{"utf8": "first logical"}], [{"utf8": "second logical"}]]
+    },
+    {
+      "name": "plain_length_over_the_limit",
+      "summary": "A plain length prefix over the frame limit is refused from the prefix alone.",
+      "wire": [{"hex": "00100001"}],
+      "error": {"kind": "frame_too_large", "at": "push"}
+    },
+    {
+      "name": "plain_length_high_bit",
+      "summary": "A length with the top bit set (not the sentinel) is an oversized plain frame.",
+      "wire": [{"hex": "80000000"}],
+      "error": {"kind": "frame_too_large", "at": "push"}
+    },
+    {
+      "name": "part_out_of_sequence",
+      "summary": "A gap in part indexes is refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000000000000000036f6e657fffffff0100000002000000057468726565"}],
+      "error": {"kind": "part_out_of_sequence", "at": "push"}
+    },
+    {
+      "name": "part_repeated",
+      "summary": "A repeated part index is refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000000000000000036f6e657fffffff0100000000000000036f6e65"}],
+      "error": {"kind": "part_out_of_sequence", "at": "push"}
+    },
+    {
+      "name": "part_sequence_not_starting_at_zero",
+      "summary": "A sequence must start at part 0.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0100000001000000036f6e65"}],
+      "error": {"kind": "part_out_of_sequence", "at": "push"}
+    },
+    {
+      "name": "plain_frame_mid_sequence",
+      "summary": "A plain frame inside a part sequence is refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000000000000000036f6e6500000005706c61696e"}],
+      "error": {"kind": "plain_frame_mid_sequence", "at": "push"}
+    },
+    {
+      "name": "part_unknown_flag_bit",
+      "summary": "A flag bit other than FIN is refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0200000000000000036f6e65"}],
+      "error": {"kind": "unknown_part_flags", "at": "push"}
+    },
+    {
+      "name": "part_corrupt_flags",
+      "summary": "Corrupt flags (0x7e) are refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff7e00000000000000036f6e65"}],
+      "error": {"kind": "unknown_part_flags", "at": "push"}
+    },
+    {
+      "name": "part_zero_length",
+      "summary": "A part must carry at least one byte.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff010000000000000000"}],
+      "error": {"kind": "invalid_part_length", "at": "push"}
+    },
+    {
+      "name": "part_length_over_the_frame_limit",
+      "summary": "A part longer than the frame limit is refused from its header alone.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff010000000000000009"}],
+      "error": {"kind": "invalid_part_length", "at": "push"}
+    },
+    {
+      "name": "reassembly_over_the_limit",
+      "summary": "A part that would take the reassembled frame past the limit is refused from its header.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 20},
+      "wire": [{"hex": "7fffffff00000000000000000800000000000000007fffffff00000000010000000800000000000000007fffffff000000000200000008"}],
+      "error": {"kind": "reassembly_too_large", "at": "push"}
+    },
+    {
+      "name": "pre_auth_reassembly_limit",
+      "summary": "Before auth the reassembly limit is one frame, so a second part is refused.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 8},
+      "wire": [{"hex": "7fffffff00000000000000000861626364656667687fffffff01000000010000000169"}],
+      "error": {"kind": "reassembly_too_large", "at": "push"}
+    },
+    {
+      "name": "error_after_a_good_frame",
+      "summary": "Frames before a protocol error are delivered when they arrive in earlier chunks.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "000000026f6b7fffffff400000000000000003626164"}],
+      "error": {"kind": "unknown_part_flags", "at": "push", "frames_before": [[{"utf8": "ok"}]]}
+    },
+    {
+      "name": "truncated_length_prefix",
+      "summary": "A stream that ends inside a length prefix is truncated.",
+      "wire": [{"hex": "0000"}],
+      "error": {"kind": "truncated", "at": "finish"}
+    },
+    {
+      "name": "truncated_payload",
+      "summary": "A stream that ends inside a payload is truncated.",
+      "wire": [{"hex": "0000000568656c6c"}],
+      "error": {"kind": "truncated", "at": "finish"}
+    },
+    {
+      "name": "truncated_part_header",
+      "summary": "A stream that ends inside a part header is truncated.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000"}],
+      "error": {"kind": "truncated", "at": "finish"}
+    },
+    {
+      "name": "truncated_mid_sequence",
+      "summary": "A stream that ends between the parts of one logical frame is truncated.",
+      "limits": {"max_frame_bytes": 8, "max_reassembled_bytes": 32},
+      "wire": [{"hex": "7fffffff0000000000000000036f6e65"}],
+      "error": {"kind": "truncated", "at": "finish"}
+    },
+    {
+      "name": "invalid_utf8_payload",
+      "summary": "A complete frame whose payload is not UTF-8 is refused.",
+      "wire": [{"hex": "00000002c328"}],
+      "error": {"kind": "invalid_utf8", "at": "push"},
+      "kotlin_divergence": "The Kotlin codec decodes malformed UTF-8 leniently (U+FFFD replacement) instead of refusing it."
+    }
+  ]
+}
