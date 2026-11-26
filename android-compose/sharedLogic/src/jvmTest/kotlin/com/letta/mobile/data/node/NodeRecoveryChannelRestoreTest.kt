@@ -187,7 +187,7 @@ class NodeRecoveryChannelRestoreTest {
         val nodeJob = Job(backgroundScope.coroutineContext[Job])
         val nodeScope = backgroundScope + nodeJob
         val brokenCache = object : ChannelAccountCache {
-            override fun lastKnownEnabled(): List<ChannelAccountRef> = throw IllegalStateException("cache unreadable")
+            override fun lastKnownEnabled(): List<ChannelAccountRef> = error("cache unreadable")
 
             override fun record(accounts: List<ChannelAccountRef>) = Unit
         }
