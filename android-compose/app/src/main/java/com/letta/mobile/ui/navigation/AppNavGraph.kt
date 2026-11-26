@@ -165,7 +165,6 @@ fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
     notificationTarget: AppLaunchTarget? = null,
     onNotificationTargetConsumed: () -> Unit = {},
-    focusInputs: com.letta.mobile.data.shell.CurrentFocusInputs? = null,
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
     val activeConfig by navViewModel.activeConfig.collectAsStateWithLifecycle()
@@ -180,10 +179,9 @@ fun AppNavGraph(
                     start = start,
                     config = activeConfig,
                     exits = androidShellExits(navController),
-                    launch = AndroidShellLaunch(
-                        notificationTarget, onNotificationTargetConsumed,
-                        { navController.navigate(PairingScanRoute) }, focusInputs,
-                    ),
+                    launch = AndroidShellLaunch(notificationTarget, onNotificationTargetConsumed) {
+                        navController.navigate(PairingScanRoute)
+                    },
                 )
             }
             pairingRoutes(navController)
