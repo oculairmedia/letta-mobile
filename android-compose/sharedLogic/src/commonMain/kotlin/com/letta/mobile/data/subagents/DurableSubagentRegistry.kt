@@ -68,6 +68,13 @@ class DurableSubagentRegistry(
     /** Insertion-ordered so eviction and snapshots are deterministic. */
     private val entries = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
 
+    /**
+     * The terminal state of keys capacity eviction dropped, oldest first and bounded by
+     * [MAX_EVICTED_TOMBSTONES]. Persisted beside [entries] so a replayed RUNNING snapshot for an
+     * evicted key is refused, also after a restart, instead of being inserted as a new live chip.
+     */
+    private val evictedTombstones = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
+
     init {
         rehydrate()
         retirePreviousProcess()
@@ -176,7 +183,14 @@ class DurableSubagentRegistry(
         }
         synchronized(lock) {
             entries.clear()
-            loaded.forEach { entries[it.key] = it }
+            evictedTombstones.clear()
+            loaded.forEach { record ->
+                if (record.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED) {
+                    evictedTombstones[record.key] = record
+                } else {
+                    entries[record.key] = record
+                }
+            }
             restartUnobserved.addAll(loaded.filter {
                 !it.state.isTerminal && (startupProcessIdentity == null || it.appServerProcessIdentity == null)
             }.map { it.key })
@@ -256,7 +270,8 @@ class DurableSubagentRegistry(
         val now = clock()
         val observedProcessIdentity = readProcessIdentity()
         val existing = entries[observation.key]
-            ?: return ObserveResult.Accepted(insertLocked(observation, now, observedProcessIdentity))
+            ?: return evictedTombstones[observation.key]?.let { tombstone -> refuseEvicted(tombstone, observation) }
+                ?: ObserveResult.Accepted(insertLocked(observation, now, observedProcessIdentity))
 
         // letta-mobile-7vs4s: precedence is checked BEFORE the lifecycle edge so
         // a stale weak source can neither advance nor rewind a strong fact.
@@ -286,6 +301,17 @@ class DurableSubagentRegistry(
         persistLocked()
         return ObserveResult.Accepted(merged)
     }
+
+    /**
+     * An evicted key keeps its terminal fact: replaying it is a no-op, and any other edge (notably
+     * RUNNING) is illegal, exactly as it would be for a retained terminal record.
+     */
+    private fun refuseEvicted(tombstone: SubagentChipRecord, observation: SubagentChipObservation): ObserveResult =
+        if (tombstone.state.canAdvanceTo(observation.state)) {
+            ObserveResult.Accepted(tombstone)
+        } else {
+            ObserveResult.IllegalTransition(tombstone, observation)
+        }
 
     private fun insertLocked(
         observation: SubagentChipObservation,
@@ -624,7 +650,7 @@ class DurableSubagentRegistry(
                 terminalAtEpochMs = clock(),
             )
             // A failed write must not acknowledge a mutation that will be lost on restart.
-            store.save(entries.values.map { if (it.key == key) dismissed else it })
+            store.save(entries.values.map { if (it.key == key) dismissed else it } + evictedTombstones.values)
             entries[key] = dismissed
             listOf(dismissed)
         }
@@ -699,6 +725,7 @@ class DurableSubagentRegistry(
             // A later chip reusing this key must not inherit the evicted one's absence clock.
             snapshotAbsence.forget(victim.key)
             restartUnobserved.remove(victim.key)
+            rememberEvictedLocked(victim)
             evicted += victim
         }
         evicted.forEach { victim ->
@@ -723,13 +750,32 @@ class DurableSubagentRegistry(
         }
     }
 
+    /** Keep only the evicted key's terminal fact; the oldest tombstone goes past the bound. */
+    private fun rememberEvictedLocked(victim: SubagentChipRecord) {
+        evictedTombstones.remove(victim.key)
+        evictedTombstones[victim.key] = SubagentChipRecord(
+            conversationId = victim.conversationId,
+            agentId = victim.agentId,
+            toolCallId = victim.toolCallId,
+            state = victim.state,
+            source = victim.source,
+            firstSeenEpochMs = victim.firstSeenEpochMs,
+            lastSeenEpochMs = victim.lastSeenEpochMs,
+            terminalAtEpochMs = victim.terminalAtEpochMs,
+            terminalReason = SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED,
+        )
+        while (evictedTombstones.size > MAX_EVICTED_TOMBSTONES) {
+            evictedTombstones.remove(evictedTombstones.keys.first())
+        }
+    }
+
     private fun evictionCandidates(): List<SubagentChipRecord> = entries.values
         .filter { it.state.isTerminal }
         .filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
         .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
 
     private fun persistLocked() {
-        runCatching { store.save(entries.values.toList()) }
+        runCatching { store.save(entries.values.toList() + evictedTombstones.values) }
             .onFailure { Telemetry.error(TAG, "persist.failed", it) }
     }
 
@@ -737,6 +783,7 @@ class DurableSubagentRegistry(
     fun clear() {
         synchronized(lock) {
             entries.clear()
+            evictedTombstones.clear()
             restartUnobserved.clear()
             snapshotAbsence.retainKeys(emptySet())
             persistLocked()
@@ -757,6 +804,13 @@ class DurableSubagentRegistry(
          * eviction is recorded at WARN because it means chip history was lost.
          */
         const val MAX_ENTRIES = 512
+
+        /**
+         * Evicted keys whose terminal fact is retained. A tombstone is identity plus state only
+         * (well under 300 bytes), so the bound costs at most about 1 MiB on disk. A key evicted
+         * more than this many evictions ago is forgotten and could be inserted again.
+         */
+        const val MAX_EVICTED_TOMBSTONES = 4096
 
         /** Early (pre-receipt) terminal notifications retained per dispatch; oldest dropped first. */
         const val MAX_EARLY_TERMINALS = 8

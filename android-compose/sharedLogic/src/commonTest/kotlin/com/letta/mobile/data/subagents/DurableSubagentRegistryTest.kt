@@ -566,8 +566,8 @@ class DurableSubagentRegistryTest {
     }
 
     private fun List<SubagentChipRecord>.evictedTombstones() =
-        filter { it.terminalReason == "capacity_evicted" }
+        filter { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED }
 
     private fun List<SubagentChipRecord>.ordinary() =
-        filterNot { it.terminalReason == "capacity_evicted" }
+        filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED }
 }

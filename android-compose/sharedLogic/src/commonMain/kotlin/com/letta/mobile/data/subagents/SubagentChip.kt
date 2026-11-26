@@ -236,6 +236,9 @@ data class SubagentChipRecord(
 
         /** The user hid this record without stopping its worker. */
         const val TERMINAL_REASON_USER_DISMISSED = "user_dismissed"
+
+        /** Tombstone of a terminal record capacity eviction dropped; never shown, only refuses replays. */
+        const val TERMINAL_REASON_CAPACITY_EVICTED = "capacity_evicted"
     }
 }
 
