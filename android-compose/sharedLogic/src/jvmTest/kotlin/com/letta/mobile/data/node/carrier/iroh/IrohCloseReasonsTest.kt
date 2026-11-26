@@ -15,6 +15,28 @@ class IrohCloseReasonsTest {
     }
 
     @Test
+    fun everyCloseTheNodeMakesSurvivesTheText() {
+        listOf(
+            NodeLinkClosure(4401L, "not_authenticated"),
+            NodeLinkClosure(4403L, "peer_revoked"),
+            NodeLinkClosure(4403L, "peer_not_allowed"),
+            NodeLinkClosure(4403L, "protocol_not_authorized"),
+            NodeLinkClosure(4404L, "unknown_alpn"),
+            NodeLinkClosure(4400L, "malformed_frame"),
+        ).forEach { closure ->
+            assertEquals(closure, IrohCloseReasons.closureOf("closed by peer: ${closure.reason} (code ${closure.code})"))
+        }
+    }
+
+    @Test
+    fun aReasonThatItselfLooksLikeACodeKeepsTheRealCode() {
+        assertEquals(
+            NodeLinkClosure(4403L, "revoked (code 1) by operator"),
+            IrohCloseReasons.closureOf("closed by peer: revoked (code 1) by operator (code 4403)"),
+        )
+    }
+
+    @Test
     fun aCloseWithoutAnApplicationCodeIsLost() {
         listOf(null, "", "timed out", "reset by peer", "closed", "closed by peer: PROTOCOL_VIOLATION: bad frame").forEach {
             assertEquals(NodeLinkClosure.LOST, IrohCloseReasons.closureOf(it), "close text $it")
