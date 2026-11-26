@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -258,6 +259,44 @@ class ServerStartedTurnFeedTest {
         assertEquals(1, entries(node.journal).count { it.kind == "turn_open" && it.turn != CLIENT_TURN })
     }
 
+    /**
+     * The real client relay: relayTurn with its ServerFrameTap, whose post-turn window (ServerFrameTap.relayQueueAfterTurn)
+     * forwards only `update_queue` to the initiator and stops at the next turn's first stream delta. A turn the server starts
+     * inside that window reaches the phone once, through the node's relay, and the tap forwards none of its deltas.
+     */
+    @Test
+    fun aServerStartedTurnInsideTheClientsPostTurnQueueWindowIsRelayedOnce() = runTest {
+        val phoneViewer = RecordingViewer("observer")
+        val node = node { setOf(phoneViewer) }
+        val phone = FakePhoneLink(RUNTIME_SCOPE, CLIENT_TURN, requestId = "req-1", writeScope = backgroundScope)
+        phone.protocol.postTurnScope = backgroundScope
+        val clientFrames = clientRun()
+        val writer = node.journal.openTurn(AGENT, CONVERSATION, CLIENT_TURN)
+        val controller = controllerRunning(node.frames) {
+            kotlinx.coroutines.flow.flow {
+                clientFrames.forEach { emit(clientDraft(RuntimeEventPayload.RemoteStreamFrame(frameId = key(it), body = it))) }
+                emit(clientDraft(RuntimeEventPayload.RunLifecycleChanged(status = com.letta.mobile.runtime.RuntimeRunStatus.Completed)))
+            }
+        }
+        val turn = launch {
+            node.host.run(NodeTurn(CONVERSATION.value, CLIENT_TURN, phone.fanout, writer) { phone.relay(controller, turnCommandFor(RUNTIME_SCOPE, CLIENT_TURN)) })
+        }
+        runCurrent()
+        clientFrames.forEach { node.frames.emit(decode(it)) }
+        node.frames.emit(turnFinished(CLIENT_RUN))
+        runCurrent()
+        turn.join()
+
+        serverStartedTurn().forEach { node.frames.emit(it) }
+        runCurrent()
+        testScheduler.advanceUntilIdle()
+
+        val tapDeltas = phone.stream.filter { it.type == "stream_delta" }.map { it.kind }
+        assertEquals(listOf("assistant_message", "stop_reason"), tapDeltas, "the client relay carries only its own run")
+        assertEquals(listOf("user_message", "assistant_message", "usage_statistics", "stop_reason"), phoneViewer.frames.map { it.delta().text("message_type") })
+        assertEquals(1, entries(node.journal).count { it.kind == "turn_open" && it.turn != CLIENT_TURN })
+    }
+
     /** A real server-started turn the App Server ran on a `<task-notification>` (feed journal of local-conv-95806538, text redacted). */
     @Test
     fun aCapturedServerStartedTurnReachesTheFeedInFull() = runTest {
@@ -270,7 +309,7 @@ class ServerStartedTurnFeedTest {
         runCurrent()
 
         val journaled = entries(node.journal).filter { it.kind == "stream_delta" }.map { it.payload?.text("message_type") }
-        val expected = captured.map { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonObject.text("message_type") }
+        val expected = captured.map { Json.parseToJsonElement(it).jsonObject.text("message_type") }
         assertEquals(expected, journaled)
         assertEquals("turn_closed", entries(node.journal).last().kind)
         assertTrue(viewer.frames.isNotEmpty())
@@ -348,6 +387,18 @@ class ServerStartedTurnFeedTest {
             frame("""{"message_type":"stop_reason","stop_reason":"end_turn","run_id":"$CLIENT_RUN","seq_id":2,"type":"message"}"""),
         )
 
+        fun key(raw: String): String = (Json.parseToJsonElement(raw).jsonObject["idempotency_key"] as JsonPrimitive).content
+
+        fun clientDraft(payload: RuntimeEventPayload) = com.letta.mobile.runtime.RuntimeEventDraft(
+            backendId = com.letta.mobile.runtime.BackendId("iroh-node-server"),
+            runtimeId = com.letta.mobile.runtime.RuntimeId("iroh-node:${AGENT.value}:${CONVERSATION.value}"),
+            agentId = AGENT,
+            conversationId = com.letta.mobile.runtime.ConversationId(CONVERSATION.value),
+            runId = com.letta.mobile.runtime.RunId(CLIENT_RUN),
+            source = com.letta.mobile.runtime.RuntimeEventSource.LocalRuntime,
+            payload = payload,
+        )
+
         fun loopStatus(run: String, clientMessageId: String): String {
             seq += 1
             return """{"type":"update_loop_status","loop_status":{"status":"PROCESSING_API_RESPONSE","active_run_ids":["$run"],"client_message_ids_by_run_id":{"$run":["$clientMessageId"]}},$RUNTIME,"event_seq":$seq,"emitted_at":"2026-11-26T01:24:00Z","idempotency_key":"update_loop_status:$seq:k"}"""
@@ -355,9 +406,9 @@ class ServerStartedTurnFeedTest {
 
         fun decode(raw: String): AppServerReceivedFrame = AppServerProtocol.decodeFrame(raw, AppServerChannel.Stream)
 
-        fun turnFinished(): AppServerReceivedFrame {
+        fun turnFinished(run: String = RUN): AppServerReceivedFrame {
             seq += 1
-            return decode("""{"type":"turn_finished","turn_id":"turn-4d1c","stop_reason":"end_turn","run_id":"$RUN",$RUNTIME,"event_seq":$seq,"emitted_at":"2026-11-26T01:23:40Z","idempotency_key":"turn_finished:$seq:k"}""")
+            return decode("""{"type":"turn_finished","turn_id":"turn-4d1c","stop_reason":"end_turn","run_id":"$run",$RUNTIME,"event_seq":$seq,"emitted_at":"2026-11-26T01:23:40Z","idempotency_key":"turn_finished:$seq:k"}""")
         }
 
         /** What the App Server sends for a turn it starts on a `<task-notification>`; no client input precedes it. */
