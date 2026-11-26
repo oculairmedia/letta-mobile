@@ -688,7 +688,9 @@ internal fun applyPendingToolReturns(
     if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
     val matchingReturns = ev.takeMatchingPendingReturns(pendingToolReturnsByCallId)
     if (matchingReturns.isEmpty()) return ev
-    val firstReturn = matchingReturns.first().second
+    // The row's own return is its first call's (the UI shows it on call 0), not the first one that matched.
+    val firstCallId = ev.toolCalls.first().effectiveId
+    val firstReturn = matchingReturns.firstOrNull { it.first == firstCallId }?.second
     // letta-mobile-fe51r: shared fold keeps projected previews from
     // clobbering full bodies and tracks truncation markers per call id.
     val fold = foldToolReturnBodies(ev.toolReturnContentByCallId, ev.toolReturnTruncationByCallId, matchingReturns)
@@ -700,12 +702,11 @@ internal fun applyPendingToolReturns(
         "serverId" attr ev.serverId,
         "count" attr matchingReturns.size,
     )
-    val firstCallId = matchingReturns.first().first
     return ev.copy(
         approvalDecided = ev.approvalDecided ||
             ev.willCompleteWith(matchingReturns.mapTo(mutableSetOf()) { it.first }),
         toolReturnContent = fold.contentByCallId[firstCallId] ?: ev.toolReturnContent,
-        toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
+        toolReturnIsError = firstReturn?.let { it.isErr == true || it.status == "error" } == true || ev.toolReturnIsError,
         toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
         toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),

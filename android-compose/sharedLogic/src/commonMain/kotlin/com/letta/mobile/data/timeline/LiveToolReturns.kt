@@ -61,10 +61,12 @@ private fun TimelineEvent.Confirmed.answeredBy(callId: String, returned: ToolRet
     // A return with no body still completes the call.
     val bodies = if (callId in fold.contentByCallId) fold.contentByCallId else fold.contentByCallId + (callId to "")
     val body = bodies.getValue(callId)
+    // The row's own return is its first call's (the UI shows it on call 0); a later call's return lives only in the maps.
+    val ownsRowReturn = toolCalls.firstOrNull()?.effectiveId == callId
     return copy(
         approvalDecided = approvalDecided || willCompleteWith(callId),
-        toolReturnContent = body.ifBlank { toolReturnContent ?: body },
-        toolReturnIsError = isError,
+        toolReturnContent = if (ownsRowReturn) body.ifBlank { toolReturnContent ?: body } else toolReturnContent,
+        toolReturnIsError = if (ownsRowReturn) isError else toolReturnIsError,
         toolReturnContentByCallId = bodies.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = (toolReturnIsErrorByCallId + (callId to isError)).toTimelinePersistentMap(),
         toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
