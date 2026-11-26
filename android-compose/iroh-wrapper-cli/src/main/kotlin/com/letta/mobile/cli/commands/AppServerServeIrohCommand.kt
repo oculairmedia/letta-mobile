@@ -662,16 +662,14 @@ class AppServerServeIrohCommand : CliktCommand(
      * letta-mobile-bn008-phase2-custom-tool (1vuec): build the production
      * [ExternalToolRegistry] for the wrapper.
      *
-     * Returns [ExternalToolRegistry.factoryDefault] (advertises nothing) when
-     * `--meridian-binary` is empty, so an unconfigured wrapper has the same
-     * observable behavior as before this bead.
-     *
-     * Returns a registry with the Iroh agent-message tool wired in (and
-     * capability [com.letta.mobile.data.controller.capability.Capability.AgentMessaging]
-     * enabled) when `--meridian-binary` points at a real binary. The tool is
-     * constructed with the binary path and the wrapper's a2a identity /
-     * address-book directories so the subprocess invocation reads from the
-     * same kv files the operator flow already populated.
+     * Whether the Iroh agent-message tool is offered (with capability
+     * [com.letta.mobile.data.controller.capability.Capability.AgentMessaging]
+     * enabled) is the host bindings' call: on Linux only when
+     * `--meridian-binary` points at a real binary, run as a subprocess; on
+     * Windows always, sent in this process with no binary. Without it the
+     * registry advertises only the host's own tools. The tool is constructed
+     * with the wrapper's a2a identity / address-book directories so it reads
+     * the same kv files the operator flow already populated.
      *
      * Test seam: `buildProductionExternalToolRegistryForTesting` exposes the
      * same logic without the class-private option fields.
