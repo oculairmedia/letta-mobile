@@ -29,7 +29,7 @@ The tests verify the patches against the deployed bundle (`LETTA_CLI_PATH_REAL`,
 
 ```bash
 cd scripts/appserver/runtime-patches
-LETTA_CLI_PATH_REAL=/root/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js \
+LETTA_CLI_PATH_REAL=/root/letta-code-<version>/node_modules/@letta-ai/letta-code/letta.js \
   node --import tsx/esm --test --test-concurrency=1 test/*.test.ts
 ```
 
