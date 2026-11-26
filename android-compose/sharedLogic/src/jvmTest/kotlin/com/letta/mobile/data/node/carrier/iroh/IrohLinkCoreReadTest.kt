@@ -82,6 +82,22 @@ class IrohLinkCoreReadTest {
         assertEquals(NodeLinkClosure.LOST, withTimeout(TIMEOUT) { core.closure.first { it != null } })
     }
 
+    @Test
+    fun aFramingViolationOnTheNodesEndFailsOnlyItsLane() = runBlocking {
+        val nodeEnd = IrohLinkCore(Connection(NoHandle), scope, violationsEndTheLane = true)
+        var sent = false
+        val source: suspend (UInt) -> ByteArray = {
+            if (sent) awaitCancellation()
+            sent = true
+            byteArrayOf(0x00, 0x20, 0x00, 0x01)
+        }
+        val lane = Channel<NodeFrame>(IrohLinkCore.LANE_BUFFER)
+        nodeEnd.readFrom(source, lane, { IrohLinkCore.MAX_FRAME_BYTES }, closeAtEnd = true)
+        val failure = withTimeout(TIMEOUT) { runCatching { lane.receive() }.exceptionOrNull() }
+        assertTrue(failure is IrohFrameCodec.ProtocolException, "the lane fails with the violation: $failure")
+        assertEquals(null, nodeEnd.closure.value, "the link stays up, so the node can answer on the lane")
+    }
+
     private companion object {
         const val PEER_FRAMES = 1_000
         val SETTLE = 300.milliseconds
