@@ -21,10 +21,15 @@ import com.letta.mobile.data.controller.node.iroh.servicecredentials.ServiceCred
 import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStatePublisher
 import com.letta.mobile.data.controller.node.iroh.shellstate.ShellStateRoutes
 import com.letta.mobile.data.controller.node.iroh.voice.VoiceEndpointRoutes
+import com.letta.mobile.data.node.carrier.InProcessNodeCarrier
+import com.letta.mobile.data.node.carrier.NodeAddress
+import com.letta.mobile.data.node.carrier.NodePeerAcceptor
+import com.letta.mobile.data.node.carrier.NodePeerIdentity
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 
 /**
  * One Baken node: the runtime controller over its App Server, the admin_rpc router, the durable
@@ -119,6 +124,33 @@ class NodeComposition(
     suspend fun start(endpoint: IrohNodeEndpoint, connection: NodeAppServerConnection) {
         ports.toolsSocket.start(scope, connection.client)
         endpoint.start(connection.controller)
+    }
+
+    /**
+     * The node's end of every carrier link: each link is served as one node connection on [endpoint], with the same
+     * router, auth, gates, viewers, turns and feed as an Iroh peer accepted there. The in-process shell's link is
+     * admitted as an admin peer by its carrier identity; any other peer meets the endpoint's policy. Links are served
+     * once [start] has run; one that arrives earlier is closed.
+     */
+    fun peerAcceptor(endpoint: IrohNodeEndpoint): NodePeerAcceptor = NodePeerAcceptor { link ->
+        coroutineScope { endpoint.serveWire(NodePeerLinkWire(link, this)) }
+    }
+
+    /**
+     * The carrier the shell in this process attaches to [endpoint]'s node with, at [IN_PROCESS_ADDRESS]. The shell
+     * sees [node] as the node's identity: by default the endpoint's own Iroh id, so it sees the same node over either
+     * carrier (the endpoint must be bound for the default).
+     */
+    fun inProcessCarrier(
+        endpoint: IrohNodeEndpoint,
+        node: NodePeerIdentity = NodePeerIdentity(endpoint.nodeIdHex()),
+    ): InProcessNodeCarrier = InProcessNodeCarrier(IN_PROCESS_NAME, node, peerAcceptor(endpoint), scope)
+
+    companion object {
+        private const val IN_PROCESS_NAME = "node"
+
+        /** The address the shell dials its own process's node at over the in-process carrier. */
+        val IN_PROCESS_ADDRESS: NodeAddress = NodeAddress(InProcessNodeCarrier.SCHEME + IN_PROCESS_NAME)
     }
 
     private fun adminRouterSpec(

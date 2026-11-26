@@ -173,8 +173,8 @@ class InboxArrivalDeliveryTest {
             put("capabilities", buildJsonArray { if (advertised) add(ServerFrame.ConversationActivity.CAPABILITY) })
         }, "auth-1") as String
         assertTrue(Json.parseToJsonElement(response).jsonObject["success"]!!.jsonPrimitive.boolean)
-        val viewer = IrohNodeConnection::class.java.getDeclaredMethod("ensureSelfViewer", SendStream::class.java)
-            .apply { isAccessible = true }.invoke(node, SendStream(NoHandle)) as ViewerHandle
+        val viewer = IrohNodeConnection::class.java.getDeclaredMethod("ensureSelfViewer", ViewerFrameSink::class.java)
+            .apply { isAccessible = true }.invoke(node, sendStreamSink(SendStream(NoHandle))) as ViewerHandle
         val frames = java.util.concurrent.CopyOnWriteArrayList<String>()
         // Exercise the production viewer's gates and length framing with an in-memory JNI sink.
         viewer.javaClass.getDeclaredField("sink").apply { isAccessible = true }.set(viewer, object : ViewerFrameSink {

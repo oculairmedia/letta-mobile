@@ -35,6 +35,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.link.NodeConnectionWire
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
@@ -125,6 +126,10 @@ class IrohNodeEndpoint(
      * endpoint for its whole process; across a restart the durable [turnJournal] recognises it.
      */
     private val clientMessageDedupe = ProcessScopedClientMessageDedupe()
+
+    /** The controller this endpoint generation serves, set with its [turnHost]; links served before that are refused. */
+    @Volatile
+    private var servingController: AppServerController? = null
 
     init {
         // letta-mobile-6vf4r (S3): a connection that starts viewing a conversation mid-turn learns
@@ -407,6 +412,7 @@ class IrohNodeEndpoint(
     internal fun startTurnHost(controller: AppServerController): NodeTurnHost {
         val host = NodeTurnHost.childOf(scope, turnJournal)
         turnHost = host
+        servingController = controller
         controller.observeRuntimeFrames()?.let { frames ->
             host.relayServerStartedTurns(
                 frames,
@@ -548,17 +554,65 @@ class IrohNodeEndpoint(
             connection = connection,
             controller = controller,
             adminRpcRouter = adminRpcRouter,
-            authentication = IrohConnectionAuthentication(
-                authPolicy = authPolicy,
-                authVerifier = authVerifier,
-                pairingService = pairingService,
-                remoteEndpointId = remoteId,
-            ),
+            authentication = peerAuthentication(remoteId),
             connectionRegistry = connectionRegistry,
             clientMessageDedupe = clientMessageDedupe,
             turnHost = turnHost,
             turnIdentity = turnIdentity,
         )
+        serveNodeConnection(nodeConnection, remoteId)
+    }
+
+    /**
+     * Serves one link that reached the node through a carrier other than this endpoint's own accept loop: the shell in
+     * this process over the in-process carrier. It is the same node connection an accepted Iroh peer gets, with the same
+     * router, viewers, turns and feed; only its auth differs for the local shell, which the carrier verified and which
+     * is admitted as an admin peer by construction (a static allowlist of its identity: no token, no pairing record).
+     * Any other peer meets this endpoint's own policy. A link that arrives before [start] is refused.
+     */
+    internal suspend fun serveWire(wire: NodeConnectionWire) {
+        val controller = servingController
+        val host = turnHost
+        if (controller == null || host == null) {
+            Telemetry.event("IrohNode", "link.refused", "remoteEndpointId" attr wire.peerId, "reason" attr "not_started")
+            wire.closeAfterServe()
+            return
+        }
+        if (!wire.localShell && !isPeerAllowed(wire.peerId)) {
+            Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" attr wire.peerId, "reason" attr "peer_not_allowed")
+            runCatching { wire.close(4403L, "peer_not_allowed") }
+            return
+        }
+        val authentication = if (wire.localShell) {
+            IrohConnectionAuthentication(
+                authPolicy = IrohAuthPolicy.PeerAllowlist(setOf(wire.peerId)),
+                remoteEndpointId = wire.peerId,
+            )
+        } else {
+            peerAuthentication(wire.peerId)
+        }
+        val nodeConnection = IrohNodeConnection(
+            wire = wire,
+            controller = controller,
+            adminRpcRouter = adminRpcRouter,
+            authentication = authentication,
+            connectionRegistry = connectionRegistry,
+            turnHost = host,
+            turnIdentity = turnIdentity,
+        )
+        serveNodeConnection(nodeConnection, wire.peerId)
+    }
+
+    /** A remote peer's auth: this endpoint's policy, its shared verifier (so redials keep their failure budget), pairing. */
+    private fun peerAuthentication(remoteId: String) = IrohConnectionAuthentication(
+        authPolicy = authPolicy,
+        authVerifier = authVerifier,
+        pairingService = pairingService,
+        remoteEndpointId = remoteId,
+    )
+
+    /** Serves [nodeConnection] with its app tool relay link, tracked by peer for revocation and canvas admission. */
+    private suspend fun serveNodeConnection(nodeConnection: IrohNodeConnection, remoteId: String) {
         val relayLink = appToolRelay?.link(send = nodeConnection::writeAppToolFrame, ready = { nodeConnection.acceptsAppToolCalls })
         nodeConnection.appToolRelayLink = relayLink
         // Add and remove inside compute, so a peer's entry lives exactly as long as one of its connections:
@@ -614,6 +668,7 @@ class IrohNodeEndpoint(
     suspend fun shutdown() {
         acceptJob?.cancel()
         acceptJob = null
+        servingController = null
         turnHost?.shutdown()
         turnHost = null
 

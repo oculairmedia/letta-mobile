@@ -55176,6 +55176,20 @@ final class com.letta.mobile.data.model/VibesyncStatsResponse { // com.letta.mob
     }
 }
 
+final class com.letta.mobile.data.node.carrier/InProcessNodeCarrier : com.letta.mobile.data.node.carrier/NodeCarrier { // com.letta.mobile.data.node.carrier/InProcessNodeCarrier|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.node.carrier/NodePeerIdentity, com.letta.mobile.data.node.carrier/NodePeerAcceptor, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.<init>|<init>(kotlin.String;com.letta.mobile.data.node.carrier.NodePeerIdentity;com.letta.mobile.data.node.carrier.NodePeerAcceptor;kotlinx.coroutines.CoroutineScope){}[0]
+
+    final val address // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.address|{}address[0]
+        final fun <get-address>(): com.letta.mobile.data.node.carrier/NodeAddress // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.address.<get-address>|<get-address>(){}[0]
+
+    final suspend fun dial(com.letta.mobile.data.node.carrier/NodeAddress): com.letta.mobile.data.node.carrier/NodeLink // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.dial|dial(com.letta.mobile.data.node.carrier.NodeAddress){}[0]
+
+    final object Companion { // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.Companion|null[0]
+        final const val SCHEME // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.Companion.SCHEME|{}SCHEME[0]
+            final fun <get-SCHEME>(): kotlin/String // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.Companion.SCHEME.<get-SCHEME>|<get-SCHEME>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.node.carrier/NodeCapabilities { // com.letta.mobile.data.node.carrier/NodeCapabilities|null[0]
     constructor <init>(kotlin.collections/Set<kotlin/String>, kotlin/Boolean) // com.letta.mobile.data.node.carrier/NodeCapabilities.<init>|<init>(kotlin.collections.Set<kotlin.String>;kotlin.Boolean){}[0]
 

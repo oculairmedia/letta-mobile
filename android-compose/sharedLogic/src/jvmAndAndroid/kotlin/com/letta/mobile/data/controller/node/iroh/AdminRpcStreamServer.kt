@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.link.NodeCallExchange
+import com.letta.mobile.data.controller.node.link.NodeCallFraming
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcConnection
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamHalves
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedExchange
@@ -163,19 +165,28 @@ internal class AdminRpcStreamServer(
      * supervisor scope so one failing stream never tears down siblings or the
      * accept loop itself.
      */
-    suspend fun serveAcceptLoop(acceptBi: suspend () -> AdminRpcBiStream?) = supervisorScope {
+    suspend fun serveAcceptLoop(acceptBi: suspend () -> AdminRpcBiStream?) =
+        serveCalls { acceptBi()?.let(::exchangeOf) }
+
+    /**
+     * Serves call lanes until [nextCall] returns null or the scope is cancelled, each on its own child job under a
+     * supervisor scope, as [serveAcceptLoop] does for raw bi-streams.
+     */
+    suspend fun serveCalls(nextCall: suspend () -> NodeCallExchange?) = supervisorScope {
         while (true) {
-            val stream = acceptBi() ?: break
-            launchHandler(stream)
+            val exchange = nextCall() ?: break
+            launchExchange(exchange)
         }
     }
 
-    fun CoroutineScope.launchHandler(stream: AdminRpcBiStream): Job = launch {
+    fun CoroutineScope.launchHandler(stream: AdminRpcBiStream): Job = launchExchange(exchangeOf(stream))
+
+    private fun CoroutineScope.launchExchange(exchange: NodeCallExchange): Job = launch {
         permits.withPermit {
             val active = activeHandlers.incrementAndGet()
             maxObservedActiveHandlers.updateMax(active)
             try {
-                handleStream(stream)
+                handleExchange(exchange)
             } finally {
                 activeHandlers.decrementAndGet()
             }
@@ -186,10 +197,54 @@ internal class AdminRpcStreamServer(
      * Serves exactly one admin_rpc exchange on [stream]: one request, then one response, or for a
      * streamed method ([AdminRpcRouter.registerStreamed]) stream frames and then the final response.
      */
-    suspend fun handleStream(stream: AdminRpcBiStream) {
+    suspend fun handleStream(stream: AdminRpcBiStream) = handleExchange(exchangeOf(stream))
+
+    /** Frames a raw call lane the way [handleStream] reads and writes a bi-stream. */
+    val callFraming: NodeCallFraming = NodeCallFraming { readBytes, writeBytes, finishLane ->
+        exchangeOf(
+            object : AdminRpcBiStream {
+                override fun recv(): AdminRpcRecvStream = object : AdminRpcRecvStream {
+                    override suspend fun read(maxBytes: UInt): ByteArray = readBytes(maxBytes)
+                }
+
+                override fun send(): AdminRpcSendStream = object : AdminRpcSendStream {
+                    override suspend fun writeAll(bytes: ByteArray) = writeBytes(bytes)
+
+                    override suspend fun finish() = finishLane()
+                }
+            },
+        )
+    }
+
+    /**
+     * [stream] as a call exchange: length-prefixed frames, a request bounded like any frame until the peer has
+     * authenticated and advertised `frame_part`, and a response chunked, or replaced by a typed error, when too large.
+     */
+    private fun exchangeOf(stream: AdminRpcBiStream): NodeCallExchange {
         val sendStream = stream.send()
+        // Chunked (frame_part) requests may only widen reassembly memory
+        // beyond a single frame once the peer has authenticated AND advertised
+        // the capability — otherwise a peer holding just the ticket could pin
+        // maxReassembled bytes per stream before presenting any token.
+        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
+            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
+        })
+        val nextFrame = frameReader(stream.recv(), decoder)
+        return object : NodeCallExchange {
+            override suspend fun next(): String? = nextFrame()
+
+            override suspend fun write(frame: String) = sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes))
+
+            override suspend fun respond(response: String) = writeResponse(sendStream, response)
+
+            override suspend fun finish() = sendStream.finish()
+        }
+    }
+
+    /** Serves one call exchange; a failure answers with an error envelope, and the lane is always finished. */
+    suspend fun handleExchange(exchange: NodeCallExchange) {
         try {
-            exchange(stream, sendStream)
+            exchange(exchange)
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
@@ -199,29 +254,15 @@ internal class AdminRpcStreamServer(
                 "error" attr (error.message ?: error.toString()),
                 "class" attr error::class.simpleName,
             )
-            runCatching {
-                sendStream.writeAll(
-                    IrohFrameCodec.encodeFrame(
-                        errorEnvelope("", error.message ?: "admin_rpc stream failed"),
-                        maxFrameBytes,
-                    ),
-                )
-            }
+            runCatching { exchange.write(errorEnvelope("", error.message ?: "admin_rpc stream failed")) }
         } finally {
-            runCatching { sendStream.finish() }
+            runCatching { exchange.finish() }
         }
     }
 
-    /** Reads the request and answers it: one response, or a streamed exchange. Failures propagate to [handleStream]. */
-    private suspend fun exchange(stream: AdminRpcBiStream, sendStream: AdminRpcSendStream) {
-        // Chunked (frame_part) requests may only widen reassembly memory
-        // beyond a single frame once the peer has authenticated AND advertised
-        // the capability — otherwise a peer holding just the ticket could pin
-        // maxReassembled bytes per stream before presenting any token.
-        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
-            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
-        })
-        val nextFrame = frameReader(stream.recv(), decoder)
+    /** Reads the request and answers it: one response, or a streamed exchange. Failures propagate to [handleExchange]. */
+    private suspend fun exchange(exchange: NodeCallExchange) {
+        val nextFrame: suspend () -> String? = { exchange.next() }
         val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) { nextFrame() }
         var streamed: AdminRpcStreamedRequest? = null
         val response = if (frameJson == null) {
@@ -230,12 +271,12 @@ internal class AdminRpcStreamServer(
             handleFrame(frameJson) { streamed = it }
         }
         streamed?.let { request ->
-            val write: suspend (String) -> Unit = { frame -> sendStream.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes)) }
+            val write: suspend (String) -> Unit = { frame -> exchange.write(frame) }
             streamedExchange.serve(request, AdminRpcStreamHalves(nextFrame, write))
             return
         }
         checkNotNull(response)
-        runCatching { writeResponse(sendStream, response) }
+        runCatching { exchange.respond(response) }
             .onFailure { writeError ->
                 Telemetry.event(
                     "IrohNode", "admin_rpc.stream.error_response_failed",

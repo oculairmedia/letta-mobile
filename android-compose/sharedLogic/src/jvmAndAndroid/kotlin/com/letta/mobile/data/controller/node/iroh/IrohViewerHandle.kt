@@ -25,6 +25,18 @@ import java.util.UUID
  */
 interface ViewerFrameSink {
     suspend fun writeAll(bytes: ByteArray)
+
+    /**
+     * Writes one whole wire [frame]. The default length-prefixes it for a byte stream, split into `frame_part`s when
+     * [frameParts] is true, and hands the bytes to [writeAll]; a sink whose transport carries whole frames overrides it.
+     */
+    suspend fun writeFrame(frame: String, frameParts: Boolean, maxFrameBytes: Int) {
+        if (frameParts) {
+            IrohFrameCodec.encodeFrameParts(frame, maxFrameBytes).forEach { writeAll(it) }
+        } else {
+            writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes))
+        }
+    }
 }
 
 /** Adapt a real Iroh [SendStream] to a [ViewerFrameSink]. */
@@ -136,12 +148,7 @@ internal class IrohViewerHandle(
      */
     private suspend fun writeSerialized(encode: () -> String): Boolean = try {
         streamWriteMutex.withLock {
-            val frame = encode()
-            if (frameParts()) {
-                IrohFrameCodec.encodeFrameParts(frame, maxFrameBytes).forEach { sink.writeAll(it) }
-            } else {
-                sink.writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes))
-            }
+            sink.writeFrame(encode(), frameParts(), maxFrameBytes)
         }
         true
     } catch (e: kotlinx.coroutines.CancellationException) {
