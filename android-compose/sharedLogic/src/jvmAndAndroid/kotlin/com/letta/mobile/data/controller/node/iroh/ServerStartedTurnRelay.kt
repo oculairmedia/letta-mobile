@@ -4,6 +4,9 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.RunId
 import com.letta.mobile.data.runtime.LoopPhase
+import com.letta.mobile.data.runtime.TurnBoundaryDecision
+import com.letta.mobile.data.runtime.TurnBoundaryGate
+import com.letta.mobile.data.runtime.TurnBoundaryInput
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -31,8 +34,10 @@ import java.util.UUID
  * keeps it open however long it was quiet, so one run is never split across two turns. A turn whose `turn_finished`
  * was lost closes (`terminal_observed` false) on the App Server's own evidence that it is over: any frame stamped with
  * a newer connection generation than the one the turn began on, `update_loop_status` binding the active run to a
- * running client turn's prompt, or the runtime's idle loop status (waiting on input, no active run), which the server
- * sends when a turn ends and replays on every sync. The idle status comes before the server's `turn_finished`, and
+ * running client turn's prompt, or the runtime's idle loop status, which the server sends when a turn ends and
+ * replays on every sync. Whether an idle status counts is decided by the same [TurnBoundaryGate] a client turn uses
+ * (waiting on input, no active run, the turn produced evidence, and its latest round did not stop for an approval
+ * continuation). The idle status comes before the server's `turn_finished`, and
  * when a turn is aborted it comes while the turn is still settling, so it does not close the turn at once: it ends
  * the tool/approval exemption and restarts the silence clock, and a delta of another run (the server's next turn)
  * then closes it at once. Otherwise a turn closes once it has shown no sign of life for [SERVER_TURN_SILENCE_MS], but
@@ -57,6 +62,9 @@ internal class ServerStartedTurnRelay(
     private val generations = HashMap<AppServerRuntimeScope, Long>()
     private val runs = HashMap<AppServerRuntimeScope, MutableSet<RunId>>()
     private val busy = HashSet<AppServerRuntimeScope>()
+
+    /** Each open turn's boundary facts, read the way a client turn reads them. Collector-only. */
+    private val gates = HashMap<AppServerRuntimeScope, TurnBoundaryGate>()
 
     /** Open turns whose runtime the server last said is idle (their turn is over). Collector-only. */
     private val idle = HashSet<AppServerRuntimeScope>()
@@ -102,7 +110,7 @@ internal class ServerStartedTurnRelay(
         when (frame) {
             is AppServerInboundFrame.StreamDelta -> onDelta(key, frame, received)
             is AppServerInboundFrame.TurnFinished -> close(key, terminalObserved = true, why = frame.stopReason)
-            is AppServerInboundFrame.UpdateLoopStatus -> onLoopStatus(key, frame.loopStatus)
+            is AppServerInboundFrame.UpdateLoopStatus -> onLoopStatus(key, received, frame.loopStatus)
             else -> Unit
         }
     }
@@ -116,14 +124,15 @@ internal class ServerStartedTurnRelay(
             openTurn(key, received.connectionGeneration)
         }
         seenAtMs[key] = nowMs()
+        gates[key]?.decide(received.boundaryInput())
         run?.let { runs.getOrPut(key) { HashSet() } += it }
         if (!host.claimFrame(frame.idempotencyKey, run, server = true)) return
         current.fanout.relayServerStartedDelta(received.raw)
     }
 
     /** The active run is a running client turn's: it is that turn's, whatever this relay assumed so far. */
-    private fun onLoopStatus(key: AppServerRuntimeScope, status: AppServerLoopStatus) {
-        if (key in open) noteLoopStatus(key, status)
+    private fun onLoopStatus(key: AppServerRuntimeScope, received: AppServerReceivedFrame, status: AppServerLoopStatus) {
+        if (key in open) noteLoopStatus(key, received, status)
         val clientRuns = status.activeRunIds.filter { run ->
             host.clientSent(ConversationId(key.conversationId), status.clientMessageIdsByRunId[run].orEmpty())
         }
@@ -134,14 +143,17 @@ internal class ServerStartedTurnRelay(
 
     /**
      * The server is running a tool or waiting on an approval for this turn (a long quiet stretch is expected then), or
-     * its runtime went idle (the turn is over). A status this relay does not know is neither.
+     * its runtime went idle (the turn is over). A status this relay does not know is neither. The relay keeps no
+     * approval registry, so the gate is told none is outstanding: while one is, the server itself reports
+     * WAITING_ON_APPROVAL or names the run, and the `requires_approval` stop it relayed holds the gate.
      */
-    private fun noteLoopStatus(key: AppServerRuntimeScope, status: AppServerLoopStatus) {
+    private fun noteLoopStatus(key: AppServerRuntimeScope, received: AppServerReceivedFrame, status: AppServerLoopStatus) {
         val phase = status.phase
         if (phase == LoopPhase.Unknown) noteUnknown(status.status)
         if (phase.waitsLong()) busy += key else busy -= key
-        val runtimeIdle = phase.isIdle && status.activeRunIds.none { it.isNotBlank() }
+        val runtimeIdle = gates[key]?.decide(received.boundaryInput()) is TurnBoundaryDecision.LoopIdle
         // Idle restarts the silence clock: an aborted turn may still be settling, and its finish arrives within the bound.
+        // A delta of another run after it then closes the turn at once (closeIfLost).
         if (runtimeIdle && idle.add(key)) seenAtMs[key] = nowMs()
         if (!runtimeIdle) idle -= key
         if (status.activeRunIds.any { it.isNotBlank() && RunId(it) in runs[key].orEmpty() }) seenAtMs[key] = nowMs()
@@ -154,7 +166,8 @@ internal class ServerStartedTurnRelay(
 
     /**
      * A frame on a run this turn already relayed proves the turn is alive, however long it was quiet. Otherwise a delta
-     * of another run after the server said the runtime went idle (the server's next turn), or silence past the bound while the
+     * of another run after the server said the runtime went idle (normally its next turn; a late frame of an earlier
+     * run also counts, and then reopens as its own turn), or silence past the bound while the
      * server was not running a tool or waiting on an approval, means its `turn_finished` was lost. A generation change
      * is handled for every turn at once by [closeOlderGenerations].
      */
@@ -174,10 +187,6 @@ internal class ServerStartedTurnRelay(
 
     private fun isSilent(key: AppServerRuntimeScope): Boolean =
         key !in busy && nowMs() - (seenAtMs[key] ?: 0L) >= SERVER_TURN_SILENCE_MS
-
-    /** A delta naming a run; checked after [ownRunOf], so it names another run than the turn's own. */
-    private fun AppServerReceivedFrame.namesARun(): Boolean =
-        ((frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject)?.runOrNull() != null
 
     private fun AppServerReceivedFrame.ownRunOf(key: AppServerRuntimeScope): Boolean {
         val run = when (val f = frame) {
@@ -201,6 +210,7 @@ internal class ServerStartedTurnRelay(
         )
         val opened = NodeTurn(runtime.conversationId, clientMessageId = null, fanout, writer) {}
         open[runtime] = opened
+        gates[runtime] = TurnBoundaryGate()
         seenAtMs[runtime] = nowMs()
         generation?.let { generations[runtime] = it }
         Telemetry.event("IrohNode", "turn.server_started_opened", "conversationId" attr runtime.conversationId, "turnId" attr turnId)
@@ -214,6 +224,7 @@ internal class ServerStartedTurnRelay(
         runs.remove(key)
         busy.remove(key)
         idle.remove(key)
+        gates.remove(key)
         closed.journal.close(terminalObserved = terminalObserved || closed.fanout.anyTerminalWritten)
         Telemetry.event(
             "IrohNode", "turn.server_started_closed",
@@ -232,10 +243,18 @@ internal class ServerStartedTurnRelay(
             level = Telemetry.Level.WARN,
         )
     }
-
-    private fun JsonObject.runOrNull(): RunId? =
-        (this["run_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::RunId)
 }
+
+private fun JsonObject.runOrNull(): RunId? =
+    (this["run_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::RunId)
+
+/** A delta naming a run; checked after the turn's own runs, so it names another run than the turn's own. */
+private fun AppServerReceivedFrame.namesARun(): Boolean =
+    ((frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject)?.runOrNull() != null
+
+/** A server-started turn has no lease run to compare against and, here, no approval registry. */
+private fun AppServerReceivedFrame.boundaryInput(): TurnBoundaryInput =
+    TurnBoundaryInput(received = this, leaseRunId = null, approvalOutstanding = false)
 
 /** A silence check every [SILENCE_CHECK_MS], so a silent turn closes without waiting for another frame. */
 private fun silenceTicks(): Flow<Unit> = flow {
@@ -245,7 +264,11 @@ private fun silenceTicks(): Flow<Unit> = flow {
     }
 }
 
-/** Whether the server is legitimately quiet in this phase for as long as it lasts: a client-side tool runs or an approval is awaited. */
+/**
+ * Whether the server is legitimately quiet in this phase for as long as it lasts: a client-side tool runs or an
+ * approval is awaited. An unknown phase is not: a future long-wait status would lose the exemption (and close on
+ * silence) rather than keep a turn open forever; it is logged so the mapping can be extended.
+ */
 private fun LoopPhase.waitsLong(): Boolean = when (this) {
     LoopPhase.ExecutingClientTool, LoopPhase.WaitingOnApproval -> true
     LoopPhase.SendingRequest, LoopPhase.WaitingForResponse, LoopPhase.Retrying, LoopPhase.ProcessingResponse,

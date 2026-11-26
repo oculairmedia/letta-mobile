@@ -295,12 +295,13 @@ class ServerStartedTurnFeedTest {
 
     /**
      * A busy turn loses its `turn_finished`. Silence alone never closes it (the tool may legitimately run for hours),
-     * but the App Server's idle loop status for the runtime (WAITING_ON_INPUT, no active run: it sends one right before
-     * `turn_finished` when its turn ends, and replays one on every sync) ends the tool exemption: the turn closes within
-     * the silence bound after it, as not truly ended.
+     * but any later loop status that is not a long wait, here the idle one the server sends right before
+     * `turn_finished`, ends the tool exemption: the turn closes within the silence bound after it, as not truly ended.
+     * This pins behaviour the relay already had before the idle status was read as evidence (any non-waiting status
+     * cleared the exemption); it is not evidence of the later change.
      */
     @Test
-    fun aBusyTurnWhoseFinishIsLostClosesOnTheServersIdleLoopStatus() = runTest {
+    fun aBusyTurnWhoseFinishIsLostClosesWithinTheBoundAfterANonWaitingLoopStatus() = runTest {
         val node = node { emptySet() }
         busyTurn().forEach { node.frames.emit(it) }
         runCurrent()
@@ -386,6 +387,45 @@ class ServerStartedTurnFeedTest {
         val journal = entries(node.journal)
         assertEquals(1, journal.count { it.kind == "turn_open" }, "${journal.map { it.kind }}")
         assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
+    /**
+     * The idle status the server can send between approval-continuation rounds (after a `requires_approval` stop) is
+     * not the end of the turn: the same rule a client turn's boundary gate applies. The next round's run then stays in
+     * this turn instead of closing it.
+     */
+    @Test
+    fun anIdleBetweenApprovalRoundsDoesNotEndTheTurn() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(stop(RUN, reason = "requires_approval")))
+        node.frames.emit(decode(idleLoopStatus()))
+        node.frames.emit(decode(assistant("Approved; continuing.", run = NEXT_RUN)))
+        node.frames.emit(decode(stop(NEXT_RUN)))
+        node.frames.emit(turnFinished(NEXT_RUN))
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_open" }, "${journal.map { it.kind }}")
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
+    /**
+     * While a server-started turn runs, the server's loop status may name no run (before the run's first chunk, or
+     * after an approval-only continuation cleared it) but is then not idle. A delta of another run (a client's run the
+     * server started after this turn) does not close the turn as "server idle".
+     */
+    @Test
+    fun aRunlessButBusyLoopStatusDoesNotArmTheIdleClose() = runTest {
+        val node = node { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(decode(runlessLoopStatus("PROCESSING_API_RESPONSE")))
+        node.frames.emit(decode(assistant("Still the same turn.", run = NEXT_RUN)))
+        runCurrent()
+
+        val kinds = entries(node.journal).map { it.kind }
+        assertEquals(1, kinds.count { it == "turn_open" }, "$kinds")
+        assertTrue("turn_closed" !in kinds, "$kinds")
     }
 
     /** A pending approval is a wait too: silence alone keeps the turn open. */
@@ -768,6 +808,11 @@ class ServerStartedTurnFeedTest {
         /** What the App Server says when no turn runs on the runtime: waiting for input, no active run. */
         fun idleLoopStatus(): String = envelope("update_loop_status") {
             put("loop_status", Json.parseToJsonElement("""{"status":"WAITING_ON_INPUT","active_run_ids":[]}"""))
+        }
+
+        /** A loop status [status] that names no active run. */
+        fun runlessLoopStatus(status: String): String = envelope("update_loop_status") {
+            put("loop_status", Json.parseToJsonElement("""{"status":"$status","active_run_ids":[]}"""))
         }
 
         /** A loop status of another conversation of the same agent. */
