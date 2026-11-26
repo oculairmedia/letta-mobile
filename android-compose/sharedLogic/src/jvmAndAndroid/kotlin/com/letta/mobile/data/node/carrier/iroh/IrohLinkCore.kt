@@ -145,7 +145,8 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
 
 /**
  * One call lane over one QUIC bi-stream, from either end. Its reader starts at once and buffers up to
- * [IrohLinkCore.LANE_BUFFER] of the other end's frames until [incoming] is collected, then waits; [incoming] completes when the other end finishes sending or the link ends.
+ * [IrohLinkCore.LANE_BUFFER] of the other end's frames until [incoming] is collected, then waits; [incoming]
+ * completes when the other end finishes sending or the link ends.
  */
 internal class IrohCallLane(
     private val core: IrohLinkCore,
