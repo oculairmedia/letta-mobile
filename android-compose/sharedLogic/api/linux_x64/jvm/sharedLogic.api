@@ -18053,7 +18053,7 @@ public abstract interface class com/letta/mobile/data/controller/AppServerContro
 	public fun getQueueSnapshots ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getState ()Lkotlinx/coroutines/flow/Flow;
 	public fun markConnected ()V
-	public fun observeRuntimeFrames (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;)Lkotlinx/coroutines/flow/Flow;
+	public fun observeRuntimeFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun onTransportDisconnected (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun onTransportDisconnected$default (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun permissionModeOf (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -18079,7 +18079,7 @@ public final class com/letta/mobile/data/controller/AppServerController$DefaultI
 	public static fun getPendingApprovals (Lcom/letta/mobile/data/controller/AppServerController;)Lkotlinx/coroutines/flow/StateFlow;
 	public static fun getQueueSnapshots (Lcom/letta/mobile/data/controller/AppServerController;)Lkotlinx/coroutines/flow/StateFlow;
 	public static fun markConnected (Lcom/letta/mobile/data/controller/AppServerController;)V
-	public static fun observeRuntimeFrames (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;)Lkotlinx/coroutines/flow/Flow;
+	public static fun observeRuntimeFrames (Lcom/letta/mobile/data/controller/AppServerController;)Lkotlinx/coroutines/flow/Flow;
 	public static fun onTransportDisconnected (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun onTransportDisconnected$default (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun permissionModeOf (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -18253,7 +18253,7 @@ public final class com/letta/mobile/data/controller/DefaultAppServerController :
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getToolAdvertisementState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun markConnected ()V
-	public fun observeRuntimeFrames (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;)Lkotlinx/coroutines/flow/Flow;
+	public fun observeRuntimeFrames ()Lkotlinx/coroutines/flow/Flow;
 	public fun onTransportDisconnected (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun permissionModeOf (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeQueueItem (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -19637,10 +19637,6 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyClient {
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminProxyClient$Companion {
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/AdminProxyHttpException : java/lang/RuntimeException {
-	public fun <init> (ILjava/lang/String;)V
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminProxyRequest {

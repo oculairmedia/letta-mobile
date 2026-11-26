@@ -4,12 +4,14 @@ import com.letta.mobile.data.runtime.admitsParentStreamDelta
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.runtime.StreamTextFrameSource
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.canonicalToolCalls
 import com.letta.mobile.data.transport.iroh.canonicalToolReturn
 import com.letta.mobile.runtime.RunId
+import com.letta.mobile.data.model.RunId as AppServerRunId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.util.Telemetry
@@ -124,6 +126,11 @@ internal class TurnFanoutDelivery(
      * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
      */
     val initiatorWrites: ObserverWriteQueue? = observerWrites,
+    /**
+     * Claims a raw App Server frame (its `idempotency_key`, its run) for a client turn ([NodeTurnHost.claimFrame]);
+     * false: another turn relays it.
+     */
+    val claimFrame: (String, AppServerRunId?) -> Boolean = { _, _ -> true },
 )
 
 /**
@@ -200,10 +207,16 @@ internal class ConversationTurnFanout(
     private val observerWriteTimeoutMs = delivery.observerWriteTimeoutMs
     private val observerWrites = delivery.observerWrites
     private val initiatorWrites = delivery.initiatorWrites
+    private val claimFrame = delivery.claimFrame
 
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
+
+    private val relayedRuns = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** The App Server runs whose deltas this turn relayed. */
+    val relayedRunIds: Set<String> get() = relayedRuns
 
     /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
@@ -297,6 +310,17 @@ internal class ConversationTurnFanout(
         emitRawFrameBody(raw.toString())
     }
 
+    /**
+     * Relay one raw App Server `stream_delta` [raw] of a turn the App Server started by itself. No
+     * engine stamped it, so it is stamped here with this turn's identity (cumulative text, logical ids)
+     * before it goes the way every relayed delta goes. A frame from a child agent is still refused.
+     */
+    suspend fun relayServerStartedDelta(raw: JsonObject) {
+        val stamped = synthesizedIdentity.stamp(raw.toString(), StreamTextFrameSource.AppServerDelta) ?: return
+        val terminal = emitRawFrameBody(stamped)
+        if (terminal) terminalWritten = true
+    }
+
     /** The turn's terminal went out from the App Server's own frames. */
     fun markTerminalWritten() {
         terminalWritten = true
@@ -323,6 +347,7 @@ internal class ConversationTurnFanout(
     private suspend fun emitRawFrameBody(body: String): Boolean {
         val candidate = innerDeltaOf(body)
         if (candidate != null && !admitsParentStreamDelta(candidate, runtime)) return false
+        if (candidate != null && frameKeyOf(body)?.let { claimFrame(it, candidate.runOrNull()) } == false) return false
         openToolCalls.observe(body)
         identity?.noteFrame(body)
         val delta = innerDeltaOf(body) ?: run {
@@ -331,6 +356,7 @@ internal class ConversationTurnFanout(
             return false
         }
         toolProjection.noteRelayed(delta)
+        (delta["run_id"] as? JsonPrimitive)?.contentOrNull?.let(relayedRuns::add)
         broadcastToolDeltaIfNew(delta)
         return deltaIsTerminal(delta)
     }
@@ -699,6 +725,13 @@ internal class ConversationTurnFanout(
             )
         }
     }
+
+    private fun JsonObject.runOrNull(): AppServerRunId? =
+        (this["run_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::AppServerRunId)
+
+    private fun frameKeyOf(rawFrame: String): String? = runCatching {
+        (AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["idempotency_key"] as? JsonPrimitive)?.contentOrNull
+    }.getOrNull()
 
     private fun innerDeltaOf(rawFrame: String): JsonObject? = runCatching {
         val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
