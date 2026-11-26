@@ -149,10 +149,10 @@ abstract class NodeCarrierContractSuite {
 
     @Test
     fun aTransportLossIsLost() {
-        val nodeSaw = CompletableDeferred<NodeLinkClosure?>()
+        val nodeEnd = CompletableDeferred<NodePeerLink>()
         val node = NodePeerAcceptor { link ->
+            nodeEnd.complete(link)
             link.control.collect { }
-            nodeSaw.complete(link.closure.value)
         }
         onCarrier(node) { endpoint, _ ->
             val sever = endpoint.sever ?: return@onCarrier
@@ -161,7 +161,8 @@ abstract class NodeCarrierContractSuite {
             sever()
             assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null }, "the shell sees a lost transport")
             assertEquals(emptyList(), link.inbound.toList(), "inbound completes")
-            assertEquals(NodeLinkClosure.LOST, nodeSaw.await(), "the node sees a lost transport")
+            // Read from outside the acceptor: a carrier may lose the link by cancelling the node's serving.
+            assertEquals(NodeLinkClosure.LOST, nodeEnd.await().closure.first { it != null }, "the node sees a lost transport")
         }
     }
 
