@@ -306,12 +306,10 @@ class DurableSubagentRegistry(
      * An evicted key keeps its terminal fact: replaying it is a no-op, and any other edge (notably
      * RUNNING) is illegal, exactly as it would be for a retained terminal record.
      */
-    private fun refuseEvicted(tombstone: SubagentChipRecord, observation: SubagentChipObservation): ObserveResult =
-        if (tombstone.state.canAdvanceTo(observation.state)) {
-            ObserveResult.Accepted(tombstone)
-        } else {
-            ObserveResult.IllegalTransition(tombstone, observation)
-        }
+    private fun refuseEvicted(tombstone: SubagentChipRecord, observation: SubagentChipObservation): ObserveResult {
+        if (tombstone.state.canAdvanceTo(observation.state)) return ObserveResult.Accepted(tombstone)
+        return ObserveResult.IllegalTransition(tombstone, observation)
+    }
 
     private fun insertLocked(
         observation: SubagentChipObservation,
@@ -407,30 +405,30 @@ class DurableSubagentRegistry(
     private fun SubagentChipRecord.keepingSilenceWhileCompletionPending(
         existing: SubagentChipRecord,
         observation: SubagentChipObservation,
-    ): SubagentChipRecord =
-        if (existing.earlyTerminals.isNotEmpty() && !state.isTerminal && !observation.state.isTerminal) {
-            copy(lastSeenEpochMs = existing.lastSeenEpochMs)
-        } else {
-            this
-        }
+    ): SubagentChipRecord {
+        val stillLive = !state.isTerminal && !observation.state.isTerminal
+        return if (stillLive && existing.earlyTerminals.isNotEmpty()) copy(lastSeenEpochMs = existing.lastSeenEpochMs) else this
+    }
 
     /**
      * Remember a terminal notification for each live dispatch in [candidates] that has no task id
      * yet. Changes neither lifecycle nor last-seen: it is not a sighting of
      * the dispatch, only a fact to correlate once its receipt names its task.
      */
-    internal fun rememberEarlyTerminal(candidates: Collection<SubagentChipKey>, early: SubagentEarlyTerminal): Int =
+    internal fun rememberEarlyTerminal(candidates: Collection<SubagentChipKey>, early: SubagentEarlyTerminal): Int {
         synchronized(lock) {
-            var remembered = 0
-            candidates.forEach { key ->
-                val record = entries[key]?.takeIf { !it.state.isTerminal && it.taskId == null } ?: return@forEach
-                if (early in record.earlyTerminals) return@forEach
-                entries[key] = record.copy(earlyTerminals = (record.earlyTerminals + early).takeLast(MAX_EARLY_TERMINALS))
-                remembered++
-            }
-            if (remembered > 0) persistLocked()
-            remembered
+            val updated = candidates.mapNotNull { key -> entries[key]?.withEarlyTerminal(early) }
+            updated.forEach { entries[it.key] = it }
+            if (updated.isNotEmpty()) persistLocked()
+            return updated.size
         }
+    }
+
+    /** The record holding [early] too, or null when it is no longer awaiting a receipt or holds it already. */
+    private fun SubagentChipRecord.withEarlyTerminal(early: SubagentEarlyTerminal): SubagentChipRecord? {
+        if (state.isTerminal || taskId != null || early in earlyTerminals) return null
+        return copy(earlyTerminals = (earlyTerminals + early).takeLast(MAX_EARLY_TERMINALS))
+    }
 
     /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
     private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
