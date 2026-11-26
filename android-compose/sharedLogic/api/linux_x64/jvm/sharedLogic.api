@@ -21180,6 +21180,11 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/TurnJ
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerFrameSink {
 	public abstract fun writeAll ([BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun writeFrame (Ljava/lang/String;ZILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/ViewerFrameSink$DefaultImpls {
+	public static fun writeFrame (Lcom/letta/mobile/data/controller/node/iroh/ViewerFrameSink;Ljava/lang/String;ZILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerHandle {
@@ -38009,6 +38014,7 @@ public final class com/letta/mobile/data/node/NodeAppServerConnectorKt {
 }
 
 public final class com/letta/mobile/data/node/NodeComposition {
+	public static final field Companion Lcom/letta/mobile/data/node/NodeComposition$Companion;
 	public fun <init> (Lcom/letta/mobile/data/node/NodeConfig;Lcom/letta/mobile/data/node/NodePorts;Lkotlinx/coroutines/CoroutineScope;)V
 	public final fun connect (Lcom/letta/mobile/data/runtime/host/LocalAppServerLease;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;)Lcom/letta/mobile/data/node/NodeAppServerConnection;
 	public final fun connect (Lcom/letta/mobile/data/transport/appserver/AppServerEndpoint;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;)Lcom/letta/mobile/data/node/NodeAppServerConnection;
@@ -38017,8 +38023,15 @@ public final class com/letta/mobile/data/node/NodeComposition {
 	public final fun getIdentityRows ()Lcom/letta/mobile/data/controller/node/iroh/LateBoundConversationRows;
 	public final fun getScope ()Lkotlinx/coroutines/CoroutineScope;
 	public final fun getTurnIdentity ()Lcom/letta/mobile/data/runtime/TurnIdentityLedger;
+	public final fun inProcessCarrier-QQn0qqI (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/InProcessNodeCarrier;
+	public static synthetic fun inProcessCarrier-QQn0qqI$default (Lcom/letta/mobile/data/node/NodeComposition;Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/InProcessNodeCarrier;
 	public final fun installAdminRpc (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lcom/letta/mobile/data/node/NodeAdminExtras;)V
+	public final fun peerAcceptor (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;)Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;
 	public final fun start (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/NodeComposition$Companion {
+	public final fun getIN_PROCESS_ADDRESS-HN4vsaY ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/node/NodeConfig {
@@ -38084,6 +38097,17 @@ public abstract interface class com/letta/mobile/data/node/NodeToolsSocket {
 
 public final class com/letta/mobile/data/node/NodeToolsSocket$Companion {
 	public final fun getNone ()Lcom/letta/mobile/data/node/NodeToolsSocket;
+}
+
+public final class com/letta/mobile/data/node/carrier/InProcessNodeCarrier : com/letta/mobile/data/node/carrier/NodeCarrier {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/InProcessNodeCarrier$Companion;
+	public static final field SCHEME Ljava/lang/String;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun dial-VM31NQ8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getAddress-HN4vsaY ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/InProcessNodeCarrier$Companion {
 }
 
 public final class com/letta/mobile/data/node/carrier/NodeAddress {

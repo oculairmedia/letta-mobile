@@ -16,15 +16,14 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.controller.node.link.NodeConnectionWire
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
-import computer.iroh.BiStream
 import computer.iroh.Connection
-import computer.iroh.SendStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -66,13 +65,15 @@ private suspend fun <T> recoverUnlessCancelled(
 }
 
 /**
- * Handles a single Iroh connection serving the App Server protocol.
+ * Serves the node protocol to one connected peer: auth, capability gates, runtime commands, admin_rpc, turns and the
+ * feed, routed to the provided controller.
  *
- * Accepts two bi-directional streams (control + stream) and routes incoming
- * App Server v2 frames to the provided controller.
+ * The transport underneath is a [NodeConnectionWire]: an accepted Iroh connection (two bi-directional streams,
+ * control + stream, then one per admin call), or a carrier's node end such as the in-process shell's link. The
+ * protocol code is the same over both.
  */
-class IrohNodeConnection(
-    private val connection: Connection,
+class IrohNodeConnection internal constructor(
+    private val wire: NodeConnectionWire,
     private val controller: AppServerController,
     /**
      * Router for admin RPC calls. Domain handlers register here.
@@ -98,6 +99,27 @@ class IrohNodeConnection(
     /** The host's stream-to-stored identity join; null leaves rows unjoined. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
+    /** Serves one accepted Iroh [connection]; the other parameters are as for the primary constructor. */
+    constructor(
+        connection: Connection,
+        controller: AppServerController,
+        adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
+        authentication: IrohConnectionAuthentication,
+        connectionRegistry: ConnectionRegistry? = null,
+        clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
+        turnHost: NodeTurnHost = NodeTurnHost.SHARED,
+        turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
+    ) : this(
+        wire = irohConnectionWire(connection, authentication.remoteEndpointId),
+        controller = controller,
+        adminRpcRouter = adminRpcRouter,
+        authentication = authentication,
+        connectionRegistry = connectionRegistry,
+        clientMessageDedupe = clientMessageDedupe,
+        turnHost = turnHost,
+        turnIdentity = turnIdentity,
+    )
+
     private val remoteEndpointId = authentication.remoteEndpointId
 
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
@@ -110,16 +132,28 @@ class IrohNodeConnection(
     // letta-mobile-qygvv.12: control responses and relayed turns' input_accepted acks share
     // the control stream, so writes to it are serialized.
     private val controlWriteMutex = Mutex()
-    private var controlSend: SendStream? = null
+
+    /** Set once the control lane is served; writes before that (and app tool frames) are dropped. */
+    @Volatile
+    private var controlOpen = false
 
     /** A client's `remove_queue_item` / `resume_queue`, forwarded upstream. */
     private val queueControlRelay = IrohQueueControlRelay(controller)
 
     private suspend fun writeControl(frame: String) {
-        val send = controlSend ?: return
+        if (!controlOpen) return
         controlWriteMutex.withLock {
-            IrohFrameCodec.write(send, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
+            wire.writeControl(frame, frameParts = peerSupportsFrameParts())
         }
+    }
+
+    /** This connection's push lane as a viewer sink: whole frames go to the wire, which frames them for its transport. */
+    private val pushSink = object : ViewerFrameSink {
+        override suspend fun writeAll(bytes: ByteArray) =
+            throw UnsupportedOperationException("the push lane is written in whole frames")
+
+        override suspend fun writeFrame(frame: String, frameParts: Boolean, maxFrameBytes: Int) =
+            wire.writePush(frame, frameParts, maxFrameBytes)
     }
     /**
      * Auth + grants for this connection: pre-authenticated
@@ -131,7 +165,7 @@ class IrohNodeConnection(
         verifier = authentication.authVerifier,
         pairing = authentication.pairingService,
         remoteId = remoteEndpointId,
-        onRevoked = { runCatching { connection.close(4403L, "peer_revoked".encodeToByteArray()) } },
+        onRevoked = { runCatching { wire.close(4403L, "peer_revoked") } },
     )
     private val authenticated: AtomicBoolean get() = sessionAuth.authenticated
 
@@ -169,7 +203,7 @@ class IrohNodeConnection(
 
     /** Writes one relay frame on the control stream; false when the stream is not open or the write failed. */
     internal suspend fun writeAppToolFrame(frame: String): Boolean {
-        if (controlSend == null) return false
+        if (!controlOpen) return false
         return recoverUnlessCancelled(action = {
             writeControl(frame)
             true
@@ -179,7 +213,7 @@ class IrohNodeConnection(
     /**
      * This connection's single viewer handle onto its own turn/stream
      * BiStream. Built once when the stream opens in [serve] (it needs the
-     * stream's [SendStream]) and reused for every conversation this connection
+     * push lane's sink) and reused for every conversation this connection
      * views. It reuses the connection's per-connection [eventSeq] and
      * [streamWriteMutex] so fanned-out frames keep this connection's monotonic
      * seq + serialized writes, exactly like the single-viewer path.
@@ -203,16 +237,16 @@ class IrohNodeConnection(
     private val feedConversations: MutableSet<ModelConversationId> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /**
-     * Build this connection's [selfViewer] once, bound to the turn
-     * stream's [SendStream]. Idempotent — later calls return the existing handle
+     * Build this connection's [selfViewer] once, bound to the push lane's
+     * [push] sink. Idempotent — later calls return the existing handle
      * so every conversation this connection views shares ONE viewer identity
      * (so [ConnectionRegistry.release] can drop them all on disconnect).
      */
-    private fun ensureSelfViewer(streamSend: SendStream): IrohViewerHandle {
+    private fun ensureSelfViewer(push: ViewerFrameSink): IrohViewerHandle {
         selfViewer?.let { return it }
         val handle = IrohViewerHandle(
             connectionId = remoteEndpointId,
-            sink = sendStreamSink(streamSend),
+            sink = push,
             eventSeq = eventSeq,
             streamWriteMutex = streamWriteMutex,
             frameParts = { peerSupportsFrameParts() },
@@ -265,18 +299,15 @@ class IrohNodeConnection(
         )
     }
 
+    /** Serves the connection until its control lane ends, then closes it. */
     suspend fun serve() = coroutineScope {
         try {
-            val controlBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" attr remoteEndpointId)
-            val streamBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" attr remoteEndpointId)
-            val streamSend = streamBiStream.send()
+            wire.openLanes()
             // eaczz.3: build this connection's viewer handle now that its turn
             // stream is open, so both subscription signals (runtime_start on the
             // control channel, message.list on an admin_rpc stream) can register
             // it as a conversation viewer.
-            val viewer = ensureSelfViewer(streamSend)
+            val viewer = ensureSelfViewer(pushSink)
             connectionRegistry?.let { registry ->
                 val registration = registry.claim(viewer)
                 viewerRegistration = registration
@@ -284,11 +315,11 @@ class IrohNodeConnection(
             }
 
             val controlJob = launch {
-                serveControlChannel(controlBiStream, streamSend)
+                serveControlChannel(pushSink)
             }
 
             val streamJob = launch {
-                serveStreamReadiness(streamBiStream)
+                wire.awaitPushReadiness()
             }
 
             val adminRpcAcceptJob = launch {
@@ -298,7 +329,7 @@ class IrohNodeConnection(
             controlJob.join()
             adminRpcAcceptJob.cancelAndJoin()
             streamJob.cancelAndJoin()
-            runCatching { streamSend.finish() }
+            runCatching { wire.finishPush() }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -314,8 +345,8 @@ class IrohNodeConnection(
             viewerRegistration?.let { registration ->
                 runCatching { connectionRegistry?.release(registration) }
             }
-            recordConnectionClosed("remoteEndpointId" attr remoteEndpointId, connection)
-            runCatching { connection.close() }
+            wire.recordClosed()
+            runCatching { wire.closeAfterServe() }
         }
     }
 
@@ -346,7 +377,7 @@ class IrohNodeConnection(
             // register it as a viewer of X (de-scoping any prior conversation).
             onMethodObserved = ::observeAdminMethod,
         )
-        server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
+        server.serveCalls { wire.nextCall(server.callFraming) }
     }
 
     /**
@@ -517,25 +548,20 @@ class IrohNodeConnection(
     }
 
     private suspend fun serveControlChannel(
-        biStream: BiStream,
-        streamSend: SendStream,
+        push: ViewerFrameSink,
     ) = coroutineScope {
-        val sendStream = biStream.send()
-        controlSend = sendStream
+        controlOpen = true
         val activeTurnJobs = LinkedHashSet<Job>()
         val activeTurnJobsMutex = Mutex()
         observerWrites = ObserverWriteQueue(this)
 
         try {
-            val recvStream = biStream.recv()
-            IrohFrameCodec.readAll(
-                recvStream = recvStream,
-                maxFrameBytes = MAX_FRAME_BYTES,
+            wire.readControl(
                 // Chunked requests may only widen reassembly memory beyond a
                 // single frame once the peer authenticated AND advertised
                 // frame_part — the auth frame itself arrives on this stream,
                 // so pre-auth peers stay bounded to MAX_FRAME_BYTES.
-                maxReassembledBytesProvider = {
+                maxReassembledBytes = {
                     if (authenticated.get() && peerSupportsFrameParts()) {
                         IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES
                     } else {
@@ -547,7 +573,7 @@ class IrohNodeConnection(
                 try {
                     val response = handleControlFrame(
                         frameJson = frameJson,
-                        streamSend = streamSend,
+                        push = push,
                         activeTurnJobs = activeTurnJobs,
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
@@ -565,13 +591,13 @@ class IrohNodeConnection(
             }
         } finally {
             drainTurnJobs(activeTurnJobs, activeTurnJobsMutex)
-            runCatching { sendStream.finish() }
+            runCatching { wire.finishControl() }
         }
     }
 
     private suspend fun CoroutineScope.handleControlFrame(
         frameJson: String,
-        streamSend: SendStream,
+        push: ViewerFrameSink,
         activeTurnJobs: LinkedHashSet<Job>,
         activeTurnJobsMutex: Mutex,
     ): String? {
@@ -594,7 +620,7 @@ class IrohNodeConnection(
                     ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("input")) {
                     launchInputJob(
                         frameJson = frameJson,
-                        streamSend = streamSend,
+                        push = push,
                         activeTurnJobs = activeTurnJobs,
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
@@ -632,13 +658,13 @@ class IrohNodeConnection(
 
     private suspend fun CoroutineScope.launchInputJob(
         frameJson: String,
-        streamSend: SendStream,
+        push: ViewerFrameSink,
         activeTurnJobs: LinkedHashSet<Job>,
         activeTurnJobsMutex: Mutex,
     ) {
         val job = launch(start = CoroutineStart.LAZY) {
             val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson)
-            handleInput(input as AppServerCommand.Input, streamSend)
+            handleInput(input as AppServerCommand.Input, push)
         }
         activeTurnJobsMutex.withLock { activeTurnJobs += job }
         job.invokeOnCompletion { cause ->
@@ -711,6 +737,7 @@ class IrohNodeConnection(
             ?.toSet()
             .orEmpty()
         peerCapabilities.set(advertised)
+        wire.onPeerCapabilities(advertised)
         Telemetry.event(
             "IrohNode", "auth.ok",
             "remoteEndpointId" attr remoteEndpointId,
@@ -737,7 +764,7 @@ class IrohNodeConnection(
     private fun rejectAuth(requestId: String, outcome: IrohBearerAuthVerifier.Outcome): String {
         if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
             Telemetry.event("IrohNode", "auth.rate_limited", "remoteEndpointId" attr remoteEndpointId)
-            runCatching { connection.close(4429L, "auth_rate_limited".encodeToByteArray()) }
+            runCatching { wire.close(4429L, "auth_rate_limited") }
             return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"rate_limited"}"""
         }
         val reason = (outcome as? IrohBearerAuthVerifier.Outcome.Denied)?.reason ?: "denied"
@@ -750,7 +777,7 @@ class IrohNodeConnection(
         )
         if (failures >= IrohBearerAuthVerifier.MAX_FAILURES_BEFORE_CLOSE) {
             Telemetry.event("IrohNode", "auth.connection_closed", "remoteEndpointId" attr remoteEndpointId)
-            runCatching { connection.close(4401L, "auth_failures".encodeToByteArray()) }
+            runCatching { wire.close(4401L, "auth_failures") }
         }
         return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"$reason"}"""
     }
@@ -872,7 +899,7 @@ class IrohNodeConnection(
      */
     private fun createTurnFanout(
         input: AppServerCommand.Input,
-        streamSend: SendStream,
+        push: ViewerFrameSink,
         journal: TurnJournalWriter,
         clientMessageId: String?,
     ) = ConversationTurnFanout(
@@ -885,7 +912,7 @@ class IrohNodeConnection(
             initiatorWrites = observerWrites,
             claimFrame = { key, run -> turnHost.claimFrame(key, run, server = false) },
         ),
-        initiatorViewer = ensureSelfViewer(streamSend),
+        initiatorViewer = ensureSelfViewer(push),
         trackInitiatorFrame = journal::append,
         journalUserEcho = journal::append,
         turnId = firstUserMessage(input)?.clientMessageId,
@@ -911,7 +938,7 @@ class IrohNodeConnection(
      * tail, the journal still holds it: replay it now so the client's turn resolves instead of hanging forever. Otherwise
      * the original turn is still in flight or already delivered, so drop silently.
      */
-    private suspend fun serveResentInput(input: AppServerCommand.Input, message: AppServerInputMessage, streamSend: SendStream) {
+    private suspend fun serveResentInput(input: AppServerCommand.Input, message: AppServerInputMessage, push: ViewerFrameSink) {
         val clientMsgId = message.clientMessageId ?: return
         ackRedialResend(input)
         val replay = turnHost.journal.replayForInitiator(input.owner(), input.conversation(), clientMsgId)
@@ -925,14 +952,14 @@ class IrohNodeConnection(
         if (replay == null) return
         // A write that fails leaves the replay undelivered, so a later redial is offered it again.
         runCatching {
-            replayJournalDeltas(ensureSelfViewer(streamSend), input.runtime, replay)
+            replayJournalDeltas(ensureSelfViewer(push), input.runtime, replay)
             replay.delivered()
         }.onFailure { replayError -> if (replayError is CancellationException) throw replayError }
     }
 
     private suspend fun handleInput(
         input: AppServerCommand.Input,
-        streamSend: SendStream,
+        push: ViewerFrameSink,
     ) {
         val userMsg = firstUserMessage(input)
         val contentParts = userMsg?.content as? JsonArray
@@ -941,7 +968,7 @@ class IrohNodeConnection(
             ?: ""
         val clientMsgId = userMsg?.clientMessageId
         if (userMsg != null && isResentInput(input, userMsg)) {
-            serveResentInput(input, userMsg, streamSend)
+            serveResentInput(input, userMsg, push)
             return
         }
         val command = TurnCommand(
@@ -957,7 +984,7 @@ class IrohNodeConnection(
         )
         // The turn's durable record: the frames the initiator is sent are journaled, so its redial can be served the tail.
         val journal = turnHost.journal.openTurn(input.owner(), input.conversation(), clientMsgId ?: "turn-${UUID.randomUUID()}")
-        val fanout = createTurnFanout(input, streamSend, journal, clientMsgId)
+        val fanout = createTurnFanout(input, push, journal, clientMsgId)
         val echo = clientMsgId?.let { RelayedUserEcho(it, text, contentParts) }
         val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), journal)
         // The collector runs on the node-owned host. If this connection closes first, the turn is
@@ -1060,11 +1087,6 @@ class IrohNodeConnection(
         parts?.firstOrNull { part ->
             runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
         }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
-
-    private suspend fun serveStreamReadiness(biStream: BiStream) {
-        val recvStream = biStream.recv()
-        runCatching { recvStream.read(1u) }
-    }
 
     companion object {
         /** Control frames that address an agent and so are subject to the peer's agent scope. */
