@@ -60,6 +60,25 @@ class ProductionIrohToolRegistryWiringTest {
         )
     }
 
+    /** Windows bindings send in-process: the tool is advertised with no `meridian` binary at all. */
+    @Test
+    fun anInProcessRunnerAdvertisesTheToolWithNoBinary() {
+        val messaging = requireNotNull(
+            com.letta.mobile.data.node.host.NodeHostBindings
+                .forOs(com.letta.mobile.data.node.host.NodeHostOs.WINDOWS)
+                .agentMessaging(""),
+        )
+
+        val registry = buildProductionExternalToolRegistryForTesting(
+            binary = messaging.binary,
+            identityDir = null,
+            addressStore = null,
+            runner = messaging.runner,
+        )
+
+        assertTrue(registry.listAdvertisedTools().any { it.name == CustomIrohMessagingTool.TOOL_NAME })
+    }
+
     /**
      * letta-mobile-aknkw: every runtime the host starts gets the host's canvas_* tools, whether or
      * not --meridian-binary is set, since they need only the canvas relay the host runs.

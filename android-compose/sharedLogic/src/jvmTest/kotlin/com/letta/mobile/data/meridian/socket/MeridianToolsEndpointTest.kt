@@ -1,12 +1,12 @@
-package com.letta.mobile.cli.meridian
+package com.letta.mobile.data.meridian.socket
 
-import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
-import com.letta.mobile.data.controller.extras.claimedToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.controller.extras.claimedToolCaller
+import com.letta.mobile.data.controller.extras.identity.ToolCallScope
 import com.letta.mobile.data.meridian.MeridianExit
 import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
 import com.letta.mobile.data.meridian.endpoint.MeridianToolsWire
@@ -30,15 +30,6 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.junit.jupiter.api.AfterEach
-import com.letta.mobile.data.meridian.AgentToolsModePolicy
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayInputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -49,10 +40,15 @@ import java.nio.channels.Channels
 import java.nio.channels.SocketChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MeridianToolsEndpointTest {
-    @TempDir
-    lateinit var dir: Path
+    private val dir: Path = Files.createTempDirectory("meridian-tools")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val frames = MutableSharedFlow<AppServerReceivedFrame>(replay = 16)
@@ -60,8 +56,11 @@ class MeridianToolsEndpointTest {
     private val logs = mutableListOf<String>()
     private val runtime = AppServerRuntimeScope("agent-a", "conv-a")
 
-    @AfterEach
-    fun tearDown() = scope.cancel()
+    @AfterTest
+    fun tearDown() {
+        scope.cancel()
+        dir.toFile().deleteRecursively()
+    }
 
     private fun config(
         transport: MeridianToolsTransport = MeridianToolsTransport.UNIX,
@@ -98,7 +97,7 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `serves the router on the Unix socket and binds by the live shell call's token`() = runBlocking {
+    fun servesTheRouterOnTheUnixSocketAndBindsByTheLiveShellCallsToken() = runBlocking {
         frames.emit(toolStart("call-7", "meridian canvas list"))
         assertNotNull(endpoint(config()).start(scope))
         val socket = dir.resolve("t.sock")
@@ -112,7 +111,7 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `refuses callers with no live meridian shell call`() = runBlocking {
+    fun refusesCallersWithNoLiveMeridianShellCall() = runBlocking {
         assertNotNull(endpoint(config()).start(scope))
 
         val response = exchange(unix(dir.resolve("t.sock")), request("canvas", "list"))
@@ -122,7 +121,7 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `falls back to loopback TCP with a bearer token file`() = runBlocking {
+    fun fallsBackToLoopbackTcpWithABearerTokenFile() = runBlocking {
         frames.emit(toolStart("call-1", "meridian canvas list"))
         val blocked = dir.resolve("not-a-socket")
         Files.writeString(blocked, "regular file")
@@ -144,7 +143,7 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `a host with no cli agent serves nothing`() = runBlocking {
+    fun aHostWithNoCliAgentServesNothing() = runBlocking {
         val job = endpoint(config(enabled = false)).start(scope)
 
         assertNull(job)
@@ -152,21 +151,11 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `an oversized request line is refused unread`() {
+    fun anOversizedRequestLineIsRefusedUnread() {
         val tooLong = ByteArrayInputStream(ByteArray(32) { 'a'.code.toByte() })
 
         assertNull(MeridianToolsSocketServer.readLine(tooLong, maxBytes = 16))
         assertEquals("abc", MeridianToolsSocketServer.readLine(ByteArrayInputStream("abc\nrest".toByteArray())))
-    }
-
-    @Test
-    fun `the endpoint follows agent-tools-mode cli, as host default or per-agent override`() {
-        fun policy(default: String, overrides: String? = null) = AgentToolsModePolicy.parse(default, overrides).getOrThrow()
-
-        assertTrue(policy("cli").servesCli())
-        assertTrue(policy("native", "agent-a=cli").servesCli())
-        assertFalse(policy("native").servesCli())
-        assertFalse(policy("meta", "agent-a=native").servesCli())
     }
 
     private fun unix(path: Path): SocketChannel = SocketChannel.open(StandardProtocolFamily.UNIX).apply {

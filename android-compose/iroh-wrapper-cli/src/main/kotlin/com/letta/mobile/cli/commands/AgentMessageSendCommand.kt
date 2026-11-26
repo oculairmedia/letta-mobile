@@ -6,15 +6,9 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.required
+import com.letta.mobile.data.node.host.AgentMessageDelivery
 import com.letta.mobile.data.transport.iroh.AgentSendResult
-import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
-import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
-import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
-import com.letta.mobile.data.transport.iroh.IrohAgentMessageSender
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -66,9 +60,9 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
     private val correlation by option("--correlation", help = "Task correlation key=value; repeatable.").multiple()
     private val correlationJson by option("--correlation-json", help = "Task correlation as a JSON string map.")
     private val identityDir by option("--identity-dir", help = "Per-agent Iroh identity dir.")
-        .default(File(System.getProperty("user.home"), ".letta/iroh/identities").path)
+        .default(AgentMessageDelivery.defaultIdentityDir().path)
     private val addressStore by option("--address-store", help = "Agent address book kv file.")
-        .default(File(System.getProperty("user.home"), ".letta/iroh/agent-addresses.kv").path)
+        .default(AgentMessageDelivery.defaultAddressStore().path)
 
     override fun run() = runBlocking {
         val id = msgId.ifBlank { "msg-${java.util.UUID.randomUUID()}" }
@@ -89,34 +83,18 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
             sendHook(message)
             return@runBlocking
         }
-        val identity = IrohAgentIdentity.loadOrCreate(fromAgentId, File(identityDir))
-        val endpoint = Endpoint.bind(
-            EndpointOptions(
-                relayMode = RelayMode.defaultMode(),
-                secretKey = identity.secretKeyBytes,
-                alpns = listOf(IrohAgentMessage.ALPN),
-            ),
-        )
-        try {
-            endpoint.online()
-            // No backend store injected — this CLI is a sender, not a
-            // membership oracle. The host record is the recipient's
-            // wrapper's responsibility; resolve() here returns Found for any
-            // agentId the caller asks about as long as the host record is
-            // present. Garbage ids still surface as `unknown_host` (no host
-            // record on disk) — not silently Found.
-            val resolver = IrohAgentAddressResolver(HostEndpointAddressStore(File(addressStore)))
-            val sender = IrohAgentMessageSender(endpoint, resolver)
-            val result = sender.send(
-                message,
-            )
-            println(resultJson(result, id))
-            when (result) {
-                is AgentSendResult.Delivered -> exitProcess(0)
-                is AgentSendResult.Accepted, is AgentSendResult.Unaddressable, is AgentSendResult.Failed -> exitProcess(1)
-            }
-        } finally {
-            runCatching { endpoint.shutdown() }
+        // No backend store injected — this CLI is a sender, not a
+        // membership oracle. The host record is the recipient's
+        // wrapper's responsibility; resolve() here returns Found for any
+        // agentId the caller asks about as long as the host record is
+        // present. Garbage ids still surface as `unknown_host` (no host
+        // record on disk) — not silently Found. The same delivery runs
+        // in-process on hosts with no `meridian` binary.
+        val result = AgentMessageDelivery.send(message, File(identityDir), File(addressStore))
+        println(resultJson(result, id))
+        when (result) {
+            is AgentSendResult.Delivered -> exitProcess(0)
+            is AgentSendResult.Accepted, is AgentSendResult.Unaddressable, is AgentSendResult.Failed -> exitProcess(1)
         }
     }
 

@@ -8,6 +8,8 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.data.meridian.AgentToolsMode
 import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
+import com.letta.mobile.data.meridian.socket.MeridianToolsConfig
+import com.letta.mobile.data.meridian.socket.MeridianToolsTransport
 
 /**
  * True when any agent on this host is offered its tools through the `meridian` CLI
@@ -16,40 +18,6 @@ import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
  */
 fun AgentToolsModePolicy.servesCli(): Boolean =
     hostDefault == AgentToolsMode.CLI || AgentToolsMode.CLI in perAgent.values
-
-/** Which listener(s) the endpoint opens: the Unix socket, loopback TCP, or the socket with TCP as fallback. */
-enum class MeridianToolsTransport(val wire: String) {
-    AUTO("auto"),
-    UNIX("unix"),
-    TCP("tcp"),
-    ;
-
-    companion object {
-        fun parse(value: String): MeridianToolsTransport = entries.firstOrNull { it.wire == value.trim().lowercase() }
-            ?: throw IllegalArgumentException("--meridian-tools-transport must be one of ${entries.joinToString("|") { it.wire }}")
-    }
-}
-
-/** The resolved endpoint settings, independent of clikt so tests can build them directly. */
-data class MeridianToolsConfig(
-    /** Whether `agent-tools-mode` puts any agent on the CLI ([servesCli]); off, nothing is served. */
-    val enabled: Boolean = false,
-    val transport: MeridianToolsTransport = MeridianToolsTransport.AUTO,
-    val socketPath: String = DEFAULT_SOCKET,
-    val tcpPort: Int = 0,
-    val endpointFile: String = defaultEndpointFile(),
-    val binding: MeridianCallerBindingMode = MeridianCallerBindingMode.LIVE_CALL,
-    val callsPerMinute: Int = DEFAULT_CALLS_PER_MINUTE,
-) {
-    companion object {
-        /** systemd `RuntimeDirectory=meridian`; not /tmp, which the unit's `PrivateTmp=true` hides. */
-        const val DEFAULT_SOCKET = "/run/meridian/tools.sock"
-        const val DEFAULT_CALLS_PER_MINUTE = 120
-
-        fun defaultEndpointFile(): String =
-            "${System.getProperty("user.home") ?: "."}/.letta/meridian/tools.endpoint"
-    }
-}
 
 /**
  * The `app-server-serve-iroh` options for the local `meridian/tools/1` endpoint (letta-mobile-jna0o.4).
