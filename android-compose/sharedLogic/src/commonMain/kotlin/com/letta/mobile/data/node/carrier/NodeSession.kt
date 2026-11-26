@@ -5,6 +5,7 @@ import com.letta.mobile.data.feed.wire.FeedCursor
 import com.letta.mobile.data.feed.wire.FeedPage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.RequestId
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
 import com.letta.mobile.util.runCatchingCancellable
@@ -113,7 +114,7 @@ class NodeSession private constructor(
      * `voice.speech`), so a streamed method called through this is cancelled and its frames are dropped.
      */
     suspend fun adminRpc(method: String, params: JsonObject?): NodeFrame {
-        val lane = link.openCall(adminRpcFrame(requestIds(), method, params))
+        val lane = link.openCall(adminRpcFrame(RequestId(requestIds()), method, params))
         lane.finishSending()
         return lane.incoming.firstOrNull { it.type == NodeCarrierWire.ADMIN_RPC_RESPONSE }
             ?: throw NodeCarrierException(NodeCarrierFailure.Closed(link.closure.value ?: NodeLinkClosure.LOST))
@@ -166,7 +167,7 @@ class NodeSession private constructor(
             var session: NodeSession? = null
             try {
                 val router = NodeControlRouter.start(link, scope)
-                val answer = router.request(authFrame(requestIds(), request))
+                val answer = router.request(authFrame(RequestId(requestIds()), request))
                 if (answer.json[NodeCarrierWire.SUCCESS].booleanValue() != true) {
                     val reason = answer.json[NodeCarrierWire.ERROR].stringValue() ?: "denied"
                     throw NodeCarrierException(NodeCarrierFailure.AuthRejected(reason))
@@ -181,20 +182,20 @@ class NodeSession private constructor(
     }
 }
 
-private fun authFrame(requestId: String, request: NodeOpenRequest): NodeFrame = NodeFrame(
+private fun authFrame(requestId: RequestId, request: NodeOpenRequest): NodeFrame = NodeFrame(
     buildJsonObject {
         put(NodeCarrierWire.TYPE, NodeCarrierWire.AUTH)
-        put(NodeCarrierWire.REQUEST_ID, requestId)
+        put(NodeCarrierWire.REQUEST_ID, requestId.value)
         (request.credential as? NodeCredential.Token)?.let { put(NodeCarrierWire.TOKEN, it.secret) }
         request.peerName?.let { put(NodeCarrierWire.PEER_NAME, it) }
         putJsonArray(NodeCarrierWire.CAPABILITIES) { request.clientCapabilities.sorted().forEach { add(JsonPrimitive(it)) } }
     },
 )
 
-private fun adminRpcFrame(requestId: String, method: String, params: JsonObject?): NodeFrame = NodeFrame(
+private fun adminRpcFrame(requestId: RequestId, method: String, params: JsonObject?): NodeFrame = NodeFrame(
     buildJsonObject {
         put(NodeCarrierWire.TYPE, NodeCarrierWire.ADMIN_RPC)
-        put(NodeCarrierWire.REQUEST_ID, requestId)
+        put(NodeCarrierWire.REQUEST_ID, requestId.value)
         put(NodeCarrierWire.METHOD, method)
         params?.let { put(NodeCarrierWire.PARAMS, it) }
     },
