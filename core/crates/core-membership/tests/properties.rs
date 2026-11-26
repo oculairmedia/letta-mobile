@@ -190,6 +190,17 @@ fn semantic(view: &MembershipView) -> Semantic {
     )
 }
 
+/// Whether an op can remove an admin: a revoke, a rotate, or a grant dropping `admin.full`.
+fn takes_admin_away(op: &Op) -> bool {
+    match &op.payload {
+        OpPayload::Revoke { .. } | OpPayload::Rotate { .. } => true,
+        OpPayload::Grant { caps_remove, .. } => caps_remove
+            .iter()
+            .any(|cap| cap.as_str() == Capability::ADMIN_FULL),
+        _ => false,
+    }
+}
+
 fn revoked(evaluation: &Evaluation) -> BTreeSet<NodeId> {
     evaluation
         .view
@@ -314,7 +325,8 @@ proptest! {
     }
 
     /// M6: no single op leaves zero admins. Every valid op had an admin in its past's state, and a
-    /// locked constellation needs two concurrent valid revokes.
+    /// locked constellation needs two concurrent valid ops that each take an admin away: a revoke,
+    /// a rotate (which retires the old key) or a grant removing `admin.full`.
     #[test]
     fn no_single_op_removes_the_last_admin(steps in vec(step(), 1..14)) {
         let (constellation, ops) = build(&steps);
@@ -328,8 +340,11 @@ proptest! {
             prop_assert!(!past.view.admins().is_empty());
         }
         if evaluation.view.is_locked() {
-            let revokes = valid_revokes(&log, &evaluation);
-            let concurrent = revokes.iter().any(|a| revokes.iter().any(|b| {
+            let removers: Vec<&SignedOp> = log
+                .ops()
+                .filter(|op| evaluation.valid.contains(&op.id()) && takes_admin_away(op.op()))
+                .collect();
+            let concurrent = removers.iter().any(|a| removers.iter().any(|b| {
                 a.id() != b.id()
                     && !log.causal_past(&a.id()).contains(&b.id())
                     && !log.causal_past(&b.id()).contains(&a.id())

@@ -222,7 +222,7 @@ For a down-closed set E:
   The current root is the end of the chain. Every other root named by genesis or a valid move is **superseded** (C2
   reads it once and retires it).
 - **Locked.** With a genesis held but no active member holding `admin.full`, the constellation is locked: no further op
-  is authorized. It arises only from concurrent revokes (Q1: mutual concurrent revokes both apply; a revoked node never
+  is authorized. It arises only from two concurrent ops that each take an admin away (a revoke, a rotate retiring the old key, or a grant removing `admin.full`; Q1: mutual concurrent revokes both apply; a revoked node never
   gains authority; the recovery is a new genesis that re-adds the same node ids, and agent logs stay verifiable because
   node keys sign them).
 

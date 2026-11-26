@@ -301,6 +301,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Agent-state log v1 \(R1\) and \`baken/log/1\`](reference/contracts/log/log-v1.md)
 
+### reference/contracts/membership
+
+- [Membership v1 \(M1\): the constellation's signed op DAG](reference/contracts/membership/membership-v1.md)
+
 ### reference/contracts/message.list
 
 - [message.list: Byte-Bounded Pages v1](reference/contracts/message.list/pages-v1.md)
