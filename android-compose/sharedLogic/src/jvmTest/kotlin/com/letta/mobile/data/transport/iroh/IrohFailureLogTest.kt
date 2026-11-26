@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.util.numberOrNull
 
 import com.letta.mobile.util.textOrNull
@@ -79,6 +80,7 @@ class IrohFailureLogTest {
             authenticate = { _, _ -> true },
         )
         fun host(withA2a: Boolean) = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             protocolHandlers = if (withA2a) listOf(receiver) else emptyList(),

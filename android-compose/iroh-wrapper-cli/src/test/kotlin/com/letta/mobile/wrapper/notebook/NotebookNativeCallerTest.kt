@@ -11,6 +11,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -58,6 +59,7 @@ class NotebookNativeCallerTest {
             peers.save(PairedPeer(nodeId = peer, name = peer, pairedAtMs = 0L, capabilities = emptySet()))
         }
         val host = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = scope, authPolicy = IrohAuthPolicy.PairedPeersOnly,
             binding = IrohEndpointBinding(relayConfig = IrohRelayConfig.Disabled),
             pairingService = IrohPairingService(peers),

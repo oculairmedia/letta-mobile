@@ -32,9 +32,18 @@ import kotlinx.coroutines.sync.withLock
 /**
  * What both ends of an Iroh link share: the QUIC connection, the one closure, the coroutines that read its streams,
  * and what must end when the link ends. The closure is set exactly once, before any lane completes, so a collector
- * that sees its lane complete always finds the closure set.
+ * that sees its lane complete because the link ended always finds the closure set.
+ *
+ * A framing violation on a stream ([IrohFrameCodec.ProtocolException], an oversized or malformed frame) ends the
+ * whole link as [NodeLinkClosure.LOST] on the shell's end. On the node's end ([violationsEndTheLane]) it fails only
+ * the lane it arrived on, with the codec's exception, so the node answers it as it always has: an error envelope on
+ * that call lane, or the end of the connection when it was the control lane.
  */
-internal class IrohLinkCore(private val connection: Connection, parent: CoroutineScope) {
+internal class IrohLinkCore(
+    private val connection: Connection,
+    parent: CoroutineScope,
+    private val violationsEndTheLane: Boolean = false,
+) {
     private val job = SupervisorJob(parent.coroutineContext[Job])
     private val closureState = MutableStateFlow<NodeLinkClosure?>(null)
     private val onEnd = CopyOnWriteArrayList<() -> Unit>()
@@ -94,11 +103,11 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
 
     /**
      * Reads frames from [recv] into [sink] until the stream ends or the link does. A read error is the connection
-     * going away (the close watcher reports why) or a framing violation, which ends the link as [NodeLinkClosure.LOST].
-     * A frame that is not a JSON object ends the link as [MALFORMED_FRAME]: it may have carried a request id, and a
-     * dropped request would leave its caller waiting for ever. A full [sink] suspends the read, so the other end is
-     * held by QUIC flow control. [closeAtEnd] closes [sink] when the stream ends, for a call lane; the control and push
-     * lanes close with the link.
+     * going away (the close watcher reports why) or a framing violation, handled as the class comment says. A frame
+     * that is not a JSON object ends the link as [MALFORMED_FRAME]: it may have carried a request id, and a dropped
+     * request would leave its caller waiting for ever. A full [sink] suspends the read, so the other end is held by QUIC
+     * flow control. [closeAtEnd] closes [sink] when the stream ends, for a call lane (and the node's control lane); the
+     * shell's control and push lanes close with the link.
      */
     fun read(recv: RecvStream, sink: SendChannel<NodeFrame>, maxReassembledBytes: () -> Int, closeAtEnd: Boolean) =
         readFrom({ recv.read(it) }, sink, maxReassembledBytes, closeAtEnd)
@@ -118,8 +127,8 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
                 }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: IrohFrameCodec.ProtocolException) {
-                close(NodeLinkClosure.LOST)
+            } catch (violation: IrohFrameCodec.ProtocolException) {
+                if (violationsEndTheLane) sink.close(violation) else close(NodeLinkClosure.LOST)
             } catch (_: Exception) {
                 // The connection went away; the close watcher sets the closure.
             } finally {

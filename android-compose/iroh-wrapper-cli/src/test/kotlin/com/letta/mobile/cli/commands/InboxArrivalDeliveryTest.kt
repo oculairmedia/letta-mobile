@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.iroh.*
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.messaging.AgentMessageClientId
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.WsFrameMapper
@@ -11,9 +12,6 @@ import com.letta.mobile.data.transport.appserver.*
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
-import computer.iroh.Connection
-import computer.iroh.NoHandle
-import computer.iroh.SendStream
 import java.io.File
 import java.lang.reflect.Proxy
 import java.nio.ByteBuffer
@@ -69,7 +67,7 @@ class InboxArrivalDeliveryTest {
             val home = conversation(backend, "home", "lane:home")
             val registry = ConnectionRegistry()
             val endpoint = IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.PairedPeersOnly,
-                connectionRegistry = registry)
+                appServerLinks = ::serveIrohCarrierLink, connectionRegistry = registry)
             val capable = homeViewer("capable", registry, advertised = true)
             val legacy = homeViewer("legacy", registry, advertised = false)
             val scoped = homeViewer("scoped", registry, advertised = true, peer = PairedPeer(
@@ -164,7 +162,7 @@ class InboxArrivalDeliveryTest {
         val peers = InMemoryPairedPeerStore().apply { save(peer) }
         val unusedController = Proxy.newProxyInstance(AppServerController::class.java.classLoader,
             arrayOf(AppServerController::class.java)) { _, method, _ -> error("unexpected controller call: ${method.name}") } as AppServerController
-        val node = IrohNodeConnection(Connection(NoHandle), unusedController,
+        val node = IrohNodeConnection(unusedController,
             authentication = IrohConnectionAuthentication(IrohAuthPolicy.PairedPeersOnly,
                 pairingService = IrohPairingService(peers), remoteEndpointId = id), connectionRegistry = registry)
         val auth = IrohNodeConnection::class.java.getDeclaredMethod("handleAuth", JsonObject::class.java, String::class.java)
@@ -174,7 +172,9 @@ class InboxArrivalDeliveryTest {
         }, "auth-1") as String
         assertTrue(Json.parseToJsonElement(response).jsonObject["success"]!!.jsonPrimitive.boolean)
         val viewer = IrohNodeConnection::class.java.getDeclaredMethod("ensureSelfViewer", ViewerFrameSink::class.java)
-            .apply { isAccessible = true }.invoke(node, sendStreamSink(SendStream(NoHandle))) as ViewerHandle
+            .apply { isAccessible = true }.invoke(node, object : ViewerFrameSink {
+                override suspend fun writeAll(bytes: ByteArray) = Unit
+            }) as ViewerHandle
         val frames = java.util.concurrent.CopyOnWriteArrayList<String>()
         // Exercise the production viewer's gates and length framing with an in-memory JNI sink.
         viewer.javaClass.getDeclaredField("sink").apply { isAccessible = true }.set(viewer, object : ViewerFrameSink {

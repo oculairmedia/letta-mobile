@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,7 @@ class BackgroundProcessRelayTest {
         val channel = ScriptedAppServerTransport { emptyList() }
         val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
         val registry = ConnectionRegistry()
-        IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             connectionRegistry = registry).attachToolsetStatuses(client)
         val denied = object : ViewerHandle by Viewer("denied") {
             override fun adminContext() = null
@@ -47,7 +48,7 @@ class BackgroundProcessRelayTest {
         val channel = ScriptedAppServerTransport { emptyList() }
         val client = DefaultAppServerClient(channel, parentScope = backgroundScope)
         val registry = ConnectionRegistry()
-        val endpoint = IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        val endpoint = IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             connectionRegistry = registry)
         endpoint.attachToolsetStatuses(client)
         val phone = Viewer("phone")
@@ -94,7 +95,7 @@ class BackgroundProcessRelayTest {
             }
         } as AppServerClient
         val registry = ConnectionRegistry()
-        IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        IrohNodeEndpoint(appServerLinks = ::serveIrohCarrierLink, scope = backgroundScope, authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             connectionRegistry = registry).attachToolsetStatuses(client)
         fun status(conversation: String, generation: Long) = AppServerProtocol.decodeFrame(
             """{"type":"update_device_status","event_seq":1,"emitted_at":"now","idempotency_key":"status",

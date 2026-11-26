@@ -20,6 +20,7 @@ import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -139,6 +140,7 @@ class IrohCanvasRelayEndToEndTest {
     private suspend fun startHost(): String {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = scope,
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
             canvasRelay = IrohCanvasRelay(scope, InMemoryCanvasRelayStore()),

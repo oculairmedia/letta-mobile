@@ -6,8 +6,6 @@ import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import computer.iroh.Connection
-import computer.iroh.NoHandle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
@@ -267,7 +265,6 @@ class IrohNodeConnectionRuntimeStartModeCapabilityTest {
                 val controller = RecordingController()
                 val registry = ConnectionRegistry()
                 val connection = IrohNodeConnection(
-                    connection = Connection(NoHandle),
                     controller = controller.fake,
                     adminRpcRouter = router,
                     authentication = authentication(capabilities, agentScope),

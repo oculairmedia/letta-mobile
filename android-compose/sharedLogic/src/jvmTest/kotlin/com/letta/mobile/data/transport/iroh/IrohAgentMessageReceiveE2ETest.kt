@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.util.textOrNull
 
 import com.letta.mobile.data.controller.node.FakeAppServerController
@@ -77,6 +78,7 @@ class IrohAgentMessageReceiveE2ETest {
     private suspend fun startHost(receiver: IrohAgentMessageReceiver): IrohNodeEndpoint =
         IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = hostScope,
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("some-other-paired-peer")),
             protocolHandlers = listOf(receiver),

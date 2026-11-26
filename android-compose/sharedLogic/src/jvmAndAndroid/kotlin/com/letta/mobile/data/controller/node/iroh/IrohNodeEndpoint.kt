@@ -51,6 +51,13 @@ class IrohNodeEndpoint(
      * [IrohAuthPolicy.InsecureAnonymousForTestOnly].
      */
     private val authPolicy: IrohAuthPolicy,
+    /**
+     * REQUIRED: serves one App Server connection this endpoint accepted (admitted, on the App Server ALPN) as a node
+     * carrier link, through this endpoint's [serveWire], and returns when it has been served. The node's composition
+     * supplies the Iroh carrier's node end (`com.letta.mobile.data.node.serveIrohCarrierLink`), so every peer is
+     * served by one protocol code path whatever carrier it came over. The endpoint releases the connection afterwards.
+     */
+    private val appServerLinks: suspend (connection: Connection, endpoint: IrohNodeEndpoint) -> Unit,
     /** Optional pairing service; shared across every accepted connection. */
     private val pairingService: IrohPairingService? = null,
     /**
@@ -429,7 +436,7 @@ class IrohNodeEndpoint(
     fun start(controller: AppServerController) {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
-        val host = startTurnHost(controller)
+        startTurnHost(controller)
 
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
@@ -456,7 +463,7 @@ class IrohNodeEndpoint(
                     // client handshake (peer died mid-connect) can never block
                     // the accept loop for other clients — the exact wedge that
                     // made every subsequent dial time out.
-                    launch { serveIncoming(incoming, controller, host) }
+                    launch { serveIncoming(incoming) }
                 } catch (_: TimeoutCancellationException) {
                     continue
                 } catch (e: CancellationException) {
@@ -477,7 +484,7 @@ class IrohNodeEndpoint(
     }
 
     /** Handshake and serve one accepted connection; failures are logged, never thrown into the accept loop. */
-    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController, turnHost: NodeTurnHost) {
+    private suspend fun serveIncoming(incoming: Incoming) {
         var offeredAlpn = ""
         try {
             val accepting = incoming.accept()
@@ -496,11 +503,7 @@ class IrohNodeEndpoint(
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
-            dispatchAcceptedConnection(
-                AcceptedConnection(peerAlpn, connection, remoteId),
-                controller,
-                turnHost,
-            )
+            dispatchAcceptedConnection(AcceptedConnection(peerAlpn, connection, remoteId))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -514,11 +517,7 @@ class IrohNodeEndpoint(
         val remoteId: String,
     )
 
-    private suspend fun dispatchAcceptedConnection(
-        accepted: AcceptedConnection,
-        controller: AppServerController,
-        turnHost: NodeTurnHost,
-    ) {
+    private suspend fun dispatchAcceptedConnection(accepted: AcceptedConnection) {
         val relay = canvasRelay
         if (relay != null && relay.handles(accepted.peerAlpn)) {
             serveCanvas(relay, accepted.peerAlpn, accepted.connection, accepted.remoteId)
@@ -528,7 +527,7 @@ class IrohNodeEndpoint(
             accepted.connection.close(4404L, "unknown_alpn".encodeToByteArray())
             return
         }
-        serveAppServer(accepted.connection, accepted.remoteId, controller, turnHost)
+        serveAppServer(accepted.connection)
     }
 
     private suspend fun serveProtocol(
@@ -544,36 +543,22 @@ class IrohNodeEndpoint(
         handler.accept(connection, remoteId)
     }
 
-    internal suspend fun serveAppServer(
-        connection: Connection,
-        remoteId: String,
-        controller: AppServerController,
-        turnHost: NodeTurnHost,
-    ) {
-        val nodeConnection = IrohNodeConnection(
-            connection = connection,
-            controller = controller,
-            adminRpcRouter = adminRpcRouter,
-            authentication = IrohConnectionAuthentication(
-                authPolicy = authPolicy,
-                authVerifier = authVerifier,
-                pairingService = pairingService,
-                remoteEndpointId = remoteId,
-            ),
-            connectionRegistry = connectionRegistry,
-            clientMessageDedupe = clientMessageDedupe,
-            turnHost = turnHost,
-            turnIdentity = turnIdentity,
-        )
-        serveNodeConnection(nodeConnection)
+    /** Serves an admitted App Server connection as a carrier link ([appServerLinks]), then releases its handle. */
+    private suspend fun serveAppServer(connection: Connection) {
+        try {
+            appServerLinks(connection, this)
+        } finally {
+            // The QUIC connection was closed with the link; this frees the binding's native handle.
+            runCatching { connection.close() }
+        }
     }
 
     /**
-     * Serves one link that reached the node through a carrier other than this endpoint's own accept loop: the shell in
-     * this process over the in-process carrier. It is the same node connection an accepted Iroh peer gets, with the same
-     * router, viewers, turns and feed; only its auth differs for the local shell, which the carrier verified and which
-     * is admitted as an admin peer by construction (a static allowlist of its identity: no token, no pairing record).
-     * Any other peer meets this endpoint's own policy. A link that arrives before [start] is refused.
+     * Serves one carrier link as a node connection: an Iroh peer this endpoint accepted (through [appServerLinks]), or
+     * the shell in this process over the in-process carrier. Every link gets the same router, viewers, turns and feed;
+     * only the local shell's auth differs, which the carrier verified and which is admitted as an admin peer by
+     * construction (a static allowlist of its identity: no token, no pairing record). Any other peer meets this
+     * endpoint's own policy. A link that arrives before [start] (or after [shutdown]) is refused.
      */
     internal suspend fun serveWire(wire: NodeConnectionWire) {
         val controller = servingController
@@ -608,6 +593,7 @@ class IrohNodeEndpoint(
             adminRpcRouter = adminRpcRouter,
             authentication = authentication,
             connectionRegistry = connectionRegistry,
+            clientMessageDedupe = clientMessageDedupe,
             turnHost = host,
             turnIdentity = turnIdentity,
         )

@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.link.NodeCallExchange
-import com.letta.mobile.data.controller.node.link.NodeCallFraming
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcConnection
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamHalves
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedExchange
@@ -200,26 +199,9 @@ internal class AdminRpcStreamServer(
      */
     suspend fun handleStream(stream: AdminRpcBiStream) = handleExchange(exchangeOf(stream))
 
-    /** Frames a raw call lane the way [handleStream] reads and writes a bi-stream. */
-    val callFraming: NodeCallFraming = NodeCallFraming { readBytes, writeBytes, finishLane ->
-        exchangeOf(
-            object : AdminRpcBiStream {
-                override fun recv(): AdminRpcRecvStream = object : AdminRpcRecvStream {
-                    override suspend fun read(maxBytes: UInt): ByteArray = readBytes(maxBytes)
-                }
-
-                override fun send(): AdminRpcSendStream = object : AdminRpcSendStream {
-                    override suspend fun writeAll(bytes: ByteArray) = writeBytes(bytes)
-
-                    override suspend fun finish() = finishLane()
-                }
-            },
-        )
-    }
-
     /**
      * [stream] as a call exchange: length-prefixed frames, a request bounded like any frame until the peer has
-     * authenticated and advertised `frame_part`, and a response chunked, or replaced by a typed error, when too large.
+     * authenticated and advertised `frame_part`, and a response chunked when it is larger than one frame.
      */
     private fun exchangeOf(stream: AdminRpcBiStream): NodeCallExchange {
         val sendStream = stream.send()
@@ -272,12 +254,12 @@ internal class AdminRpcStreamServer(
             handleFrame(frameJson) { streamed = it }
         }
         streamed?.let { request ->
-            val write: suspend (String) -> Unit = { frame -> exchange.write(frame) }
+            val write: suspend (String) -> Unit = { frame -> exchange.write(requireOneFrame(frame)) }
             streamedExchange.serve(request, AdminRpcStreamHalves(nextFrame, write))
             return
         }
         checkNotNull(response)
-        runCatching { exchange.respond(response) }
+        runCatching { exchange.respond(fittedResponse(response)) }
             .onFailure { writeError ->
                 Telemetry.event(
                     "IrohNode", "admin_rpc.stream.error_response_failed",
@@ -289,39 +271,55 @@ internal class AdminRpcStreamServer(
     }
 
     /**
-     * Writes [response] as a single frame when it fits, as frame_part
-     * continuations when the peer negotiated the capability, or — for
-     * oversized responses to capability-off peers — as a small typed error
-     * envelope (never partial/corrupt framing the peer cannot decode).
+     * [response] when this peer can receive it: within one frame, or within the chunked logical-frame cap when the
+     * peer negotiated `frame_part`. Otherwise a small typed error envelope takes its place, so the client fails fast
+     * instead of receiving framing it cannot decode or timing out on a silently finished lane. Every call lane gets
+     * this bound, whatever carrier it arrived on.
      */
-    private suspend fun writeResponse(sendStream: AdminRpcSendStream, response: String) {
-        val payload = response.encodeToByteArray()
-        val buffers = when {
-            payload.size <= maxFrameBytes -> listOf(IrohFrameCodec.encodeFrame(payload, maxFrameBytes))
-            peerSupportsFrameParts() -> try {
-                IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes, maxReassembledBytes)
-            } catch (tooLarge: IrohFrameCodec.FrameTooLargeException) {
-                // Response exceeds even the chunked logical-frame cap. Fall
-                // back to the same typed envelope the capability-off path
-                // sends, so the client fails fast instead of timing out on a
-                // silently finished stream.
-                tooLargeEnvelopeBuffers(
-                    response = response,
-                    bytes = payload.size,
-                    detail = tooLarge.message ?: "admin_rpc response exceeds the chunked logical frame cap",
-                )
-            }
-            else -> tooLargeEnvelopeBuffers(
+    private fun fittedResponse(response: String): String {
+        val bytes = response.encodeToByteArray().size
+        return when {
+            bytes <= maxFrameBytes -> response
+            !peerSupportsFrameParts() -> tooLargeEnvelope(
                 response = response,
-                bytes = payload.size,
-                detail = "admin_rpc response too large: ${payload.size} bytes > max $maxFrameBytes " +
+                bytes = bytes,
+                detail = "admin_rpc response too large: $bytes bytes > max $maxFrameBytes " +
                     "and peer did not advertise the ${IrohFrameCodec.FRAME_PART_CAPABILITY} capability",
             )
+            // Larger than even the chunked logical-frame cap (the codec's own wording).
+            bytes > maxReassembledBytes -> tooLargeEnvelope(
+                response = response,
+                bytes = bytes,
+                detail = "Iroh logical frame too large: $bytes bytes > max $maxReassembledBytes",
+            )
+            else -> response
+        }
+    }
+
+    /**
+     * [frame] when it fits in one frame. A streamed frame is never split into `frame_part`s, whatever the peer
+     * negotiated; a larger one fails the call as the codec would.
+     */
+    private fun requireOneFrame(frame: String): String {
+        val bytes = frame.encodeToByteArray().size
+        if (bytes > maxFrameBytes) {
+            throw IrohFrameCodec.FrameTooLargeException("Iroh frame too large: $bytes bytes > max $maxFrameBytes")
+        }
+        return frame
+    }
+
+    /** Writes an already fitted [response] on a byte lane: one frame, or `frame_part`s when it is larger than one. */
+    private suspend fun writeResponse(sendStream: AdminRpcSendStream, response: String) {
+        val payload = response.encodeToByteArray()
+        val buffers = if (payload.size > maxFrameBytes && peerSupportsFrameParts()) {
+            IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes, maxReassembledBytes)
+        } else {
+            listOf(IrohFrameCodec.encodeFrame(payload, maxFrameBytes))
         }
         buffers.forEach { sendStream.writeAll(it) }
     }
 
-    private fun tooLargeEnvelopeBuffers(response: String, bytes: Int, detail: String): List<ByteArray> {
+    private fun tooLargeEnvelope(response: String, bytes: Int, detail: String): String {
         val requestId = runCatching {
             json.parseToJsonElement(response).jsonObject["request_id"]?.jsonPrimitive?.contentOrNull
         }.getOrNull().orEmpty()
@@ -333,7 +331,7 @@ internal class AdminRpcStreamServer(
             "maxFrameBytes" attr maxFrameBytes,
             level = Telemetry.Level.WARN,
         )
-        return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
+        return errorEnvelope(requestId, detail)
     }
 
     /**

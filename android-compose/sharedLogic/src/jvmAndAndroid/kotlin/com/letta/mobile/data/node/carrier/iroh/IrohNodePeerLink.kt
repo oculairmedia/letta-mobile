@@ -7,8 +7,11 @@ import com.letta.mobile.data.node.carrier.NodeLinkClosure
 import com.letta.mobile.data.node.carrier.NodePeerAcceptor
 import com.letta.mobile.data.node.carrier.NodePeerIdentity
 import com.letta.mobile.data.node.carrier.NodePeerLink
+import com.letta.mobile.data.node.carrier.NodePeerReassemblyBound
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.SendStream
@@ -27,13 +30,12 @@ import kotlinx.coroutines.withContext
 /**
  * Serves one accepted Iroh [connection] (already past the handshake, on the App Server ALPN) to [acceptor] as a
  * [NodePeerLink], the node end of the Iroh carrier, and returns when the link has closed. The streams split as the
- * node's own connection handler splits them: the first bi-stream the peer opens is control, the second is push (the
- * peer finishes its send half to say it is listening), and every later one is a call lane. The link's peer is the
- * connection's verified remote endpoint id in hex. When [acceptor] returns, the link closes normally if it is still
- * open.
+ * node has always split them: the first bi-stream the peer opens is control, the second is push (the peer finishes
+ * its send half to say it is listening), and every later one is a call lane. The link's peer is the connection's
+ * verified remote endpoint id in hex. When [acceptor] returns, the link closes normally if it is still open.
  */
 suspend fun serveIrohNodePeer(connection: Connection, acceptor: NodePeerAcceptor): Unit = coroutineScope {
-    val link = IrohNodePeerLink(connection, IrohLinkCore(connection, this))
+    val link = IrohNodePeerLink(connection, IrohLinkCore(connection, this, violationsEndTheLane = true))
     link.start()
     try {
         acceptor.serve(link)
@@ -43,10 +45,12 @@ suspend fun serveIrohNodePeer(connection: Connection, acceptor: NodePeerAcceptor
 }
 
 /**
- * The node's end of one Iroh link. Writes wait until the peer has opened the lane they go on; frames go as
- * `frame_part`s only after the node reported, through [onPeerCapabilities], that the peer advertised them, and the
- * peer's frames may be reassembled past one Iroh frame only then (until it authenticates, a peer cannot make the node
- * hold more than one frame).
+ * The node's end of one Iroh link. The peer's control frames are delivered once both its control and push streams
+ * are open, as the node has always started serving a connection; the control lane also ends when the peer finishes
+ * sending on it. Writes wait until the peer has opened the lane they go on; frames go as `frame_part`s only after the
+ * node reported, through [onPeerCapabilities], that the peer advertised them. How far the peer's frames may be
+ * reassembled is the node's call ([boundReassembly]); until the node says, it is one Iroh frame unless the peer
+ * advertised `frame_part`.
  *
  * Nothing is read ahead of the node without bound: control frames and each call lane's frames wait in a small buffer,
  * and a full buffer stops the read, so QUIC flow control holds the peer, as when the node read its streams directly.
@@ -56,7 +60,7 @@ suspend fun serveIrohNodePeer(connection: Connection, acceptor: NodePeerAcceptor
 internal class IrohNodePeerLink(
     private val connection: Connection,
     private val core: IrohLinkCore,
-) : NodePeerLink {
+) : NodePeerLink, NodePeerReassemblyBound {
     private val controlFrames = Channel<NodeFrame>(IrohLinkCore.LANE_BUFFER)
     private val callLanes = Channel<NodeCallLane>(IrohLinkCore.LANE_BUFFER)
     private val controlSend = CompletableDeferred<SendStream>()
@@ -66,6 +70,9 @@ internal class IrohNodePeerLink(
 
     @Volatile
     private var peerFrameParts = false
+
+    @Volatile
+    private var reassemblyBound: (() -> Int)? = null
 
     override val peer: NodePeerIdentity = NodePeerIdentity(IrohDiagnostics.endpointIdHex(connection.remoteId()))
 
@@ -90,10 +97,12 @@ internal class IrohNodePeerLink(
     private suspend fun acceptStreams() {
         try {
             val control = connection.acceptBi()
-            core.read(control.recv(), controlFrames, ::maxReassembledBytes, closeAtEnd = false)
-            controlSend.complete(control.send())
+            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" attr peer.value)
             val push = connection.acceptBi()
+            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" attr peer.value)
+            controlSend.complete(control.send())
             pushSend.complete(push.send())
+            core.read(control.recv(), controlFrames, ::maxReassembledBytes, closeAtEnd = true)
             core.scope.launch { awaitPeerListening(push) }
             while (true) {
                 val stream = connection.acceptBi()
@@ -112,8 +121,12 @@ internal class IrohNodePeerLink(
         runCatching { push.recv().read(1u) }
     }
 
-    private fun maxReassembledBytes(): Int =
-        if (peerFrameParts) IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES else IrohLinkCore.MAX_FRAME_BYTES
+    private fun maxReassembledBytes(): Int = reassemblyBound?.invoke()
+        ?: if (peerFrameParts) IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES else IrohLinkCore.MAX_FRAME_BYTES
+
+    override fun boundReassembly(maxBytes: () -> Int) {
+        reassemblyBound = maxBytes
+    }
 
     override suspend fun sendControl(frame: NodeFrame) = core.write(awaitOpen(controlSend), controlLock, frame, peerFrameParts)
 

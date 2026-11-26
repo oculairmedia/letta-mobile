@@ -8,7 +8,6 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
-import computer.iroh.SendStream
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
@@ -19,9 +18,9 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Minimal byte sink for a viewer's wire stream. Abstracts [computer.iroh.SendStream]
- * (a JNI class that cannot be faked) so [IrohViewerHandle] is unit-testable with a
- * capturing fake. The real adapter wraps a SendStream ([sendStreamSink]).
+ * Minimal sink for a viewer's wire stream, so [IrohViewerHandle] is unit-testable with a
+ * capturing fake. A node connection's sink is its push lane, which takes whole frames
+ * ([writeFrame]) and leaves their framing to the connection's carrier.
  */
 interface ViewerFrameSink {
     suspend fun writeAll(bytes: ByteArray)
@@ -37,11 +36,6 @@ interface ViewerFrameSink {
             writeAll(IrohFrameCodec.encodeFrame(frame, maxFrameBytes))
         }
     }
-}
-
-/** Adapt a real Iroh [SendStream] to a [ViewerFrameSink]. */
-fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink {
-    override suspend fun writeAll(bytes: ByteArray) = send.writeAll(bytes)
 }
 
 /**

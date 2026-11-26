@@ -12,6 +12,7 @@ import com.letta.mobile.data.controller.extras.relay.AppToolRelayResponder
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -89,6 +90,7 @@ class IrohAppToolRelayEndToEndTest {
     private suspend fun startHost(relay: AppToolRelayHost): String {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = scope,
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )

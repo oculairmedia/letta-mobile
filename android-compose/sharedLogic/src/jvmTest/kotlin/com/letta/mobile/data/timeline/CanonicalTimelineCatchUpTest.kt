@@ -22,8 +22,6 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.appServerAdminRpcParams
-import computer.iroh.Connection
-import computer.iroh.NoHandle
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import kotlin.coroutines.Continuation
@@ -226,7 +224,7 @@ class CanonicalTimelineCatchUpTest {
         private var node = newNode()
 
         private fun newNode(): IrohNodeConnection = IrohNodeConnection(
-            Connection(NoHandle), controller,
+            controller,
             AdminRpcRouter().also { ConversationAdminHandlers.register(it, NativeReadTiers(nativeClient = native)) },
             IrohConnectionAuthentication(IrohAuthPolicy.InsecureAnonymousForTestOnly),
         )

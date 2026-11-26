@@ -1,8 +1,11 @@
 # Node carrier v1: one client stack over any transport
 
-Status: **v1 frozen. The SPI, the client session, the fixture and the contract suite are implemented and proven against
-the reference loopback carrier. The in-process carrier and the Iroh carrier are the next slices; each is done when the
-suite passes against it. No shell code uses the carrier yet.**
+Status: **v1 frozen. The SPI, the client session, the fixture and the contract suite are implemented, and the suite
+passes against all three carriers: the reference loopback carrier, the in-process carrier (`InProcessNodeCarrier`) and
+the Iroh carrier (`IrohNodeCarrier`). The node serves every peer through the carrier: `IrohNodeEndpoint` hands each
+App Server connection it accepts to the Iroh carrier's node end (`serveIrohNodePeer`) and serves that link through
+the same `NodeConnectionWire` as the in-process shell's, so one node protocol code path serves every carrier, with
+the wire unchanged for existing Iroh clients. No shell code uses the carrier yet (that is the shell migration).**
 
 Code: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/node/carrier/`.
 Fixture: `android-compose/sharedLogic/src/commonTest/resources/contracts/node-carrier/v1.json`.
@@ -179,7 +182,8 @@ When the scripted node sees a frame that does not match the script, its mismatch
 the shell's end reported (usually `Closed` with `4900 contract_mismatch`).
 
 The suite proves the transport and the session. That the real node serves the same frames is proven separately, by
-running the real node behind the in-process carrier (next slice) and by the existing `WireContractsTest`.
+running the real node behind the in-process carrier (`InProcessNodeRealNodeTest`), by the existing Iroh client and
+host tests running against the endpoint's carrier route, and by the existing `WireContractsTest`.
 
 ## How each carrier maps onto the SPI
 
@@ -199,12 +203,11 @@ running the real node behind the in-process carrier (next slice) and by the exis
   `LOCAL_SHELL` through the general acceptor (`NodeComposition.peerAcceptor`) meets the endpoint's policy.
 - **A node that goes away**: a node that stops serving a link the shell had not closed closes it as `LOST`, so the
   shell never mistakes it for its own detach. In the suite, stopping the node is this carrier's transport loss.
-- **The node side is the real work**: `IrohNodeConnection` serves `computer.iroh.Connection` directly (control =
-  first `acceptBi`, push = second, calls via `AdminRpcStreamServer` over later ones). Generalize it to serve a
-  `NodePeerLink`: control frames from `link.control`, writes to `link.sendControl`/`link.push`, admin calls from
-  `link.calls`, `remoteEndpointId` from `link.peer`, closes through `link.close(NodeLinkClosure.AUTH_FAILURES ...)`, and
-  `link.onPeerCapabilities` where it records `peerCapabilities`. `NodeComposition` then exposes the node's acceptor.
-  `PeerSessionAuth` admits `LOCAL_SHELL` through the auth policy (pre-authenticated, admin grants).
+- **The node side**: `IrohNodeConnection` serves a `NodePeerLink` through `NodePeerLinkWire`: control frames from
+  `link.control`, writes to `link.sendControl`/`link.push`, admin calls from `link.calls`, `remoteEndpointId` from
+  `link.peer`, closes through `link.close(NodeLinkClosure.AUTH_FAILURES ...)`, and `link.onPeerCapabilities` where it
+  records `peerCapabilities`. It is the same path the Iroh carrier's links take. `NodeComposition` exposes the node's
+  acceptor. `PeerSessionAuth` admits `LOCAL_SHELL` through the auth policy (pre-authenticated, admin grants).
 - **Wraps**: `NodeComposition` (the node), `IrohNodeConnection` (to serve a link), `ConnectionRegistry` (viewer per
   link), `PeerSessionAuth` / auth policy (admit `LOCAL_SHELL`). It replaces `DesktopLocalAppServerClientRegistry` as
   the shell's way into the local node (that migration is N3).
@@ -217,16 +220,23 @@ running the real node behind the in-process carrier (next slice) and by the exis
   `openCall` is `openBi` plus the request (`adminRpcOverStream` and `adminRpcStream` show both one-shot and cancel use).
   `node` is the remote endpoint id in hex (`IrohDiagnostics.endpointIdHex`). `close(c)` is `connection.close(c.code,
   c.reason)`; a remote application close maps back to `NodeLinkClosure(code, reason)`, anything else to `LOST`.
-- **Node end (`NodePeerLink`)**: wrap one accepted `Connection` as `IrohNodeConnection.serve` does today: first
-  `acceptBi` is control, second is push (wait for the peer's readiness as `serveStreamReadiness` does), every later
-  `acceptBi` is a call lane. `peer` is the authenticated remote endpoint id. Writes use `frame_part` only after
-  `onPeerCapabilities` reported it, as `peerSupportsFrameParts()` does now. Keep `IrohFrameCodec`'s frame limits.
-  Nothing is read ahead of the node without bound: control frames, each call lane's frames and call lanes not yet
-  taken wait in a small fixed buffer (8), and a full buffer stops the read, so QUIC flow control holds a peer that has
-  not authenticated. A frame that is not a JSON object ends the link as `4400 malformed_frame`, so a request is never
-  dropped silently.
+- **Node end (`NodePeerLink`, `serveIrohNodePeer`)**: wraps one accepted `Connection` the way the node has always
+  split it: first `acceptBi` is control, second is push (the peer finishes its send half once it listens), every later
+  `acceptBi` is a call lane; control frames are delivered once both are open, and the control lane also ends when the
+  peer finishes sending on it. `peer` is the authenticated remote endpoint id. Writes use `frame_part` only after
+  `onPeerCapabilities` reported it. `IrohFrameCodec`'s frame limits stay: one frame is 1 MiB, and the node bounds
+  reassembly (`NodePeerReassemblyBound`) to one frame until the peer has authenticated and advertised `frame_part`. A
+  framing violation fails only the lane it arrived on (an error envelope on a call lane, the end of the connection on
+  the control lane), as it always has. A frame that is not a JSON object ends the link as `4400 malformed_frame`, so a request is never
+  dropped silently. Nothing is read ahead of the node without bound: control frames, each call lane's frames and call
+  lanes not yet taken wait in a small fixed buffer (8), and a full buffer stops the read, so QUIC flow control holds a
+  peer that has not authenticated.
+- **Routing**: `IrohNodeEndpoint` takes `appServerLinks`; the node's composition passes `serveIrohCarrierLink`, which
+  serves each admitted App Server connection through `serveIrohNodePeer` and the endpoint's `serveWire`, the same entry
+  the in-process carrier uses. The endpoint cannot import the carrier itself (that would close a package cycle), so the
+  route is injected.
 - **Wraps**: `IrohFrameCodec`, the dial path of `IrohAppServerTransport` / `IrohDialer`, `IrohNodeEndpoint`'s accept
-  loop, `IrohDiagnostics`. It must not change `IrohNodeConnection` (the in-process slice owns that refactor).
+  loop, `IrohDiagnostics`.
 - **Suite**: a `jvmTest` subclass binds two loopback Iroh endpoints, wraps each accepted connection as a
   `NodePeerLink` handed to the suite's acceptor, and dials with the carrier. `unreachable` is a well-formed address of a
   node id nobody binds. It passes `sever = null`: every way a test can end an Iroh connection is an application
