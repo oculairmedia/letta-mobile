@@ -4,12 +4,31 @@ import { readFileSync } from "node:fs";
 import { resolveDeployedLettaBundle } from "./bundle-fixtures.ts";
 import { patchLettaCodeSourceResultForTest } from "../letta-code-patch-loader.mjs";
 
-const anchors = [
+const common = [
   '  backgroundTasks.set(taskId, bgTask);\n  registerSubagentAbortHook(subagentId, buildBackgroundTaskAbortHook(taskId, abortController));',
   '    bgTask.status = result3.success ? "completed" : "failed";\n    if (result3.error) {',
-  '    bgTask.status = "failed";\n    bgTask.error = errorMessage5;',
-  '      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);',
 ];
+const stop = '      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);';
+// 0.34.39 and 0.34.70 shapes; 0.34.70 adds two failure transitions on the task stop path.
+const releases = [
+  { catchBinding: "errorMessage5", anchors: [...common, '    bgTask.status = "failed";\n    bgTask.error = errorMessage5;', stop] },
+  {
+    catchBinding: "errorMessage6",
+    anchors: [
+      ...common,
+      '    bgTask.status = "failed";\n    bgTask.error = errorMessage6;',
+      '          task.status = "failed";\n          scheduleBackgroundTaskCleanup(task_id);\n          return {',
+      '          task.status = "failed";\n          scheduleBackgroundTaskCleanup(task_id);\n          task.cancelPendingWakes',
+      stop,
+    ],
+  },
+];
+
+function release(source: string) {
+  const matching = releases.filter(({ anchors }) => anchors.every((anchor) => source.split(anchor).length - 1 === 1));
+  assert.equal(matching.length, 1, "the bundle must match exactly one known release shape");
+  return matching[0]!;
+}
 
 function bundle(t: { skip: (reason: string) => void }): string | null {
   const path = resolveDeployedLettaBundle();
@@ -44,21 +63,31 @@ test("agent task status transitions notify listeners with the task scope", (t) =
       args: ['bgTask', 'result3', 'notifyBackgroundProcessStateChanged'], values: [task, { success }, notify] });
     assert.equal(task.status, success ? 'completed' : 'failed');
   }
+  const { catchBinding, anchors } = release(source);
   task.status = 'running';
-  run({ start: 'bgTask.status = "failed";', end: 'bgTask.error = errorMessage5;',
+  run({ start: 'bgTask.status = "failed";', end: `bgTask.error = ${catchBinding};`,
     args: ['bgTask', 'notifyBackgroundProcessStateChanged'], values: [task, notify] });
-  task.status = 'running';
-  run({ start: 'task.status = "failed";', end: 'scheduleBackgroundTaskCleanup(task_id);',
-    args: ['task', 'notifyBackgroundProcessStateChanged'], values: [task, notify] });
-  assert.deepEqual(events, [scope, scope, scope, scope, scope]);
+  // Every task-stop failure transition: run the patched two lines at each site, in bundle order.
+  const stopSites = anchors.filter((anchor) => anchor.trimStart().startsWith("task.status"));
+  for (const anchor of stopSites) {
+    task.status = 'running';
+    const marked = patched.split(anchor.slice(0, anchor.indexOf("\n"))).length - 1;
+    assert.ok(marked >= 1);
+    const at = patched.indexOf(anchor.slice(0, anchor.indexOf("\n")) + "\n" + anchor.match(/^ */)![0] + "notifyBackgroundProcessStateChanged(task.runtimeScope);");
+    assert.notEqual(at, -1, `stop site must notify: ${anchor.slice(0, 60)}`);
+    const body = patched.slice(at, patched.indexOf("scheduleBackgroundTaskCleanup(task_id);", at));
+    new Function('task', 'notifyBackgroundProcessStateChanged', body)(task, notify);
+    assert.equal(task.status, 'failed');
+  }
+  assert.deepEqual(events, Array(3 + 1 + stopSites.length).fill(scope));
 });
 
-test("agent task patch matches four unique real bundle anchors and skips atomically on drift", (t) => {
+test("agent task patch matches every unique real bundle anchor and skips atomically on drift", (t) => {
   const source = bundle(t);
   if (!source) return;
-  for (const anchor of anchors) assert.equal(source.split(anchor).length - 1, 1);
+  const { anchors } = release(source);
   const result = patchLettaCodeSourceResultForTest(source);
-  assert.equal((result.source.match(/\/\/ lcp-agent-task-status/g) ?? []).length, 4);
+  assert.equal((result.source.match(/\/\/ lcp-agent-task-status/g) ?? []).length, anchors.length);
   for (const anchor of anchors) {
     const duplicate = source + '\n' + anchor;
     const drifted = patchLettaCodeSourceResultForTest(duplicate);
@@ -66,5 +95,5 @@ test("agent task patch matches four unique real bundle anchors and skips atomica
     assert.equal(drifted.skippedPatches, result.skippedPatches + 1);
   }
   const reapplied = patchLettaCodeSourceResultForTest(result.source).source;
-  assert.equal(reapplied.split("// lcp-agent-task-status").length - 1, 4);
+  assert.equal(reapplied.split("// lcp-agent-task-status").length - 1, anchors.length);
 });

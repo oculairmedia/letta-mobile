@@ -13,7 +13,7 @@ const PINNED_BUNDLE = "/root/letta-code-0.34.14/node_modules/@letta-ai/letta-cod
 // falling back to the pinned 0.34.14 install. The anchors below still require 0.34.14 bytes.
 const BUNDLE = process.env["LETTA_CLI_PATH_REAL"] || PINNED_BUNDLE;
 
-// Every item is a byte-exact 0.34.14 anchor. Keep this list in lock-step with
+// Every item is a byte-exact 0.34.14/0.34.39 anchor; 0.34.70 renames only the locals in RENAMES. Keep this list in lock-step with
 // the loader: this is the drift alarm before the runtime loader is allowed to
 // rewrite any reflection-control site.
 const REFLECTION_CONTROLS_ANCHORS = [
@@ -28,6 +28,20 @@ const REFLECTION_CONTROLS_ANCHORS = [
   `\n}\nvar AUTO_REFLECTION_DESCRIPTION = "Reflect on recent conversations", REFLECTION_AGENT_ID_WAIT_MS = 30000, reservedReflectionAgentIds, pendingReflectionLaunches, suppressedAutomaticReflections;`,
   `        } finally {\n          releaseReflectionLaunch(agentId);\n        }\n      }\n    });\n    releaseOnComplete = true;`,
 ];
+
+// 0.34.70's bundler names for the same locals (the code around them is byte-identical).
+const RENAMES: Record<string, string> = { settings3: "settings", merge4: "merge3", dependencies4: "dependencies", error5: "error4" };
+const renamed = (text: string) => Object.entries(RENAMES).reduce((out, [from, to]) => out.replace(new RegExp(`\\b${from}\\b`, "g"), to), text);
+
+/** The anchor list and local names of the release `raw` was built from. */
+function releaseOf(raw: string) {
+  const releases = [
+    { anchors: REFLECTION_CONTROLS_ANCHORS, local: (name: string) => name },
+    { anchors: REFLECTION_CONTROLS_ANCHORS.map(renamed), local: (name: string) => RENAMES[name] ?? name },
+  ].filter(({ anchors }) => anchors.every((anchor) => occurrences(raw, anchor) === 1));
+  assert.equal(releases.length, 1, "the bundle must match exactly one known release shape");
+  return releases[0]!;
+}
 
 function occurrences(source: string, token: string): number {
   return source.split(token).length - 1;
@@ -48,23 +62,21 @@ function readBundle(): string {
 
 test("lcp-reflection-controls anchors are unique and patch atomically on letta-code 0.34.14", () => {
   const raw = readBundle();
-  for (const anchor of REFLECTION_CONTROLS_ANCHORS) {
-    assert.equal(occurrences(raw, anchor), 1, `anchor must match exactly once: ${anchor.slice(0, 72)}`);
-  }
+  const { anchors, local } = releaseOf(raw);
 
   const patched = patchLettaCodeSourceResultForTest(raw);
   assert.equal(patched.skippedPatches, 0, "no current patch may fail open on the pinned bundle");
   assert.match(patched.source, /globalThis\.__lcpReflectionOutcomes = globalThis\.__lcpReflectionOutcomes \|\| new Map\(\)/);
-  assert.match(patched.source, /model: settings3\.model \?\? null,/);
-  assert.match(patched.source, /focus_instructions: settings3\.focusInstructions \?\? "",/);
+  assert.ok(patched.source.includes(`model: ${local("settings3")}.model ?? null,`));
+  assert.ok(patched.source.includes(`focus_instructions: ${local("settings3")}.focusInstructions ?? "",`));
   assert.match(patched.source, /last_outcome: globalThis\.__lcpReflectionLastOutcome\(agentId\)/);
   assert.match(patched.source, /async function __lcpLaunchReflectionSubagentInner\(/);
-  assert.match(patched.source, /async function launchReflectionSubagent\(options, dependencies4 = \{\}\)/);
+  assert.ok(patched.source.includes(`async function launchReflectionSubagent(options, ${local("dependencies4")} = {})`));
   assert.match(patched.source, /status: success \? "completed" : "failed"/);
 
   // A single drift must prevent every reflection-control rewrite; do not risk a
   // schema change without the corresponding persistence and launch behavior.
-  const setHandlerAnchor = REFLECTION_CONTROLS_ANCHORS[5];
+  const setHandlerAnchor = anchors[5];
   assert.ok(setHandlerAnchor, "test anchor list must include the set handler");
   const driftedRaw = raw.replace(setHandlerAnchor, "// lcp reflection set-handler drift");
   const drifted = patchLettaCodeSourceResultForTest(driftedRaw);
@@ -87,12 +99,17 @@ test("lcp-reflection-controls leaves the fully patched letta.js bundle parseable
 });
 
 function createReflectionFixture() {
-  const { source } = patchLettaCodeSourceResultForTest(readBundle());
-  const helper = section(source, "globalThis.__lcpReflectionOutcomes =", "\n\":\" //#");
-  const memorySettings = section(source, "function isValidStepCount", "// src/agent/memory-runtime.ts");
+  const raw = readBundle();
+  const { local } = releaseOf(raw);
+  const { source } = patchLettaCodeSourceResultForTest(raw);
+  // The helper is injected after the shebang; it ends with the last-outcome reader.
+  const helperEnd = "globalThis.__lcpReflectionLastOutcome = function(agentId) {\n  return globalThis.__lcpReflectionOutcomes.get(agentId) ?? null;\n};\n";
+  const helper = section(source, "globalThis.__lcpReflectionOutcomes =", helperEnd) + helperEnd;
+  // Ends at the module initialiser, which this fixture replaces with its own DEFAULT_REFLECTION_SETTINGS.
+  const memorySettings = section(source, "function isValidStepCount", "var init_memory_reminder = __esm(");
   const responseAndHandler = section(source, "function toReflectionSettingsResponse", "function handleSettingsProtocolCommand");
   const validator = section(source, "function isSetReflectionSettingsCommand", "function isGetExperimentsCommand");
-  const wrapper = section(source, "async function launchReflectionSubagent(options, dependencies4 = {}) {", "var AUTO_REFLECTION_DESCRIPTION");
+  const wrapper = section(source, `async function launchReflectionSubagent(options, ${local("dependencies4")} = {}) {`, "var AUTO_REFLECTION_DESCRIPTION");
 
   const state = {
     global: {
