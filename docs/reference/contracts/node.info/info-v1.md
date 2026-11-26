@@ -18,7 +18,9 @@
   - `runtime_patches` (object): the letta-code runtime patch set. `source` is `boot_line` when the
     node read the patch loader's `lcp-patches applied=N skipped=M` line from an App Server it
     supervises, else `unknown`, in which case `applied`, `skipped` and `patch_ids_sha256` are null.
-    `patch_ids_sha256` is null until a node can see the applied patch ids.
+    `patch_ids_sha256` is the lowercase hex sha256 of the sorted applied patch ids (the `lcp:` part of
+    the runtime parity string `letta-code@<letta_code_version>+lcp:<patch_ids_sha256>`), and is null
+    until a node can see the applied patch ids.
 - Every free-text value is reduced to a version-like token; no secret, hostname or host path is returned.
 - Errors: none specific. A failing App Server makes its fields read `unknown` or empty, never a failure.
 - Old peers: a node without this method answers the router's unknown-method error, or `forbidden`
