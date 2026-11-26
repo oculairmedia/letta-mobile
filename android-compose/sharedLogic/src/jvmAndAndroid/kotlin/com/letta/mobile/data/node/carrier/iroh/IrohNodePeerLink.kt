@@ -47,13 +47,18 @@ suspend fun serveIrohNodePeer(connection: Connection, acceptor: NodePeerAcceptor
  * `frame_part`s only after the node reported, through [onPeerCapabilities], that the peer advertised them, and the
  * peer's frames may be reassembled past one Iroh frame only then (until it authenticates, a peer cannot make the node
  * hold more than one frame).
+ *
+ * Nothing is read ahead of the node without bound: control frames and each call lane's frames wait in a small buffer,
+ * and a full buffer stops the read, so QUIC flow control holds the peer, as when the node read its streams directly.
+ * Call lanes the node has not taken yet are bounded the same way: past [IrohLinkCore.LANE_BUFFER] waiting lanes the
+ * node stops accepting streams until it takes one.
  */
 internal class IrohNodePeerLink(
     private val connection: Connection,
     private val core: IrohLinkCore,
 ) : NodePeerLink {
-    private val controlFrames = Channel<NodeFrame>(Channel.UNLIMITED)
-    private val callLanes = Channel<NodeCallLane>(Channel.UNLIMITED)
+    private val controlFrames = Channel<NodeFrame>(IrohLinkCore.LANE_BUFFER)
+    private val callLanes = Channel<NodeCallLane>(IrohLinkCore.LANE_BUFFER)
     private val controlSend = CompletableDeferred<SendStream>()
     private val pushSend = CompletableDeferred<SendStream>()
     private val controlLock = Mutex()
@@ -93,12 +98,12 @@ internal class IrohNodePeerLink(
             while (true) {
                 val stream = connection.acceptBi()
                 val call = IrohCallLane(core, stream, frameParts = { peerFrameParts }, maxReassembledBytes = ::maxReassembledBytes)
-                if (callLanes.trySend(call).isFailure) return
+                callLanes.send(call)
             }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            // The connection went away; the close watcher sets the closure.
+            // The connection went away (the close watcher sets the closure), or the link ended and closed the lanes.
         }
     }
 
