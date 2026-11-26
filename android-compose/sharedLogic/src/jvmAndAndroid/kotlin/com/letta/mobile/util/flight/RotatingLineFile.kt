@@ -5,7 +5,6 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 
 /**
  * Appends lines to [file], keeping at most about twice [maxBytes]: when [file] would pass [maxBytes] it becomes `<name>.1`
@@ -45,7 +44,7 @@ class RotatingLineFile(private val file: File, private val maxBytes: Long = DEFA
 }
 
 /** A [FlightRecordStore] on disk: [RotatingLineFile] `flight-record.log` (and `.1`) in [directory], at most about 2 x [maxBytesPerFile]. */
-class FileFlightRecordStore(directory: File, maxBytesPerFile: Long = DEFAULT_MAX_BYTES_PER_FILE) : FlightRecordStore {
+internal class FileFlightRecordStore(directory: File, maxBytesPerFile: Long = DEFAULT_MAX_BYTES_PER_FILE) : FlightRecordStore {
     private val file = RotatingLineFile(File(directory, FILE_NAME), maxBytesPerFile)
 
     override fun append(lines: List<String>) = lines.forEach(file::append)
@@ -61,6 +60,10 @@ class FileFlightRecordStore(directory: File, maxBytesPerFile: Long = DEFAULT_MAX
     }
 }
 
-/** Installs the flight record for [recorder] into `flight-record.log` under [directory], written from the I/O dispatcher. */
-fun installFileFlightRecording(recorder: TelemetryRecorder, directory: File, build: String): AutoCloseable =
-    FlightRecording.install(recorder, FileFlightRecordStore(directory), CoroutineScope(SupervisorJob() + Dispatchers.IO), build)
+/**
+ * Installs the flight record for [recorder] into `flight-record.log` under [directory]. The writer is a child of [scope], the
+ * process-lifetime scope the platform entry point owns, and does its file I/O on the I/O dispatcher. Closing the result
+ * writes what is waiting and ends the writer.
+ */
+fun installFileFlightRecording(recorder: TelemetryRecorder, directory: File, build: String, scope: CoroutineScope): AutoCloseable =
+    FlightRecording.install(recorder, FileFlightRecordStore(directory), scope, build, Dispatchers.IO)

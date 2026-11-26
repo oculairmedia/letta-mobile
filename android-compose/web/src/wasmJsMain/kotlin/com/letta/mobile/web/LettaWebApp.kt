@@ -38,9 +38,9 @@ import kotlinx.coroutines.launch
 
 /** letta-mobile-ckmub.17.4: bootstrap and browser bindings (gateway, storage, URL) around the shared [LettaShellWorkspace]. */
 @Composable
-fun LettaWebApp() {
+fun LettaWebApp(telemetry: com.letta.mobile.util.TelemetryRecorder) {
     val scope = rememberCoroutineScope()
-    val app = remember { WebApp(scope) }
+    val app = remember { WebApp(scope).also { com.letta.mobile.util.flight.recordFlightInMemory(telemetry, scope, "web") } }
     val highContrastPreference = remember(app) { HighContrastPreference(app.storage.settings) }
     val backend = app.backend
     val workspace = rememberShellWorkspaceState(ShellDestination.Chat())

@@ -6,9 +6,9 @@ import com.letta.mobile.util.TelemetryValue
 /**
  * Which telemetry events the flight record keeps and what of them: connection, turn and feed state, never content. An event
  * is kept when its tag/name is listed in [RECORDED] or it is a warning or an error; debug events never are. Of a kept event
- * only ids, seqs, states, counts and timings survive: an attribute whose name says it carries text, a payload, a credential
- * an address or a free-form error message is dropped ([isContentKey]), text values are cut to [MAX_TEXT_CHARS] on one line, and a throwable keeps only
- * its class (its message stays out).
+ * only ids, seqs, states, counts and timings survive: an attribute whose name says it carries text, a payload, a credential,
+ * an address or a free-form error message is dropped ([isContentKey]), text values are cut to [MAX_TEXT_CHARS] on one
+ * line, and a throwable keeps only its class (its message stays out).
  */
 internal object FlightRecordPolicy {
     /** Whether the record keeps [event] at all (before rate limiting). */

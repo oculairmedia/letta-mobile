@@ -66,7 +66,7 @@ class FileFlightRecordStoreTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val recorder = TelemetryRecorder()
         val history = Telemetry.installRecorder(recorder)
-        val flight = FlightRecording.install(recorder, store, scope, "test")
+        val flight = installFileFlightRecordingInto(recorder, store, scope)
         try {
             Telemetry.event("FeedTimeline", "applied", "seq" attr 1)
             assertTrue(written.await(10, TimeUnit.SECONDS), "the record was written")
@@ -77,4 +77,8 @@ class FileFlightRecordStoreTest {
             scope.cancel()
         }
     }
+
+    /** The production file install's writer context (the I/O dispatcher), over a [store] the test can watch. */
+    private fun installFileFlightRecordingInto(recorder: TelemetryRecorder, store: FlightRecordStore, scope: CoroutineScope) =
+        FlightRecording.install(recorder, store, scope, "test", Dispatchers.IO)
 }

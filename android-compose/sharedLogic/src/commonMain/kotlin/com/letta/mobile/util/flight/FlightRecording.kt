@@ -3,10 +3,11 @@ package com.letta.mobile.util.flight
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import com.letta.mobile.util.attr
-import kotlin.concurrent.Volatile
+import com.letta.mobile.util.runCatchingCancellable
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -17,7 +18,7 @@ import kotlinx.coroutines.launch
  * Android and desktop it is a pair of files that outlive the process; where there is no file system (the browser) it is
  * [InMemoryFlightRecordStore], which ends with the page.
  */
-interface FlightRecordStore {
+internal interface FlightRecordStore {
     /** Appends [lines] in order. Blocking I/O is allowed: only the flight record's own writer calls it, never a caller of `Telemetry`. */
     fun append(lines: List<String>)
 
@@ -26,7 +27,7 @@ interface FlightRecordStore {
 }
 
 /** A [FlightRecordStore] in memory: at most [maxBytes] of lines (UTF-8), evicting the oldest. */
-class InMemoryFlightRecordStore(private val maxBytes: Long = DEFAULT_MAX_BYTES) : FlightRecordStore {
+internal class InMemoryFlightRecordStore(private val maxBytes: Long = DEFAULT_MAX_BYTES) : FlightRecordStore {
     private val lock = kotlinx.atomicfu.locks.SynchronizedObject()
     private val lines = ArrayDeque<String>()
     private var bytes = 0L
@@ -58,20 +59,20 @@ internal class FlightRecorder(
     private val store: FlightRecordStore,
     scope: CoroutineScope,
     private val flushDelayMs: Long = FLUSH_DELAY_MS,
+    writerContext: CoroutineContext = EmptyCoroutineContext,
 ) {
     private val waiting = Channel<Telemetry.Event>(QUEUE_CAPACITY, BufferOverflow.DROP_OLDEST)
     private val limiter = FlightRateLimiter()
 
-    init {
-        scope.launch { drain() }
-    }
+    /** The writer, a child of the owner's scope: it ends after [close] once what was waiting is written, or with the scope. */
+    val writer: Job = scope.launch(writerContext) { drain() }
 
     /** Called inside every `Telemetry.event`: a map lookup and a non-blocking queue offer, nothing else. */
     fun offer(event: Telemetry.Event) {
         if (FlightRecordPolicy.admits(event)) waiting.trySend(event)
     }
 
-    /** Stops taking events; what is already waiting is still written. */
+    /** Stops taking events; what is already waiting is still written, then [writer] completes. */
     fun close() {
         waiting.close()
     }
@@ -84,7 +85,8 @@ internal class FlightRecorder(
                 while (true) add(waiting.tryReceive().getOrNull() ?: break)
             }
             val lines = batch.mapNotNull { event -> limiter.admit(event)?.let { FlightRecordPolicy.lineFor(event, it) } }
-            if (lines.isNotEmpty()) store.append(lines)
+            // A record that cannot be written loses those lines; it never fails the scope that owns it.
+            if (lines.isNotEmpty()) runCatchingCancellable { store.append(lines) }
         }
     }
 
@@ -100,32 +102,36 @@ internal class FlightRecorder(
  * after the fact. It keeps ids, seqs, states, counts and timings only ([FlightRecordPolicy]); each host installs it once
  * beside its [TelemetryRecorder].
  */
-object FlightRecording {
+internal object FlightRecording {
     /** The tag of the record's own events (the process start marker). */
     const val TAG: String = "FlightRecord"
 
-    @Volatile
-    private var installed: FlightRecordStore? = null
-
     /**
-     * Starts recording what [recorder] records into [store], writing from [scope], and marks the start with [build] (the app's
-     * version or host name). Closing the result stops recording; lines already waiting are still written.
+     * Starts recording what [recorder] records into [store] and marks the start with [build] (the app's version or host
+     * name). The writer runs in [scope] (on [writerContext]), which the platform entry point owns for the process (or page)
+     * lifetime. Closing the result detaches it from [recorder] and lets the writer finish: lines already waiting are
+     * written, then the writer ends.
      */
-    fun install(recorder: TelemetryRecorder, store: FlightRecordStore, scope: CoroutineScope, build: String): AutoCloseable {
-        val flight = FlightRecorder(store, scope)
+    fun install(
+        recorder: TelemetryRecorder,
+        store: FlightRecordStore,
+        scope: CoroutineScope,
+        build: String,
+        writerContext: CoroutineContext = EmptyCoroutineContext,
+    ): AutoCloseable {
+        val flight = FlightRecorder(store, scope, writerContext = writerContext)
         recorder.onRecorded = flight::offer
-        installed = store
         Telemetry.event(TAG, "process.start", "build" attr build)
         return AutoCloseable {
             recorder.onRecorded = null
             flight.close()
         }
     }
-
-    /** [install] into an [InMemoryFlightRecordStore], for a host with no file system (the browser): the record ends with it. */
-    fun installInMemory(recorder: TelemetryRecorder, build: String): AutoCloseable =
-        install(recorder, InMemoryFlightRecordStore(), CoroutineScope(SupervisorJob() + Dispatchers.Default), build)
-
-    /** The record's lines, oldest first; empty when nothing is installed. */
-    fun read(): List<String> = installed?.read().orEmpty()
 }
+
+/**
+ * The flight record for a host with no file system (the browser): [recorder]'s selected events go to an
+ * [InMemoryFlightRecordStore], written from [scope], the page-lifetime scope the entry point owns; the record ends with it.
+ */
+fun recordFlightInMemory(recorder: TelemetryRecorder, scope: CoroutineScope, build: String): AutoCloseable =
+    FlightRecording.install(recorder, InMemoryFlightRecordStore(), scope, build)

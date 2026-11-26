@@ -2,10 +2,12 @@ package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.session.ProcessScope
 import com.letta.mobile.startup.AppStartupCoordinator
 import com.letta.mobile.util.EncryptedPrefsHelper
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Constructor-injected Application collaborators.
@@ -23,4 +25,6 @@ class LettaApplicationDependencies @Inject constructor(
     @Suppress("unused") val encryptedPrefsHelper: EncryptedPrefsHelper,
     // Eager process owner: UI and relay resolve the same repository for the app lifetime.
     val notebookLocalStore: NotebookLocalStore,
+    /** The process-lifetime scope; the flight record's writer runs in it. */
+    @param:ProcessScope val processScope: CoroutineScope,
 )

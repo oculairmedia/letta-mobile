@@ -16,7 +16,7 @@ class TelemetryRecorder {
      * return at once (no I/O, no locks held for long), because it runs inside every `Telemetry.event` call.
      */
     @Volatile
-    var onRecorded: ((Telemetry.Event) -> Unit)? = null
+    internal var onRecorded: ((Telemetry.Event) -> Unit)? = null
 
     fun record(event: Telemetry.Event) {
         mutableEvents.update { current -> (listOf(event) + current).take(CAPACITY) }

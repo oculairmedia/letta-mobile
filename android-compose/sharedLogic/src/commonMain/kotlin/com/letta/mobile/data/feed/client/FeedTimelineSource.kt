@@ -12,9 +12,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.resolveConversationReadTarget
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.TelemetryValue
 import com.letta.mobile.util.attr
-import com.letta.mobile.util.flight.LatestReporter
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,8 +25,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -80,7 +76,9 @@ class FeedTimelineSource(
     private val mutableMetrics = MutableStateFlow(FeedTimelineMetrics())
     private val mutablePresented = MutableStateFlow<List<ChatRenderItem>?>(null)
     private var job: Job? = null
-    private val appliedReport = LatestReporter<FeedCursor>(scope, CURSOR_REPORT_MS) { reportCursor("applied") }
+    private val flight = FeedFlightReport(scope, journalConversation) {
+        FeedPosition(follower.cursor, mutableMetrics.value.framesApplied, mutableRows.value.size)
+    }
 
     /** The rows now, newest first, as the chat list takes them. */
     val rows: StateFlow<List<ChatRenderItem>> = mutableRows.asStateFlow()
@@ -126,30 +124,17 @@ class FeedTimelineSource(
                 bump { it.copy(framesApplied = it.framesApplied + 1) }
                 outcome.entries.forEach { apply(it) }
                 publish(replaced = false)
-                follower.cursor?.let(appliedReport::offer)
+                follower.cursor?.let(flight::applied)
             }
             FeedFrameOutcome.Stale -> Unit
             is FeedFrameOutcome.Resync -> catchUp(outcome.reason)
         }
     }
 
-    /**
-     * The position applied now, for the flight record. A pushed frame reports through [appliedReport] (once per
-     * [CURSOR_REPORT_MS] while frames keep arriving, ending on the last), so a streaming turn writes a line per window, not
-     * per frame; a page and a resync report at once.
-     */
-    private fun reportCursor(name: String, vararg extra: Pair<String, TelemetryValue>) {
-        val cursor = follower.cursor
-        Telemetry.event(
-            TAG, name, "conversationId" attr journalConversation.value, "epoch" attr cursor?.epoch, "seq" attr cursor?.seq,
-            "framesApplied" attr mutableMetrics.value.framesApplied, "rows" attr mutableRows.value.size, *extra,
-        )
-    }
-
     /** Reads `feed.subscribe` from the cursor until the host has no more, applying each page. */
     private suspend fun catchUp(reason: FeedResync?) {
         reason?.let { bump { m -> m.copy(resyncs = m.resyncs + 1) } }
-        reason?.let { reportCursor("resync", "reason" attr it.name) }
+        reason?.let(flight::resync)
         runCatchingCancellable { readUntilCaughtUp() }.onFailure { failure ->
             Telemetry.event(TAG, "read.failed", "class" attr failure::class.simpleName, level = Telemetry.Level.WARN)
         }
@@ -165,10 +150,7 @@ class FeedTimelineSource(
             outcome.entries.forEach { apply(it) }
             publish(replaced = outcome.replaced)
             more = outcome.hasMore
-            reportCursor(
-                "read.page", "mode" attr page.mode, "resyncReason" attr page.resyncReason, "entries" attr page.entries.size,
-                "headSeq" attr page.headSeq, "hasMore" attr page.hasMore,
-            )
+            flight.page(page)
         }
     }
 
@@ -198,22 +180,8 @@ class FeedTimelineSource(
     }
 
     private suspend fun apply(entry: FeedDelta) {
-        reportTurnBoundary(entry)
+        flight.entry(entry)
         projector.apply(entry).forEach { sink(it) }
-    }
-
-    /** A turn opening or closing in the journal, as this client applied it; stream deltas between them report nothing. */
-    private fun reportTurnBoundary(entry: FeedDelta) {
-        val name = when (entry.kind) {
-            ConversationFeedWire.KIND_TURN_OPEN -> "turn.opened"
-            ConversationFeedWire.KIND_TURN_CLOSED -> "turn.closed"
-            else -> return
-        }
-        val observed = entry.payload?.get(TERMINAL_OBSERVED)?.let { (it as? JsonPrimitive)?.booleanOrNull }
-        Telemetry.event(
-            TAG, name, "conversationId" attr journalConversation.value, "turnId" attr entry.turn, "seq" attr entry.seq,
-            "terminalObserved" attr observed,
-        )
     }
 
     /** Publishes the rows when they changed, keeping every unchanged row's instance. */
@@ -247,9 +215,7 @@ class FeedTimelineSource(
     /** The frame in [raw], or null after reporting it: a push this client cannot read is never silently lost. */
     private fun decodeOrReport(raw: JsonObject): FeedDeltaFrame? =
         runCatching { LettaJson.wire.decodeFromJsonElement(FeedDeltaFrame.serializer(), raw) }
-            .onFailure { failure ->
-                Telemetry.event(TAG, "frame.undecodable", "class" attr failure::class.simpleName, level = Telemetry.Level.WARN)
-            }
+            .onFailure(flight::undecodable)
             .getOrNull()
 
     /** A frame names its journal; one for another conversation or agent is not this source's (the host pushes by viewer, not by source). */
@@ -280,11 +246,5 @@ class FeedTimelineSource(
 
         /** Frames waiting for the loop; one dropped past it is a gap the next frame turns into a resync. */
         private const val EVENT_BUFFER = 64
-
-        /** Longest an applied cursor goes unreported while frames keep arriving. */
-        private const val CURSOR_REPORT_MS = 5_000L
-
-        /** The `turn_closed` payload field saying whether a real terminal went through the feed first. */
-        private const val TERMINAL_OBSERVED = "terminal_observed"
     }
 }
