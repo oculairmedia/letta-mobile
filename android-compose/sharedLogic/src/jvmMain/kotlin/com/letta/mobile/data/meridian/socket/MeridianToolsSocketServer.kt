@@ -119,15 +119,12 @@ class MeridianToolsSocketServer(
             var done = false
             while (!done) {
                 val read = input.read(chunk)
-                if (read < 0) {
-                    done = true
-                } else {
-                    val newline = (0 until read).firstOrNull { chunk[it] == NEWLINE }
-                    val take = newline ?: read
-                    if (out.size() + take > maxBytes) return null
-                    out.write(chunk, 0, take)
-                    done = newline != null
-                }
+                // At EOF (read < 0) the range is empty and nothing is taken.
+                val newline = (0 until read).firstOrNull { chunk[it] == NEWLINE }
+                val take = newline ?: read.coerceAtLeast(0)
+                if (out.size() + take > maxBytes) return null
+                out.write(chunk, 0, take)
+                done = read < 0 || newline != null
             }
             return out.toString(Charsets.UTF_8)
         }
