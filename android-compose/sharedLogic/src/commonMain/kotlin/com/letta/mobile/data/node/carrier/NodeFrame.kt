@@ -8,8 +8,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
- * One node protocol frame: a JSON object with a `type`. A carrier moves frames and never reads or rewrites them;
- * the frame is immutable data, so handing it across a carrier never shares state between the shell and the node.
+ * One node protocol frame: a JSON object with a `type`. A carrier moves frames and never reads or rewrites them.
+ * The frame holds the [JsonObject] it was given, which may wrap a map its builder still holds, so a carrier that does
+ * not serialize hands the other end a deep snapshot of the tree, never the sender's own: the shell and the node never
+ * share state through a frame.
  */
 @JvmInline
 value class NodeFrame(val json: JsonObject) {

@@ -57,6 +57,28 @@ class NodeSessionLifecycleTest {
         session.close()
     }
 
+    @Test
+    fun aRouterStartedInACancelledScopeStillClosesItsLink() = onLoopback { carrier, _, node ->
+        val dead = CoroutineScope(SupervisorJob()).apply { cancel() }
+        val link = carrier.dial(LoopbackNodeCarrier.ADDRESS)
+        NodeControlRouter.start(link, dead)
+        assertEquals(NodeLinkClosure.NORMAL, node.closure.await(), "the link is closed, not left without a reader")
+    }
+
+    @Test
+    fun aRequestWhoseCallerGaveUpLeavesNoWaiterBehind() = onLoopback { carrier, scope, node ->
+        val link = carrier.dial(LoopbackNodeCarrier.ADDRESS)
+        val router = NodeControlRouter.start(link, scope)
+        val late = NodeFrame(buildJsonObject { put("type", "sync"); put("request_id", "r-1") })
+        val waiting = scope.async { router.request(late) }
+        node.authReceived.await()
+        waiting.cancelAndJoin()
+        node.answerLate("r-1")
+        val unsolicited = router.unsolicited.first()
+        assertEquals("r-1", unsolicited.frame.requestId, "a late answer reaches the unsolicited frames, not an abandoned waiter")
+        link.close()
+    }
+
     private fun onLoopback(
         answerAuth: Boolean = false,
         endlessFeed: Boolean = false,
@@ -82,8 +104,13 @@ class NodeSessionLifecycleTest {
 private class LifecycleNode(private val answerAuth: Boolean, private val endlessFeed: Boolean) : NodePeerAcceptor {
     val authReceived = CompletableDeferred<Unit>()
     val closure = CompletableDeferred<NodeLinkClosure>()
+    private val served = CompletableDeferred<NodePeerLink>()
+
+    /** Answers [requestId] on the control lane now, after its caller may have given up. */
+    suspend fun answerLate(requestId: String) = served.await().sendControl(authAccepted(requestId))
 
     override suspend fun serve(link: NodePeerLink) {
+        served.complete(link)
         try {
             coroutineScope {
                 launch { link.calls.collect { lane -> launch { answerFeed(lane) } } }
