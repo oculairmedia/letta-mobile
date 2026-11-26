@@ -91,6 +91,12 @@ class RailChatBackTest {
 
     private var page by mutableStateOf(Page.Home)
     private var openOnCanvas = false
+    private var withCanvas = true
+    private var withShortcuts = true
+    private val drawer = ShellWorkspaceDrawer()
+
+    /** Presses the app shell's Back handler took (the drawer's close, or the way Home). */
+    private var hostBacks = 0
 
     private enum class Page { Home, Chat }
 
@@ -103,6 +109,7 @@ class RailChatBackTest {
     fun oneBackFromARailOpenedChatLandsOnHomeWithoutPassingTheCanvas() {
         openChatFromTheRail()
         assertEquals(Seen.Chat, seen())
+        assertFalse("the orb's pick closes the drawer", drawer.open)
 
         val trail = mutableListOf<Seen>()
         while (trail.size < MAX_PRESSES && trail.lastOrNull() != Seen.Home) {
@@ -112,21 +119,55 @@ class RailChatBackTest {
 
         assertFalse("Back showed a canvas nobody opened: $trail", Seen.Canvas in trail)
         assertEquals("one Back from the chat lands on Home: $trail", listOf(Seen.Home), trail)
+        assertFalse(drawer.open)
+    }
+
+    /**
+     * The shared half alone. Without a canvas the page has no Back of its own, so only Compose's
+     * focus walk stands between the press and the host: focus left in the closed drawer's sheet
+     * must not swallow it.
+     */
+    @Test
+    fun focusLeftInTheClosedDrawerDoesNotSwallowBack() {
+        withCanvas = false
+        openChatFromTheRail()
+        assertFalse(drawer.open)
+
+        pressBack()
+        assertEquals("the first Back reached the host", 1, hostBacks)
+        assertEquals(Seen.Home, seen())
     }
 
     /**
      * The prompt holding focus with no soft keyboard up (a hardware keyboard, or the person hid the
      * keyboard): Back is not spent taking focus out of the field first. With the keyboard up, the
      * keyboard takes one Back to hide itself, as everywhere on Android; that press never reaches the app.
+     * No canvas, so this pins the shared half alone.
      */
     @Test
     fun aFocusedPromptDoesNotCostAnExtraBack() {
+        withCanvas = false
         openChatFromTheRail()
         compose.onNodeWithTag(PROMPT_TAG).requestFocus()
         compose.waitForIdle()
 
         pressBack()
+        assertEquals("the first Back reached the host", 1, hostBacks)
         assertEquals(Seen.Home, seen())
+    }
+
+    /**
+     * The Android half alone. A host without the shared keymap has no focusable root, so no focus
+     * walk can take the press: what Back does is the page's rule. A chat that opened on its full
+     * page leaves on Back; its canvas is never shown.
+     */
+    @Test
+    fun aChatOpenedOnItsFullPageLeavesOnBackRatherThanShowingItsCanvas() {
+        withShortcuts = false
+        openChatFromTheRail()
+
+        pressBack()
+        assertEquals("Back never shows a canvas nobody opened", Seen.Home, seen())
     }
 
     @Test
@@ -158,13 +199,14 @@ class RailChatBackTest {
         compose.waitForIdle()
         compose.onNodeWithTag(ShellAgentRailTags.orb(AGENT_NAME)).performClick()
         compose.waitForIdle()
+        hostBacks = 0
     }
 
     @Composable
     private fun Workspace() {
-        val drawer = remember { ShellWorkspaceDrawer() }
         // The app shell's Back (AndroidShellWorkspace): close the drawer, else go Home.
         BackHandler(enabled = drawer.open || page != Page.Home) {
+            hostBacks++
             if (drawer.open) drawer.open = false else page = Page.Home
         }
         LettaShellWorkspace(
@@ -189,7 +231,9 @@ class RailChatBackTest {
                 chrome = ShellWindowChrome.Inline,
                 drawer = drawer,
                 // Android binds the shared keymap, so the workspace root takes focus as on the phone.
-                events = ShellWorkspaceEvents(shortcuts = ShellShortcutBinding(ShortcutPlatform.Android, WorkspaceShortcuts) {}),
+                events = ShellWorkspaceEvents(
+                    shortcuts = ShellShortcutBinding(ShortcutPlatform.Android, WorkspaceShortcuts) {}.takeIf { withShortcuts },
+                ),
             ),
         )
     }
@@ -199,7 +243,7 @@ class RailChatBackTest {
         when (page) {
             Page.Home -> Text("Home", modifier.testTag(HOME_TAG))
             Page.Chat -> Box(modifier.fillMaxSize()) {
-                CompositionLocalProvider(LocalChatCanvasSlot provides canvasSlot) { ChatPage() }
+                CompositionLocalProvider(LocalChatCanvasSlot provides canvasSlot.takeIf { withCanvas }) { ChatPage() }
             }
         }
     }
