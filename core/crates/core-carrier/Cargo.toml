@@ -1,0 +1,31 @@
+[package]
+name = "core-carrier"
+version = "0.1.0"
+description = "The carrier SPI (Carrier, Link, PeerLink, ProtocolHandler, AccessHook), verified peer identity, the in-process carrier with fault hooks, and the node-carrier v1 contract suite. No transport library."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# The node-carrier v1 contract suite, for other carriers' tests.
+contract-suite = ["dep:core-testkit", "dep:serde_json"]
+
+[dependencies]
+async-trait.workspace = true
+core-proto.workspace = true
+core-testkit = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "macros", "time"] }
+
+[dev-dependencies]
+# Turns the contract suite on for this crate's own tests.
+core-carrier = { path = ".", features = ["contract-suite"] }
+core-testkit.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "rt-multi-thread", "macros", "time", "test-util"] }
+
+[lints]
+workspace = true
