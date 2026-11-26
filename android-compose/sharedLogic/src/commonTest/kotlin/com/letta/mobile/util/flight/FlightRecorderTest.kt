@@ -5,7 +5,11 @@ import com.letta.mobile.util.TelemetryValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.util.attr
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -150,5 +154,42 @@ class FlightRecorderTest {
         val line = store.read().single()
         assertTrue('\n' !in line)
         assertTrue(line.length < 300, "text attributes are cut, line was ${line.length}")
+    }
+
+    @Test
+    fun closingWritesWhatIsWaitingAndEndsTheWriterSoNothingIsLeftRunningInTheOwnersScope() = runTest {
+        val store = CountingStore()
+        val owner = Job()
+        val ownerScope = CoroutineScope(coroutineContext + owner)
+        val recorder = FlightRecorder(store, ownerScope, flushDelayMs = 1_000)
+        runCurrent()
+
+        recorder.offer(event("applied", 1, "seq" to TelemetryValue.Numeric(5)))
+        recorder.close()
+        advanceUntilIdle()
+
+        assertTrue(store.read().single().contains("seq=5"), "what was waiting at close is written")
+        assertTrue(recorder.writer.isCompleted, "the writer ends after close")
+        assertTrue(owner.children.none(Job::isActive), "no coroutine of the record is left in the owner's scope")
+        owner.cancel()
+    }
+
+    @Test
+    fun theInstalledRecordStopsWithItsHandleAndLeavesTheOwnersScopeEmpty() = runTest {
+        val store = CountingStore()
+        val owner = Job()
+        val recorder = com.letta.mobile.util.TelemetryRecorder()
+        val history = Telemetry.installRecorder(recorder)
+        val recording = FlightRecording.install(recorder, store, CoroutineScope(coroutineContext + owner), "test")
+        runCurrent()
+
+        recording.close()
+        Telemetry.event("FeedTimeline", "applied", "seq" attr 9)
+        advanceUntilIdle()
+        history.close()
+
+        assertEquals(listOf("process.start"), store.read().map { it.substringAfter("/").substringBefore(' ') })
+        assertTrue(owner.children.none(Job::isActive), "closing the handle ended the writer")
+        owner.cancel()
     }
 }

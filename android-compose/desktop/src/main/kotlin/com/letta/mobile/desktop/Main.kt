@@ -48,8 +48,8 @@ private val DESKTOP_DENSITY_SCALE: Float =
 
 internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
 internal const val DESKTOP_APP_NAME = com.letta.mobile.data.model.DisplayNames.PRODUCT
-fun main(args: Array<String>) {
-    com.letta.mobile.util.flight.installDesktopTelemetry(DESKTOP_APP_NAME).use {
+fun main(args: Array<String>) = kotlinx.coroutines.runBlocking { // owns the process scope; returns once the record is flushed
+    com.letta.mobile.util.flight.installDesktopTelemetry(DESKTOP_APP_NAME, this).use {
         installBeamShaderTelemetry()
         LinuxAwtScale().run()
         DesktopCrashReporter.installGlobalHandler()
@@ -69,7 +69,7 @@ fun main(args: Array<String>) {
         // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
         if (com.letta.mobile.desktop.phone.desktopPhoneModeRequested()) {
             com.letta.mobile.desktop.phone.runDesktopPhoneApplication(args)
-            return
+            return@runBlocking
         }
         if (Platform.Current == Platform.Windows) {
             System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
