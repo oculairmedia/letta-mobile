@@ -83,7 +83,7 @@ class IrohSecretKeyStoreTest {
             PosixFilePermissions.toString(Files.getPosixFilePermissions(plain)) != "rw-------",
         )
 
-        val atCreation = OwnerOnlyFiles.createOwnerOnly(dir.resolve("secret"))
+        val atCreation = createOwnerOnly(dir.resolve("secret"))
 
         assertTrue(atCreation, "the restriction was part of the creation")
         assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve("secret"))))
@@ -94,7 +94,7 @@ class IrohSecretKeyStoreTest {
         assumeTrue("Windows ACLs only", isWindowsHost())
         val dir = Files.createTempDirectory("iroh-create-acl")
 
-        val atCreation = OwnerOnlyFiles.createOwnerOnly(dir.resolve("secret"))
+        val atCreation = createOwnerOnly(dir.resolve("secret"))
 
         assertTrue(atCreation, "the ACL was part of the creation")
         assertOnlyCurrentUserAllowed(dir.resolve("secret"))
@@ -105,7 +105,7 @@ class IrohSecretKeyStoreTest {
         assumeTrue("Windows ACLs only", isWindowsHost())
         val dir = Files.createTempDirectory("iroh-create-no-principal")
 
-        val atCreation = OwnerOnlyFiles.createOwnerOnly(dir.resolve("secret")) { null }
+        val atCreation = createOwnerOnly(dir.resolve("secret")) { null }
 
         assertFalse(atCreation, "no principal, so the restriction came after creation")
         assertSingleAllowEntry(dir.resolve("secret"))
@@ -120,7 +120,7 @@ class IrohSecretKeyStoreTest {
         }.getOrNull()
         assumeTrue("another account to name", other != null)
 
-        val atCreation = OwnerOnlyFiles.createOwnerOnly(dir.resolve("secret")) { other }
+        val atCreation = createOwnerOnly(dir.resolve("secret")) { other }
 
         assertFalse(atCreation, "the file named an account this process is not, so it was recreated")
         assertSingleAllowEntry(dir.resolve("secret"))
@@ -135,7 +135,7 @@ class IrohSecretKeyStoreTest {
             assumeTrue("a filesystem without posix or acl", "posix" !in views && "acl" !in views)
             Files.createDirectories(fs.getPath("/state"))
 
-            val failure = assertFailsWith<IllegalArgumentException> { OwnerOnlyFiles.createOwnerOnly(fs.getPath("/state/secret")) }
+            val failure = assertFailsWith<IllegalArgumentException> { createOwnerOnly(fs.getPath("/state/secret")) }
 
             assertTrue("/state" in failure.message.orEmpty(), failure.message)
             assertTrue("neither POSIX permissions nor ACLs" in failure.message.orEmpty(), failure.message)

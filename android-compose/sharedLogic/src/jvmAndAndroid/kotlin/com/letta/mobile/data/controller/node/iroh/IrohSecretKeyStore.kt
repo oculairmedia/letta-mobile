@@ -42,7 +42,7 @@ object IrohSecretKeyStores {
         file.parentFile?.mkdirs()
         val tmp = java.io.File(file.parentFile ?: java.io.File("."), ".${file.name}.tmp-${java.util.UUID.randomUUID()}")
         try {
-            OwnerOnlyFiles.createOwnerOnly(tmp.toPath())
+            createOwnerOnly(tmp.toPath())
         } catch (expected: IllegalArgumentException) {
             // A filesystem with neither POSIX permissions nor ACLs: keep the old best-effort restriction for the identity key.
             tmp.createNewFile()
@@ -86,7 +86,7 @@ object IrohSecretKeyStores {
     /**
      * Writes [text] to [path] in a file only the host's user may read (POSIX `rw-------`, else an ACL
      * naming only the owner), the way the host keeps its secrets. The temp file is created owner-only
-     * (see [OwnerOnlyFiles.createOwnerOnly]) before the text is written into it, and replaced by a rename; where neither
+     * (see [createOwnerOnly]) before the text is written into it, and replaced by a rename; where neither
      * restriction applies this throws, so a secret is never written into a file others may read (unlike
      * [restrictKeyFilePermissions], there is no best-effort fallback). [onCreated] sees the temp file the
      * moment it exists, before anything is written into it.
@@ -95,7 +95,7 @@ object IrohSecretKeyStores {
         path.parent?.let(java.nio.file.Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
         try {
-            OwnerOnlyFiles.createOwnerOnly(temp)
+            createOwnerOnly(temp)
             onCreated(temp)
             writeAndSync(temp, text.toByteArray(Charsets.UTF_8))
             runCatching {
@@ -103,7 +103,7 @@ object IrohSecretKeyStores {
                     temp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
                 )
             }.getOrElse { java.nio.file.Files.move(temp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
-            OwnerOnlyFiles.restrictToOwnerOnly(path)
+            restrictOwnerOnly(path)
         } finally {
             java.nio.file.Files.deleteIfExists(temp)
         }
@@ -136,5 +136,5 @@ object IrohSecretKeyStores {
     }
 
     /** Replaces [path]'s ACL with one entry: full control for its owner. Throws where ACLs are unsupported. */
-    fun restrictToOwnerAcl(path: java.nio.file.Path) = OwnerOnlyFiles.restrictToOwnerAcl(path)
+    fun restrictToOwnerAcl(path: java.nio.file.Path) = applyOwnerAcl(path)
 }
