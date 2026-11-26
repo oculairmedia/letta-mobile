@@ -389,6 +389,20 @@ class IrohNodeConnection(
         return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
     }
 
+    /**
+     * letta-mobile-wisqe.2: a runtime frame of an agent-scoped peer naming a conversation owned outside its scope (or
+     * whose owner the host cannot resolve) is denied before any upstream side effect or viewer registration, even
+     * when the agent it names is in scope. Returns the denial frame, or null to proceed.
+     */
+    private suspend fun conversationScopeViolation(frame: JsonObject): String? {
+        val type = frame["type"]?.jsonPrimitive?.contentOrNull
+        if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
+        if (adminRpcRouter.conversationsInScope(type.orEmpty(), frame, currentAdminRpcRequestContext())) return null
+        Telemetry.event("IrohNode", "authz.conversation_owner_denied", "remoteEndpointId" attr remoteEndpointId, "type" attr type)
+        val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
+    }
+
     /** Control-channel admin_rpc: parse + dispatch with scoped auth context. */
     private suspend fun handleControlAdminRpc(obj: JsonObject): String {
         val requestId = obj["request_id"]?.jsonPrimitive?.content
@@ -415,13 +429,16 @@ class IrohNodeConnection(
             params = params,
             context = currentAdminRpcRequestContext(),
         )
-        // Authorize before the observer can add this connection as a viewer.
-        // Dispatch still receives a fresh context after observation so a successful
-        // message.list keeps its established conversation-scope behaviour.
+        // letta-mobile-wisqe.2 F2: the whole pre-handler authorization (capability above; agent scope and the
+        // owning agent of every named conversation here) runs before any viewer change, and the handler runs on
+        // that same pre-observation context, so becoming a conversation's viewer never grants access to it.
         adminRpcRouter.preauthorize(invocation)?.let { return it }
-        val settle = observeAdminMethod(method, params)
+        // Observe first (so no hydrating turn frame is missed) only when already authorized for the conversation;
+        // otherwise only the handler can authorize the call, and it is observed once it has succeeded.
+        val observesFirst = adminRpcRouter.mayObserveBeforeDispatch(invocation)
+        val settle = if (observesFirst) observeAdminMethod(method, params) else null
         val response = try {
-            adminRpcRouter.dispatch(invocation.copy(context = currentAdminRpcRequestContext()))
+            adminRpcRouter.dispatch(invocation)
         } catch (cancelled: CancellationException) {
             settleObservedAdminMethod(settle, succeeded = false)
             throw cancelled
@@ -429,7 +446,13 @@ class IrohNodeConnection(
             settleObservedAdminMethod(settle, succeeded = false)
             throw error
         }
-        settleObservedAdminMethod(settle, succeeded = !isAdminRpcFailureEnvelope(response))
+        val succeeded = !isAdminRpcFailureEnvelope(response)
+        val observation = when {
+            observesFirst -> settle
+            succeeded -> observeAdminMethod(method, params)
+            else -> null
+        }
+        settleObservedAdminMethod(observation, succeeded = succeeded)
         return response
     }
 
@@ -584,6 +607,7 @@ class IrohNodeConnection(
 
             recordControlFrame("remoteEndpointId" attr remoteEndpointId, obj)
             agentScopeViolation(obj)?.let { return it }
+            conversationScopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
                 "runtime_start" -> ifAuthorized(requestId) {

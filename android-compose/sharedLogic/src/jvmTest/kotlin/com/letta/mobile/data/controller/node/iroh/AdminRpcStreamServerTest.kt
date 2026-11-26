@@ -92,6 +92,75 @@ class AdminRpcStreamServerTest {
         assertFalse(dispatched.get(), "a denied method must not reach the router (no proxy side effects)")
     }
 
+    /**
+     * letta-mobile-wisqe.2 F2: a peer bounded to the conversation it views (no conversation.manage) may not make
+     * another conversation readable by naming it: the viewer change used to happen before dispatch and the handler then
+     * saw a context in which the requested conversation was the viewed one.
+     */
+    @Test
+    fun aBoundedPeerCannotAuthorizeItselfByObservingTheRequestedConversation() = runTest {
+        var viewed: String? = "convA"
+        var observed = false
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = FakeNativeClient()))
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            requestContextProvider = {
+                AdminRpcRequestContext(authenticated = true, authorizedConversationIds = setOfNotNull(viewed))
+            },
+            onMethodObserved = { _, params ->
+                observed = true
+                val previous = viewed
+                viewed = params?.get("conversation_id")?.jsonPrimitive?.content
+                ({ succeeded -> if (!succeeded) viewed = previous })
+            },
+        )
+        val stream = FakeBiStream()
+        val job = launchTracked(server, stream)
+        stream.sendFrame("""{"type":"admin_rpc","request_id":"r","method":"message.list","params":{"conversation_id":"convB"}}""")
+        stream.closeRecv()
+        val response = stream.awaitFrame()
+        job.join()
+        assertFalse(response["success"]?.jsonPrimitive?.boolean == true, "$response")
+        assertEquals("forbidden: conversation out of authorized scope", response["error"]?.jsonPrimitive?.content)
+        assertFalse(observed, "a call the pre-observation context could not authorize must not touch the subscription")
+        assertEquals("convA", viewed)
+    }
+
+    /** letta-mobile-wisqe.2 F1+F2 on the stream path, with the real default chat grant. */
+    @Test
+    fun aForeignConversationOwnerIsDeniedBeforeStreamObservation() = runTest {
+        var observed = false
+        val native = FakeNativeClient(conversationAgentIds = mapOf("foreign" to "agent-B"))
+        val scopedRouter = AdminRpcRouter()
+        ConversationAdminHandlers.register(scopedRouter, NativeReadTiers(nativeClient = native))
+        val server = AdminRpcStreamServer(
+            router = scopedRouter,
+            authenticated = AtomicBoolean(true),
+            requestContextProvider = {
+                AdminRpcRequestContext(
+                    authenticated = true,
+                    authorizedConversationIds = IrohPeerCapabilities.conversationScope(IrohPeerCapabilities.CHAT_ROLE, null),
+                    authorizedAgentIds = setOf("agent-A"),
+                    grantedCapabilities = IrohPeerCapabilities.CHAT_ROLE,
+                )
+            },
+            onMethodObserved = { _, _ -> observed = true; null },
+        )
+        for (method in listOf("message.list", "conversation.update", "conversation.archive")) {
+            val stream = FakeBiStream()
+            val job = launchTracked(server, stream)
+            stream.sendFrame("""{"type":"admin_rpc","request_id":"r","method":"$method","params":{"conversation_id":"foreign"}}""")
+            stream.closeRecv()
+            val response = stream.awaitFrame()
+            job.join()
+            assertEquals(AgentScopeGuard.DENIED, response["error"]?.jsonPrimitive?.content, method)
+        }
+        assertFalse(observed)
+        assertTrue(native.calls.all { it == "conversation_retrieve" }, "${native.calls}")
+    }
+
     @Test
     fun capabilityGateAllowsAuthorizedMethod() = runTest {
         val server = AdminRpcStreamServer(

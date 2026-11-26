@@ -102,7 +102,8 @@ internal class AdminRpcStreamServer(
      * carry NO connection identity. This hook lets the owning [IrohNodeConnection]
      * associate a method call with ITS OWN selfViewer — e.g. register the
      * connection as a conversation viewer when method == "message.list". Invoked
-     * best-effort AFTER preauthorization and BEFORE dispatch, only for an
+     * best-effort AFTER preauthorization and BEFORE dispatch (after a successful
+     * dispatch when only the handler can authorize the call), only for an
      * authenticated admin_rpc frame with a non-null method. It may return a
      * settle callback, invoked once with whether dispatch succeeded. A throwing hook must never
      * break the request — the caller swallows failures.
@@ -382,8 +383,11 @@ internal class AdminRpcStreamServer(
     }
 
     private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String {
-        val settle = notifyMethodObserved(method, params)
-        val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
+        // letta-mobile-wisqe.2 F2: the handler runs on the context as authorized BEFORE any viewer change. A call is
+        // observed first (so no hydrating turn frame is missed) only when already authorized for its conversation;
+        // otherwise only the handler can authorize it, and it is observed once it has succeeded.
+        val observesFirst = router.mayObserveBeforeDispatch(invocation)
+        val settleObservation: suspend ((suspend (Boolean) -> Unit)?, Boolean) -> Unit = { settle, succeeded ->
             if (settle != null) {
                 withContext(NonCancellable) {
                     runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
@@ -398,22 +402,30 @@ internal class AdminRpcStreamServer(
                 }
             }
         }
+        val settle = if (observesFirst) notifyMethodObserved(method, params) else null
         val response = try {
-            withContext(connection) { router.dispatch(invocation.copy(context = requestContextProvider())) }
+            withContext(connection) { router.dispatch(invocation) }
         } catch (cancelled: CancellationException) {
-            settleObservation(false)
+            settleObservation(settle, false)
             throw cancelled
         } catch (error: Exception) {
-            settleObservation(false)
+            settleObservation(settle, false)
             throw error
         }
-        settleObservation(!isAdminRpcFailureEnvelope(response))
+        val succeeded = !isAdminRpcFailureEnvelope(response)
+        val observation = when {
+            observesFirst -> settle
+            succeeded -> notifyMethodObserved(method, params)
+            else -> null
+        }
+        settleObservation(observation, succeeded)
         return response
     }
 
     /**
-     * Let the owning connection observe an authenticated method call
-     * (e.g. subscribe as a viewer on message.list) before dispatch.
+     * Let the owning connection observe a preauthorized method call
+     * (e.g. subscribe as a viewer on message.list), before dispatch or, when
+     * only the handler can authorize the call, after it succeeded.
      * Best-effort: a failing hook must never break the RPC.
      */
     private suspend fun notifyMethodObserved(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {

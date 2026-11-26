@@ -109,11 +109,97 @@ class IrohNodeConnectionRuntimeStartModeCapabilityTest {
         assertTrue(harness.viewersForConversation("convB").isEmpty(), "failed hydration must roll back its viewer")
     }
 
+    /**
+     * letta-mobile-wisqe.2 F1 on the control path, with the real default chat grant and the real conversation routes: a
+     * peer scoped to agent A that omits agent_id cannot hydrate agent B's conversation, and is not made its viewer, so
+     * no B turn frame is fanned out to it.
+     */
+    @Test
+    fun controlAdminRpcForeignConversationOwnerIsDeniedAndNeverViewed() = runBlocking {
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = FakeNativeClient(
+            conversationAgentIds = mapOf("convA" to "agent-A", "convB" to "agent-B"),
+        )))
+        val harness = RuntimeStartHarness.open(IrohPeerCapabilities.CHAT_ROLE, router, setOf("agent-A"))
+        assertEquals("true", harness.messageList(conversationId = "convA").string("success"))
+        for (conversation in listOf("convB", "conv-unknown")) {
+            val response = harness.messageList(conversationId = conversation)
+            assertEquals("false", response.string("success"), conversation)
+            assertEquals(AgentScopeGuard.DENIED, response.string("error"), conversation)
+            assertTrue(harness.viewersForConversation(conversation).isEmpty(), "no $conversation turn frame may reach this peer")
+        }
+        assertEquals("convA", harness.currentViewerConversation)
+    }
+
+    /**
+     * letta-mobile-wisqe.2 F2: a peer bounded to the conversation it views (chat without conversation.manage) used to
+     * be registered as the requested conversation's viewer before dispatch, and the handler then saw a context in which
+     * that conversation was the viewed one, so the hydration succeeded and the subscription stayed.
+     */
+    @Test
+    fun controlAdminRpcBoundedPeerCannotAuthorizeItselfByBecomingTheViewer() = runBlocking {
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = FakeNativeClient()))
+        val harness = RuntimeStartHarness.open(IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CONVERSATION_MANAGE, router)
+        harness.subscribeViewer("convA")
+
+        val response = harness.messageList(conversationId = "convB")
+
+        assertEquals("false", response.string("success"))
+        assertEquals("forbidden: conversation out of authorized scope", response.string("error"))
+        assertEquals("convA", harness.currentViewerConversation)
+        assertTrue(harness.viewersForConversation("convB").isEmpty())
+        assertEquals("true", harness.messageList(conversationId = "convA").string("success"), "its viewed conversation stays readable")
+    }
+
+    @Test
+    fun controlAdminRpcHandlerRefusalNeverTemporarilyRegistersViewer() = runBlocking {
+        lateinit var harness: RuntimeStartHarness
+        val router = AdminRpcRouter().apply {
+            register("message.list") {
+                assertTrue(harness.viewersForConversation("convB").isEmpty(), "authorization must finish before subscription")
+                error("denied by handler")
+            }
+        }
+        harness = RuntimeStartHarness.open(IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CONVERSATION_MANAGE, router)
+        harness.subscribeViewer("convA")
+        val response = harness.messageList(conversationId = "convB")
+        assertEquals("false", response.string("success"))
+        assertEquals(ADMIN_RPC_INTERNAL_ERROR, response.string("error"))
+        assertEquals("convA", harness.currentViewerConversation)
+    }
+
+    /** letta-mobile-wisqe.2: runtime frames name a conversation too; agent A's peer cannot start or drive agent B's. */
+    @Test
+    fun runtimeFramesNamingAForeignConversationAreDeniedBeforeAnySideEffect() = runBlocking {
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = FakeNativeClient(
+            conversationAgentIds = mapOf("convA" to "agent-A", "convB" to "agent-B"),
+        )))
+        val harness = RuntimeStartHarness.open(IrohPeerCapabilities.CHAT_ROLE, router, setOf("agent-A"))
+        fun frame(type: String, conversation: String) = buildJsonObject {
+            put("type", type)
+            put("request_id", "r")
+            put("agent_id", "agent-A")
+            put("conversation_id", conversation)
+        }
+        for (type in listOf("runtime_start", "input", "sync", "abort_message")) {
+            val denied = harness.conversationScopeViolation(frame(type, "convB"))
+            assertEquals("agent_scope", denied?.let { AppServerProtocol.json.parseToJsonElement(it).jsonObject.string("reason") }, type)
+            assertEquals(null, harness.conversationScopeViolation(frame(type, "convA")), type)
+        }
+        val unscoped = RuntimeStartHarness.open(IrohPeerCapabilities.CHAT_ROLE, router)
+        assertEquals(null, unscoped.conversationScopeViolation(frame("runtime_start", "convB")), "unscoped peers are unaffected")
+        assertTrue(harness.controller.starts.isEmpty())
+        assertTrue(harness.viewersForConversation("convB").isEmpty())
+    }
+
     @Test
     fun controlAdminRpcSuccessfulMessageListRegistersTheViewer() = runBlocking {
         val harness = RuntimeStartHarness.open(
             capabilities = IrohPeerCapabilities.CHAT_ROLE,
             router = AdminRpcRouter().apply {
+                conversationOwner = { "agent-A" }
                 register("message.list") { JsonPrimitive("[]") }
             },
             agentScope = setOf("agent-A"),
@@ -160,6 +246,8 @@ class IrohNodeConnectionRuntimeStartModeCapabilityTest {
             ).jsonObject
 
         suspend fun subscribeViewer(conversationId: String) = subscription.subscribe(conversationId)
+
+        suspend fun conversationScopeViolation(frame: JsonObject): String? = connection.invokeConversationScopeViolation(frame)
 
         val currentViewerConversation: String?
             get() = subscription.currentConversation
@@ -286,6 +374,26 @@ private suspend fun IrohNodeConnection.invokeControlAdminRpc(frame: JsonObject):
             if (response !== COROUTINE_SUSPENDED) {
                 continuation.resume(requireNotNull(response as? String))
             }
+        } catch (failure: InvocationTargetException) {
+            continuation.resumeWithException(failure.targetException)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            continuation.resumeWithException(failure)
+        }
+    }
+
+private suspend fun IrohNodeConnection.invokeConversationScopeViolation(frame: JsonObject): String? =
+    suspendCoroutine { continuation ->
+        val method = IrohNodeConnection::class.java.getDeclaredMethod(
+            "conversationScopeViolation",
+            JsonObject::class.java,
+            Continuation::class.java,
+        )
+        method.isAccessible = true
+        try {
+            val response = method.invoke(this, frame, continuation)
+            if (response !== COROUTINE_SUSPENDED) continuation.resume(response as? String)
         } catch (failure: InvocationTargetException) {
             continuation.resumeWithException(failure.targetException)
         } catch (cancelled: CancellationException) {
