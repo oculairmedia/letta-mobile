@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime.host
 
+import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.runtime.supervisor.RuntimeCrashPolicy
 import com.letta.mobile.data.runtime.supervisor.RuntimeCrashPolicyConfig
 import com.letta.mobile.data.transport.appserver.AppServerDiscovery
@@ -8,9 +9,6 @@ import io.ktor.client.engine.cio.CIO
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -33,13 +31,17 @@ class JvmLocalAppServerLauncher(
 
     override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
         val process = try {
-            writeOwnerOnly(File(tokenFile), token)
+            // Owner-only from creation on POSIX and Windows alike, the way the host writes its other secrets.
+            IrohSecretKeyStores.writeOwnerOnly(File(tokenFile).absoluteFile.toPath(), token)
             ProcessBuilder(launch.command).apply {
                 environment().putAll(launch.environment)
                 launch.workingDirectory?.let { directory(File(it)) }
             }.start()
         } catch (e: IOException) {
             throw LocalAppServerStartException("Could not start ${launch.command.firstOrNull()}: ${e.message}", null, e)
+        } catch (e: IllegalArgumentException) {
+            // No owner-only permission view on the token file's filesystem: refuse rather than write a readable token.
+            throw LocalAppServerStartException("Could not write the token for ${launch.command.firstOrNull()}: ${e.message}", null, e)
         }
         onSpawned(process)
         return JvmLocalAppServerProcess(process, stopTimeoutMs)
@@ -108,16 +110,3 @@ private fun InputStream.lines(): Flow<String> = flow {
         }
     }
 }.flowOn(Dispatchers.IO)
-
-/** Writes [secret] to [file], created readable and writable by this user only where POSIX allows. */
-private fun writeOwnerOnly(file: File, secret: String) {
-    file.absoluteFile.parentFile?.mkdirs()
-    val path = file.toPath()
-    Files.deleteIfExists(path)
-    if ("posix" in FileSystems.getDefault().supportedFileAttributeViews()) {
-        Files.createFile(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
-    } else {
-        Files.createFile(path)
-    }
-    Files.writeString(path, secret)
-}

@@ -80,17 +80,18 @@ object IrohSecretKeyStores {
 
     /**
      * Writes [text] to [path] in a file only the host's user may read (POSIX `rw-------`, else an ACL
-     * naming only the owner), the way the host keeps its secrets. The file is restricted before the text
-     * is written into it and replaced by a rename; where neither restriction applies this throws, so a
-     * secret is never written into a file others may read (unlike [restrictKeyFilePermissions], there is
-     * no best-effort fallback).
+     * naming only the owner), the way the host keeps its secrets. The temp file is created owner-only
+     * (see [createOwnerOnly]) before the text is written into it, and replaced by a rename; where neither
+     * restriction applies this throws, so a secret is never written into a file others may read (unlike
+     * [restrictKeyFilePermissions], there is no best-effort fallback). [onCreated] sees the temp file the
+     * moment it exists, before anything is written into it.
      */
-    internal fun writeOwnerOnly(path: java.nio.file.Path, text: String) {
+    internal fun writeOwnerOnly(path: java.nio.file.Path, text: String, onCreated: (java.nio.file.Path) -> Unit = {}) {
         path.parent?.let(java.nio.file.Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
         try {
-            java.nio.file.Files.createFile(temp)
-            restrictToOwnerOnly(temp)
+            createOwnerOnly(temp)
+            onCreated(temp)
             writeAndSync(temp, text.toByteArray(Charsets.UTF_8))
             runCatching {
                 java.nio.file.Files.move(
@@ -129,11 +130,50 @@ object IrohSecretKeyStores {
         }
     }
 
+    /**
+     * Creates the empty [file] so that only this user can open it from the moment it exists: on POSIX with a
+     * `rw-------` attribute at creation (the umask can only narrow it), on an ACL filesystem (Windows) with a
+     * one-entry ACL for the current user at creation. A provider that accepts neither attribute at creation (or a
+     * current user that cannot be looked up) gets a plain create followed by [restrictToOwnerOnly]: for that short
+     * window the still-empty file has the directory's default access. Where neither restriction applies at all this
+     * throws, leaving the empty file for the caller to delete.
+     */
+    internal fun createOwnerOnly(file: java.nio.file.Path) {
+        val views = file.fileSystem.supportedFileAttributeViews()
+        val attribute: java.nio.file.attribute.FileAttribute<*>? = when {
+            "posix" in views -> java.nio.file.attribute.PosixFilePermissions.asFileAttribute(OWNER_ONLY_POSIX)
+            "acl" in views -> currentUserOnlyAcl(file)
+            else -> null
+        }
+        if (attribute != null) {
+            try {
+                java.nio.file.Files.createFile(file, attribute)
+                return
+            } catch (expected: UnsupportedOperationException) {
+                // The provider cannot set this attribute at creation (checked before the file is made): restrict after.
+            }
+        }
+        java.nio.file.Files.createFile(file)
+        restrictToOwnerOnly(file)
+    }
+
+    private val OWNER_ONLY_POSIX = java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")
+
+    /** An `acl:acl` creation attribute granting the current user alone full control, or null when the user is not found. */
+    private fun currentUserOnlyAcl(file: java.nio.file.Path): java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>>? {
+        val user = runCatching {
+            file.fileSystem.userPrincipalLookupService.lookupPrincipalByName(System.getProperty("user.name"))
+        }.getOrNull() ?: return null
+        val entries = listOf(fullControlFor(user))
+        return object : java.nio.file.attribute.FileAttribute<List<java.nio.file.attribute.AclEntry>> {
+            override fun name(): String = "acl:acl"
+            override fun value(): List<java.nio.file.attribute.AclEntry> = entries
+        }
+    }
+
     /** Owner-only access (POSIX `rw-------`, else an ACL naming only the owner), or a thrown error. */
     private fun restrictToOwnerOnly(file: java.nio.file.Path) {
-        val posix = runCatching {
-            java.nio.file.Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))
-        }
+        val posix = runCatching { java.nio.file.Files.setPosixFilePermissions(file, OWNER_ONLY_POSIX) }
         if (posix.isSuccess) return
         restrictToOwnerAcl(file)
     }
@@ -143,12 +183,13 @@ object IrohSecretKeyStores {
         val view = requireNotNull(
             java.nio.file.Files.getFileAttributeView(path, java.nio.file.attribute.AclFileAttributeView::class.java),
         ) { "no ACL view for $path" }
-        view.acl = listOf(
-            java.nio.file.attribute.AclEntry.newBuilder()
-                .setType(java.nio.file.attribute.AclEntryType.ALLOW)
-                .setPrincipal(view.owner)
-                .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission::class.java))
-                .build(),
-        )
+        view.acl = listOf(fullControlFor(view.owner))
     }
+
+    private fun fullControlFor(principal: java.nio.file.attribute.UserPrincipal): java.nio.file.attribute.AclEntry =
+        java.nio.file.attribute.AclEntry.newBuilder()
+            .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+            .setPrincipal(principal)
+            .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission::class.java))
+            .build()
 }
