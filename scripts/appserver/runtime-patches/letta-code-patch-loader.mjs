@@ -2615,13 +2615,23 @@ function memoryLineEndings(state) {
 // append to the same transcript (two final assistant messages on one parent).
 //
 // The lock is a file per conversation key under the OS temp dir (never in the replicated store),
-// holding the owner's pid and process start time; a dead owner's lock is reclaimed. Holders:
-//  - an App Server turn (handleIncomingMessage) for its whole duration, tool calls included;
+// holding the owner's pid and process start time. It is created complete (written to a temp file,
+// then hard-linked into place), a dead owner's lock is reclaimed, and a file that cannot be
+// parsed is reclaimed once it is older than a few seconds. Holders:
+//  - an App Server turn, inside handleIncomingMessageInner once its lifecycle lease has begun.
+//    While it waits the turn is already the conversation's active turn: clients see it (loop
+//    status plus a "waiting" status notice) and the stock cancel aborts the lease signal, which
+//    ends the wait and finishes the turn as cancelled. It is released in the turn's last finally.
 //  - a `letta -p` run from the moment its conversation is known until the process exits, so
 //    its stale-approval recovery and its turn only ever run when no other turn is live.
 // HeadlessBackend.executeConversationTurn refuses with the stock "busy with another active run"
-// error while another live process holds the key (the existing busy back-off retries it).
+// error while another live process holds the key, cancelConversation does not settle tool calls
+// of a conversation whose turn belongs to another process, and the App Server's sync-time approval
+// recovery leaves such a conversation alone instead of caching denials for its live tool calls.
 // SendAgentMessage reports `queued` instead of `spawned` when the target has a turn in progress.
+// That label is a sample taken at send time: a target whose previous spawned message is still
+// starting has not taken the lock yet and is reported `spawned`, though the new message will wait
+// behind it. The lock, not the label, is what keeps one writer on the transcript.
 const TURN_LOCK_MARK = "// lcp-conversation-turn-lock";
 
 const TURN_LOCK_HELPER = `
@@ -2630,8 +2640,7 @@ globalThis.__lcpTurnLock ??= (() => {
   const getBuiltin = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule : null;
   if (!getBuiltin) {
     process.stderr.write("[lcp-turn-lock] WARN: process.getBuiltinModule unavailable; conversations are not locked across processes\\n");
-    const none = () => null;
-    return { acquire: async () => () => {}, holder: none, assertNotHeldElsewhere: () => {}, acquireForHeadless: async () => {} };
+    return { acquire: async () => () => {}, holder: () => null, heldElsewhere: () => false, assertNotHeldElsewhere: () => {}, acquireForHeadless: async () => {} };
   }
   const fs = getBuiltin("node:fs");
   const path = getBuiltin("node:path");
@@ -2640,6 +2649,7 @@ globalThis.__lcpTurnLock ??= (() => {
   const POLL_MS = 250;
   const NOTICE_MS = 30000;
   const RECLAIM_GUARD_STALE_MS = 10000;
+  const UNREADABLE_STALE_MS = 5000;
   const startTime = (pid) => {
     try {
       return fs.readFileSync("/proc/" + pid + "/stat", "utf8").split(") ").pop().split(" ")[19] ?? null;
@@ -2649,11 +2659,6 @@ globalThis.__lcpTurnLock ??= (() => {
   };
   const self = { pid: process.pid, start: startTime(process.pid), token: crypto.randomUUID() };
   const held = new Map();
-  const conversationKey = (agentId, conversationId) => {
-    const id = conversationId || "default";
-    if (id !== "default") return "conversation:" + id;
-    return agentId ? "default:" + agentId : null;
-  };
   const storageDirOf = (backend) => {
     try {
       return typeof backend?.getLocalStorageDir === "function" ? backend.getLocalStorageDir() ?? null : null;
@@ -2661,21 +2666,47 @@ globalThis.__lcpTurnLock ??= (() => {
       return null;
     }
   };
+  // The same key the local store uses; a default conversation without an agent id resolves the
+  // agent the way the backend does for its own turns.
+  const conversationKey = (backend, agentId, conversationId) => {
+    const id = conversationId || "default";
+    if (id !== "default") return "conversation:" + id;
+    let agent = agentId;
+    if (!agent) {
+      try {
+        agent = backend?.store?.resolveAgentIdForConversation?.("default") ?? null;
+      } catch {
+        agent = null;
+      }
+    }
+    return agent ? "default:" + agent : null;
+  };
   const lockFile = (storageDir, key) => {
     const uid = typeof process.getuid === "function" ? process.getuid() : "user";
     const digest = crypto.createHash("sha256").update(path.resolve(storageDir) + "\\0" + key).digest("hex").slice(0, 40);
     return path.join(os.tmpdir(), "letta-turn-locks-" + uid, digest + ".lock");
   };
   const readOwner = (file) => {
+    let text;
     try {
-      return JSON.parse(fs.readFileSync(file, "utf8"));
+      text = fs.readFileSync(file, "utf8");
     } catch (error) {
-      return error?.code === "ENOENT" ? null : { unreadable: true };
+      if (error?.code === "ENOENT") return null;
+      return { unreadable: true, mtimeMs: null };
     }
+    try {
+      const owner = JSON.parse(text);
+      if (owner && typeof owner.pid === "number" && typeof owner.token === "string") return owner;
+    } catch {}
+    let mtimeMs = null;
+    try {
+      mtimeMs = fs.statSync(file).mtimeMs;
+    } catch {}
+    return { unreadable: true, mtimeMs };
   };
   const ownerAlive = (owner) => {
     if (!owner) return false;
-    if (owner.unreadable || typeof owner.pid !== "number") return true;
+    if (owner.unreadable) return true;
     try {
       process.kill(owner.pid, 0);
     } catch (error) {
@@ -2687,6 +2718,10 @@ globalThis.__lcpTurnLock ??= (() => {
     }
     return true;
   };
+  const stale = (owner) => owner.unreadable
+    ? owner.mtimeMs !== null && Date.now() - owner.mtimeMs > UNREADABLE_STALE_MS
+    : !ownerAlive(owner);
+  const sameOwner = (a, b) => a.unreadable ? b.unreadable === true : b.token === a.token;
   const reclaimIfStale = (file, seen) => {
     const guard = file + ".reclaim";
     try {
@@ -2700,28 +2735,40 @@ globalThis.__lcpTurnLock ??= (() => {
     }
     try {
       const now = readOwner(file);
-      if (now && !now.unreadable && now.token === seen.token && !ownerAlive(now)) {
+      if (now && sameOwner(seen, now) && stale(now)) {
         fs.unlinkSync(file);
-        process.stderr.write("[lcp-turn-lock] reclaimed the turn lock of dead pid " + seen.pid + " (" + (seen.holder ?? "unknown") + ")\\n");
+        process.stderr.write(seen.unreadable
+          ? "[lcp-turn-lock] reclaimed an unreadable turn lock " + file + "\\n"
+          : "[lcp-turn-lock] reclaimed the turn lock of dead pid " + seen.pid + " (" + (seen.holder ?? "unknown") + ")\\n");
       }
     } finally {
       try { fs.unlinkSync(guard); } catch {}
     }
   };
+  // Atomic create with content: the lock file never exists half-written.
+  const createLock = (file, content) => {
+    const temp = file + "." + process.pid + "." + crypto.randomUUID() + ".tmp";
+    try {
+      fs.writeFileSync(temp, content, { flag: "wx", mode: 0o600 });
+      fs.linkSync(temp, file);
+      return true;
+    } catch (error) {
+      if (error?.code === "EEXIST") return false;
+      throw error;
+    } finally {
+      try { fs.unlinkSync(temp); } catch {}
+    }
+  };
   const tryTake = (file, holder, key) => {
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    try {
-      fs.writeFileSync(file, JSON.stringify({ ...self, holder, key, at: new Date().toISOString() }), { flag: "wx", mode: 0o600 });
-      return null;
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-    }
+    if (createLock(file, JSON.stringify({ ...self, holder, key, at: new Date().toISOString() }))) return null;
     const owner = readOwner(file);
-    if (owner && !owner.unreadable && !ownerAlive(owner)) {
+    if (!owner) return { retryNow: true };
+    if (stale(owner)) {
       reclaimIfStale(file, owner);
-      return { retryNow: true };
+      return readOwner(file) === null ? { retryNow: true } : owner;
     }
-    return owner ?? { retryNow: true };
+    return owner;
   };
   const releaseFile = (file) => {
     const count = (held.get(file) ?? 0) - 1;
@@ -2740,19 +2787,44 @@ globalThis.__lcpTurnLock ??= (() => {
       releaseFile(file);
     }
   });
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  async function acquire(backend, agentId, conversationId, holder) {
+  const abortError = (signal) => signal.reason ?? Object.assign(new Error("The turn lock wait was aborted"), { name: "AbortError" });
+  const sleep = (ms, signal) => new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError(signal));
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  const describe = (owner) => owner.unreadable ? "an unreadable lock" : "pid " + owner.pid + " (" + (owner.holder ?? "unknown") + ")";
+  /**
+   * Waits until this process owns the conversation and returns the release function.
+   * options.signal ends the wait with its abort reason; options.onWait(owner) runs once when the
+   * conversation is first found busy.
+   */
+  async function acquire(backend, agentId, conversationId, holder, options = {}) {
     const storageDir = storageDirOf(backend);
-    const key = conversationKey(agentId, conversationId);
+    const key = conversationKey(backend, agentId, conversationId);
     if (!storageDir || !key) return () => {};
     const file = lockFile(storageDir, key);
     if (held.has(file)) {
       held.set(file, held.get(file) + 1);
-      return () => releaseFile(file);
+      let releasedNested = false;
+      return () => {
+        if (releasedNested) return;
+        releasedNested = true;
+        releaseFile(file);
+      };
     }
     const startedWaiting = Date.now();
+    let waited = false;
     let noticed = false;
     for (;;) {
+      if (options.signal?.aborted) throw abortError(options.signal);
       let owner;
       try {
         owner = tryTake(file, holder, key);
@@ -2762,7 +2834,7 @@ globalThis.__lcpTurnLock ??= (() => {
       }
       if (owner === null) {
         held.set(file, 1);
-        if (noticed) process.stderr.write("[lcp-turn-lock] " + holder + " acquired " + key + " after waiting " + (Date.now() - startedWaiting) + "ms\\n");
+        if (waited) process.stderr.write("[lcp-turn-lock] " + holder + " acquired " + key + " after waiting " + (Date.now() - startedWaiting) + "ms\\n");
         let released = false;
         return () => {
           if (released) return;
@@ -2771,26 +2843,39 @@ globalThis.__lcpTurnLock ??= (() => {
         };
       }
       if (owner.retryNow) continue;
+      if (!waited) {
+        waited = true;
+        try { options.onWait?.(owner); } catch {}
+      }
       if (!noticed && Date.now() - startedWaiting >= NOTICE_MS) {
         noticed = true;
-        process.stderr.write("[lcp-turn-lock] " + holder + " is waiting for the turn of pid " + owner.pid + " (" + (owner.holder ?? "unknown") + ") on " + key + "\\n");
+        process.stderr.write("[lcp-turn-lock] " + holder + " is waiting for the turn of " + describe(owner) + " on " + key + "\\n");
       }
-      await sleep(POLL_MS);
+      await sleep(POLL_MS, options.signal);
     }
   }
   function holder(backend, agentId, conversationId) {
     const storageDir = storageDirOf(backend);
-    const key = conversationKey(agentId, conversationId);
+    const key = conversationKey(backend, agentId, conversationId);
     if (!storageDir || !key) return null;
     const file = lockFile(storageDir, key);
     if (held.has(file)) return { pid: process.pid, holder: "this process" };
     const owner = readOwner(file);
     return ownerAlive(owner) ? owner : null;
   }
+  // cancelConversation takes a conversation id, or an agent id for the default conversation.
+  function heldElsewhere(backend, conversationOrAgentId) {
+    for (const [agentId, conversationId] of [[null, conversationOrAgentId], [conversationOrAgentId, "default"]]) {
+      if (conversationId === "default" && !agentId) continue;
+      const owner = holder(backend, agentId, conversationId);
+      if (owner && owner.pid !== process.pid) return true;
+    }
+    return false;
+  }
   function assertNotHeldElsewhere(backend, conversationId, agentId) {
     const owner = holder(backend, agentId, conversationId);
     if (owner && owner.pid !== process.pid) {
-      throw new Error("Conversation " + conversationId + " is busy with another active run (a turn in process " + owner.pid + ", " + (owner.holder ?? "unknown") + ")");
+      throw new Error("Conversation " + conversationId + " is busy with another active run (a turn in " + describe(owner) + ")");
     }
   }
   async function acquireForHeadless(backend, agentId, conversationId, options) {
@@ -2801,35 +2886,61 @@ globalThis.__lcpTurnLock ??= (() => {
     }
     await acquire(backend, agentId, conversationId, "letta -p pid " + process.pid);
   }
-  return { acquire, holder, assertNotHeldElsewhere, acquireForHeadless };
+  return { acquire, holder, heldElsewhere, assertNotHeldElsewhere, acquireForHeadless };
 })();
 `;
 
+const TURN_LOCK_WAIT_NOTICE =
+  '"Waiting for the turn already running on this conversation (" + (lcpOwner.unreadable ? "unknown owner" : lcpOwner.holder ?? "pid " + lcpOwner.pid) + ") to finish."';
+
 const TURN_LOCK_SITES = [
   {
-    // App Server: every listener turn, recovery continuations included, runs through here.
+    // App Server: the release slot, declared before the turn body's try.
     token:
-      "async function handleIncomingMessage(...args) {\n" +
-      "  const [msg] = args;\n" +
-      "  notifyTurnStarted(msg);\n" +
       "  try {\n" +
-      "    await handleIncomingMessageInner(...args);\n" +
-      "  } finally {\n" +
-      "    notifyTurnFinished(msg);\n" +
-      "  }\n" +
-      "}\n",
+      "    runtime.lastTerminalLoopErrorMessage = null;\n" +
+      "    runtime.lastTerminalLoopErrorRunId = null;\n",
     replacement:
-      "async function handleIncomingMessage(...args) {\n" +
-      "  const [msg] = args;\n" +
-      `  const lcpReleaseTurnLock = await globalThis.__lcpTurnLock.acquire(getBackend(), msg?.agentId, msg?.conversationId || "default", "app-server pid " + process.pid); ${TURN_LOCK_MARK}\n` +
-      "  notifyTurnStarted(msg);\n" +
+      `  let lcpReleaseTurnLock = () => {}; ${TURN_LOCK_MARK}\n` +
       "  try {\n" +
-      "    await handleIncomingMessageInner(...args);\n" +
-      "  } finally {\n" +
-      "    notifyTurnFinished(msg);\n" +
-      "    lcpReleaseTurnLock();\n" +
+      "    runtime.lastTerminalLoopErrorMessage = null;\n" +
+      "    runtime.lastTerminalLoopErrorRunId = null;\n",
+  },
+  {
+    // App Server: wait inside the turn, after its lease began and its state went out, before the
+    // turn touches the store. Stop aborts turnAbortSignal; the catch below finishes it as cancelled.
+    token:
+      "    telemetry.setCurrentAgentId(agentId ?? null);\n" +
+      "    let turnToolContextId = null;\n" +
+      "    const setup = await prepareListenerTurn({\n",
+    replacement:
+      "    telemetry.setCurrentAgentId(agentId ?? null);\n" +
+      "    lcpReleaseTurnLock = await globalThis.__lcpTurnLock.acquire(getBackend(), agentId, conversationId, \"app-server pid \" + process.pid, {\n" +
+      "      signal: turnAbortSignal,\n" +
+      `      onWait: (lcpOwner) => emitStatusDelta(socket, runtime, { message: ${TURN_LOCK_WAIT_NOTICE}, level: "info", agentId: agentId ?? undefined, conversationId })\n` +
+      `    }); ${TURN_LOCK_MARK}\n` +
+      "    let turnToolContextId = null;\n" +
+      "    const setup = await prepareListenerTurn({\n",
+  },
+  {
+    // App Server: release in the turn's last finally, after its terminal and cleanup ran.
+    token:
+      "    } finally {\n" +
+      "      releaseListenerTurnContext({ runtime, agentId, conversationId });\n" +
+      "    }\n" +
+      "    evictConversationRuntimeIfIdle(runtime);\n" +
       "  }\n" +
-      "}\n",
+      "}\n" +
+      "var init_turn = __esm(() => {\n",
+    replacement:
+      "    } finally {\n" +
+      "      releaseListenerTurnContext({ runtime, agentId, conversationId });\n" +
+      `      lcpReleaseTurnLock(); ${TURN_LOCK_MARK}\n` +
+      "    }\n" +
+      "    evictConversationRuntimeIfIdle(runtime);\n" +
+      "  }\n" +
+      "}\n" +
+      "var init_turn = __esm(() => {\n",
   },
   {
     // letta -p: the conversation is known here and nothing has touched its transcript yet; the
@@ -2855,6 +2966,41 @@ const TURN_LOCK_SITES = [
       `    globalThis.__lcpTurnLock.assertNotHeldElsewhere(this, conversationId, turnAgentId); ${TURN_LOCK_MARK}\n`,
   },
   {
+    // A cancel with no local run must not close the tool calls of another process's live turn
+    // (Stop on an App Server turn that was still waiting for the lock lands here).
+    token:
+      "    } else {\n" +
+      "      this.store.settleInterruptedToolCalls(conversationIdOrAgentId);\n" +
+      "    }\n" +
+      "    if (runId) {\n",
+    replacement:
+      `    } else if (!globalThis.__lcpTurnLock.heldElsewhere(this, conversationIdOrAgentId)) { ${TURN_LOCK_MARK}\n` +
+      "      this.store.settleInterruptedToolCalls(conversationIdOrAgentId);\n" +
+      "    }\n" +
+      "    if (runId) {\n",
+  },
+  {
+    // App Server sync (runtime_start, reconnect) reads a pending tool call in the transcript as a
+    // stale approval to close. A call that belongs to another process's live turn is not stale:
+    // treat that conversation as busy, the way the stock check treats a local active turn.
+    token:
+      "  const sameActiveScope = runtime.agentId === scope.agent_id && runtime.conversationId === scope.conversation_id;\n" +
+      "  if (sameActiveScope && runtime.turnLifecycle.kind !== \"idle\") {\n" +
+      "    clearRecoveredApprovalState(runtime);\n" +
+      "    return;\n" +
+      "  }\n",
+    replacement:
+      "  const sameActiveScope = runtime.agentId === scope.agent_id && runtime.conversationId === scope.conversation_id;\n" +
+      "  if (sameActiveScope && runtime.turnLifecycle.kind !== \"idle\") {\n" +
+      "    clearRecoveredApprovalState(runtime);\n" +
+      "    return;\n" +
+      "  }\n" +
+      `  if (globalThis.__lcpTurnLock.holder(resolvedDeps.getBackend(), scope.agent_id, scope.conversation_id)) { ${TURN_LOCK_MARK}\n` +
+      "    clearRecoveredApprovalState(runtime);\n" +
+      "    return;\n" +
+      "  }\n",
+  },
+  {
     // SendAgentMessage on the local backend: say the message is queued when the target is busy.
     token:
       "      (deps.spawnLocal ?? spawnDetached)(launcher.command, launcher.args);\n" +
@@ -2871,7 +3017,7 @@ const TURN_LOCK_SITES = [
       '          status: "queued",\n' +
       "          conversation_id: destination.conversationId,\n" +
       '          delivery: "after_current_turn",\n' +
-      "          note: \"The recipient has a turn in progress. Your message is queued and will run as the recipient's next turn when that turn ends; don't resend it.\"\n" +
+      "          note: \"The recipient had a turn in progress when you sent this. Your message waits and runs as one of the recipient's next turns, in order; don't resend it.\"\n" +
       "        } : {\n" +
       '          status: "spawned",\n' +
       "          conversation_id: destination.conversationId\n" +
