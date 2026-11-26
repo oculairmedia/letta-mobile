@@ -19,7 +19,11 @@ enum class NodeHostOs {
     ;
 
     companion object {
-        /** The OS named [osName] (the `os.name` system property's spelling). */
+        /**
+         * The OS named [osName] (the `os.name` system property's spelling). Anything that is not
+         * Windows, macOS and an empty name included, is treated as Linux on purpose: those hosts
+         * share the POSIX bindings, and an unknown host must not lose its tools endpoint.
+         */
         fun of(osName: String): NodeHostOs = if (osName.startsWith("Windows", ignoreCase = true)) WINDOWS else LINUX
 
         /** The OS this JVM runs on. */

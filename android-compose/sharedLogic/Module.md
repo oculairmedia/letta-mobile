@@ -215,7 +215,6 @@ Lock order is coordinator lifecycle mutex, registry index lock, then per-turn id
 
 Retention remains unchanged: registry aliases are capped at 64, settled OTIDs at 16, settled-run and assistant-run evidence sets at 8, deduplication at 512 and tracked conversation states have a soft cap 32. The existing pre-conversation delta deque, runtime audit channel, client send queue and turn-fence history retain their existing unbounded policies; this extraction does not add a new retention policy.
 
-
 # Package com.letta.mobile.data.chat.sentruns
 
 Which run each message this client sent started, by identity only. The send pipeline's turn state publishes an entry when the send's echo pairs its otid with a run, adds every later id of the same turn (a durable id promoting a provisional one), and ends the entry when the turn completes, fails, is stopped or is replaced. An echo that arrives only after its turn settled is still paired, as an ended run, when that run is among the recently settled ones. Entries are bounded; one whose run is in flight is never dropped. [IdentifiedChatSend](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html) is what a chat owner offers when it can name the message a send enqueued; the shared send coordinator offers one as `identifiedSend`, returning the otid read under the same lock hold that enqueued the message.
@@ -403,6 +402,10 @@ Meridian command catalog, parser/router and tool-offer modes. Requests are mappe
 
 Caller-bound Meridian tool service and request/response wire handling. Live-call tracking and token comparison support the local command endpoint; a display label does not authenticate a caller. Keep caller identity independent of display labels; bind authenticated callers through [MeridianCallerBinder](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.meridian.endpoint/-meridian-caller-binder/index.html) and expose tool execution through [MeridianToolsService](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.meridian.endpoint/-meridian-tools-service/index.html).
 
+# Package com.letta.mobile.data.meridian.socket
+
+The host's local `meridian/tools/1` endpoint on JVM hosts: a Unix socket where the platform has one, else loopback TCP whose port and bearer token sit in a file only the host's user can read. Callers are bound to live `meridian` shell calls before any tool runs. Keep platform transport choice in the node's host bindings; start the endpoint through [MeridianToolsEndpoint](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.meridian.socket/-meridian-tools-endpoint/index.html) with a [MeridianToolsConfig](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.meridian.socket/-meridian-tools-config/index.html).
+
 # Package com.letta.mobile.data.messaging
 
 Inter-agent delivery routing and structured provenance. Stable sender/recipient relationships and delivery state remain separate from display-only labels used by presentation. Keep display labels out of routing trust decisions; carry identity and provenance through [AgentMessageClientId](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-client-id/index.html) and [AgentMessageProvenanceProjection](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-provenance-projection/index.html) when integrating [IrohAgentMessageRouter](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.messaging/-iroh-agent-message-router/index.html).
@@ -472,6 +475,10 @@ One Baken node composed from configuration and ports: the runtime controller ove
 # Package com.letta.mobile.data.node.carrier
 
 The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarrier`, `NodeLink`, `NodePeerLink`) moves node protocol frames on three lanes (control, push, one per admin_rpc call) between a shell and a node and reports the verified identity of the other end; it never authenticates or interprets frames. `NodeSession` speaks the node protocol over any carrier: auth and capability negotiation, control requests, admin_rpc and feed resume, with close as a detach. Contract: `docs/reference/contracts/node-carrier/node-carrier-v1.md`. No Iroh types and no in-process object references belong here.
+
+# Package com.letta.mobile.data.node.host
+
+Per-OS bindings of a node's ports on JVM hosts: App Server process identity that survives PID reuse, the local tools endpoint's transport, and how `agent_message_send` is sent (a `meridian` subprocess on Linux, in-process on Windows). Hosts pick one set by OS and compose through [NodeHostBindings](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.node.host/-node-host-bindings/index.html), never naming a platform's implementation.
 
 # Package com.letta.mobile.data.pairing
 
@@ -712,7 +719,6 @@ Starter-agent template models and controller operations. Templates describe init
 Timeline reducers, synchronization and bounded canonical storage/presentation. Gateway loops and the paged canonical ledger are distinct APIs; live overlays, pending locals, durable rows and generation fences retain their respective ownership. Keep painting and direct host mutations outside timeline authority; supply persistence through [TimelineBoundedStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.timeline/-timeline-bounded-store/index.html), ingress through [TimelineTransport](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.timeline/-timeline-transport/index.html) and canonical commits through [TimelineCanonicalWriter](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.timeline/-timeline-canonical-writer/index.html).
 
 Canonical pending prompts retain their send-time position in paged history. Reconnect and history recovery preserve unconfirmed prompts as Not sent; only a persisted user echo with the same OTID confirms one. `CanonicalTimelinePresentation.retry(MessageId)` routes a failed prompt through its agent's captured send coordinator, preserving its conversation, OTID, text and attachments. `CanonicalTimelinePresentation.dismiss(MessageId)` explicitly removes only that conversation's failed prompt through `CanonicalPendingLocalStore.discardFailed`. Retry and Dismiss are available on both live and paged failed rows. Active streaming rows retain their established order while pending records are positioned by send time. A fresh send never implicitly discards an earlier failure.
-
 
 # Package com.letta.mobile.data.timeline.session
 

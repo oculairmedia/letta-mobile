@@ -16,11 +16,15 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -58,7 +62,8 @@ class MeridianToolsEndpointTest {
 
     @AfterTest
     fun tearDown() {
-        scope.cancel()
+        // Join, not just cancel: nothing this test started may outlive it.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         dir.toFile().deleteRecursively()
     }
 
@@ -151,6 +156,23 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
+    fun stoppingTheEndpointWhileItWaitsForACallerIsNotAFailure() = runBlocking {
+        val uncaught = mutableListOf<Throwable>()
+        val serving = CoroutineScope(
+            SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> synchronized(uncaught) { uncaught += e } },
+        )
+        val job = assertNotNull(endpoint(config()).start(serving))
+        // Let the server block in accept(), which cancelling interrupts.
+        delay(ACCEPT_SETTLE_MS)
+
+        job.cancelAndJoin()
+
+        assertTrue(job.isCancelled)
+        assertTrue(synchronized(uncaught) { uncaught.isEmpty() }, uncaught.toString())
+        serving.cancel()
+    }
+
+    @Test
     fun anOversizedRequestLineIsRefusedUnread() {
         val tooLong = ByteArrayInputStream(ByteArray(32) { 'a'.code.toByte() })
 
@@ -204,5 +226,9 @@ class MeridianToolsEndpointTest {
             callers += caller
             return ExternalToolResult.Success("""{"canvases":[]}""")
         }
+    }
+
+    private companion object {
+        const val ACCEPT_SETTLE_MS = 200L
     }
 }

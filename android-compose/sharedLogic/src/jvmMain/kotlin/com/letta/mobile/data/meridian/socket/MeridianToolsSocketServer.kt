@@ -6,6 +6,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
@@ -20,6 +22,7 @@ import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.nio.file.Files
@@ -48,6 +51,12 @@ class MeridianToolsSocketServer(
                     slots.acquire()
                     val connection = try {
                         runInterruptible(Dispatchers.IO) { server.accept() }
+                    } catch (e: ClosedChannelException) {
+                        slots.release()
+                        // Cancelling interrupts accept(), which closes the channel: that is the
+                        // cancellation, not a failure to report.
+                        currentCoroutineContext().ensureActive()
+                        throw e
                     } catch (e: Throwable) {
                         slots.release()
                         throw e

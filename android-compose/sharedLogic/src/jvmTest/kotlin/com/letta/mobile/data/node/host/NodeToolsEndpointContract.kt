@@ -13,8 +13,9 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -58,7 +59,8 @@ abstract class NodeToolsEndpointContract {
 
     @AfterTest
     fun cleanUp() {
-        scope.cancel()
+        // Join, not just cancel: nothing this test started may outlive it.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         dir.toFile().deleteRecursively()
     }
 
@@ -115,7 +117,7 @@ abstract class NodeToolsEndpointContract {
         val acl = Files.getFileAttributeView(file, AclFileAttributeView::class.java)
         assumeTrue("neither a POSIX nor an ACL permission view on this filesystem", acl != null)
         val owner = Files.getOwner(file)
-        return acl!!.acl.all { entry -> entry.principal() == owner }
+        return acl!!.acl.all { entry -> entry.principal() == owner && entry.type() == AclEntryType.ALLOW }
     }
 }
 
