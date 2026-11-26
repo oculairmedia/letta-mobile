@@ -13,6 +13,8 @@
 //! - [`VerifiedPeer`] is who the transport proved the other end to be, never a value from a frame.
 //! - [`LinkClosure`] carries close codes and reasons unchanged; [`core_proto::closure::Closure`]
 //!   names the ones the node protocol defines.
+//! - A byte-stream ALPN ([`ProtocolsBuilder::accept_stream`], [`Carrier::dial_stream`]) gets one raw
+//!   [`StreamLink`] per link instead of lanes, for protocols with their own framing.
 //! - [`in_process`] is the carrier for tests and the simulator, with loss, delay and partition hooks.
 //! - `contract` (feature `contract-suite`) runs the node-carrier v1 scenarios against any carrier.
 //!
@@ -26,6 +28,7 @@ mod identity;
 pub mod in_process;
 mod link;
 mod router;
+mod stream;
 
 #[cfg(feature = "contract-suite")]
 pub mod contract;
@@ -40,3 +43,4 @@ pub use link::{
     Link, LinkControl, PeerLink,
 };
 pub use router::{ProtocolHandler, Protocols, ProtocolsBuilder};
+pub use stream::{ByteStream, StreamHandler, StreamLink};

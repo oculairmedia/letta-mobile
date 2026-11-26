@@ -1,0 +1,72 @@
+{
+  "class": "constellation",
+  "documentId": "3YiiF7HzUMGDabpFWZgVyD9s83uZ",
+  "heads": [
+    "a8d73fc151aa7ffc461f3a05682bf89196d722f9dd259017b8aacc0cb86a2267"
+  ],
+  "schemaMajor": "baken.catalog.constellation/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": true
+  },
+  "expectedView": {
+    "status": "constellation",
+    "header": {
+      "schema": "baken.catalog.constellation/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "name": "Home",
+    "shellDoc": null,
+    "membershipOps": {
+      "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "dd259ad900a7467d0394d91afa6ff24989adfdb4117e4ec8487d006a1b760105": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+    },
+    "members": {
+      "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394": {
+        "name": "node-2",
+        "caps": [
+          "approve",
+          "catalog",
+          "catalog.write",
+          "node.execute",
+          "node.replicate",
+          "node.takeover",
+          "store",
+          "ui"
+        ],
+        "state": "active",
+        "addedBy": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "addedAtMs": 0,
+        "revokedAtMs": null,
+        "derivedFromHead": "stale"
+      }
+    },
+    "nodes": {},
+    "agents": {},
+    "violations": [
+      {
+        "path": "/members/8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "reason": "stale_member_row"
+      },
+      {
+        "path": "/membershipOps/dd259ad900a7467d0394d91afa6ff24989adfdb4117e4ec8487d006a1b76010500",
+        "reason": "unverified_op"
+      }
+    ]
+  },
+  "expectedViolations": [
+    {
+      "path": "/members/8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "reason": "stale_member_row"
+    },
+    {
+      "path": "/membershipOps/dd259ad900a7467d0394d91afa6ff24989adfdb4117e4ec8487d006a1b76010500",
+      "reason": "unverified_op"
+    }
+  ]
+}

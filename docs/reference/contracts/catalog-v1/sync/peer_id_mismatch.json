@@ -1,0 +1,9 @@
+{
+  "case": "peer_id_mismatch",
+  "about": "A join whose senderId is not the authenticated endpoint id closes 4403 peer_id_mismatch.",
+  "members": [{ "n": 2, "preset": "desktop_node" }],
+  "steps": [
+    { "op": "node", "name": "a", "n": 1 },
+    { "op": "raw_join", "n": 2, "to": "a", "sender": "0000000000000000000000000000000000000000000000000000000000000000", "code": 4403, "reason": "peer_id_mismatch" }
+  ]
+}

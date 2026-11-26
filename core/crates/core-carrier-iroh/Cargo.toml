@@ -13,7 +13,7 @@ core-carrier.workspace = true
 core-proto.workspace = true
 iroh = { version = "=1.5.0", default-features = false, features = ["tls-ring"] }
 thiserror.workspace = true
-tokio = { workspace = true, features = ["sync", "rt", "macros", "time"] }
+tokio = { workspace = true, features = ["sync", "rt", "macros", "time", "io-util"] }
 
 [dev-dependencies]
 serde_json.workspace = true

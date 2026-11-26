@@ -1,0 +1,54 @@
+{
+  "class": "constellation",
+  "documentId": "2h5gsiqAc2FmJz3A1sWQV4BbMZwF",
+  "heads": [
+    "b116786920c44088d41b0873aa7ded1247ce7998f928b23521363d215ea6892d",
+    "e2b848a376acc4203a8f824c62179aaf9b8cf632153adefb3996f0822c3fdf5a"
+  ],
+  "schemaMajor": "baken.catalog.constellation/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "constellation",
+    "header": {
+      "schema": "baken.catalog.constellation/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "name": "Home",
+    "shellDoc": null,
+    "membershipOps": {},
+    "members": {},
+    "nodes": {},
+    "agents": {
+      "agent-a": {
+        "agentId": "agent-a",
+        "kind": "standard",
+        "name": "Agent A",
+        "description": null,
+        "avatarToken": null,
+        "docUrl": "automerge:DyoNDG8qU8d2CsCJ5h3PPAf7WKd",
+        "treeAgentId": null,
+        "createdAtMs": 0,
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "deletedAtMs": null,
+        "supersededDocUrls": [
+          "automerge:4MgzVAv2Y1yKK4yvRDMcnjLNB9ZC"
+        ]
+      }
+    },
+    "violations": []
+  },
+  "expectedViolations": []
+}

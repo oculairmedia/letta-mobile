@@ -1,0 +1,75 @@
+{
+  "class": "agent",
+  "documentId": "2hZMAnAFEhmtKWHjsjRfd8pEU5Qd",
+  "heads": [
+    "ffb971df96c76606fd8eeacba114f508f8daf2ca982a06d3317a386f72b294e4"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {
+      "conv-late": {
+        "id": "conv-late",
+        "agentId": "agent-a",
+        "parentId": "conv-root",
+        "kind": "fork",
+        "forkPoint": null,
+        "createdBy": null,
+        "createdAtMs": 9000,
+        "title": null,
+        "titleSource": null,
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-root": {
+        "id": "conv-root",
+        "agentId": "agent-a",
+        "parentId": null,
+        "kind": "root",
+        "forkPoint": null,
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-root",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      }
+    },
+    "deleted": {
+      "conv-1": 1789913600000,
+      "conv-2": 1789827200000
+    },
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

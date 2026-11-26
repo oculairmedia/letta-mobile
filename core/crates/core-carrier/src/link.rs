@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{AppClose, CarrierError, Frame, Lane, LinkClosure, NodeAddr, VerifiedPeer};
+use crate::{AppClose, CarrierError, Frame, Lane, LinkClosure, NodeAddr, StreamLink, VerifiedPeer};
 
 /// Dials nodes. One carrier per local endpoint; its dials all carry the endpoint's identity.
 #[async_trait]
@@ -27,6 +27,24 @@ pub trait Carrier: Send + Sync {
     /// [`CarrierError::NoProtocol`] when the node does not serve `alpn`; [`CarrierError::Closed`]
     /// when the node refused the dialler before the dial returned.
     async fn dial(&self, target: &NodeAddr, alpn: &[u8]) -> Result<DialedLink, CarrierError>;
+
+    /// Opens a link to `target` for the byte-stream protocol `alpn`: one raw stream, no lanes.
+    ///
+    /// The default refuses every ALPN; carriers that carry byte-stream protocols override it.
+    ///
+    /// # Errors
+    ///
+    /// As for [`dial`](Self::dial).
+    async fn dial_stream(
+        &self,
+        target: &NodeAddr,
+        alpn: &[u8],
+    ) -> Result<StreamLink, CarrierError> {
+        let _ = target;
+        Err(CarrierError::NoProtocol(
+            String::from_utf8_lossy(alpn).into_owned(),
+        ))
+    }
 }
 
 /// What both ends of a link have: the other end's identity, the protocol, and closure.

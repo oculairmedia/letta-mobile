@@ -1,0 +1,29 @@
+{
+  "agentId": "agent-a",
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "conversations": {},
+  "createdAtMs": 0,
+  "deleted": {},
+  "ext": {},
+  "memoryDivergences": {},
+  "placement": {
+    "copiedAtMs": 0,
+    "copiedBy": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "epochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "epochN": 1,
+    "holder": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "prevHolder": null,
+    "record": {
+      "$bytes": "QktMMbnVYybDjK92yhOO0uTbAYsSTOw67T6tmDnfdxO8at34AAAAAAAAAAGKiOPddAnxlf1S2y08ul1yymcJvx2UEhvzdIgBtA9vXAAAAAAAAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "sig": {
+      "$bytes": "2tKGGgpUXJWmS9FiVuUf8Tw7cdWpZ0J40xaAzNLRJCO2LdGmDyJ_pbUdfP_eWUa24SEjbXBeOflp0ZeSwxXpAA"
+    },
+    "signer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "state": "active"
+  },
+  "schema": "baken.catalog.agent/1",
+  "subagentLinks": {},
+  "supersededBy": null,
+  "v": 1
+}

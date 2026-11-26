@@ -30,8 +30,11 @@ use tokio::time::Instant;
 use crate::{
     AcceptedLink, AccessDecision, AppClose, CallLane, CallSource, Carrier, CarrierError,
     DialedLink, Frame, FrameSink, FrameSource, InboundSource, Lane, Link, LinkClosure, LinkControl,
-    NodeAddr, PeerLink, Protocols, VerifiedPeer,
+    NodeAddr, PeerLink, Protocols, StreamLink, VerifiedPeer,
 };
+
+/// The buffer of each direction of an in-process byte stream.
+const STREAM_BUFFER: usize = 256 * 1024;
 
 /// An unordered pair of endpoints, smaller identity first.
 type Pair = (VerifiedPeer, VerifiedPeer);
@@ -235,39 +238,8 @@ impl Carrier for InProcessCarrier {
 
     async fn dial(&self, target: &NodeAddr, alpn: &[u8]) -> Result<DialedLink, CarrierError> {
         let remote = VerifiedPeer::Node(target.id);
-        let key = pair(self.local, remote);
-        let protocols = {
-            let state = self.net.state();
-            let Some(protocols) = state.nodes.get(&target.id) else {
-                return Err(CarrierError::Unreachable(format!(
-                    "no in-process node {}",
-                    target.id
-                )));
-            };
-            if state.partitions.contains(&key) {
-                return Err(CarrierError::Unreachable(format!(
-                    "partitioned from {}",
-                    target.id
-                )));
-            }
-            protocols.clone()
-        };
-        if !protocols.serves(alpn) {
-            return Err(CarrierError::NoProtocol(
-                String::from_utf8_lossy(alpn).into_owned(),
-            ));
-        }
-        if let AccessDecision::Reject(close) = protocols.check(&self.local, alpn).await {
-            return Err(CarrierError::Closed(close.into()));
-        }
-
-        let (closure, _) = watch::channel(None);
-        let shared = Arc::new(Shared {
-            pair: key,
-            net: Arc::downgrade(&self.net),
-            closure,
-        });
-        self.net.state().links.push((key, Arc::downgrade(&shared)));
+        let protocols = self.admit(target, alpn, false).await?;
+        let shared = self.open_shared(remote);
 
         let (to_node_tx, to_node_rx) = mpsc::unbounded_channel();
         let (to_shell_tx, to_shell_rx) = mpsc::unbounded_channel();
@@ -300,6 +272,129 @@ impl Carrier for InProcessCarrier {
             link: shell,
             inbound: Box::new(Rx::new(to_shell_rx, &shared)),
         })
+    }
+
+    async fn dial_stream(
+        &self,
+        target: &NodeAddr,
+        alpn: &[u8],
+    ) -> Result<StreamLink, CarrierError> {
+        let remote = VerifiedPeer::Node(target.id);
+        let protocols = self.admit(target, alpn, true).await?;
+        let shared = self.open_shared(remote);
+        // Each end holds its own duplex; a relay between the two inner halves copies bytes until the
+        // link closes or is lost, then drops them so both ends read end-of-stream.
+        let (dialler, dialler_inner) = tokio::io::duplex(STREAM_BUFFER);
+        let (node, node_inner) = tokio::io::duplex(STREAM_BUFFER);
+        let relay_shared = Arc::clone(&shared);
+        tokio::spawn(async move {
+            let mut a = dialler_inner;
+            let mut b = node_inner;
+            tokio::select! {
+                _ = tokio::io::copy_bidirectional(&mut a, &mut b) => {}
+                _ = relay_shared.closed() => {}
+            }
+        });
+        let node_end = StreamEnd {
+            shared: Arc::clone(&shared),
+            remote: self.local,
+            alpn: alpn.to_vec(),
+        };
+        let accepted = StreamLink {
+            control: Arc::new(node_end),
+            stream: Box::new(node),
+        };
+        tokio::spawn(async move { protocols.serve_stream(accepted).await });
+        Ok(StreamLink {
+            control: Arc::new(StreamEnd {
+                shared,
+                remote,
+                alpn: alpn.to_vec(),
+            }),
+            stream: Box::new(dialler),
+        })
+    }
+}
+
+impl InProcessCarrier {
+    /// Finds `target`, applies partitions and the access hook, and checks that `alpn` is served the
+    /// way the dial asks for (lanes, or one byte stream).
+    async fn admit(
+        &self,
+        target: &NodeAddr,
+        alpn: &[u8],
+        stream: bool,
+    ) -> Result<Protocols, CarrierError> {
+        let remote = VerifiedPeer::Node(target.id);
+        let key = pair(self.local, remote);
+        let protocols = {
+            let state = self.net.state();
+            let Some(protocols) = state.nodes.get(&target.id) else {
+                return Err(CarrierError::Unreachable(format!(
+                    "no in-process node {}",
+                    target.id
+                )));
+            };
+            if state.partitions.contains(&key) {
+                return Err(CarrierError::Unreachable(format!(
+                    "partitioned from {}",
+                    target.id
+                )));
+            }
+            protocols.clone()
+        };
+        if !protocols.serves(alpn) || protocols.is_stream(alpn) != stream {
+            return Err(CarrierError::NoProtocol(
+                String::from_utf8_lossy(alpn).into_owned(),
+            ));
+        }
+        if let AccessDecision::Reject(close) = protocols.check(&self.local, alpn).await {
+            return Err(CarrierError::Closed(close.into()));
+        }
+        Ok(protocols)
+    }
+
+    /// The shared closure state of a new link to `remote`, tracked for faults.
+    fn open_shared(&self, remote: VerifiedPeer) -> Arc<Shared> {
+        let key = pair(self.local, remote);
+        let (closure, _) = watch::channel(None);
+        let shared = Arc::new(Shared {
+            pair: key,
+            net: Arc::downgrade(&self.net),
+            closure,
+        });
+        self.net.state().links.push((key, Arc::downgrade(&shared)));
+        shared
+    }
+}
+
+/// Either end of an in-process byte-stream link.
+struct StreamEnd {
+    shared: Arc<Shared>,
+    remote: VerifiedPeer,
+    alpn: Vec<u8>,
+}
+
+#[async_trait]
+impl LinkControl for StreamEnd {
+    fn remote(&self) -> VerifiedPeer {
+        self.remote
+    }
+
+    fn alpn(&self) -> &[u8] {
+        &self.alpn
+    }
+
+    fn close(&self, close: AppClose) {
+        self.shared.close(close.into());
+    }
+
+    fn closure(&self) -> Option<LinkClosure> {
+        self.shared.closure()
+    }
+
+    async fn closed(&self) -> LinkClosure {
+        self.shared.closed().await
     }
 }
 

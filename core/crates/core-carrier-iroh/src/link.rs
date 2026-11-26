@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use core_carrier::{
     AcceptedLink, AppClose, CallLane, CallSource, CarrierError, DialedLink, Frame, FrameSink,
     FrameSource, InboundSource, Lane, Link, LinkClosure, LinkControl, PeerLink, Protocols,
-    VerifiedPeer,
+    StreamLink, VerifiedPeer,
 };
 use core_proto::NodeId;
 use core_proto::capability::FRAME_PART;
@@ -418,6 +418,24 @@ impl ProtocolHandler for RouterAdapter {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
         let remote = VerifiedPeer::Node(node_id(connection.remote_id()));
         let alpn = connection.alpn().to_vec();
+        if self.protocols.is_stream(&alpn) {
+            // A byte-stream protocol: the dialler's first stream is the whole link.
+            let Ok(Ok((send, recv))) =
+                tokio::time::timeout(LANE_SETUP, connection.accept_bi()).await
+            else {
+                return Ok(());
+            };
+            let link = StreamLink {
+                control: Arc::new(StreamEnd {
+                    state: State::new(connection),
+                    remote,
+                    alpn,
+                }),
+                stream: Box::new(tokio::io::join(recv, send)),
+            };
+            self.protocols.serve_stream(link).await;
+            return Ok(());
+        }
         let lanes = tokio::time::timeout(LANE_SETUP, async {
             let control = connection.accept_bi().await?;
             let push = connection.accept_bi().await?;
@@ -520,5 +538,70 @@ impl PeerLink for ServeEnd {
         self.encoding
             .peer_frame_part
             .store(frame_part, Ordering::Release);
+    }
+}
+
+/// Opens a byte-stream link on a fresh connection: its first bidirectional stream.
+pub(crate) async fn dial_stream(
+    connection: Connection,
+    expected: NodeId,
+) -> Result<StreamLink, CarrierError> {
+    let remote = node_id(connection.remote_id());
+    if remote != expected {
+        connection.close(VarInt::from_u32(0), b"closed");
+        return Err(CarrierError::Unreachable(format!(
+            "dialled {expected}, reached {remote}"
+        )));
+    }
+    let alpn = connection.alpn().to_vec();
+    let state = State::new(connection);
+    let (send, recv) = state
+        .connection
+        .open_bi()
+        .await
+        .map_err(|error| state.opening_error(&error))?;
+    Ok(StreamLink {
+        control: Arc::new(StreamEnd {
+            state,
+            remote: VerifiedPeer::Node(remote),
+            alpn,
+        }),
+        stream: Box::new(tokio::io::join(recv, send)),
+    })
+}
+
+/// Either end of a byte-stream link. Dropping it is a detach (`0 closed`).
+struct StreamEnd {
+    state: Arc<State>,
+    remote: VerifiedPeer,
+    alpn: Vec<u8>,
+}
+
+impl Drop for StreamEnd {
+    fn drop(&mut self) {
+        self.state.close(AppClose::closed());
+    }
+}
+
+#[async_trait]
+impl LinkControl for StreamEnd {
+    fn remote(&self) -> VerifiedPeer {
+        self.remote
+    }
+
+    fn alpn(&self) -> &[u8] {
+        &self.alpn
+    }
+
+    fn close(&self, close: AppClose) {
+        self.state.close(close);
+    }
+
+    fn closure(&self) -> Option<LinkClosure> {
+        self.state.closure()
+    }
+
+    async fn closed(&self) -> LinkClosure {
+        self.state.closed().await
     }
 }

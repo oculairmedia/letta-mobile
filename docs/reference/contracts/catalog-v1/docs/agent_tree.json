@@ -1,0 +1,220 @@
+{
+  "agentId": "agent-a",
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "conversations": {
+    "b296c136-33ec-8df8-82fa-3865ec15163f": {
+      "agentId": "agent-a",
+      "createdAtMs": 5000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {
+        "detectedAtMs": 5000,
+        "detectedBy": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+        "lastCommonLogSeq": 4,
+        "lastCommonMessageId": "message-4",
+        "resolution": {
+          "atMs": null,
+          "by": null,
+          "state": "open"
+        },
+        "strandedEpochClaimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "strandedEpochN": 2,
+        "strandedHolder": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "winningEpochClaimant": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+        "winningEpochN": 2
+      },
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-4",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "b296c136-33ec-8df8-82fa-3865ec15163f",
+      "kind": "divergence",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": null,
+      "titleSource": null
+    },
+    "conv-aside": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {
+        "anchorMessageId": "message-2",
+        "returnedAtMs": 2000,
+        "summaryMessageId": "message-9"
+      },
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-aside",
+      "kind": "aside",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": "Conversation conv-aside",
+      "titleSource": "auto"
+    },
+    "conv-edit": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {
+        "replacedMessageId": "message-2"
+      },
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-edit",
+      "kind": "edit",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": "Conversation conv-edit",
+      "titleSource": "auto"
+    },
+    "conv-fork": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {},
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-fork",
+      "kind": "fork",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": "Conversation conv-fork",
+      "titleSource": "auto"
+    },
+    "conv-rerun": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {
+        "rerunMessageId": "message-3"
+      },
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-rerun",
+      "kind": "rerun",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": "Conversation conv-rerun",
+      "titleSource": "auto"
+    },
+    "conv-root": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {},
+      "ext": {},
+      "forkPoint": null,
+      "id": "conv-root",
+      "kind": "root",
+      "lastActivityAtMs": null,
+      "parentId": null,
+      "title": "Conversation conv-root",
+      "titleSource": "auto"
+    },
+    "conv-sub": {
+      "agentId": "agent-sub-1",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {
+        "dispatchMessageId": "message-4",
+        "endedAtMs": 3000,
+        "startedAtMs": 1500,
+        "status": "done",
+        "subagentType": "explore",
+        "toolCallId": "call-1"
+      },
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-sub",
+      "kind": "subagent",
+      "lastActivityAtMs": null,
+      "parentId": "conv-root",
+      "title": "Conversation conv-sub",
+      "titleSource": "auto"
+    }
+  },
+  "createdAtMs": 0,
+  "deleted": {},
+  "ext": {},
+  "memoryDivergences": {},
+  "placement": null,
+  "schema": "baken.catalog.agent/1",
+  "subagentLinks": {
+    "agent-sub-1": {
+      "atMs": 1500,
+      "dispatchedFrom": "conv-root"
+    }
+  },
+  "supersededBy": null,
+  "v": 1
+}

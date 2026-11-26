@@ -1,0 +1,155 @@
+{
+  "class": "agent",
+  "documentId": "2hoY9M23RzD2sfuz5THWGYCuhf1S",
+  "heads": [
+    "409e12257f5067c6ef9fe573887b87d203ae9aec786d7f2e37a618d064d8afb8"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": "automerge:2hZMAnAFEhmtKWHjsjRfd8pEU5Qd",
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {
+      "conv-1": {
+        "id": "conv-1",
+        "agentId": "agent-a",
+        "parentId": "conv-root",
+        "kind": "fork",
+        "forkPoint": {
+          "lastSharedMessageId": "message-1",
+          "logEpochN": 1,
+          "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "logSeq": 4
+        },
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-1",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": 1789913600000,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-2": {
+        "id": "conv-2",
+        "agentId": "agent-a",
+        "parentId": "conv-root",
+        "kind": "fork",
+        "forkPoint": {
+          "lastSharedMessageId": "message-1",
+          "logEpochN": 1,
+          "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "logSeq": 4
+        },
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-2",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": 1789827200000,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-3": {
+        "id": "conv-3",
+        "agentId": "agent-a",
+        "parentId": "conv-root",
+        "kind": "fork",
+        "forkPoint": {
+          "lastSharedMessageId": "message-1",
+          "logEpochN": 1,
+          "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "logSeq": 4
+        },
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-3",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": 1772720000000,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-late": {
+        "id": "conv-late",
+        "agentId": "agent-a",
+        "parentId": "conv-root",
+        "kind": "fork",
+        "forkPoint": null,
+        "createdBy": null,
+        "createdAtMs": 9000,
+        "title": null,
+        "titleSource": null,
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-root": {
+        "id": "conv-root",
+        "agentId": "agent-a",
+        "parentId": null,
+        "kind": "root",
+        "forkPoint": null,
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-root",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      }
+    },
+    "deleted": {
+      "conv-ancient": 1755440000000
+    },
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

@@ -1,0 +1,42 @@
+[package]
+name = "core-catalog"
+version = "0.1.0"
+description = "The catalog (C2, catalog-v1): Automerge documents on samod for the constellation, shell and agent, typed views with the app conflict rules, the doc registry and samod storage on core-store, the three-layer access gate, rollover, and the meridian/automerge-repo/1 handler on core-carrier. The only crate that names automerge or samod."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+automerge.workspace = true
+base64.workspace = true
+bytes.workspace = true
+ciborium.workspace = true
+core-carrier.workspace = true
+core-log.workspace = true
+core-membership.workspace = true
+core-proto.workspace = true
+core-store.workspace = true
+futures.workspace = true
+hex.workspace = true
+regex.workspace = true
+samod.workspace = true
+samod-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "macros", "time", "io-util"] }
+tokio-util = { workspace = true, features = ["codec"] }
+uuid.workspace = true
+
+[dev-dependencies]
+core-carrier-iroh = { path = "../core-carrier-iroh" }
+core-store-sqlite = { path = "../core-store-sqlite" }
+core-testkit.workspace = true
+proptest.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "rt-multi-thread", "macros", "time", "io-util", "test-util"] }
+
+[lints]
+workspace = true

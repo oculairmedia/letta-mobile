@@ -1,0 +1,32 @@
+{
+  "class": "shell",
+  "documentId": "3miboxbaSup8H78s16NQKUi5G3XQ",
+  "heads": [
+    "bbcf049f7a7517ae198edb0282995c2fdf6a4756ebb1eca244f4eaa36df3ab49"
+  ],
+  "schemaMajor": "baken.catalog.shell/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "shell",
+    "header": {
+      "schema": "baken.catalog.shell/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "docRev": 0,
+    "entries": {},
+    "pinsRev": 0,
+    "pins": [],
+    "archived": {},
+    "devices": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

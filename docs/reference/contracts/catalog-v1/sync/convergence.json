@@ -1,0 +1,19 @@
+{
+  "case": "convergence",
+  "about": "Two writers converge on an agent doc after concurrent edits (M3 acceptance 1).",
+  "members": [{ "n": 2, "preset": "desktop_node" }],
+  "steps": [
+    { "op": "node", "name": "a", "n": 1 },
+    { "op": "node", "name": "b", "n": 2 },
+    { "op": "create", "name": "a", "class": "agent", "agent": "agent-a", "as": "doc" },
+    { "op": "edit", "name": "a", "doc": "doc", "put_root": "conv-a" },
+    { "op": "register", "name": "b", "doc": "doc", "class": "agent" },
+    { "op": "connect", "from": "b", "to": "a" },
+    { "op": "find", "name": "b", "doc": "doc" },
+    { "op": "edit", "name": "b", "doc": "doc", "put_root": "conv-b" },
+    { "op": "edit", "name": "a", "doc": "doc", "put_root": "conv-c" },
+    { "op": "expect_heads_equal", "a": "a", "b": "b", "doc": "doc" },
+    { "op": "expect_nodes", "name": "a", "doc": "doc", "ids": ["conv-a", "conv-b", "conv-c"] },
+    { "op": "expect_nodes", "name": "b", "doc": "doc", "ids": ["conv-a", "conv-b", "conv-c"] }
+  ]
+}

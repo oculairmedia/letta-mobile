@@ -1,0 +1,79 @@
+{
+  "case": "guest_notebook",
+  "about": "A guest with a notebook grant syncs that notebook only; a non-member without a grant is refused by the connection hook.",
+  "members": [],
+  "steps": [
+    {
+      "op": "node",
+      "name": "a",
+      "n": 1
+    },
+    {
+      "op": "create",
+      "name": "a",
+      "class": "agent",
+      "agent": "agent-a",
+      "as": "agentdoc"
+    },
+    {
+      "op": "create_notebook",
+      "name": "a",
+      "as": "notebook",
+      "title": "Shared notes"
+    },
+    {
+      "op": "grant",
+      "name": "a",
+      "n": 5,
+      "doc": "notebook",
+      "may_read": true,
+      "may_edit": false
+    },
+    {
+      "op": "node",
+      "name": "g",
+      "n": 5
+    },
+    {
+      "op": "register",
+      "name": "g",
+      "doc": "notebook",
+      "class": "notebook"
+    },
+    {
+      "op": "register",
+      "name": "g",
+      "doc": "agentdoc",
+      "class": "agent"
+    },
+    {
+      "op": "connect",
+      "from": "g",
+      "to": "a"
+    },
+    {
+      "op": "find",
+      "name": "g",
+      "doc": "notebook"
+    },
+    {
+      "op": "expect_field",
+      "name": "g",
+      "doc": "notebook",
+      "key": "schema",
+      "value": "notebook/1"
+    },
+    {
+      "op": "expect_not_found",
+      "name": "g",
+      "doc": "agentdoc"
+    },
+    {
+      "op": "dial_refused",
+      "n": 6,
+      "to": "a",
+      "code": 4403,
+      "reason": "peer_not_allowed"
+    }
+  ]
+}

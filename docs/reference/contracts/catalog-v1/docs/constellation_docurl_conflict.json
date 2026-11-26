@@ -1,0 +1,44 @@
+{
+  "agents": {
+    "agent-a": {
+      "agentId": "agent-a",
+      "avatarToken": null,
+      "createdAtMs": 0,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "description": null,
+      "docUrl": {
+        "$conflict": [
+          "automerge:4MgzVAv2Y1yKK4yvRDMcnjLNB9ZC",
+          "automerge:DyoNDG8qU8d2CsCJ5h3PPAf7WKd"
+        ]
+      },
+      "kind": "standard",
+      "name": "Agent A",
+      "treeAgentId": null
+    }
+  },
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "createdAtMs": 0,
+  "docs": {},
+  "ext": {},
+  "members": {},
+  "membershipOps": {},
+  "meta": {
+    "iconToken": null,
+    "name": "Home"
+  },
+  "nodes": {},
+  "schema": "baken.catalog.constellation/1",
+  "settings": {
+    "display": {},
+    "signed": {}
+  },
+  "supersededBy": null,
+  "v": 1
+}

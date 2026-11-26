@@ -10,7 +10,8 @@
 //!   stream is the control lane, its second the push lane (whose send half it finishes at once),
 //!   and every later stream one call lane. Frames are core-proto's codec, with `frame_part`
 //!   chunking from dialler to node always and from node to dialler once the node reported the
-//!   peer's `frame_part` capability.
+//!   peer's `frame_part` capability. A byte-stream ALPN (`meridian/automerge-repo/1`) is the
+//!   dialler's first bidirectional stream, handed over raw.
 //! - Close codes and reasons pass through unchanged as QUIC application close codes and reasons.
 //!
 //! Wire compatibility: iroh 1.x declares its wire stable across the 1.x line, so this crate's
@@ -23,7 +24,9 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use core_carrier::{Carrier, CarrierError, DialedLink, NodeAddr, Protocols, VerifiedPeer};
+use core_carrier::{
+    Carrier, CarrierError, DialedLink, NodeAddr, Protocols, StreamLink, VerifiedPeer,
+};
 use core_proto::NodeId;
 use iroh::endpoint::{ConnectError, ConnectingError, presets};
 use iroh::protocol::Router;
@@ -185,6 +188,26 @@ impl Carrier for IrohCarrier {
     }
 
     async fn dial(&self, target: &NodeAddr, alpn: &[u8]) -> Result<DialedLink, CarrierError> {
+        let connection = self.connect(target, alpn).await?;
+        link::dial_lanes(connection, target.id).await
+    }
+
+    async fn dial_stream(
+        &self,
+        target: &NodeAddr,
+        alpn: &[u8],
+    ) -> Result<StreamLink, CarrierError> {
+        let connection = self.connect(target, alpn).await?;
+        link::dial_stream(connection, target.id).await
+    }
+}
+
+impl IrohCarrier {
+    async fn connect(
+        &self,
+        target: &NodeAddr,
+        alpn: &[u8],
+    ) -> Result<iroh::endpoint::Connection, CarrierError> {
         let id = PublicKey::from_bytes(target.id.as_bytes()).map_err(|error| {
             CarrierError::Unreachable(format!("{} is not a node key: {error}", target.id))
         })?;
@@ -198,12 +221,10 @@ impl Carrier for IrohCarrier {
             })?;
             addr = addr.with_relay_url(url);
         }
-        let connection = self
-            .endpoint
+        self.endpoint
             .connect(addr, alpn)
             .await
-            .map_err(|error| connect_error(&error))?;
-        link::dial_lanes(connection, target.id).await
+            .map_err(|error| connect_error(&error))
     }
 }
 

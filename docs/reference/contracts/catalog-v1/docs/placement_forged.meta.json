@@ -1,0 +1,50 @@
+{
+  "class": "agent",
+  "documentId": "2g9kkGe8gqLaUswJf2M6iC9nszvk",
+  "heads": [
+    "ef0e884486750b127876848e638edcc3d8b91c9d89105f05ff0585702f1accda"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": {
+      "holder": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "epochN": 1,
+      "epochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "state": "active",
+      "verified": false,
+      "effectiveEpochN": null,
+      "effectiveEpochClaimant": null
+    },
+    "conversations": {},
+    "deleted": {},
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": [
+      {
+        "path": "/placement",
+        "reason": "unverified_placement"
+      }
+    ]
+  },
+  "expectedViolations": [
+    {
+      "path": "/placement",
+      "reason": "unverified_placement"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "agentId": "agent-a",
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "conversations": {},
+  "createdAtMs": 0,
+  "deleted": {},
+  "ext": {},
+  "memoryDivergences": {},
+  "placement": null,
+  "schema": "baken.catalog.agent/2",
+  "subagentLinks": {},
+  "supersededBy": null,
+  "v": 1
+}
