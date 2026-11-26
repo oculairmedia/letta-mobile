@@ -6,7 +6,6 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
-import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
@@ -57,7 +56,6 @@ class IrohCanvasPresenceTransport(
 
     companion object {
         val CANVAS_PRESENCE_ALPN = "meridian/canvas-presence/1".encodeToByteArray()
-        private const val PREFIX_BYTES = 4
         private const val MAX_PAYLOAD_BYTES = 1024 * 1024 // 1MB
     }
 
@@ -150,31 +148,14 @@ class IrohCanvasPresenceTransport(
     }
 
     fun registerConnection(connection: Connection, isInbound: Boolean = false): Job = scope.launch {
-        try {
-            val biStream = if (isInbound) connection.acceptBi() else connection.openBi()
-            val sendStream = biStream.send()
-            val recvStream = biStream.recv()
-
-            mutex.withLock {
-                activeSendStreams.add(sendStream)
-            }
-
-            try {
-                consumePackets(recvStream)
-            } finally {
-                removeActiveSendStream(sendStream)
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "connection.error", "error" attr errorMsg)
+        runCanvasStream(connection, isInbound, mutex, activeSendStreams, "CanvasPresence") { recv, _ ->
+            consumePackets(recv)
         }
     }
 
     private suspend fun consumePackets(recvStream: RecvStream) {
         while (true) {
-            val frameBytes = readFrame(recvStream) ?: break
+            val frameBytes = readCanvasFrame(recvStream, MAX_PAYLOAD_BYTES) ?: break
             dispatchIncomingPacket(frameBytes)
         }
     }
@@ -189,22 +170,13 @@ class IrohCanvasPresenceTransport(
         fallback.updatePresence(canvasId, packet.presence)
     }
 
-    private suspend fun removeActiveSendStream(sendStream: SendStream) {
-        withContext(NonCancellable) {
-            mutex.withLock {
-                activeSendStreams.remove(sendStream)
-            }
-            runCatching { sendStream.finish() }
-        }
-    }
-
     override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
         applyPresenceInternal(canvasId, presence)
         fallback.updatePresence(canvasId, presence)
 
         val packet = CanvasPresenceWirePacket(canvasId = canvasId.value, presence = presence)
         val payload = json.encodeToString(packet).encodeToByteArray()
-        val frame = encodeFrame(payload)
+        val frame = encodeCanvasFrame(payload, MAX_PAYLOAD_BYTES, "Canvas presence")
 
         mutex.withLock {
             val iterator = activeSendStreams.iterator()
@@ -247,37 +219,64 @@ class IrohCanvasPresenceTransport(
         flow.value = list
     }
 
-    private fun encodeFrame(payload: ByteArray): ByteArray {
-        require(payload.size <= MAX_PAYLOAD_BYTES) { "Canvas presence frame too large: ${payload.size}" }
-        val frame = ByteArray(PREFIX_BYTES + payload.size)
-        frame[0] = (payload.size ushr 24).toByte()
-        frame[1] = (payload.size ushr 16).toByte()
-        frame[2] = (payload.size ushr 8).toByte()
-        frame[3] = payload.size.toByte()
-        payload.copyInto(frame, destinationOffset = PREFIX_BYTES)
-        return frame
-    }
+}
 
-    private suspend fun readFrame(stream: RecvStream): ByteArray? {
-        val prefix = ByteArray(PREFIX_BYTES)
-        var offset = 0
-        while (offset < PREFIX_BYTES) {
-            val chunk = stream.read((PREFIX_BYTES - offset).toUInt())
-            if (chunk.isEmpty()) return null
-            chunk.copyInto(prefix, destinationOffset = offset)
-            offset += chunk.size
+internal suspend fun runCanvasStream(
+    connection: Connection,
+    isInbound: Boolean,
+    mutex: Mutex,
+    activeSendStreams: MutableList<SendStream>,
+    telemetryTag: String,
+    consume: suspend (RecvStream, SendStream) -> Unit,
+) {
+    try {
+        val biStream = if (isInbound) connection.acceptBi() else connection.openBi()
+        val sendStream = biStream.send()
+        val recvStream = biStream.recv()
+        mutex.withLock { activeSendStreams.add(sendStream) }
+        try {
+            consume(recvStream, sendStream)
+        } finally {
+            withContext(NonCancellable) {
+                mutex.withLock { activeSendStreams.remove(sendStream) }
+                runCatching { sendStream.finish() }
+            }
         }
-        val length = decodePrefixLength(prefix)
-        if (length !in 0..MAX_PAYLOAD_BYTES) return null
-        return stream.readExact(length.toUInt())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (t: Throwable) {
+        Telemetry.event(telemetryTag, "connection.error", "error" attr (t.message ?: t.toString()))
     }
+}
 
-    private fun decodePrefixLength(prefix: ByteArray): Int {
-        return ((prefix[0].toInt() and 0xff) shl 24) or
-            ((prefix[1].toInt() and 0xff) shl 16) or
-            ((prefix[2].toInt() and 0xff) shl 8) or
-            (prefix[3].toInt() and 0xff)
+private const val CANVAS_PREFIX_BYTES = 4
+
+internal fun encodeCanvasFrame(payload: ByteArray, maxPayloadBytes: Int, description: String): ByteArray {
+    require(payload.size <= maxPayloadBytes) { "$description frame too large: ${payload.size}" }
+    val frame = ByteArray(CANVAS_PREFIX_BYTES + payload.size)
+    frame[0] = (payload.size ushr 24).toByte()
+    frame[1] = (payload.size ushr 16).toByte()
+    frame[2] = (payload.size ushr 8).toByte()
+    frame[3] = payload.size.toByte()
+    payload.copyInto(frame, destinationOffset = CANVAS_PREFIX_BYTES)
+    return frame
+}
+
+internal suspend fun readCanvasFrame(stream: RecvStream, maxPayloadBytes: Int): ByteArray? {
+    val prefix = ByteArray(CANVAS_PREFIX_BYTES)
+    var offset = 0
+    while (offset < CANVAS_PREFIX_BYTES) {
+        val chunk = stream.read((CANVAS_PREFIX_BYTES - offset).toUInt())
+        if (chunk.isEmpty()) return null
+        chunk.copyInto(prefix, destinationOffset = offset)
+        offset += chunk.size
     }
+    val length = ((prefix[0].toInt() and 0xff) shl 24) or
+        ((prefix[1].toInt() and 0xff) shl 16) or
+        ((prefix[2].toInt() and 0xff) shl 8) or
+        (prefix[3].toInt() and 0xff)
+    if (length !in 0..maxPayloadBytes) return null
+    return stream.readExact(length.toUInt())
 }
 
 internal suspend fun CoroutineScope.runCanvasAcceptLoop(

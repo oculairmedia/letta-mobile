@@ -1006,7 +1006,7 @@ internal fun A2uiCard(
 
 /** The one child a container (a Card, a Modal) wraps, or a placeholder when it is missing. */
 @Composable
-private fun A2uiFirstChild(
+internal fun A2uiFirstChild(
     child: String?,
     surface: A2uiSurfaceState,
     visited: Set<String>,

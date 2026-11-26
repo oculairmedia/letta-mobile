@@ -181,21 +181,16 @@ internal fun A2uiTabs(
             }
         }
         Crossfade(targetState = selectedIndex, label = "a2ui-tab-content") { index ->
-            val child = surface.components[items[index].childId]
-            if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-            } else {
-                A2uiComponentNode(
-                    component = child,
-                    surface = surface,
-                    visited = visited,
-                    onAction = onAction,
-                    surfaceSubmitting = surfaceSubmitting,
-                    onPendingActionDelta = onPendingActionDelta,
-                    actionResolutionToken = actionResolutionToken,
-                    renderScope = renderScope,
-                )
-            }
+            A2uiFirstChild(
+                items[index].childId,
+                surface,
+                visited,
+                onAction,
+                surfaceSubmitting,
+                onPendingActionDelta,
+                actionResolutionToken,
+                renderScope,
+            )
         }
     }
 }
@@ -255,21 +250,16 @@ internal fun A2uiAccordion(
                     }
                     AnimatedVisibility(visible = expandedState.value) {
                         Column(modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg)) {
-                            val child = surface.components[item.childId]
-                            if (child == null) {
-                                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
-                            } else {
-                                A2uiComponentNode(
-                                    component = child,
-                                    surface = surface,
-                                    visited = visited,
-                                    onAction = onAction,
-                                    surfaceSubmitting = surfaceSubmitting,
-                                    onPendingActionDelta = onPendingActionDelta,
-                                    actionResolutionToken = actionResolutionToken,
-                                    renderScope = renderScope,
-                                )
-                            }
+                            A2uiFirstChild(
+                                item.childId,
+                                surface,
+                                visited,
+                                onAction,
+                                surfaceSubmitting,
+                                onPendingActionDelta,
+                                actionResolutionToken,
+                                renderScope,
+                            )
                         }
                     }
                 }
@@ -371,12 +361,7 @@ internal fun A2uiSlider(
     val binding = component.raw["value"]
     val effectivePath = component.inputPath(binding, renderScope)
     val range = component.numericRange()
-    val observedAtPath by surface.dataModel.observe(effectivePath)
-    val defaultValue = component.resolveNumericInputValue(surface, binding, renderScope, range.min)
-    val value = observedAtPath
-        ?.let(A2uiBindingResolver::displayText)
-        ?.toDoubleOrNull()
-        ?: defaultValue
+    val value = component.observeNumericInput(surface, renderScope, effectivePath, range.min)
     val label = component.resolveControlLabel(surface, renderScope)
     val haptic = LocalHapticFeedback.current
     var dragStartValue by remember(component.id) { mutableStateOf<Double?>(null) }
@@ -440,6 +425,18 @@ internal fun A2uiSlider(
 }
 
 @Composable
+private fun A2uiComponent.observeNumericInput(
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+    path: String,
+    minimum: Double,
+): Double {
+    val observed by surface.dataModel.observe(path)
+    val defaultValue = resolveNumericInputValue(surface, raw["value"], renderScope, minimum)
+    return observed?.let(A2uiBindingResolver::displayText)?.toDoubleOrNull() ?: defaultValue
+}
+
+@Composable
 internal fun A2uiStepper(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
@@ -450,12 +447,7 @@ internal fun A2uiStepper(
     val binding = component.raw["value"]
     val effectivePath = component.inputPath(binding, renderScope)
     val range = component.numericRange()
-    val observedAtPath by surface.dataModel.observe(effectivePath)
-    val defaultValue = component.resolveNumericInputValue(surface, binding, renderScope, range.min)
-    val value = observedAtPath
-        ?.let(A2uiBindingResolver::displayText)
-        ?.toDoubleOrNull()
-        ?: defaultValue
+    val value = component.observeNumericInput(surface, renderScope, effectivePath, range.min)
     val label = component.resolveControlLabel(surface, renderScope)
 
     fun update(next: Double) {
