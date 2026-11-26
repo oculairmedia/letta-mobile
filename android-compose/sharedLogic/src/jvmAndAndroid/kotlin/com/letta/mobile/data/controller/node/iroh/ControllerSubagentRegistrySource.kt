@@ -15,6 +15,8 @@ import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
 import com.letta.mobile.data.subagents.SubagentChipRecord
 import com.letta.mobile.data.subagents.SubagentChipSource
+import com.letta.mobile.data.subagents.SubagentChipState
+import com.letta.mobile.data.subagents.SubagentEarlyTerminal
 import com.letta.mobile.data.subagents.withNativeTodos
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -191,8 +193,33 @@ class ControllerSubagentRegistrySource(
                     (notification.taskId != null || notification.toolCallId != null) &&
                     notification.matchesDispatch(record)
             }
+            if (matches.isEmpty()) rememberBeforeReceipt(frame, notification, status)
             val entry = matches.singleUnambiguousEntry(notification) ?: return null
             return entry.copy(status = status, durationMs = notification.durationMs ?: entry.durationMs)
+        }
+
+        /**
+         * letta-mobile-dear2: a completion can overtake the dispatch receipt that names its task.
+         * Keep it, by exact task id only, on each live dispatch of this parent still awaiting a
+         * receipt; the registry applies it when a receipt reports that task. No task id, no memory.
+         */
+        private fun rememberBeforeReceipt(
+            frame: AppServerInboundFrame.StreamDelta,
+            notification: UiSubagentNotification,
+            status: String,
+        ) {
+            val taskId = notification.taskId ?: return
+            val candidates = registry.replaySnapshot(frame.runtime.conversationId).filter { record ->
+                record.agentId == frame.runtime.agentId && !record.state.isTerminal && record.taskId == null &&
+                    (notification.toolCallId == null || notification.toolCallId == record.toolCallId)
+            }.map { it.key }
+            val early = SubagentEarlyTerminal(
+                taskId = taskId,
+                state = SubagentChipState.fromWireStatus(status),
+                subagentAgentId = notification.subagentAgentId,
+                durationMs = notification.durationMs,
+            )
+            registry.rememberEarlyTerminal(candidates, early)
         }
 
         private fun List<SubagentChipRecord>.singleUnambiguousEntry(notification: UiSubagentNotification): SubagentEntry? {

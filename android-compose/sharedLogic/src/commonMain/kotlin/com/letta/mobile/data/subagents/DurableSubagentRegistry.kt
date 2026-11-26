@@ -271,7 +271,7 @@ class DurableSubagentRegistry(
 
         val merged = existing.mergedWith(observation, now).copy(
             appServerProcessIdentity = existing.appServerProcessIdentity ?: observedProcessIdentity,
-        )
+        ).withEarlyTerminalApplied(now).keepingSilenceWhileCompletionPending(existing, observation)
         entries[observation.key] = merged
         // Any accepted sighting, even from an incomplete snapshot, is positive evidence of life.
         snapshotAbsence.seen(observation.key)
@@ -347,6 +347,64 @@ class DurableSubagentRegistry(
             lastActivityEpochMs = activityAt,
         )
     }
+
+    /**
+     * letta-mobile-dear2: once the receipt has named this dispatch's task, a completion that
+     * arrived before it is applied by exact task identity, and every other remembered early
+     * notification is dropped (the receipt proved it belongs to another task).
+     */
+    private fun SubagentChipRecord.withEarlyTerminalApplied(now: Long): SubagentChipRecord {
+        val task = taskId ?: return this
+        if (earlyTerminals.isEmpty()) return this
+        val early = earlyTerminals.firstOrNull { it.matches(task, subagentAgentId) }
+        if (early == null || state.isTerminal) return copy(earlyTerminals = emptyList())
+        Telemetry.event(
+            TAG, "terminal.earlyApplied",
+            "conversationId" attr conversationId,
+            "toolCallId" attr toolCallId,
+            "taskId" attr task,
+            "state" attr early.state.name,
+        )
+        return copy(
+            state = early.state,
+            terminalAtEpochMs = terminalAtEpochMs ?: now,
+            lastActivityEpochMs = now,
+            progress = progress.copy(durationMs = early.durationMs ?: progress.durationMs),
+            earlyTerminals = emptyList(),
+        )
+    }
+
+    /**
+     * letta-mobile-dear2: a completion this dispatch may own has been seen, so a live sighting is
+     * not evidence of life; replayed RUNNING snapshots must not keep resetting the stale TTL.
+     */
+    private fun SubagentChipRecord.keepingSilenceWhileCompletionPending(
+        existing: SubagentChipRecord,
+        observation: SubagentChipObservation,
+    ): SubagentChipRecord =
+        if (existing.earlyTerminals.isNotEmpty() && !state.isTerminal && !observation.state.isTerminal) {
+            copy(lastSeenEpochMs = existing.lastSeenEpochMs)
+        } else {
+            this
+        }
+
+    /**
+     * Remember a terminal notification for each live dispatch in [candidates] that has no task id
+     * yet (letta-mobile-dear2). Changes neither lifecycle nor last-seen: it is not a sighting of
+     * the dispatch, only a fact to correlate once its receipt names its task.
+     */
+    internal fun rememberEarlyTerminal(candidates: Collection<SubagentChipKey>, early: SubagentEarlyTerminal): Int =
+        synchronized(lock) {
+            var remembered = 0
+            candidates.forEach { key ->
+                val record = entries[key]?.takeIf { !it.state.isTerminal && it.taskId == null } ?: return@forEach
+                if (early in record.earlyTerminals) return@forEach
+                entries[key] = record.copy(earlyTerminals = (record.earlyTerminals + early).takeLast(MAX_EARLY_TERMINALS))
+                remembered++
+            }
+            if (remembered > 0) persistLocked()
+            remembered
+        }
 
     /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
     private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
@@ -699,6 +757,9 @@ class DurableSubagentRegistry(
          * eviction is recorded at WARN because it means chip history was lost.
          */
         const val MAX_ENTRIES = 512
+
+        /** Early (pre-receipt) terminal notifications retained per dispatch; oldest dropped first. */
+        const val MAX_EARLY_TERMINALS = 8
 
         /**
          * Fallback for a live chip unobserved this long. Silence alone is not
