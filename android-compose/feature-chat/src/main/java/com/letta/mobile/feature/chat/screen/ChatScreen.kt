@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
 import com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs
+import com.letta.mobile.feature.chat.screen.shared.rememberAdminChatPageSession
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
@@ -91,12 +92,12 @@ internal fun ChatScreen(
         // layer (it is opaque over the docked canvas), and its scaffold owns the IME inset.
         SharedChatPage(
             params = SharedChatPageParams(
-                viewModel = viewModel,
+                session = rememberAdminChatPageSession(viewModel, navigation),
                 navigation = navigation,
                 chatMode = chatMode,
                 fontScale = fontScale,
                 hapticsEnabled = hapticsEnabled,
-                pagingPresentation = pagingPresentation,
+                pagedTimeline = pagingPresentation?.canonical,
                 openOnCanvas = openOnCanvas,
                 subagents = SharedChatSubagentInputs(
                     source = resolvedSubagentSource,

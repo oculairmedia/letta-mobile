@@ -25,19 +25,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
-import com.letta.mobile.data.chat.recompile.ConversationRecompileController
-import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
-import com.letta.mobile.ui.chat.commands.rememberSlashCommandSessionPort
-import com.letta.mobile.data.commands.ClientSlashCommand
-import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.LocalChatModelPicker
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
-import com.letta.mobile.feature.chat.screen.AndroidClientCommands
-import com.letta.mobile.feature.chat.screen.LocalAndroidClientCommands
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
+import com.letta.mobile.data.voice.session.VoiceChatSessions
 import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
 import com.letta.mobile.feature.chat.util.saveAttachment
@@ -45,8 +40,6 @@ import com.letta.mobile.feature.chat.util.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
-import com.letta.mobile.ui.chat.session.ClientCommandRouting
-import com.letta.mobile.ui.chat.session.ClientCommandSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -66,17 +59,33 @@ import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import kotlinx.coroutines.flow.flowOf
+import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFiles
 import kotlinx.coroutines.launch
+
+/** The page's workspace files: the viewer its file chips open, and the `@` search its draft drives. */
+internal class ChatWorkspaceFiles(val workspace: WorkspaceFiles, val onDraftChanged: (String) -> Unit)
+
+/** The conversation the page shows, as the host binds it; the rows come from [SharedChatPageParams.pagedTimeline]. */
+internal data class SharedChatPageSession(
+    /** The composer, actions and run state the page binds. */
+    val port: ChatSessionPort,
+    /** Voice mode's chat; null hides voice mode. */
+    val voiceSessions: VoiceChatSessions?,
+    /** The file chips' viewer and the `@` file search; null shows neither. */
+    val workspaceFiles: ChatWorkspaceFiles?,
+    /** The agent and conversation on screen (the docked canvas's board, the subagent dual view's parent). */
+    val target: ChatCanvasTarget,
+)
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
-    val viewModel: AdminChatViewModel,
+    val session: SharedChatPageSession,
     val navigation: ChatScreenNavigationCallbacks,
     val chatMode: String,
     val fontScale: Float,
     val hapticsEnabled: Boolean,
-    val pagingPresentation: ChatPagingPresentation?,
+    /** The rows the timeline draws: the conversation's canonical presentation. */
+    val pagedTimeline: CanonicalTimelinePresentation?,
     /** "Open conversations on the canvas": the initial presentation only. */
     val openOnCanvas: Boolean,
     /** Subagent dispatches open their todo sheet from these. */
@@ -111,8 +120,7 @@ internal data class SharedChatPageParams(
  */
 @Composable
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
-    val workspaceFiles = rememberSharedChatWorkspaceFiles()
-    val port = rememberAdminChatSessionPort(params.viewModel, params.navigation, workspaceFiles)
+    val port = params.session.port
     val canvasSlot = LocalChatCanvasSlot.current
     val presentationState = rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
@@ -138,16 +146,12 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         report = params.onHostHeaderHiddenChange,
         headerHidden = hasCanvasSlot && presentation.mode != ChatSurfaceMode.FullScreen,
     )
-    val target = ChatCanvasTarget(
-        agentId = params.viewModel.agentId.value,
-        conversationId = params.viewModel.conversationId?.value,
-    )
+    val target = params.session.target
     val canvas = canvasContent(canvasSlot, target, params.topChromeInset)
     val appearance = rememberSharedChatAppearance(params, rememberSharedChatDisplayOptions())
-    val surfacePort = rememberComposerCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
-    val dualView = rememberSubagentDualView(params.viewModel.conversationId, params.viewSessions, params.fullSubagentView())
+    val dualView = rememberSubagentDualView(target.conversationId?.let(::ConversationId), params.viewSessions, params.fullSubagentView())
     val platform = rememberAndroidChatSurfacePlatform(
         pageBackground = params.pageBackground,
         onComposerHeightChange = params.onComposerHeightChange,
@@ -162,22 +166,22 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
     // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
     SharedChatPageLocals(hapticsEnabled = params.hapticsEnabled) {
-        SharedChatWorkspaceFilesBox(workspaceFiles, port, modifier) {
+        SharedChatWorkspaceFilesBox(params.session.workspaceFiles, port, modifier) {
             SubagentDualViewFrame(dualView, Modifier.fillMaxSize(), params.dualViewOptions(appearance, host)) { parentModifier ->
                 ChatSurface(
-                    port = surfacePort,
+                    port = port,
                     presentation = presentation,
                     onIntent = onIntent,
                     host = host,
                     modifier = parentModifier.fillMaxSize(),
                     appearance = appearance,
                     platform = platform,
-                    pagedTimeline = params.pagingPresentation?.canonical,
+                    pagedTimeline = params.pagedTimeline,
                     canvas = canvas,
                     dockGeometry = dockGeometry,
                     onDockGeometryChange = { dockGeometry = it },
                     recents = params.recentInteractions,
-                    voiceSessions = remember(port, params.viewModel) { AndroidVoiceChatSessions(params.viewModel, port) },
+                    voiceSessions = params.session.voiceSessions,
                 )
             }
             SharedChatSubagentSheet(
@@ -264,76 +268,11 @@ private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
     return drawer.displayOptions.collectAsStateWithLifecycle().value
 }
 
-/**
- * letta-mobile-zxk2n.5 (G92): the page's port with the scaffold's client-local `/` commands, and
- * `/recompile` runs here so its status reaches the page; host commands use the shared graph adapter.
- */
-@Composable
-private fun rememberComposerCommandPort(
-    port: AdminChatSessionPort,
-    viewModel: AdminChatViewModel,
-    commands: AndroidClientCommands?,
-): ChatSessionPort {
-    if (commands == null) return rememberSlashCommandSessionPort(port, AdminSlashCommandBinding(viewModel))
-    val current by rememberUpdatedState(commands)
-    // letta-mobile-09m53: the page's scope, never the ViewModel's (see rememberAdminChatSessionPort).
-    val scope = rememberCoroutineScope()
-    val clientPort = remember(port, viewModel, commands.offered) {
-        val recompile = ConversationRecompileController(
-            scope = scope,
-            gateway = { current.recompileGateway },
-            unavailableReason = { current.recompileUnavailableReason },
-        )
-        val routing = ClientCommandRouting(
-            offered = commands.offered,
-            run = { command ->
-                if (command == ClientSlashCommand.Recompile) {
-                    viewModel.conversationId?.let { id ->
-                        recompile.recompile(ConversationRecompileRequest(id.value, viewModel.agentId.value))
-                    }
-                } else {
-                    current.route(command)
-                }
-            },
-            recompile = recompile,
-        )
-        ClientCommandSessionPort(port, routing, scope)
-    }
-    return rememberSlashCommandSessionPort(clientPort, AdminSlashCommandBinding(viewModel))
-}
-
 /** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
 internal fun routesToCanvasNavigation(
     presentation: ChatSurfacePresentation,
     intent: ChatSurfaceIntent,
 ): Boolean = intent == ChatSurfaceIntent.OpenCanvas && presentation.mode == ChatSurfaceMode.FullScreen
-
-@Composable
-private fun rememberAdminChatSessionPort(
-    viewModel: AdminChatViewModel,
-    navigation: ChatScreenNavigationCallbacks,
-    workspaceFiles: WorkspaceFilesViewModel?,
-): AdminChatSessionPort {
-    val currentOnBugCommand by rememberUpdatedState(navigation.onBugCommand)
-    val currentOpenConversation by rememberUpdatedState(navigation.onOpenConversation)
-    val canOpenConversation = navigation.onOpenConversation != null
-    // Bind navigation and Activity callbacks to the page scope, which ends on rotation.
-    // The ViewModel scope outlives the Activity and would retain its destroyed instance.
-    val scope = rememberCoroutineScope()
-    return remember(viewModel, canOpenConversation, workspaceFiles) {
-        AdminChatSessionPort(
-            fileMentions = workspaceFiles?.mentionablesFor(viewModel.agentId.value) ?: flowOf(emptyList()),
-            viewModel = viewModel,
-            scope = scope,
-            onOpenBugReport = { currentOnBugCommand?.invoke() },
-            onOpenConversation = if (canOpenConversation) {
-                { agentId, conversationId -> currentOpenConversation?.invoke(agentId, conversationId) }
-            } else {
-                null
-            },
-        )
-    }
-}
 
 private fun ChatScreenNavigationCallbacks.toSurfaceHost(
     subagents: SharedChatSubagentSheetState,

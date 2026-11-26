@@ -141,12 +141,12 @@ class SharedChatPageRecreationTest {
         CompositionLocalProvider(LocalAndroidClientCommands provides commands) {
             SharedChatPage(
                 SharedChatPageParams(
-                    viewModel = viewModel,
+                    session = rememberAdminChatPageSession(viewModel, navigation),
                     navigation = navigation,
                     chatMode = "interactive",
                     fontScale = 1f,
                     hapticsEnabled = true,
-                    pagingPresentation = null,
+                    pagedTimeline = null,
                     openOnCanvas = false,
                     subagents = SharedChatSubagentInputs(
                         source = viewModel.activeSubagentSource,
