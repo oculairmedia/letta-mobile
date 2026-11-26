@@ -45,15 +45,13 @@ internal class AndroidShellLaunch(val target: AppLaunchTarget?, val onConsumed: 
         val chat = target as? NotificationNavigationTarget ?: return null
         return CurrentFocusInputs(source, deepLink = ShellDestination.Chat(chat.agentId, chat.conversationId).entrySnapshot(source))
     }
-}
 
-/** Arbitrates [launch]'s entry on [source] through [bind] while composing, before any page or effect starts. */
-@Composable
-internal fun BindLaunchFocus(
-    launch: AndroidShellLaunch, workspace: ShellWorkspaceState, graph: SessionGraph, source: String, bind: (CurrentFocusInputs?) -> Unit,
-) {
-    val entry = remember(launch.target, source) { launch.focusInputs(source) }
-    remember(workspace, source, graph.id, entry) { bind(entry) }
+    /** Arbitrates this launch's entry on [source] through [bind] while composing, before any page or effect starts. */
+    @Composable
+    fun BindFocus(workspace: ShellWorkspaceState, graph: SessionGraph, source: String, bind: (CurrentFocusInputs?) -> Unit) {
+        val entry = remember(target, source) { focusInputs(source) }
+        remember(workspace, source, graph.id, entry) { bind(entry) }
+    }
 }
 
 /** A notification opens its chat, a share waits for its agent, the agent directory opens, a pairing link scans. */
@@ -61,7 +59,7 @@ internal fun BindLaunchFocus(
 internal fun AndroidShellLaunchEffect(shell: WorkspaceShell, launch: AndroidShellLaunch) {
     LaunchedEffect(launch.target, shell.config != null, shell.sourceReady) {
         when (val target = launch.target ?: return@LaunchedEffect) {
-            // A bound source means BindLaunchFocus has already arbitrated the entry: hand it back once.
+            // A bound source means BindFocus has already arbitrated the entry: hand it back once.
             is NotificationNavigationTarget -> if (shell.config == null || !shell.sourceReady) return@LaunchedEffect
             is ShareLaunchTarget -> {
                 shell.port.pendingShare = target.sharedText

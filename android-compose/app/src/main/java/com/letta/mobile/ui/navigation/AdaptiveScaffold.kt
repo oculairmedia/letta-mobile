@@ -106,7 +106,7 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
             isCurrentOwner = { WorkspaceChatStoreOwner.isCurrentOwner(drawerModel, workspace) },
             onOpening = { WorkspaceChatStoreOwner.retain(workspace, it.toRoute(), drawerModel) })
     }
-    BindLaunchFocus(launch, workspace, graph, source) { bindAndroidFocus(workspace, graph, source, port, drawerModel, config, it) }
+    launch.BindFocus(workspace, graph, source) { bindAndroidFocus(workspace, graph, source, port, drawerModel, config, it) }
     val sources = drawerModel.sources
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val shell = WorkspaceShell(
