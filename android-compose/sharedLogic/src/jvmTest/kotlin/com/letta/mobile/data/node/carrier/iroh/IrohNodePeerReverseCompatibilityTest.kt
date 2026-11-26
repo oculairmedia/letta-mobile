@@ -69,7 +69,7 @@ class IrohNodePeerReverseCompatibilityTest {
                     appToolRelay = null,
                 )
                 transport.awaitConnectionReady()
-                exercise(transport, node)
+                assertTodaysClientInteroperates(transport, node)
                 transport.close()
             }
         } finally {
@@ -81,7 +81,10 @@ class IrohNodePeerReverseCompatibilityTest {
         }
     }
 
-    private suspend fun exercise(transport: IrohAppServerTransport, node: ScriptedLegacyPeerNode) = coroutineScope {
+    private suspend fun assertTodaysClientInteroperates(
+        transport: IrohAppServerTransport,
+        node: ScriptedLegacyPeerNode,
+    ) = coroutineScope {
         val authAnswer = async(start = CoroutineStart.UNDISPATCHED) {
             transport.controlFrames.first { it.raw.type() == NodeCarrierWire.AUTH_RESPONSE }
         }
