@@ -2262,6 +2262,225 @@ const MODEL_PROFILE_REPLACEMENT =
   "  }\n" +
   "  const concreteModelHandle = ";
 
+// lcp-memory-dir-expand: file tools (Read, Write, Edit, Glob, Grep, ...) expand `$VAR` in a path
+// from the App Server's own process.env, where MEMORY_DIR is unset because one process serves
+// every agent; only shell children get it. So a literal `$MEMORY_DIR/...`, which the agent-info
+// reminder (lcp-memory-dir-token) and skill content (lcp-skill-dir) now print, resolved against
+// the cwd. expandPathArgs is the one site every file-tool call and permission check goes through;
+// it now fills MEMORY_DIR and LETTA_MEMORY_DIR with the scoped memory root of the agent whose tool
+// is running, the same root the shell exports, when the environment does not already carry them.
+const MEMORY_DIR_EXPAND_TOKEN =
+  "function expandPathArgs(toolName2, toolArgs, workingDirectory, env6 = process.env, homeDir) {\n" +
+  "  if (!CWD_FILE_PATH_TOOLS.has(canonicalToolName(toolName2)))\n" +
+  "    return toolArgs;\n";
+const MEMORY_DIR_EXPAND_MARKER = "// lcp-memory-dir-expand";
+const MEMORY_DIR_EXPAND_REPLACEMENT =
+  `${MEMORY_DIR_EXPAND_MARKER}: file tools expand $MEMORY_DIR to this agent's memory root on every node.\n` +
+  "function __lcpWithMemoryDirEnv(env) {\n" +
+  "  if (env.MEMORY_DIR?.trim() && env.LETTA_MEMORY_DIR?.trim()) return env;\n" +
+  "  let memoryDir = env.MEMORY_DIR?.trim() || env.LETTA_MEMORY_DIR?.trim() || null;\n" +
+  "  if (!memoryDir) {\n" +
+  "    try {\n" +
+  "      memoryDir = resolveScopedMemoryDir({ env });\n" +
+  "    } catch {\n" +
+  "      memoryDir = null;\n" +
+  "    }\n" +
+  "  }\n" +
+  "  return memoryDir ? { ...env, MEMORY_DIR: memoryDir, LETTA_MEMORY_DIR: memoryDir } : env;\n" +
+  "}\n" +
+  MEMORY_DIR_EXPAND_TOKEN +
+  "  env6 = __lcpWithMemoryDirEnv(env6); // lcp-memory-dir-expand\n";
+
+// lcp-skill-dir: renderSkillContent substituted the absolute skill dir for <SKILL_DIR> and
+// ${CLAUDE_SKILL_DIR} and printed it as "Skill directory:", and the result is persisted in the
+// <skill_content> tool result. A skill under this agent's memory root is now addressed as
+// $MEMORY_DIR/<relative path>, which shells expand on every node and file tools expand through
+// lcp-memory-dir-expand (a precondition site below, so the two never apply apart). Skills found
+// anywhere else (bundled, global, project) keep their install path. The resource list already
+// holds paths relative to the skill dir.
+const SKILL_DIR_HELPER_TOKEN = "function renderSkillContent(skillName, skillContent, skillPath, options = {}) {";
+const SKILL_DIR_HELPER_REPLACEMENT =
+  "// lcp-skill-dir: a skill under this agent's memory root is addressed as $MEMORY_DIR/<path>.\n" +
+  "function __lcpHostNeutralSkillDir(skillDir, agentId) {\n" +
+  "  try {\n" +
+  "    const memoryDir = resolveScopedMemoryDir(agentId ? { agentId } : {});\n" +
+  "    if (!memoryDir) return skillDir;\n" +
+  '    const slashes = (value) => value.replace(/\\\\/g, "/").replace(/\\/+$/, "");\n' +
+  '    const fold = process.platform === "win32" ? (value) => value.toLowerCase() : (value) => value;\n' +
+  "    const root = slashes(memoryDir);\n" +
+  "    const dir = slashes(skillDir);\n" +
+  '    if (fold(dir) === fold(root)) return "$MEMORY_DIR";\n' +
+  '    if (fold(dir).startsWith(`${fold(root)}/`)) return `$MEMORY_DIR/${dir.slice(root.length + 1)}`;\n' +
+  "  } catch {}\n" +
+  "  return skillDir;\n" +
+  "}\n" +
+  SKILL_DIR_HELPER_TOKEN;
+const SKILL_DIR_SUBSTITUTE_TOKEN =
+  "  const withSkillDir = skillContent.replace(/<SKILL_DIR>/g, skillDir).replace(/\\$\\{CLAUDE_SKILL_DIR\\}/g, skillDir);";
+const SKILL_DIR_SUBSTITUTE_REPLACEMENT =
+  "  const lcpSkillDir = __lcpHostNeutralSkillDir(skillDir, options.agentId); // lcp-skill-dir\n" +
+  "  const withSkillDir = skillContent.replace(/<SKILL_DIR>/g, lcpSkillDir).replace(/\\$\\{CLAUDE_SKILL_DIR\\}/g, lcpSkillDir);";
+const SKILL_DIR_FOOTER_TOKEN =
+  "Skill directory: ${skillDir}\nRelative paths in this skill are relative to the skill directory.";
+const SKILL_DIR_FOOTER_REPLACEMENT =
+  "Skill directory: ${lcpSkillDir}\nRelative paths in this skill are relative to the skill directory.";
+
+// lcp-system-prompt-tracking: whether an agent's system prompt is a managed preset (and at which
+// hash and letta-code version) or custom lived only in the node-local
+// $LETTA_CONFIG_DIR/settings.json. The App Server reads it on every turn
+// (scheduleManagedSystemPromptUpdate) to decide whether to upgrade agent.system after a
+// letta-code bump, so a node without that entry froze a managed prompt as "custom" while the
+// node that had it upgraded the prompt. The tracking now lives in the agent record, which
+// replicates, as system_prompt_tracking { preset, hash?, version? }. The getters read the record
+// first and fall back to settings.json for agents that predate this (copying the entry into the
+// record the first time). The setters still write settings.json, then the record. Local backend
+// only; any other backend keeps settings.json as before.
+const SYSTEM_PROMPT_TRACKING_CLASS_TOKEN = "\nclass SettingsManager {\n";
+const SYSTEM_PROMPT_TRACKING_HELPERS =
+  "\n// lcp-system-prompt-tracking: per-agent system prompt tracking lives in the agent record.\n" +
+  "function __lcpLocalAgentStore() {\n" +
+  "  try {\n" +
+  "    if (!isLocalBackendEnvEnabled()) return null;\n" +
+  "    const store = getBackend()?.store;\n" +
+  '    return store && typeof store.refreshAgentRecordFromStorage === "function" && typeof store.persistAgent === "function" && store.agents instanceof Map ? store : null;\n' +
+  "  } catch {\n" +
+  "    return null;\n" +
+  "  }\n" +
+  "}\n" +
+  "function __lcpWriteSystemPromptTracking(agentId, settings) {\n" +
+  "  const store = __lcpLocalAgentStore();\n" +
+  "  if (!store) return;\n" +
+  "  try {\n" +
+  "    const record = store.refreshAgentRecordFromStorage(agentId);\n" +
+  "    if (!record) return;\n" +
+  "    const tracking = {\n" +
+  '      preset: settings?.systemPromptPreset ?? "",\n' +
+  "      ...settings?.systemPromptHash ? { hash: settings.systemPromptHash } : {},\n" +
+  "      ...settings?.systemPromptVersion ? { version: settings.systemPromptVersion } : {}\n" +
+  "    };\n" +
+  "    if (JSON.stringify(record.system_prompt_tracking ?? null) === JSON.stringify(tracking)) return;\n" +
+  "    store.agents.set(agentId, { ...record, system_prompt_tracking: tracking });\n" +
+  "    store.persistAgent(agentId);\n" +
+  "  } catch (error4) {\n" +
+  '    debugWarn("settings", `lcp-system-prompt-tracking: could not record system prompt tracking for ${agentId}: ${error4 instanceof Error ? error4.message : String(error4)}`);\n' +
+  "  }\n" +
+  "}\n" +
+  "function __lcpSystemPromptTracking(manager, agentId) {\n" +
+  "  const settings = manager.getAgentSettings(agentId);\n" +
+  "  const store = __lcpLocalAgentStore();\n" +
+  "  let record;\n" +
+  "  try {\n" +
+  "    record = store?.refreshAgentRecordFromStorage(agentId);\n" +
+  "  } catch {\n" +
+  "    record = undefined;\n" +
+  "  }\n" +
+  "  if (!record) return settings;\n" +
+  "  const tracking = record.system_prompt_tracking;\n" +
+  '  if (tracking && typeof tracking === "object" && !Array.isArray(tracking)) {\n' +
+  "    return {\n" +
+  "      systemPromptPreset: tracking.preset || undefined,\n" +
+  "      systemPromptHash: tracking.hash || undefined,\n" +
+  "      systemPromptVersion: tracking.version || undefined\n" +
+  "    };\n" +
+  "  }\n" +
+  "  if (settings?.systemPromptPreset || settings?.systemPromptHash || settings?.systemPromptVersion) {\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, settings);\n" +
+  "  }\n" +
+  "  return settings;\n" +
+  "}\n" +
+  SYSTEM_PROMPT_TRACKING_CLASS_TOKEN;
+const SYSTEM_PROMPT_TRACKING_METHODS_TOKEN =
+  "  getSystemPromptPreset(agentId) {\n" +
+  "    return this.getAgentSettings(agentId)?.systemPromptPreset;\n" +
+  "  }\n" +
+  "  getSystemPromptHash(agentId) {\n" +
+  "    return this.getAgentSettings(agentId)?.systemPromptHash;\n" +
+  "  }\n" +
+  "  getSystemPromptVersion(agentId) {\n" +
+  "    return this.getAgentSettings(agentId)?.systemPromptVersion;\n" +
+  "  }\n" +
+  "  setSystemPromptPreset(agentId, preset) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  "      systemPromptPreset: preset,\n" +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "  }\n" +
+  "  setManagedSystemPrompt(agentId, prompt) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  "      systemPromptPreset: prompt.preset,\n" +
+  "      systemPromptHash: prompt.hash,\n" +
+  "      systemPromptVersion: prompt.version\n" +
+  "    });\n" +
+  "  }\n" +
+  "  setSystemPromptCustom(agentId) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  '      systemPromptPreset: "custom",\n' +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "  }\n" +
+  "  clearSystemPromptPreset(agentId) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  '      systemPromptPreset: "",\n' +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "  }\n";
+const SYSTEM_PROMPT_TRACKING_METHODS_REPLACEMENT =
+  "  getSystemPromptPreset(agentId) {\n" +
+  "    return __lcpSystemPromptTracking(this, agentId)?.systemPromptPreset; // lcp-system-prompt-tracking\n" +
+  "  }\n" +
+  "  getSystemPromptHash(agentId) {\n" +
+  "    return __lcpSystemPromptTracking(this, agentId)?.systemPromptHash;\n" +
+  "  }\n" +
+  "  getSystemPromptVersion(agentId) {\n" +
+  "    return __lcpSystemPromptTracking(this, agentId)?.systemPromptVersion;\n" +
+  "  }\n" +
+  "  setSystemPromptPreset(agentId, preset) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  "      systemPromptPreset: preset,\n" +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, this.getAgentSettings(agentId));\n" +
+  "  }\n" +
+  "  setManagedSystemPrompt(agentId, prompt) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  "      systemPromptPreset: prompt.preset,\n" +
+  "      systemPromptHash: prompt.hash,\n" +
+  "      systemPromptVersion: prompt.version\n" +
+  "    });\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, this.getAgentSettings(agentId));\n" +
+  "  }\n" +
+  "  setSystemPromptCustom(agentId) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  '      systemPromptPreset: "custom",\n' +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, this.getAgentSettings(agentId));\n" +
+  "  }\n" +
+  "  clearSystemPromptPreset(agentId) {\n" +
+  "    this.upsertAgentSettings(agentId, {\n" +
+  '      systemPromptPreset: "",\n' +
+  "      systemPromptHash: null,\n" +
+  "      systemPromptVersion: null\n" +
+  "    });\n" +
+  "    __lcpWriteSystemPromptTracking(agentId, this.getAgentSettings(agentId));\n" +
+  "  }\n";
+// normalizeAgentRecord rebuilds every loaded record from a whitelist, so the field has to be
+// carried through it or the next load (and the persist after it) would drop it.
+const SYSTEM_PROMPT_TRACKING_NORMALIZE_TOKEN =
+  "    ...compactionSettings !== undefined ? { compaction_settings: compactionSettings } : {}\n" +
+  "  };\n" +
+  "}";
+const SYSTEM_PROMPT_TRACKING_NORMALIZE_REPLACEMENT =
+  "    ...compactionSettings !== undefined ? { compaction_settings: compactionSettings } : {},\n" +
+  '    ...value.system_prompt_tracking && typeof value.system_prompt_tracking === "object" && !Array.isArray(value.system_prompt_tracking) ? { system_prompt_tracking: { ...value.system_prompt_tracking } } : {} // lcp-system-prompt-tracking\n' +
+  "  };\n" +
+  "}";
+
 /**
  * One counted patch whose literal sites all match exactly once, applied atomically.
  *
@@ -2319,6 +2538,34 @@ const modelProfile = exactOncePatch(
   "lcp-model-profile",
   [{ token: MODEL_PROFILE_TOKEN, replacement: MODEL_PROFILE_REPLACEMENT }],
   "profile/<id> handles are not resolved through this node's bindings; their turns fail against the profile provider's unbound endpoint",
+);
+
+const memoryDirExpand = exactOncePatch(
+  "lcp-memory-dir-expand",
+  [{ token: MEMORY_DIR_EXPAND_TOKEN, replacement: MEMORY_DIR_EXPAND_REPLACEMENT }],
+  "file tools resolve a literal $MEMORY_DIR path against the cwd instead of the agent's memory root",
+);
+
+const skillDir = exactOncePatch(
+  "lcp-skill-dir",
+  [
+    // Precondition: $MEMORY_DIR skill paths are only usable where file tools expand them.
+    { token: MEMORY_DIR_EXPAND_MARKER + ":", replacement: MEMORY_DIR_EXPAND_MARKER + ":" },
+    { token: SKILL_DIR_HELPER_TOKEN, replacement: SKILL_DIR_HELPER_REPLACEMENT },
+    { token: SKILL_DIR_SUBSTITUTE_TOKEN, replacement: SKILL_DIR_SUBSTITUTE_REPLACEMENT },
+    { token: SKILL_DIR_FOOTER_TOKEN, replacement: SKILL_DIR_FOOTER_REPLACEMENT },
+  ],
+  "skill content persists this node's absolute path for skills under the agent's memory root",
+);
+
+const systemPromptTracking = exactOncePatch(
+  "lcp-system-prompt-tracking",
+  [
+    { token: SYSTEM_PROMPT_TRACKING_CLASS_TOKEN, replacement: SYSTEM_PROMPT_TRACKING_HELPERS },
+    { token: SYSTEM_PROMPT_TRACKING_METHODS_TOKEN, replacement: SYSTEM_PROMPT_TRACKING_METHODS_REPLACEMENT },
+    { token: SYSTEM_PROMPT_TRACKING_NORMALIZE_TOKEN, replacement: SYSTEM_PROMPT_TRACKING_NORMALIZE_REPLACEMENT },
+  ],
+  "managed system prompt tracking stays in this node's settings.json and does not replicate with the agent",
 );
 
 function memoryLineEndings(state) {
@@ -2383,6 +2630,9 @@ const PATCH_STEPS = [
   agentDescription,
   memoryDirToken,
   modelProfile,
+  memoryDirExpand,
+  skillDir,
+  systemPromptTracking,
 ];
 
 /**
