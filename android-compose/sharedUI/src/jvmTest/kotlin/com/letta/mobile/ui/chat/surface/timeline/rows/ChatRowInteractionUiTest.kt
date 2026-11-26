@@ -26,6 +26,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsFocused
@@ -82,6 +83,15 @@ class ChatRowInteractionUiTest {
         runOnIdle { markdown = "**$shorterText**" }
         waitUntil(timeoutMillis = 5_000L) { onAllNodesWithText(shorterText).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText(longerText).assertDoesNotExist()
+    }
+
+    @Test
+    fun assistantReplyTextSitsUnderItsOwnTaggedBodyInsideTheRow() = runComposeUiTest {
+        setContent { MaterialTheme { AgentText(AgentTextParams(text = "Readable reply", isError = false)) } }
+
+        waitUntil(timeoutMillis = 5_000L) { onAllNodesWithText("Readable reply").fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithTag(ChatRowTestTags.AGENT_TEXT_BODY).assert(hasAnyDescendant(hasText("Readable reply")))
+        onNodeWithTag(ChatRowTestTags.AGENT_TEXT).assert(hasAnyDescendant(hasTestTag(ChatRowTestTags.AGENT_TEXT_BODY)))
     }
 
     @Test

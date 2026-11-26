@@ -12142,6 +12142,8 @@ final object com.letta.mobile.ui.shell.rail/ShellAgentLibraryTags { // com.letta
 }
 
 final object com.letta.mobile.ui.shell.rail/ShellAgentRailTags { // com.letta.mobile.ui.shell.rail/ShellAgentRailTags|null[0]
+    final const val NEW // com.letta.mobile.ui.shell.rail/ShellAgentRailTags.NEW|{}NEW[0]
+        final fun <get-NEW>(): kotlin/String // com.letta.mobile.ui.shell.rail/ShellAgentRailTags.NEW.<get-NEW>|<get-NEW>(){}[0]
     final const val PIN_DIVIDER // com.letta.mobile.ui.shell.rail/ShellAgentRailTags.PIN_DIVIDER|{}PIN_DIVIDER[0]
         final fun <get-PIN_DIVIDER>(): kotlin/String // com.letta.mobile.ui.shell.rail/ShellAgentRailTags.PIN_DIVIDER.<get-PIN_DIVIDER>|<get-PIN_DIVIDER>(){}[0]
     final const val RAIL // com.letta.mobile.ui.shell.rail/ShellAgentRailTags.RAIL|{}RAIL[0]
@@ -12208,6 +12210,8 @@ final object com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags { // com.lett
         final fun <get-HERO>(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.HERO.<get-HERO>|<get-HERO>(){}[0]
     final const val LIBRARY // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.LIBRARY|{}LIBRARY[0]
         final fun <get-LIBRARY>(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.LIBRARY.<get-LIBRARY>|<get-LIBRARY>(){}[0]
+    final const val NEW_CHAT // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.NEW_CHAT|{}NEW_CHAT[0]
+        final fun <get-NEW_CHAT>(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.NEW_CHAT.<get-NEW_CHAT>|<get-NEW_CHAT>(){}[0]
     final const val PANEL // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.PANEL|{}PANEL[0]
         final fun <get-PANEL>(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellAgentPanelTags.PANEL.<get-PANEL>|<get-PANEL>(){}[0]
 }
@@ -13644,6 +13648,8 @@ final val com.letta.mobile.ui.host/LocalOverlayHost // com.letta.mobile.ui.host/
     final fun <get-LocalOverlayHost>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.host/OverlayHost?> // com.letta.mobile.ui.host/LocalOverlayHost.<get-LocalOverlayHost>|<get-LocalOverlayHost>(){}[0]
 final val com.letta.mobile.ui.host/LocalPaneWindowClass // com.letta.mobile.ui.host/LocalPaneWindowClass|{}LocalPaneWindowClass[0]
     final fun <get-LocalPaneWindowClass>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.host/PaneWindowClass?> // com.letta.mobile.ui.host/LocalPaneWindowClass.<get-LocalPaneWindowClass>|<get-LocalPaneWindowClass>(){}[0]
+final val com.letta.mobile.ui.host/LocalPaneWindowSemantics // com.letta.mobile.ui.host/LocalPaneWindowSemantics|{}LocalPaneWindowSemantics[0]
+    final fun <get-LocalPaneWindowSemantics>(): androidx.compose.runtime/ProvidableCompositionLocal<androidx.compose.ui/Modifier> // com.letta.mobile.ui.host/LocalPaneWindowSemantics.<get-LocalPaneWindowSemantics>|<get-LocalPaneWindowSemantics>(){}[0]
 final val com.letta.mobile.ui.host/LocalRowHoldDrag // com.letta.mobile.ui.host/LocalRowHoldDrag|{}LocalRowHoldDrag[0]
     final fun <get-LocalRowHoldDrag>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.host/RowHoldDrag?> // com.letta.mobile.ui.host/LocalRowHoldDrag.<get-LocalRowHoldDrag>|<get-LocalRowHoldDrag>(){}[0]
 final val com.letta.mobile.ui.host/com_letta_mobile_ui_host_InspectorDefaults$stableprop // com.letta.mobile.ui.host/com_letta_mobile_ui_host_InspectorDefaults$stableprop|#static{}com_letta_mobile_ui_host_InspectorDefaults$stableprop[0]

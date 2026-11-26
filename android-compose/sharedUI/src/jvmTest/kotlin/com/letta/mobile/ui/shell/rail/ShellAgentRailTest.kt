@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -44,6 +45,7 @@ class ShellAgentRailTest {
         onNodeWithText("A").performClick()
         // A stack opens its selected member.
         onNodeWithText("B").performClick()
+        onNodeWithTag(ShellAgentRailTags.NEW).assertHasClickAction()
         onNodeWithContentDescription("New").performClick()
         assertEquals(listOf("home", "agent:a1", "agent:b2", "new"), events)
     }

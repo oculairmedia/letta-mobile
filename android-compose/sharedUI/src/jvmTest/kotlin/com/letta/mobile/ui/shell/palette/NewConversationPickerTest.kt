@@ -4,6 +4,7 @@ package com.letta.mobile.ui.shell.palette
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -63,6 +64,7 @@ class NewConversationPickerTest {
         onNodeWithText("Scout").assertDoesNotExist()
         onNodeWithText("merlin").assertExists()
         onNodeWithText("merlin").performClick()
+        onNodeWithTag(NewConversationPickerTags.CREATE_AGENT).assertHasClickAction()
         onNodeWithTag(NewConversationPickerTags.CREATE_AGENT).performClick()
         onNodeWithTag(NewConversationPickerTags.NEW_CANVAS).assertDoesNotExist()
 

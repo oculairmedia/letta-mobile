@@ -63,6 +63,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 object ShellAgentRailTags {
     const val RAIL = "shell-agent-rail"
     const val PIN_DIVIDER = "shell-agent-rail-pin-divider"
+    /** The rail's New control (the plus), collapsed or expanded. */
+    const val NEW = "shell-agent-rail-new"
     fun orb(key: String) = "shell-agent-rail-orb-$key"
 }
 
@@ -333,6 +335,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
         onClick = onNewSession,
+        modifier = Modifier.testTag(ShellAgentRailTags.NEW),
     )
 }
 
@@ -345,10 +348,10 @@ private data class RailCircleButtonStyle(
 )
 
 @Composable
-private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) {
+private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit, modifier: Modifier = Modifier) {
     LocalLettaHost.current.tooltip(style.description) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .size(style.diameter)
                 .clip(CircleShape)
                 .background(style.container)

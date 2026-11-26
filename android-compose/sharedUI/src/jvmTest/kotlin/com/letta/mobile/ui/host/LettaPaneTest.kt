@@ -11,7 +11,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -86,6 +90,38 @@ class LettaPaneTest {
         onNodeWithTag(LettaPaneTags.POPOVER).assertExists()
         onNodeWithTag(BODY).assertExists()
         onNodeWithTag(LettaPaneTags.SHEET).assertDoesNotExist()
+    }
+
+    @Test
+    fun aSheetWindowCarriesTheRootsWindowSemantics() = assertWindowSemantics(LettaPaneKind.Sheet)
+
+    @Test
+    fun aDialogWindowCarriesTheRootsWindowSemantics() = assertWindowSemantics(LettaPaneKind.Dialog)
+
+    @Test
+    fun anAlertWindowCarriesTheRootsWindowSemantics() = assertWindowSemantics(LettaPaneKind.Alert)
+
+    @Test
+    fun aPopoverWindowCarriesTheRootsWindowSemantics() = assertWindowSemantics(LettaPaneKind.Popover())
+
+    @Test
+    fun aMenuWindowCarriesTheRootsWindowSemantics() = assertWindowSemantics(LettaPaneKind.Menu())
+
+    /**
+     * The marker the root would set ([LocalPaneWindowSemantics]) must be in the container's window.
+     * Only the body text is asserted besides: a menu container does not apply the pane's test tag.
+     */
+    private fun assertWindowSemantics(kind: LettaPaneKind) = runComposeUiTest {
+        setContent {
+            Host(LettaHost.Touch) {
+                CompositionLocalProvider(LocalPaneWindowSemantics provides Modifier.semantics { contentDescription = WINDOW_MARKER }) {
+                    Pane(kind)
+                }
+            }
+        }
+        waitForIdle()
+        onNodeWithText("Pane body").assertExists()
+        onNode(hasContentDescription(WINDOW_MARKER), useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -190,5 +226,6 @@ class LettaPaneTest {
 
     private companion object {
         const val BODY = "pane-body"
+        const val WINDOW_MARKER = "window-semantics-marker"
     }
 }

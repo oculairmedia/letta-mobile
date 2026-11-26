@@ -4705,6 +4705,7 @@ public final class com/letta/mobile/ui/host/LettaPaneKind$Sheet : com/letta/mobi
 public final class com/letta/mobile/ui/host/LettaPaneKt {
 	public static final fun LettaMenu (ZLkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/host/PaneAnchor;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaPane (Lcom/letta/mobile/ui/host/LettaPaneKind;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/host/PaneSize;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/host/purpose/PanePurpose;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun getLocalPaneWindowSemantics ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/host/LettaPaneTags {
@@ -10879,6 +10880,7 @@ public final class com/letta/mobile/ui/shell/rail/ShellAgentRailState {
 public final class com/letta/mobile/ui/shell/rail/ShellAgentRailTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/rail/ShellAgentRailTags;
+	public static final field NEW Ljava/lang/String;
 	public static final field PIN_DIVIDER Ljava/lang/String;
 	public static final field RAIL Ljava/lang/String;
 	public final fun orb (Ljava/lang/String;)Ljava/lang/String;
@@ -11401,6 +11403,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelTags {
 	public static final field HERO Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelTags;
 	public static final field LIBRARY Ljava/lang/String;
+	public static final field NEW_CHAT Ljava/lang/String;
 	public static final field PANEL Ljava/lang/String;
 }
 

@@ -95,7 +95,6 @@ class MainActivity : ComponentActivity() {
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
             val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-
             SnackbarForwardingEffect(snackbarDispatcher, overlays)
             LastCrashSnackbarEffect(overlays)
             ChatPushServiceStartEffect()
@@ -105,6 +104,7 @@ class MainActivity : ComponentActivity() {
                 LocalSnackbarDispatcher provides snackbarDispatcher,
                 LocalWindowSizeClass provides windowSizeClass,
                 LocalAttentionPrefs provides deps.attentionPrefs,
+                com.letta.mobile.ui.host.LocalPaneWindowSemantics provides rootDebugSemantics(),
                 LocalAgentDefaults provides deps.agentDefaults,
                 LocalShellTaskRegistry provides deps.subagentRepository,
                 com.letta.mobile.ui.shell.workspace.LocalSharedNotebooks provides deps.sharedNotebooks,
