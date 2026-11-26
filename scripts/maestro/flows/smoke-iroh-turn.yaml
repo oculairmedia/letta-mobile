@@ -57,19 +57,30 @@ appId: com.letta.mobile.dev
     visible:
       id: "chat-user-prompt"
     timeout: 15000
-- assertVisible: ${output.line}
+# The typed line must be on the sent row itself (the composer's draft could also show it).
+- assertVisible:
+    text: ${output.line}
+    childOf:
+      id: "chat-user-prompt"
 - extendedWaitUntil:
     visible:
       id: "chat-agent-text"
     timeout: 90000
 - assertVisible: "DONE"
-# Idle again: no Stop button once the run settles, and the composer is back with an empty draft.
+# Idle again: no Stop button once the run settles, and the composer's draft is empty (the input
+# shows its "Type a message" placeholder only when empty) and no longer holds the typed line.
 - extendedWaitUntil:
     notVisible:
       id: "composer-stop"
     timeout: 60000
 - assertVisible:
     id: "composer-input"
+- assertVisible:
+    text: "Type a message…"
+    childOf:
+      id: "composer-input"
 - assertNotVisible:
-    id: "composer-send"
+    text: ${output.line}
+    childOf:
+      id: "composer-input"
 - takeScreenshot: smoke-iroh-turn-after

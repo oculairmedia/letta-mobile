@@ -71,8 +71,24 @@ appId: com.letta.mobile.dev
     visible:
       id: "agent-editor-page"
     timeout: 10000
+# Nothing can be saved yet: Save is present but disabled until the blank agent is named.
 - assertVisible:
     id: "agent-editor-save"
+    enabled: false
 - assertVisible:
     id: "settings-option-starter-blank"
 - takeScreenshot: smoke-iroh-seeded-create-agent
+# Leave the editor without saving. Back returns to where the editor was opened from, which was
+# observed to be Home or the chat depending on timing, so press Back again only if Home is not
+# showing yet. Home is the known state for the next flow; nothing was created.
+- pressKey: back
+- runFlow:
+    when:
+      notVisible:
+        id: "home_page"
+    commands:
+      - pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: "home_page"
+    timeout: 10000
