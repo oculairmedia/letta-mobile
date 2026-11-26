@@ -15,7 +15,7 @@ import kotlinx.collections.immutable.persistentListOf
  * A row is named by the logical id the host stamped on its frames and nothing else: the first frame
  * of an id appends the row, a later text frame REPLACES its text when it carries a higher `text_seq`
  * (the text is a cumulative snapshot, never concatenated) and is dropped otherwise, and a tool return
- * joins the `tc-<tool_call_id>` row. Content, prefixes, otids, run ids and server ids never decide
+ * joins the row that lists its call. Content, prefixes, otids, run ids and server ids never decide
  * where a frame goes.
  */
 internal fun reduceLiveFrame(input: TimelineReducerInput): TimelineReducerOutput {
@@ -68,9 +68,20 @@ private fun TimelineReducerInput.updateRow(
     existing: TimelineEvent.Confirmed,
     incoming: TimelineEvent.Confirmed,
 ): TimelineReducerOutput {
-    val updated = existing.advancedBy(incoming) ?: return dropStale(existing, incoming)
+    val advanced = existing.advancedBy(incoming) ?: return dropStale(existing, incoming)
+    val (updated, pending) = collectParkedReturns(advanced)
     val next = prev.replaceByLogicalId(updated).copy(liveCursor = updated.serverId)
-    return ingested(next, updated, pendingToolReturnsByCallId, null)
+    return ingested(next, updated, pending, null)
+}
+
+/** A later emission can list a call the row did not; a return parked for that call joins the row now. */
+private fun TimelineReducerInput.collectParkedReturns(
+    row: TimelineEvent.Confirmed,
+): Pair<TimelineEvent.Confirmed, PersistentMap<String, ToolReturnMessage>> {
+    val waiting = pendingToolReturnsByCallId
+    if (waiting.isEmpty() || row.toolCalls.none { it.effectiveId in waiting }) return row to waiting
+    val pending = LinkedHashMap(waiting)
+    return applyPendingToolReturns(row, pending) to pending.toTimelinePersistentMap()
 }
 
 /** The row after [incoming], or null when [incoming] is not newer than what the row already holds. */

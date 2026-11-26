@@ -102,25 +102,64 @@ class FeedTurnCloseSettlementTest {
     }
 
     /**
-     * A parallel call message is stamped by its FIRST call only (TurnStreamIdentity.toolCallRowId: `tc-<first>`), so the
-     * second call's return finds no `tc-<second>` row and the live reducer parks it (LiveToolReturns.reduceToolReturn).
-     * At turn_closed that held result belongs on its call, with its real status: neither pending nor failed.
+     * A parallel call message is stamped by its FIRST call only (TurnStreamIdentity.toolCallRowId: `tc-<first>`), yet
+     * each return joins the row that lists its call while the turn runs: both results show before `turn_closed`, each
+     * on its own call, and the close changes neither (nothing was held for it to repair).
      */
     @Test
-    fun aParallelCallsHeldResultIsShownOnItsCallWhenTheTurnCloses() {
-        listOf(
-            parallelCalls("turn-a", "call-first", "call-second"),
-            result("turn-a", "call-first", "first ok"),
-            result("turn-a", "call-second", "second ok"),
-        ).forEach { projector.apply(it) }
-        assertNull(assertNotNull(toolCall("call-second")).result, "the second return is held, not attached, before close")
+    fun aParallelCallsResultsShowLiveAndSurviveTheClose() {
+        projector.apply(parallelCalls("turn-a", "call-first", "call-second"))
+        projector.apply(result("turn-a", "call-second", "second ok"))
+        assertEquals("second ok", assertNotNull(toolCall("call-second")).result, "the second return shows while the turn runs")
+        assertNull(assertNotNull(toolCall("call-first")).result, "the first call is still running")
+
+        projector.apply(result("turn-a", "call-first", "first ok"))
+        val live = projector.items()
+        assertEquals("first ok", assertNotNull(toolCall("call-first")).result)
+        assertEquals("success", assertNotNull(toolCall("call-second")).status)
 
         projector.apply(closed("turn-a"))
 
+        assertEquals(live, projector.items(), "a turn whose calls all answered live is not changed by its close")
         val second = assertNotNull(toolCall("call-second"))
         assertEquals("second ok", second.result)
         assertEquals("success", second.status)
         assertEquals("success", assertNotNull(toolCall("call-first")).status)
+    }
+
+    /** A return journaled before its call's row (any call of a parallel message) attaches when the row arrives. */
+    @Test
+    fun aParallelCallsReturnJournaledBeforeItsRowAttachesWhenTheRowArrives() {
+        projector.apply(result("turn-a", "call-second", "early"))
+        projector.apply(parallelCalls("turn-a", "call-first", "call-second"))
+
+        assertEquals("early", assertNotNull(toolCall("call-second")).result)
+        assertNull(assertNotNull(toolCall("call-first")).result)
+    }
+
+    /**
+     * The host names an approval row with a minted id, not `tc-<call>` (TurnStreamIdentity.rowIdentity mints for
+     * every type but user, tool call and tool return), so its result is found by call id and shows while the turn runs.
+     */
+    @Test
+    fun anApprovalRowsResultShowsLiveThoughTheRowIsNotNamedAfterItsCall() {
+        projector.apply(stream("turn-a", buildJsonObject {
+            put("message_type", "approval_request_message")
+            put("id", "approval-call-asked")
+            put("logical_message_id", "lm-approval")
+            put("run_id", "run-turn-a")
+            put("turn_id", "turn-a")
+            put("tool_call", buildJsonObject {
+                put("tool_call_id", "call-asked")
+                put("name", "Bash")
+                put("arguments", "{\"command\":\"date\"}")
+            })
+        }))
+        projector.apply(result("turn-a", "call-asked", "approved and ran"))
+
+        val answered = assertNotNull(toolCall("call-asked"))
+        assertEquals("approved and ran", answered.result, "shown before turn_closed")
+        assertEquals("success", answered.status)
     }
 
     private fun parallelCalls(turn: String, first: String, second: String) = stream(turn, buildJsonObject {
