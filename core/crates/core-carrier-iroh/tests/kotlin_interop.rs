@@ -3,7 +3,7 @@
 //!
 //! Skipped unless `BAKEN_KOTLIN_NODE` names the node as `<64-hex NodeId>@<ip:port>` and
 //! `BAKEN_KOTLIN_TOKEN` holds its bootstrap token. How to start the Kotlin host is in
-//! `docs/reference/contracts/node-carrier/rust-carrier-notes.md`.
+//! `docs/reference/contracts/node-carrier/rust-carrier-notes-v1.md`.
 
 use core_carrier::{Lane, NodeAddr, Protocols};
 use core_carrier_iroh::{IrohConfig, IrohNode};

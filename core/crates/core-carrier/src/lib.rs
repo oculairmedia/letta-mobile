@@ -2,7 +2,7 @@
 //! shells, independent of any transport library.
 //!
 //! The normative text is node-carrier v1 (`docs/reference/contracts/node-carrier/node-carrier-v1.md`)
-//! with the Rust notes beside it (`rust-carrier-notes.md`). A carrier moves UTF-8 JSON frames on
+//! with the Rust notes beside it (`rust-carrier-notes-v1.md`). A carrier moves UTF-8 JSON frames on
 //! three kinds of lane and reports the verified identity of the other end. It never authenticates,
 //! authorizes, parses or rewrites a frame.
 //!
