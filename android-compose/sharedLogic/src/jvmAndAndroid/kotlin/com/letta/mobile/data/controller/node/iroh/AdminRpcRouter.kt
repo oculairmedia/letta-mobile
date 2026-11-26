@@ -4,10 +4,13 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedHandler
 import com.letta.mobile.data.controller.node.iroh.timing.AdminRpcPhaseTimings
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +18,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Refuses the call with [message] for the remote client: the router's catch path returns
@@ -22,6 +26,12 @@ import kotlinx.serialization.json.put
  * a handler lets escape answers [ADMIN_RPC_INTERNAL_ERROR] instead.
  */
 fun adminError(message: String): Nothing = throw AdminRpcClientError(message)
+
+/** An owner lookup that takes longer than this answers no owner (a denial), never a hung request. */
+private const val OWNER_LOOKUP_TIMEOUT_MS = 2_000L
+
+/** Bound on the router's resolved-owner cache; past it the cache starts over rather than growing without limit. */
+private const val MAX_KNOWN_OWNERS = 4_096
 
 /** The fixed failure text for every handler exception that is not a deliberate client refusal. */
 internal const val ADMIN_RPC_INTERNAL_ERROR = "Internal error"
@@ -89,6 +99,24 @@ class AdminRpcRouter(
     private val handlers = mutableMapOf<String, suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement>()
     private val streamedHandlers = mutableMapOf<String, AdminRpcStreamedHandler>()
 
+    /**
+     * The agent that owns a conversation, from the host's own records (never from request parameters): given the
+     * conversation id a request names, the owner, or null when the host cannot say. Null denies an
+     * agent-scoped peer. [ConversationAdminHandlers] installs the App Server lookup; the default knows no owner.
+     */
+    internal var conversationOwner: suspend (ConversationId) -> String? = { null }
+
+    /** Owners already resolved: a conversation never changes agent, so a known owner is kept (unknowns never are). */
+    private val knownOwners = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Methods whose handler proves the owning agent of the conversation it is given itself (the feed journal's
+     * recorded owner, the canvas mount authority's host record), failing closed with its own refusal wording, so the
+     * central owner check in [preauthorize] leaves them to it. Only routes whose handler does so may add to it, at
+     * registration. A transport observes such a call of an agent-scoped peer only once it succeeded.
+     */
+    internal val handlerOwnedConversationScope: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     val methodCount: Int
         get() = handlers.size
 
@@ -125,6 +153,49 @@ class AdminRpcRouter(
         streamedHandlers[streamed.method] = streamed
     }
 
+    /**
+     * Whether a transport may observe [invocation] (register its connection as the viewer of the conversation it
+     * names) BEFORE dispatch, so that no turn frame of a conversation being hydrated is missed. Callable only once
+     * [preauthorize] passed. True only when the call is already authorized for every conversation it names on the
+     * context as it was before any viewer change: the peer may read each one (its conversation-content scope), and for
+     * an agent-scoped peer [preauthorize] (not the handler) proved each one's owner. Otherwise the transport dispatches
+     * first and observes only once the handler answered successfully, so viewing a conversation can never grant
+     * access to it and a refused call never holds even a transient subscription.
+     */
+    internal fun mayObserveBeforeDispatch(invocation: AdminRpcInvocation): Boolean {
+        val context = invocation.context
+        if (context.authorizedAgentIds != null && invocation.method in handlerOwnedConversationScope) return false
+        return AgentScopeGuard.conversationIdsOf(invocation.params).all(context::canAccessConversation)
+    }
+
+    /**
+     * Dispatches a preauthorized [invocation] through [dispatch] (the transport's own coroutine context) and lets the
+     * transport observe it: [observe] registers the connection as the call's viewer and answers how to settle that,
+     * or null when it observed nothing. It runs before dispatch when [mayObserveBeforeDispatch] allows, otherwise only
+     * once the handler answered successfully. The handler always runs on the invocation's own context, as it was
+     * before any viewer change. [settle] applies the outcome, and a failure when dispatch throws or is cancelled.
+     */
+    internal suspend fun dispatchObserving(
+        invocation: AdminRpcInvocation,
+        observe: suspend () -> (suspend (Boolean) -> Unit)?,
+        dispatch: suspend (AdminRpcInvocation) -> String,
+        settle: suspend ((suspend (Boolean) -> Unit)?, Boolean) -> Unit,
+    ): String {
+        val observesFirst = mayObserveBeforeDispatch(invocation)
+        val early = if (observesFirst) observe() else null
+        var answered = false
+        val response = try {
+            dispatch(invocation).also { answered = true }
+        } finally {
+            // Thrown or cancelled: an observation made first is rolled back before the failure propagates.
+            if (!answered) settle(early, false)
+        }
+        val succeeded = !isAdminRpcFailureEnvelope(response)
+        val late = if (!observesFirst && succeeded) observe() else null
+        settle(early ?: late, succeeded)
+        return response
+    }
+
     /** The streamed handler of [invocation]'s method, or null when it answers with a single response. */
     internal fun streamedHandler(invocation: AdminRpcInvocation): AdminRpcStreamedHandler? = streamedHandlers[invocation.method]
 
@@ -149,6 +220,9 @@ class AdminRpcRouter(
         streamedHandlers.clear()
         streamedHandlers.putAll(other.streamedHandlers)
         featureCapabilities = other.featureCapabilities
+        conversationOwner = other.conversationOwner
+        handlerOwnedConversationScope.clear()
+        handlerOwnedConversationScope.addAll(other.handlerOwnedConversationScope)
         return requireNonEmpty(other.methodCount)
     }
 
@@ -158,10 +232,12 @@ class AdminRpcRouter(
      * would return, or null when handler dispatch may proceed.
      *
      * Transport paths use this before attaching connection-local observation
-     * state. F1 may extend this pre-handler boundary with conversation-owner
-     * resolution without moving that authorization work into observers.
+     * state. For an agent-scoped peer it also resolves the owning agent of every
+     * conversation the request names: a conversation owned
+     * outside the scope, or whose owner the host cannot resolve, is denied here,
+     * so no conversation-addressed handler can forget it.
      */
-    internal fun preauthorize(invocation: AdminRpcInvocation): String? {
+    internal suspend fun preauthorize(invocation: AdminRpcInvocation): String? {
         val handler = handlers[invocation.method]
         if (handler == null) {
             Telemetry.event("AdminRpc", "method.not_found", "method" attr invocation.method)
@@ -171,6 +247,10 @@ class AdminRpcRouter(
             Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" attr invocation.method)
             return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
         }
+        if (!conversationsInScope(invocation.method, invocation.params, invocation.context)) {
+            Telemetry.event("AdminRpc", "authz.conversation_owner_denied", "method" attr invocation.method)
+            return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
+        }
         return null
     }
 
@@ -178,6 +258,43 @@ class AdminRpcRouter(
         val scope = invocation.context.authorizedAgentIds
         val scopedBeads = invocation.method.startsWith("beads.") && !scope.isNullOrEmpty()
         return scopedBeads || !AgentScopeGuard.allowsParams(scope, invocation.params)
+    }
+
+    /**
+     * Whether every conversation a request or runtime frame ([params]) names is owned by an agent in the peer's scope
+     * ([context]). Unscoped peers (owner, desktop, A2A) pass without a lookup. A conversation already in the
+     * connection's bounded content scope (the one it views) needs none either: a connection only comes to view a
+     * conversation through a request this check (or the owning handler) authorized. The bare `default` conversation is
+     * per agent, so its owner is the one agent the frame names (already checked against the scope); without one it is
+     * denied. Any other id is looked up; a lookup that fails or times out answers no owner, which denies.
+     */
+    internal suspend fun conversationsInScope(method: String, params: JsonObject?, context: AdminRpcRequestContext): Boolean {
+        val scope = context.authorizedAgentIds ?: return true
+        if (method in handlerOwnedConversationScope) return true
+        val namedAgent = AgentScopeGuard.agentIdsOf(params).singleOrNull()
+        return AgentScopeGuard.conversationIdsOf(params).all { conversation ->
+            val owner = when {
+                context.authorizedConversationIds?.contains(conversation) == true -> return@all true
+                conversation == IdFormats.DEFAULT_CONVERSATION_ID -> namedAgent
+                else -> knownOwners[conversation] ?: lookUpOwner(conversation)
+            }
+            if (owner == null) Telemetry.event("AdminRpc", "authz.conversation_owner_unresolved", "method" attr method)
+            owner != null && owner in scope
+        }
+    }
+
+    /** [conversationOwner] within [OWNER_LOOKUP_TIMEOUT_MS]; a failure or timeout answers null (a denial), a hit is kept. */
+    private val lookUpOwner: suspend (String) -> String? = { conversation ->
+        try {
+            withTimeoutOrNull(OWNER_LOOKUP_TIMEOUT_MS.milliseconds) { conversationOwner(ConversationId(conversation)) }?.also { owner ->
+                if (knownOwners.size >= MAX_KNOWN_OWNERS) knownOwners.clear()
+                knownOwners[conversation] = owner
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**

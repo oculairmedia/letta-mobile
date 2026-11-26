@@ -102,7 +102,8 @@ internal class AdminRpcStreamServer(
      * carry NO connection identity. This hook lets the owning [IrohNodeConnection]
      * associate a method call with ITS OWN selfViewer — e.g. register the
      * connection as a conversation viewer when method == "message.list". Invoked
-     * best-effort AFTER preauthorization and BEFORE dispatch, only for an
+     * best-effort AFTER preauthorization and BEFORE dispatch (after a successful
+     * dispatch when only the handler can authorize the call), only for an
      * authenticated admin_rpc frame with a non-null method. It may return a
      * settle callback, invoked once with whether dispatch succeeded. A throwing hook must never
      * break the request — the caller swallows failures.
@@ -381,39 +382,36 @@ internal class AdminRpcStreamServer(
         return dispatchObserved(method, params, invocation)
     }
 
-    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String {
-        val settle = notifyMethodObserved(method, params)
-        val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
-            if (settle != null) {
-                withContext(NonCancellable) {
-                    runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
-                        Telemetry.event(
-                            "IrohNode", "admin_rpc.method_observer.rollback_failed",
-                            "remoteEndpointId" attr remoteEndpointId,
-                            "method" attr method,
-                            "error" attr (rollbackError.message ?: rollbackError.toString()),
-                            level = Telemetry.Level.WARN,
-                        )
+    /**
+     * Dispatches on the owning connection's context, observed through [AdminRpcRouter.dispatchObserving]. The call's
+     * outcome is applied to its observation; a failing rollback is reported, never raised.
+     */
+    private suspend fun dispatchObserved(method: String, params: JsonObject?, invocation: AdminRpcInvocation): String =
+        router.dispatchObserving(
+            invocation,
+            observe = { notifyMethodObserved(method, params) },
+            dispatch = { withContext(connection) { router.dispatch(it) } },
+            settle = { settle, succeeded ->
+                if (settle != null) {
+                    withContext(NonCancellable) {
+                        runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
+                            Telemetry.event(
+                                "IrohNode", "admin_rpc.method_observer.rollback_failed",
+                                "remoteEndpointId" attr remoteEndpointId,
+                                "method" attr method,
+                                "error" attr (rollbackError.message ?: rollbackError.toString()),
+                                level = Telemetry.Level.WARN,
+                            )
+                        }
                     }
                 }
-            }
-        }
-        val response = try {
-            withContext(connection) { router.dispatch(invocation.copy(context = requestContextProvider())) }
-        } catch (cancelled: CancellationException) {
-            settleObservation(false)
-            throw cancelled
-        } catch (error: Exception) {
-            settleObservation(false)
-            throw error
-        }
-        settleObservation(!isAdminRpcFailureEnvelope(response))
-        return response
-    }
+            },
+        )
 
     /**
-     * Let the owning connection observe an authenticated method call
-     * (e.g. subscribe as a viewer on message.list) before dispatch.
+     * Let the owning connection observe a preauthorized method call
+     * (e.g. subscribe as a viewer on message.list), before dispatch or, when
+     * only the handler can authorize the call, after it succeeded.
      * Best-effort: a failing hook must never break the RPC.
      */
     private suspend fun notifyMethodObserved(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {

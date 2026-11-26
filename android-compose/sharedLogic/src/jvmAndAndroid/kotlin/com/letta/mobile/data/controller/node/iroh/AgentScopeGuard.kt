@@ -16,10 +16,9 @@ import kotlinx.serialization.json.contentOrNull
  *  - results: listings (`agent.list`, `conversation.list`, …) drop rows that
  *    belong to out-of-scope agents.
  *
- * Residual (tracked as a follow-up): reads addressed ONLY by a conversation
- * id do not resolve the conversation's owning agent here; scoped peers cannot
- * discover such ids through filtered listings, and conversation-content scope
- *  still applies.
+ * Conversation-addressed requests (any `conversation_id`, top level or under
+ * `runtime`) are resolved to their host-recorded owner by
+ * [AdminRpcRouter.conversationsInScope] before dispatch or viewer observation.
  */
 object AgentScopeGuard {
     const val DENIED = "forbidden: agent not in this device's scope"
@@ -49,6 +48,12 @@ object AgentScopeGuard {
         val ids = agentIdsOf(params)
         return ids.size <= 1 && ids.all { IrohPeerCapabilities.isAgentInScope(scope, it) }
     }
+
+    /** Every conversation a runtime/admin frame names: top level and under `runtime`, in either spelling. */
+    internal fun conversationIdsOf(frame: JsonObject?): Set<String> =
+        listOfNotNull(frame, frame?.get("runtime") as? JsonObject).flatMapTo(mutableSetOf()) { carrier ->
+            listOf("conversation_id", "conversationId").mapNotNull { carrier.stringField(listOf(it)) }
+        }
 
     fun filterResult(scope: Set<String>?, method: String, result: JsonElement): JsonElement {
         if (scope == null) return result
@@ -80,5 +85,5 @@ object AgentScopeGuard {
     }
 
     private fun JsonObject.stringField(keys: List<String>): String? =
-        keys.firstNotNullOfOrNull { key -> (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull }
+        keys.firstNotNullOfOrNull { key -> (this[key] as? JsonPrimitive)?.contentOrNull }
 }

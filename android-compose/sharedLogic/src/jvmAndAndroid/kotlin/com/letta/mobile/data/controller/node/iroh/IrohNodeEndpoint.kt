@@ -35,6 +35,9 @@ import kotlinx.coroutines.withTimeout
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 class IrohNodeEndpoint(
     binding: IrohEndpointBinding = IrohEndpointBinding(),
@@ -133,7 +136,11 @@ class IrohNodeEndpoint(
      * every conversation (see [ViewerHandle.receivesConversationEvents]), on its stream channel.
      */
     fun conversationChangeTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
-        val result = connectionRegistry.broadcast(frame) { it.receivesConversationEvents() }
+        // letta-mobile-wisqe.2: the frame names a conversation and its agent; agent-scoped peers get only their agents'.
+        val owner = runCatching {
+            (Json.parseToJsonElement(frame) as? JsonObject)?.get("agent_id")?.let { it as? JsonPrimitive }?.content
+        }.getOrNull()?.let(::AgentId)
+        val result = connectionRegistry.broadcast(frame) { it.receivesConversationUpdateOf(owner) }
         Telemetry.event(
             "IrohNode",
             "conversation_updated.broadcast",

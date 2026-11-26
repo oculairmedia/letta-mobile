@@ -255,6 +255,10 @@ object IrohPeerCapabilities {
      * lesser peers are bounded to the conversation they are actively viewing
      * (empty set when none) — cross-conversation content access is rejected
      * at the handler with no proxy side effects.
+     *
+     * Null is unrestricted only in conversation CONTENT: for an agent-scoped peer every conversation a request names
+     * must still be owned by an agent in its scope, which [AdminRpcRouter.preauthorize] resolves from the host's own
+     * records before any handler or viewer change.
      */
     fun conversationScope(capabilities: Set<String>, viewedConversationId: String?): Set<String>? =
         if (ADMIN_FULL in capabilities || CONVERSATION_MANAGE in capabilities) {

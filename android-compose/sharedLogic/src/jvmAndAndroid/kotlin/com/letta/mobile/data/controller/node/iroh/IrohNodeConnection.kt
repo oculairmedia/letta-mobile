@@ -376,15 +376,21 @@ class IrohNodeConnection(
     }
 
     /**
-     * A runtime frame (runtime_start, input, sync, abort, queue
-     * controls) naming an agent outside the peer's scope is denied before any
-     * upstream side effect. Returns the denial frame, or null to proceed.
+     * A runtime frame (runtime_start, input, sync, abort, queue controls) of an agent-scoped peer is denied before
+     * any upstream side effect or viewer registration when it names an agent outside the peer's scope, or a
+     * conversation owned outside it (or whose owner the host cannot resolve) even when the agent it names is in
+     * scope. Returns the denial frame, or null to proceed.
      */
-    private fun agentScopeViolation(frame: JsonObject): String? {
+    private suspend fun scopeViolation(frame: JsonObject): String? {
         val type = frame["type"]?.jsonPrimitive?.contentOrNull
         if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
-        if (AgentScopeGuard.allowsParams(sessionAuth.agentScope(), frame)) return null
-        Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" attr remoteEndpointId, "type" attr type)
+        val denial = when {
+            !AgentScopeGuard.allowsParams(sessionAuth.agentScope(), frame) -> "authz.agent_scope_denied"
+            !adminRpcRouter.conversationsInScope(type.orEmpty(), frame, currentAdminRpcRequestContext()) ->
+                "authz.conversation_owner_denied"
+            else -> return null
+        }
+        Telemetry.event("IrohNode", denial, "remoteEndpointId" attr remoteEndpointId, "type" attr type)
         val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
         return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
     }
@@ -415,22 +421,16 @@ class IrohNodeConnection(
             params = params,
             context = currentAdminRpcRequestContext(),
         )
-        // Authorize before the observer can add this connection as a viewer.
-        // Dispatch still receives a fresh context after observation so a successful
-        // message.list keeps its established conversation-scope behaviour.
+        // The whole pre-handler authorization (capability above; agent scope and the owning agent of every named
+        // conversation here) runs before any viewer change, and the handler runs on that same pre-observation
+        // context, so becoming a conversation's viewer never grants access to it.
         adminRpcRouter.preauthorize(invocation)?.let { return it }
-        val settle = observeAdminMethod(method, params)
-        val response = try {
-            adminRpcRouter.dispatch(invocation.copy(context = currentAdminRpcRequestContext()))
-        } catch (cancelled: CancellationException) {
-            settleObservedAdminMethod(settle, succeeded = false)
-            throw cancelled
-        } catch (error: Exception) {
-            settleObservedAdminMethod(settle, succeeded = false)
-            throw error
-        }
-        settleObservedAdminMethod(settle, succeeded = !isAdminRpcFailureEnvelope(response))
-        return response
+        return adminRpcRouter.dispatchObserving(
+            invocation,
+            observe = { observeAdminMethod(method, params) },
+            dispatch = adminRpcRouter::dispatch,
+            settle = { settle, succeeded -> settleObservedAdminMethod(settle, succeeded = succeeded) },
+        )
     }
 
     /**
@@ -583,7 +583,7 @@ class IrohNodeConnection(
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
             recordControlFrame("remoteEndpointId" attr remoteEndpointId, obj)
-            agentScopeViolation(obj)?.let { return it }
+            scopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
                 "runtime_start" -> ifAuthorized(requestId) {
