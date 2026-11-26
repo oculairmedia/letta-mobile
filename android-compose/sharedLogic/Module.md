@@ -218,6 +218,7 @@ Retention remains unchanged: registry aliases are capped at 64, settled OTIDs at
 # Package com.letta.mobile.data.chat.sentruns
 
 Which run each message this client sent started, by identity only. The send pipeline's turn state publishes an entry when the send's echo pairs its otid with a run, adds every later id of the same turn (a durable id promoting a provisional one), and ends the entry when the turn completes, fails, is stopped or is replaced. An echo that arrives only after its turn settled is still paired, as an ended run, when that run is among the recently settled ones. Entries are bounded; one whose run is in flight is never dropped. [IdentifiedChatSend](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html) is what a chat owner offers when it can name the message a send enqueued; the shared send coordinator offers one as `identifiedSend`, returning the otid read under the same lock hold that enqueued the message.
+
 # Package com.letta.mobile.data.chat.tools
 
 The tool presenter plugin contract: how a tool call reads as a timeline step on every host. A presenter claims calls by tool name (exact or globbed) and argument shape, and gives a cheap step line (verb, target, preview targets, failure) and an inset built only when the step opens. Shell tools hand each command they run to a second-level command presenter registry keyed on the program and its subcommands. Bundled presenters and the ones a plugin's manifest contributes register through the same calls; keep painting in `sharedUI`; register through [ToolPresenterRegistry](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter-registry/index.html) and implement [ToolPresenter](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter/index.html) or [CommandPresenter](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.chat.tools/-command-presenter/index.html).
@@ -484,6 +485,10 @@ The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarr
 
 Per-OS bindings of a node's ports on JVM hosts: App Server process identity that survives PID reuse, the local tools endpoint's transport, and how `agent_message_send` is sent (a `meridian` subprocess on Linux, in-process on Windows). Hosts pick one set by OS and compose through [NodeHostBindings](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.node.host/-node-host-bindings/index.html), never naming a platform's implementation.
 
+# Package com.letta.mobile.data.node.carrier.iroh
+
+The Iroh node carrier. `IrohNodeCarrier` dials a node over QUIC with the stream layout and frame codec nodes already serve (first bi-stream control, second push, every later one an admin_rpc call lane; `frame_part` chunking stays inside the carrier), and `serveIrohNodePeer` serves one accepted Iroh connection to a `NodePeerAcceptor` as the node end of the link. Application close codes and reasons cross unchanged; a connection lost without one is `LOST`.
+
 # Package com.letta.mobile.data.pairing
 
 Pair-invite parsing, flow state, device access and paired-host storage ports. Scanned data moves through explicit invite/session states before becoming a stored connection. Keep scanners, QR drawing and platform storage outside pairing state; provide effects through [PairingRedeemer](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-pairing-redeemer/index.html), [PairedHostStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-paired-host-store/index.html), [QrEncoder](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) and [BackendConfigSink](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-backend-config-sink/index.html).
@@ -727,6 +732,7 @@ Canonical pending prompts retain their send-time position in paged history. Reco
 # Package com.letta.mobile.data.timeline.session
 
 Adapters that expose the canonical paged timeline presentation through the shared `TimelineChatSession` contract without introducing a second timeline writer or duplicating projection logic.
+
 # Package com.letta.mobile.data.timeline.api
 
 The narrow external-transport timeline writer contract and internal outbound stream lifecycle/scoped-persistence dependency contracts. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. `TimelineExternalTransportWriter` inherits `TimelinePendingRetryTarget.queuedRetries`, the outbox's queued retries that the agent's send coordinator subscribes to and dispatches, so a retry queued before any sender subscribes still goes out; `TimelinePendingRetryBinding` merges the queued retries of every conversation writer a captured writer resolves, including ones resolved after subscription. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).

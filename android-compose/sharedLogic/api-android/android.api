@@ -38318,6 +38318,21 @@ public final class com/letta/mobile/data/node/carrier/NodeSession$Companion {
 	public static synthetic fun open$default (Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier : com/letta/mobile/data/node/carrier/NodeCarrier {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier$Companion;
+	public synthetic fun <init> (Lcomputer/iroh/Endpoint;Lkotlinx/coroutines/CoroutineScope;[BJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcomputer/iroh/Endpoint;Lkotlinx/coroutines/CoroutineScope;[BJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun dial-VM31NQ8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier$Companion {
+	public final fun getDEFAULT_CONNECT_TIMEOUT-UwyO8pc ()J
+}
+
+public final class com/letta/mobile/data/node/carrier/iroh/IrohNodePeerLinkKt {
+	public static final fun serveIrohNodePeer (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/notify/ApprovalAttentionMonitor {
 	public fun <init> (Lcom/letta/mobile/data/notify/AttentionGate;)V
 	public final fun watch (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
