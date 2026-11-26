@@ -74,7 +74,7 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
 
 1. **Stage the merged runtime-patch loader first** ([appserver-runtime-patches.md](appserver-runtime-patches.md))
    and confirm `lcp-patches applied=<N> skipped=0` on the old bundle. `<N>` is the loader's patch count
-   (40 for the 0.34.70 loader); `survey` prints it as the repo loader's `applied=`.
+   (41 for the 0.34.70 loader); `survey` prints it as the repo loader's `applied=`.
 2. **Install side by side** (this leaves the shell in the install directory; the commands below use absolute paths):
    `mkdir -p /root/letta-code-<new> && cd $_ && npm install --no-audit --no-fund @letta-ai/letta-code@<new>`.
 3. **Service Node, if the engines floor needs it**: the official tarball, verified against `SHASUMS256.txt`, into `/opt/meridian/node/v<ver>/`.
@@ -89,12 +89,12 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    ```bash
    install -m 0755 <checkout>/scripts/deploy/letta-code-host-cutover.sh /usr/local/sbin/
    systemd-run --unit=letta-code-cutover --collect --no-block \
-     env EXPECTED_PATCHES=40 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
+     env EXPECTED_PATCHES=41 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
    `EXPECTED_PATCHES` has no default and the script refuses to start (exit 64, before changing anything)
    unless it is a positive integer: use the `applied=N` of the REPO loader line the pre-flight `survey` printed (the host
-   loader line must show the same number; 40 for the 0.34.70 loader). Every node that shares agent state must run the
-   40-patch loader (with `lcp-system-prompt-tracking`) before replicated prompt tracking is relied on: a node
+   loader line must show the same number; 41 for the 0.34.70 loader). Every node that shares agent state must run a
+   loader with `lcp-system-prompt-tracking` (40 patches or more) before replicated prompt tracking is relied on: a node
    without it drops `system_prompt_tracking` from an agent record the next time it saves that agent.
    It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
    `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts once, and requires a new
