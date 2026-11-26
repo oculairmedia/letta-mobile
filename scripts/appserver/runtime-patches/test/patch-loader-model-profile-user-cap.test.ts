@@ -88,7 +88,7 @@ const PRELUDE = `
   };
 `;
 
-function runChild(t: { after: (fn: () => void) => void }, workDir: string, binding: Record<string, unknown>, body: string, extraEnv: Record<string, string> = {}) {
+function runChild(workDir: string, binding: Record<string, unknown>, body: string, extraEnv: Record<string, string> = {}) {
   const bundle = resolveDeployedLettaBundle();
   assert.ok(bundle, "caller must skip when no deployed bundle exists");
   const env: Record<string, string> = {};
@@ -174,7 +174,7 @@ function readConversationRecord(workDir: string, conversationId: string): Record
 test("profile user cap: a 32k cap on a profile-bound conversation reaches the turn (binding without an override)", (t) => {
   if (!deployedBundleOrSkip(t)) return;
   const workDir = workDirFor(t);
-  const out = runChild(t, workDir, PLAIN_BINDING, `
+  const out = runChild(workDir, PLAIN_BINDING, `
     ${SEED("profile/main")}
     out.before = await turn(agent.id, conversation.id);
     await setCap(agent.id, conversation.id, "32000");
@@ -196,11 +196,11 @@ test("profile user cap: the smallest of the user's cap, the binding override and
     out.capped = await turn(agent.id, conversation.id);
     out.smallModel = await turn(agent.id, conversation.id, 20000);
   `;
-  const below = runChild(t, workDirFor(t), bindingWithOverride(16000), body);
+  const below = runChild(workDirFor(t), bindingWithOverride(16000), body);
   assert.equal(below.uncapped.contextWindow, 16000, "no user cap: the binding override, as today");
   assert.equal(below.capped.contextWindow, 16000, "a binding override below the user's cap wins");
 
-  const above = runChild(t, workDirFor(t), bindingWithOverride(64000), body);
+  const above = runChild(workDirFor(t), bindingWithOverride(64000), body);
   assert.equal(above.uncapped.contextWindow, 64000, "no user cap: the binding override, as today");
   assert.equal(above.capped.contextWindow, 32000, "the user's cap below the binding override wins");
   assert.equal(above.smallModel.contextWindow, 20000, "the bound model's own window below both wins");
@@ -209,7 +209,7 @@ test("profile user cap: the smallest of the user's cap, the binding override and
 test("profile user cap: the field survives a reload from disk for a named and the default conversation, and a reset removes it", (t) => {
   if (!deployedBundleOrSkip(t)) return;
   const workDir = workDirFor(t);
-  const first = runChild(t, workDir, PLAIN_BINDING, `
+  const first = runChild(workDir, PLAIN_BINDING, `
     ${SEED("profile/main")}
     await setCap(agent.id, conversation.id, "32000");
     await setCap(agent.id, "default", "40000");
@@ -222,7 +222,7 @@ test("profile user cap: the field survives a reload from disk for a named and th
   assert.equal(agentRecord.model_settings.context_window_limit, 40000, "and the stock field is written as before");
 
   // A fresh process (another node with a plain copy of the store): load, save unrelated changes, read back.
-  const second = runChild(t, workDir, PLAIN_BINDING, `
+  const second = runChild(workDir, PLAIN_BINDING, `
     store.updateAgent(process.env.LCP_AGENT_ID, { name: "renamed" });
     store.updateConversation(process.env.LCP_CONVERSATION_ID, { summary: "renamed" });
     out.named = await turn(process.env.LCP_AGENT_ID, process.env.LCP_CONVERSATION_ID);
@@ -234,7 +234,7 @@ test("profile user cap: the field survives a reload from disk for a named and th
   assert.equal(second.default.contextWindow, 40000, "the default conversation's cap applies on the other node");
 
   // Reset (`/context-limit` with no value) goes back to the catalog default and removes the field.
-  const third = runChild(t, workDir, PLAIN_BINDING, `
+  const third = runChild(workDir, PLAIN_BINDING, `
     b.models2.push({ id: "profile-main", handle: "profile/main", label: "Main", description: "", updateArgs: { context_window: 200000 } });
     await setCap(process.env.LCP_AGENT_ID, process.env.LCP_CONVERSATION_ID, "");
     await setCap(process.env.LCP_AGENT_ID, "default", "");
@@ -250,7 +250,7 @@ test("profile user cap: the field survives a reload from disk for a named and th
 test("profile user cap: a model switch that replaces the stored cap drops the user's cap, one that keeps it keeps it", (t) => {
   if (!deployedBundleOrSkip(t)) return;
   const workDir = workDirFor(t);
-  const out = runChild(t, workDir, PLAIN_BINDING, `
+  const out = runChild(workDir, PLAIN_BINDING, `
     ${SEED("profile/main")}
     await setCap(agent.id, conversation.id, "32000");
     store.updateConversation(conversation.id, { model: "profile/main", context_window_limit: 32000 });
@@ -269,7 +269,7 @@ test("profile user cap: a model switch that replaces the stored cap drops the us
 test("profile user cap: a cap a peer without this patch overwrote is ignored", (t) => {
   if (!deployedBundleOrSkip(t)) return;
   const workDir = workDirFor(t);
-  const first = runChild(t, workDir, PLAIN_BINDING, `
+  const first = runChild(workDir, PLAIN_BINDING, `
     ${SEED("profile/main")}
     await setCap(agent.id, conversation.id, "32000");
   `);
@@ -281,7 +281,7 @@ test("profile user cap: a cap a peer without this patch overwrote is ignored", (
     if (record.id === first.conversationId) writeFileSync(file, JSON.stringify({ ...record, context_window_limit: 200000 }, null, 2) + "\n");
   }
   assert.equal(readConversationRecord(workDir, first.conversationId)[FIELD], 32000, "the stale field is still on disk");
-  const out = runChild(t, workDir, PLAIN_BINDING, `
+  const out = runChild(workDir, PLAIN_BINDING, `
     out.turn = await turn(process.env.LCP_AGENT_ID, process.env.LCP_CONVERSATION_ID);
   `, { LCP_AGENT_ID: first.agentId, LCP_CONVERSATION_ID: first.conversationId });
   assert.equal(out.turn.contextWindow, 128000, "the stale cap does not apply: the bound model's window does");
@@ -290,7 +290,7 @@ test("profile user cap: a cap a peer without this patch overwrote is ignored", (
 test("profile user cap: a non-profile conversation's turn settings are unchanged", (t) => {
   if (!deployedBundleOrSkip(t)) return;
   const workDir = workDirFor(t);
-  const out = runChild(t, workDir, PLAIN_BINDING, `
+  const out = runChild(workDir, PLAIN_BINDING, `
     ${SEED("lmstudio/plain")}
     await setCap(agent.id, conversation.id, "32000");
     out.turn = await turn(agent.id, conversation.id);
