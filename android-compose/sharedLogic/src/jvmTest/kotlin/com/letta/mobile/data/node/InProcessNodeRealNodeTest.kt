@@ -126,7 +126,10 @@ class InProcessNodeRealNodeTest {
     fun auth() = scenario {
         val session = open()
         assertEquals(NODE, session.node, "the shell sees the node's own identity")
-        assertTrue(session.capabilities.supports("frame_part") && session.capabilities.supports("conversation_feed_v1"), "${session.capabilities}")
+        assertTrue(
+            session.capabilities.supports("frame_part") && session.capabilities.supports("conversation_feed_v1"),
+            "${session.capabilities}",
+        )
         assertEquals(false, session.capabilities.paired, "the local shell is admitted by construction, not paired")
 
         // A peer the carrier reports as someone else meets the node's own policy: unpaired, no token, refused.
