@@ -12,11 +12,14 @@ import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.deco
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.delta
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.envelope
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.frame
-import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.serverLoopStatus
+import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.loopStatus
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.serverStartedTurn
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.stop
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.turnFinished
 import com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.RunId
+import com.letta.mobile.data.runtime.LoopPhase
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.coroutines.CompletableDeferred
@@ -90,7 +93,7 @@ class ServerStartedTurnFeedTest {
     fun aTurnTheServerStartsAfterTheClientTurnClosedReachesTheFeedAndTheViewers() = runTest {
         val viewer = ServerStartedTurnViewer("phone")
         val node = startedTurnNode { setOf(viewer) }
-        finishedClientTurn(node, listOf(assistant("Still running: task_42.", run = "local-run-1206")))
+        finishedClientTurn(node, listOf(assistant("Still running: task_42.", run = RunId("local-run-1206"))))
         viewer.frames.clear()
 
         serverStartedTurn().forEach { node.frames.emit(it) }
@@ -242,12 +245,12 @@ class ServerStartedTurnFeedTest {
         val call = frame(
             delta(
                 mapOf(
-                    "message_type" to "tool_call_message", "run_id" to RUN, "type" to "message",
+                    "message_type" to "tool_call_message", "run_id" to RUN.value, "type" to "message",
                     "id" to "tool-call-toolu_long",
                 ),
             ),
         )
-        listOf(serverStartedTurn()[0], decode(call), decode(serverLoopStatus(RUN, "EXECUTING_CLIENT_SIDE_TOOL"))).forEach {
+        listOf(serverStartedTurn()[0], decode(call), decode(loopStatus(LoopPhase.ExecutingClientTool, listOf(RUN)))).forEach {
             node.frames.emit(it)
         }
         runCurrent()
@@ -255,7 +258,9 @@ class ServerStartedTurnFeedTest {
         advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
         runCurrent()
         val result = frame(
-            delta(mapOf("message_type" to "tool_return_message", "run_id" to RUN, "type" to "message", "tool_call_id" to "toolu_long")),
+            delta(
+                mapOf("message_type" to "tool_return_message", "run_id" to RUN.value, "type" to "message", "tool_call_id" to "toolu_long"),
+            ),
         )
         listOf(decode(result), decode(stop(RUN)), turnFinished()).forEach { node.frames.emit(it) }
         runCurrent()
@@ -298,7 +303,7 @@ class ServerStartedTurnFeedTest {
 
         val client = clientTurn(node) { setOf(viewer) }
         runCurrent()
-        node.frames.emit(decode(loopStatus(CLIENT_RUN, CLIENT_TURN)))
+        node.frames.emit(decode(clientBoundLoopStatus(CLIENT_RUN, CLIENT_TURN)))
         runCurrent()
         clientRun().forEach { node.sendToBoth(client, it) }
         runCurrent()
@@ -376,7 +381,7 @@ class ServerStartedTurnFeedTest {
         val node = startedTurnNode { setOf(viewer) }
         val captured = resourceLines("/appserver/server-started-turn-deltas.jsonl")
 
-        captured.forEach { node.frames.emit(decode(frame(it))) }
+        captured.forEach { node.frames.emit(decode(frame(Json.parseToJsonElement(it)))) }
         node.frames.emit(turnFinished())
         runCurrent()
 
@@ -422,8 +427,8 @@ class ServerStartedTurnFeedTest {
     @Test
     fun eachFrameIsClaimedByExactlyOneSideInEitherOrder() = runTest {
         val node = startedTurnNode { emptySet() }
-        val run = com.letta.mobile.data.model.RunId(RUN)
-        val clientRun = com.letta.mobile.data.model.RunId(CLIENT_RUN)
+        val run = RUN
+        val clientRun = CLIENT_RUN
 
         val serverFirst = listOf(node.host.claimFrame("k1", run, server = true), node.host.claimFrame("k1", run, server = false))
         val clientFirst = listOf(node.host.claimFrame("k2", run, server = false), node.host.claimFrame("k2", run, server = true))
@@ -443,7 +448,7 @@ class ServerStartedTurnFeedTest {
     @Test
     fun concurrentClaimsNeverLoseOrDuplicateAFrame() {
         val host = NodeTurnHost(CoroutineScope(SupervisorJob()), FeedJournalStore())
-        val run = com.letta.mobile.data.model.RunId(RUN)
+        val run = RUN
         val keys = (1..500).map { "frame-$it" }
         val wins = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>()
         val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
@@ -492,7 +497,7 @@ class ServerStartedTurnFeedTest {
     private companion object {
         const val CHILD = "agent-local-2cf9d01d-2328-4145-9779-7127351c2961"
         const val CLIENT_TURN = "e39d7e74-e18c-406f-8045-c15ec1ef31ff"
-        const val CLIENT_RUN = "local-run-1208"
+        val CLIENT_RUN = RunId("local-run-1208")
         val SERVER_KINDS = listOf("user_message", "assistant_message", "usage_statistics", "stop_reason")
         val FULL_TURN = listOf("turn_open", "stream_delta", "stream_delta", "stream_delta", "stream_delta", "turn_closed")
 
@@ -506,14 +511,14 @@ class ServerStartedTurnFeedTest {
             runtimeId = com.letta.mobile.runtime.RuntimeId("iroh-node:${AGENT.value}:${CONVERSATION.value}"),
             agentId = AGENT,
             conversationId = com.letta.mobile.runtime.ConversationId(CONVERSATION.value),
-            runId = com.letta.mobile.runtime.RunId(CLIENT_RUN),
+            runId = com.letta.mobile.runtime.RunId(CLIENT_RUN.value),
             source = com.letta.mobile.runtime.RuntimeEventSource.LocalRuntime,
             payload = payload,
         )
 
-        fun loopStatus(run: String, clientMessageId: String): String = envelope("update_loop_status") {
-            val status = """{"status":"PROCESSING_API_RESPONSE","active_run_ids":["$run"],""" +
-                """"client_message_ids_by_run_id":{"$run":["$clientMessageId"]}}"""
+        fun clientBoundLoopStatus(run: RunId, clientMessageId: String): String = envelope(EnvelopeType.LoopStatus) {
+            val status = """{"status":"PROCESSING_API_RESPONSE","active_run_ids":["${run.value}"],""" +
+                """"client_message_ids_by_run_id":{"${run.value}":["$clientMessageId"]}}"""
             put("loop_status", Json.parseToJsonElement(status))
         }
 
@@ -531,6 +536,6 @@ class ServerStartedTurnFeedTest {
             ),
         )
 
-        fun childStop() = decode(stop("local-run-86", reason = "requires_approval", session = CHILD))
+        fun childStop() = decode(stop(RunId("local-run-86"), ServerStopReason.RequiresApproval, session = AgentId(CHILD)))
     }
 }

@@ -1,21 +1,26 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.AGENT
+import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.FUTURE_STATUS
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.RUN
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.SILENCE_CHECK_SLACK_MS
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.assistant
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.childSubagentDelta
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.decode
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.delta
-import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.envelope
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.frame
-import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.serverLoopStatus
+import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.futureLoopStatus
+import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.idleLoopStatus
+import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.loopStatus
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.serverStartedTurn
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.stop
 import com.letta.mobile.data.controller.node.iroh.ServerStartedTurnFixtures.turnFinished
+import com.letta.mobile.data.model.RunId
+import com.letta.mobile.data.runtime.LoopPhase
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -35,8 +40,8 @@ class ServerStartedTurnIdleBoundTest {
     /** A turn running a client-side tool: its prompt, the tool call, and the server's EXECUTING_CLIENT_SIDE_TOOL. */
     private fun busyTurn(): List<AppServerReceivedFrame> = listOf(
         serverStartedTurn()[0],
-        decode(frame(delta(mapOf("message_type" to "tool_call_message", "run_id" to RUN, "id" to "tool-call-toolu_lost")))),
-        decode(serverLoopStatus(RUN, "EXECUTING_CLIENT_SIDE_TOOL")),
+        decode(frame(delta(mapOf("message_type" to "tool_call_message", "run_id" to RUN.value, "id" to "tool-call-toolu_lost")))),
+        decode(loopStatus(LoopPhase.ExecutingClientTool, listOf(RUN))),
     )
 
     /**
@@ -102,7 +107,7 @@ class ServerStartedTurnIdleBoundTest {
     fun anIdleLoopStatusRightBeforeTurnFinishedStillEndsTheTurnAsTrulyEnded() = runTest {
         val node = startedTurnNode { emptySet() }
         busyTurn().forEach { node.frames.emit(it) }
-        node.frames.emit(decode(serverLoopStatus(RUN, "PROCESSING_API_RESPONSE")))
+        node.frames.emit(decode(loopStatus(LoopPhase.ProcessingResponse, listOf(RUN))))
         node.frames.emit(decode(idleLoopStatus()))
         node.frames.emit(turnFinished())
         advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
@@ -127,7 +132,8 @@ class ServerStartedTurnIdleBoundTest {
         runCurrent()
 
         advanceTimeBy(SERVER_TURN_SILENCE_MS / 2)
-        listOf(decode(toolReturn()), decode(stop(RUN, reason = "cancelled")), turnFinished()).forEach { node.frames.emit(it) }
+        listOf(decode(toolReturn()), decode(stop(RUN, reason = ServerStopReason.Cancelled)), turnFinished())
+            .forEach { node.frames.emit(it) }
         runCurrent()
 
         val journal = journalEntries(node.journal)
@@ -144,7 +150,7 @@ class ServerStartedTurnIdleBoundTest {
     fun anIdleBetweenApprovalRoundsDoesNotEndTheTurn() = runTest {
         val node = startedTurnNode { emptySet() }
         busyTurn().forEach { node.frames.emit(it) }
-        node.frames.emit(decode(stop(RUN, reason = "requires_approval")))
+        node.frames.emit(decode(stop(RUN, reason = ServerStopReason.RequiresApproval)))
         node.frames.emit(decode(idleLoopStatus()))
         node.frames.emit(decode(assistant("Approved; continuing.", run = NEXT_RUN)))
         node.frames.emit(decode(stop(NEXT_RUN)))
@@ -163,15 +169,7 @@ class ServerStartedTurnIdleBoundTest {
      */
     @Test
     fun aRunlessButBusyLoopStatusDoesNotArmTheIdleClose() = runTest {
-        val node = startedTurnNode { emptySet() }
-        busyTurn().forEach { node.frames.emit(it) }
-        node.frames.emit(decode(runlessLoopStatus("PROCESSING_API_RESPONSE")))
-        node.frames.emit(decode(assistant("Still the same turn.", run = NEXT_RUN)))
-        runCurrent()
-
-        val kinds = journalEntries(node.journal).map { it.kind }
-        assertEquals(1, kinds.count { it == "turn_open" }, "$kinds")
-        assertTrue("turn_closed" !in kinds, "$kinds")
+        assertForeignRunKeepsTheBusyTurn(decode(loopStatus(LoopPhase.ProcessingResponse, emptyList())))
     }
 
     /**
@@ -180,15 +178,7 @@ class ServerStartedTurnIdleBoundTest {
      */
     @Test
     fun aWaitingOnInputStatusThatStillNamesAnActiveRunDoesNotArmTheIdleClose() = runTest {
-        val node = startedTurnNode { emptySet() }
-        busyTurn().forEach { node.frames.emit(it) }
-        node.frames.emit(decode(serverLoopStatus(RUN, "WAITING_ON_INPUT")))
-        node.frames.emit(decode(assistant("Still the same turn.", run = NEXT_RUN)))
-        runCurrent()
-
-        val kinds = journalEntries(node.journal).map { it.kind }
-        assertEquals(1, kinds.count { it == "turn_open" }, "$kinds")
-        assertTrue("turn_closed" !in kinds, "$kinds")
+        assertForeignRunKeepsTheBusyTurn(decode(loopStatus(LoopPhase.WaitingOnInput, listOf(RUN))))
     }
 
     /**
@@ -221,7 +211,7 @@ class ServerStartedTurnIdleBoundTest {
     fun anApprovalWaitKeepsABusyTurnOpenThroughSilence() = runTest {
         val node = startedTurnNode { emptySet() }
         busyTurn().forEach { node.frames.emit(it) }
-        node.frames.emit(decode(serverLoopStatus(RUN, "WAITING_ON_APPROVAL")))
+        node.frames.emit(decode(loopStatus(LoopPhase.WaitingOnApproval, listOf(RUN))))
         runCurrent()
 
         advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
@@ -259,8 +249,8 @@ class ServerStartedTurnIdleBoundTest {
         com.letta.mobile.util.Telemetry.installRecorder(recorder).use {
             val node = startedTurnNode { emptySet() }
             busyTurn().forEach { node.frames.emit(it) }
-            node.frames.emit(decode(serverLoopStatus(RUN, FUTURE_STATUS)))
-            node.frames.emit(decode(serverLoopStatus(RUN, FUTURE_STATUS)))
+            node.frames.emit(decode(futureLoopStatus(RUN)))
+            node.frames.emit(decode(futureLoopStatus(RUN)))
             runCurrent()
 
             advanceTimeBy(SERVER_TURN_SILENCE_MS + SILENCE_CHECK_SLACK_MS)
@@ -280,40 +270,42 @@ class ServerStartedTurnIdleBoundTest {
         }
     }
 
+    /** After [statusFrame] a delta of [NEXT_RUN] arrives on the busy turn: it stays the one open turn. */
+    private suspend fun TestScope.assertForeignRunKeepsTheBusyTurn(statusFrame: AppServerReceivedFrame) {
+        val node = startedTurnNode { emptySet() }
+        busyTurn().forEach { node.frames.emit(it) }
+        node.frames.emit(statusFrame)
+        node.frames.emit(decode(assistant("Still the same turn.", run = NEXT_RUN)))
+        runCurrent()
+
+        val kinds = journalEntries(node.journal).map { it.kind }
+        assertEquals(1, kinds.count { it == "turn_open" }, "$kinds")
+        assertTrue("turn_closed" !in kinds, "$kinds")
+    }
+
     private fun assertStillOpen(node: ServerStartedTurnNode) {
         val kinds = journalEntries(node.journal).map { it.kind }
         assertTrue("turn_closed" !in kinds, "silence alone keeps a busy turn: $kinds")
     }
 
     private companion object {
-        const val NEXT_RUN = "local-run-1209"
-
-        /** A loop status no App Server sent yet. */
-        const val FUTURE_STATUS = "SOME_FUTURE_STATUS"
-
-        /** What the App Server says when no turn runs on the runtime: waiting for input, no active run. */
-        fun idleLoopStatus(): String = envelope("update_loop_status") {
-            put("loop_status", Json.parseToJsonElement("""{"status":"WAITING_ON_INPUT","active_run_ids":[]}"""))
-        }
-
-        /** A loop status [status] that names no active run. */
-        fun runlessLoopStatus(status: String): String = envelope("update_loop_status") {
-            put("loop_status", Json.parseToJsonElement("""{"status":"$status","active_run_ids":[]}"""))
-        }
+        val NEXT_RUN = RunId("local-run-1209")
 
         /** A loop status of another conversation of the same agent. */
         fun otherRuntimeLoopStatus(): String {
             val other = Json.parseToJsonElement(idleLoopStatus()).jsonObject.toMutableMap()
             other["runtime"] = AppServerProtocol.json.encodeToJsonElement(
-                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope.serializer(),
-                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(AGENT.value, "local-conv-other"),
+                AppServerRuntimeScope.serializer(),
+                AppServerRuntimeScope(AGENT.value, "local-conv-other"),
             )
             return JsonObject(other).toString()
         }
 
         /** The result of the busy turn's tool, on its run. */
         fun toolReturn(): String = frame(
-            delta(mapOf("message_type" to "tool_return_message", "run_id" to RUN, "type" to "message", "tool_call_id" to "toolu_lost")),
+            delta(
+                mapOf("message_type" to "tool_return_message", "run_id" to RUN.value, "type" to "message", "tool_call_id" to "toolu_lost"),
+            ),
         )
     }
 }
