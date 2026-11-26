@@ -98,13 +98,21 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
     /**
      * Reads frames from [recv] into [sink] until the stream ends or the link does. A read error is the connection
      * going away (the close watcher reports why) or a framing violation, which ends the link as [NodeLinkClosure.LOST].
-     * [closeAtEnd] closes [sink] when the stream ends, for a call lane; the control and push lanes close with the link.
+     * A frame that is not a JSON object ends the link as [MALFORMED_FRAME]: it may have carried a request id, and a
+     * dropped request would leave its caller waiting for ever. A full [sink] suspends the read, so the other end is
+     * held by QUIC flow control. [closeAtEnd] closes [sink] when the stream ends, for a call lane; the control and push
+     * lanes close with the link.
      */
     fun read(recv: RecvStream, sink: SendChannel<NodeFrame>, maxReassembledBytes: () -> Int, closeAtEnd: Boolean) {
         scope.launch {
             try {
                 IrohFrameCodec.readAll(recv, MAX_FRAME_BYTES, maxReassembledBytesProvider = maxReassembledBytes) { text ->
-                    decode(text)?.let { sink.send(it) }
+                    val frame = decode(text)
+                    if (frame == null) {
+                        close(MALFORMED_FRAME)
+                        return@readAll
+                    }
+                    sink.send(frame)
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -126,12 +134,18 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
     companion object {
         /** The largest plain Iroh frame, and the largest one `frame_part` piece. */
         const val MAX_FRAME_BYTES: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
+
+        /** Frames read ahead of the node on one lane, and call lanes accepted ahead of it, before the read waits. */
+        const val LANE_BUFFER: Int = 8
+
+        /** The closure for a frame that is not a JSON object. */
+        val MALFORMED_FRAME: NodeLinkClosure = NodeLinkClosure(4400L, "malformed_frame")
     }
 }
 
 /**
- * One call lane over one QUIC bi-stream, from either end. Its reader starts at once, so the other end's frames are
- * buffered until [incoming] is collected; [incoming] completes when the other end finishes sending or the link ends.
+ * One call lane over one QUIC bi-stream, from either end. Its reader starts at once and buffers up to
+ * [IrohLinkCore.LANE_BUFFER] of the other end's frames until [incoming] is collected, then waits; [incoming] completes when the other end finishes sending or the link ends.
  */
 internal class IrohCallLane(
     private val core: IrohLinkCore,
@@ -139,7 +153,7 @@ internal class IrohCallLane(
     private val frameParts: () -> Boolean,
     maxReassembledBytes: () -> Int,
 ) : NodeCallLane {
-    private val received = Channel<NodeFrame>(Channel.UNLIMITED)
+    private val received = Channel<NodeFrame>(IrohLinkCore.LANE_BUFFER)
     private val send: SendStream = stream.send()
     private val writeLock = Mutex()
 
