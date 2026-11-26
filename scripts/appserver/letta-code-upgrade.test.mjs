@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 
 import {
   SITES_FILE, bumpPinFile, dependencyDiff, dryRunLoader, embeddedPatchOrder, readPin, readSites,
-  hostLoaderRequest, replaceGroup, rewriteSites, skippedPatchNames, surveyProblems, unionDiff,
+  hostLoaderRequest, replaceGroup, rewriteSites, skippedPatchNames, surveyProblems, surveyVerdict, unionDiff,
 } from "./letta-code-upgrade.mjs";
 import { repositoryRoot } from "./verify-contract-baseline.mjs";
 
@@ -172,4 +172,13 @@ test("hostLoaderRequest is explicit only when --host-loader names a directory", 
   assert.deepEqual(hostLoaderRequest(["survey", "0.34.70", "--host-loader", "/x/y"]), { dir: "/x/y", explicit: true });
   assert.throws(() => hostLoaderRequest(["survey", "0.34.70", "--host-loader"]), /--host-loader needs a directory/);
   assert.throws(() => hostLoaderRequest(["survey", "0.34.70", "--host-loader", "--json"]), /--host-loader needs a directory/);
+});
+
+test("surveyVerdict says READY only for a survey that saw the host loader, and qualifies one that did not", () => {
+  const base = { unions: {}, hostLoader: { path: "/opt/host/letta-code-patch-loader.mjs", explicit: false } };
+  assert.equal(surveyVerdict({ ...base, loaders: { repo: { applied: 36, skipped: 0 }, host: { applied: 36, skipped: 0 } } }), "READY");
+  assert.equal(surveyVerdict({ ...base, loaders: { repo: { applied: 36, skipped: 0 }, host: null } }),
+    "READY (repo loader only: no host loader at /opt/host/letta-code-patch-loader.mjs; run on the host with the staged loader before a cutover)");
+  assert.equal(surveyVerdict({ ...base, loaders: { repo: { applied: 0, skipped: 0 }, host: null } }), "NOT READY: repo loader applied 0 patches");
+  assert.deepEqual(surveyProblems({ ...base, loaders: { repo: { applied: 36, skipped: 0 }, host: null } }), [], "still not a problem (exit 0)");
 });

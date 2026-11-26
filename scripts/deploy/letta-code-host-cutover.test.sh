@@ -20,7 +20,7 @@ snapshot() { (cd "$T" && find . -printf '%p %y %s %l\n' | sort; cat state/appser
 # Runs the cutover with every path variable inside $T; extra arguments are env assignments.
 run_cutover() {
   env -u EXPECTED_PATCHES PATH="$T/bin:$PATH" LOG="$T/state/cutover.log" ENV_FILE="$T/state/appserver.env" \
-    LETTA_LINK="$T/state/letta" APP_LOG="$T/state/app.log" CUTOVER_LOCK="$T/state/cutover.lock" \
+    LETTA_LINK="$T/state/letta" APP_UNIT=dummy-cutover-test-unit APP_LOG="$T/state/app.log" CUTOVER_LOCK="$T/state/cutover.lock" \
     INSTALL_ROOT="$T/root" ROLLBACK_SETTLE_SECONDS=0 POLL_SECONDS=0 "$@" \
     bash "$SCRIPT" 1.0.0 2.0.0 2>&1
 }

@@ -92,15 +92,15 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
      env EXPECTED_PATCHES=40 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
    `EXPECTED_PATCHES` has no default and the script refuses to start (exit 64, before changing anything)
-   unless it is a positive integer: use the `applied=N` the pre-flight `survey` printed for the
-   loader being deployed (40 for the 0.34.70 loader). Every node that shares agent state must run the
+   unless it is a positive integer: use the `applied=N` of the REPO loader line the pre-flight `survey` printed (the host
+   loader line must show the same number; 40 for the 0.34.70 loader). Every node that shares agent state must run the
    40-patch loader (with `lcp-system-prompt-tracking`) before replicated prompt tracking is relied on: a node
    without it drops `system_prompt_tracking` from an agent record the next time it saves that agent.
    It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
    `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts once, and requires a new
    boot line `lcp-patches applied=<N> skipped=0`, the new node and env in the live process and the
    `:4500` listener in the service's cgroup. On any failure it restores all three and restarts.
-8. **Verify from the live process**: `/var/log/letta-code-cutover-<new>.log` says `RESULT: OK`;
+8. **Verify from the live process**: `/var/log/letta-code-cutover-<new>.log` says `RESULT: OK` (no log file means the script refused to start: read `journalctl -u letta-code-cutover`);
    `readlink /proc/<pid>/exe`, `/proc/<pid>/environ`. The bead closes on Emmanuel's live confirmation.
 
 Rollback (the script prints the exact line):
