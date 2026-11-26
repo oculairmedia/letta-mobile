@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
+import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
@@ -78,26 +79,12 @@ class IrohCanvasPresenceTransport(
         acceptJob?.cancel()
         val ep = endpoint ?: return Job().apply { complete() }
         val job = scope.launch {
-            runCanvasAcceptLoop(ep, "CanvasPresence") { handleIncomingConnection(it) }
+            runCanvasAcceptLoop(ep, CANVAS_PRESENCE_ALPN, "CanvasPresence") { registerConnection(it, isInbound = true) }
         }
         acceptJob = job
         return job
     }
 
-    private suspend fun handleIncomingConnection(incoming: Incoming) {
-        runCatching {
-            val accepting = incoming.accept()
-            val peerAlpn = accepting.alpn()
-            if (peerAlpn.contentEquals(CANVAS_PRESENCE_ALPN)) {
-                val connection = accepting.connect()
-                Telemetry.event("CanvasPresence", "incoming.connected")
-                registerConnection(connection, isInbound = true)
-            }
-        }.onFailure { t ->
-            val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "incoming.error", "error" attr errorMsg)
-        }
-    }
 
     private fun startReaper(): Job {
         reaperJob?.cancel()
@@ -133,22 +120,19 @@ class IrohCanvasPresenceTransport(
         return changed
     }
 
-    suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection {
-        val ep = endpoint ?: error("Iroh endpoint is not configured")
-        Telemetry.event("CanvasPresence", "dial.start")
-        val connection = ep.connect(endpointAddr, CANVAS_PRESENCE_ALPN)
-        Telemetry.event("CanvasPresence", "dial.connected")
-        registerConnection(connection, isInbound = false)
-        return connection
-    }
+    suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection =
+        dialCanvasPeer(endpoint, endpointAddr, CANVAS_PRESENCE_ALPN, "CanvasPresence")
+            .also { registerConnection(it, isInbound = false) }
 
-    suspend fun connectToPeerByTicket(ticketString: String): Connection {
-        val ticket = EndpointTicket.fromString(ticketString)
-        return connectToPeer(ticket.endpointAddr())
-    }
+    suspend fun connectToPeerByTicket(ticketString: String): Connection =
+        connectToPeer(EndpointTicket.fromString(ticketString).endpointAddr())
 
     fun registerConnection(connection: Connection, isInbound: Boolean = false): Job = scope.launch {
-        runCanvasStream(connection, isInbound, mutex, activeSendStreams, "CanvasPresence") { recv, _ ->
+        mutex.runCanvasStream(
+            { connection.canvasBiStream(isInbound) },
+            activeSendStreams,
+            "CanvasPresence",
+        ) { recv, _ ->
             consumePackets(recv)
         }
     }
@@ -221,24 +205,66 @@ class IrohCanvasPresenceTransport(
 
 }
 
-internal suspend fun runCanvasStream(
-    connection: Connection,
-    isInbound: Boolean,
-    mutex: Mutex,
+/** Dials [endpointAddr] on [alpn] through [endpoint], reporting the dial under [telemetryTag]. */
+internal suspend fun dialCanvasPeer(
+    endpoint: Endpoint?,
+    endpointAddr: EndpointAddr,
+    alpn: ByteArray,
+    telemetryTag: String,
+): Connection {
+    val ep = endpoint ?: error("Iroh endpoint is not configured")
+    Telemetry.event(telemetryTag, "dial.start")
+    val connection = ep.connect(endpointAddr, alpn)
+    Telemetry.event(telemetryTag, "dial.connected")
+    return connection
+}
+
+/**
+ * Accepts [this] incoming connection when its ALPN is [alpn] and hands it to [register]; any other
+ * ALPN is ignored. Failures are reported under [telemetryTag] and never escape the accept loop.
+ */
+private suspend fun Incoming.acceptCanvasConnection(
+    alpn: ByteArray,
+    telemetryTag: String,
+    register: (Connection) -> Unit,
+) {
+    runCatching {
+        val accepting = accept()
+        if (accepting.alpn().contentEquals(alpn)) {
+            val connection = accepting.connect()
+            Telemetry.event(telemetryTag, "incoming.connected")
+            register(connection)
+        }
+    }.onFailure { t ->
+        Telemetry.event(telemetryTag, "incoming.error", "error" attr (t.message ?: t.toString()))
+    }
+}
+
+/** Accepts the peer's canvas stream when it dialled us, otherwise opens one to it. */
+internal suspend fun Connection.canvasBiStream(isInbound: Boolean): BiStream =
+    if (isInbound) acceptBi() else openBi()
+
+/**
+ * Runs one canvas bidirectional stream from [openStream], registering its send side in
+ * [activeSendStreams] (guarded by this mutex) for the stream's lifetime. Errors other than
+ * cancellation are reported under [telemetryTag] and end only this stream.
+ */
+internal suspend fun Mutex.runCanvasStream(
+    openStream: suspend () -> BiStream,
     activeSendStreams: MutableList<SendStream>,
     telemetryTag: String,
     consume: suspend (RecvStream, SendStream) -> Unit,
 ) {
     try {
-        val biStream = if (isInbound) connection.acceptBi() else connection.openBi()
+        val biStream = openStream()
         val sendStream = biStream.send()
         val recvStream = biStream.recv()
-        mutex.withLock { activeSendStreams.add(sendStream) }
+        withLock { activeSendStreams.add(sendStream) }
         try {
             consume(recvStream, sendStream)
         } finally {
             withContext(NonCancellable) {
-                mutex.withLock { activeSendStreams.remove(sendStream) }
+                withLock { activeSendStreams.remove(sendStream) }
                 runCatching { sendStream.finish() }
             }
         }
@@ -281,13 +307,14 @@ internal suspend fun readCanvasFrame(stream: RecvStream, maxPayloadBytes: Int): 
 
 internal suspend fun CoroutineScope.runCanvasAcceptLoop(
     endpoint: Endpoint,
+    alpn: ByteArray,
     telemetryTag: String,
-    handle: suspend (Incoming) -> Unit,
+    register: (Connection) -> Unit,
 ) {
     while (isActive) {
         try {
             val incoming = endpoint.acceptNext() ?: return
-            launch { handle(incoming) }
+            launch { incoming.acceptCanvasConnection(alpn, telemetryTag, register) }
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
