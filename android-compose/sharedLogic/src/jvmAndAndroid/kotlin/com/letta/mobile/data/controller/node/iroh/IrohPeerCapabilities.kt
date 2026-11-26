@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
+import com.letta.mobile.data.node.info.NodeInfoWire
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.secrets.wire.SecretRequestRouteWire
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
@@ -16,6 +17,15 @@ import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 object IrohPeerCapabilities {
     /** Internal gate for notebook methods; their handler requires authentication and a document grant. */
     const val NOTEBOOK_AUTHENTICATED = "notebook.authenticated"
+
+    /**
+     * Gate for methods every authenticated peer may call whatever capabilities it holds: `node.info`, which a client
+     * and a peer node must be able to read before anything else to judge compatibility. Never grantable.
+     */
+    const val PEER_AUTHENTICATED = "peer.authenticated"
+
+    /** The gates a session's authentication alone satisfies; [isAllowed] (a capability check) never does. */
+    val AUTHENTICATION_GATES: Set<String> = setOf(NOTEBOOK_AUTHENTICATED, PEER_AUTHENTICATED)
     private val NOTEBOOK_METHODS = setOf(
         "notebook.reference.resolve", "notebook.note.open", "notebook.note.save", "notebook.note.flush",
         "notebook.shared.list",
@@ -149,6 +159,7 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
+        method == NodeInfoWire.METHOD -> PEER_AUTHENTICATED
         method == CanvasMountWire.RESOLVE || method == CanvasMountWire.CANDIDATES -> CANVAS_MOUNT_READ
         method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE
         method in SecretRequestRouteWire.HUMAN_METHODS -> SECRET_REQUEST_ANSWER
@@ -239,7 +250,7 @@ object IrohPeerCapabilities {
     }
 
     fun isAllowed(capabilities: Set<String>, required: String): Boolean =
-        required != NOTEBOOK_AUTHENTICATED && (ADMIN_FULL in capabilities || required in capabilities)
+        required !in AUTHENTICATION_GATES && (ADMIN_FULL in capabilities || required in capabilities)
 
     /**
      * Agent scope check: null scope = every agent; a

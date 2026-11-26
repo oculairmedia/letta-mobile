@@ -162,7 +162,8 @@ internal fun rememberSettingsPageModel(state: SettingsPageState, services: Setti
         }
     }
     val saved = state.saved?.let { SavedBackendsState(it, adding) { next -> adding = next } }
-    val backend = BackendFormState(editing, form, state.connection.takeUnless { adding }, saved) { form = it }
+    val node = rememberNodeHandshake(services.pairing?.rpc)
+    val backend = BackendFormState(editing, form, state.connection.takeUnless { adding }, saved, node.takeUnless { adding }) { form = it }
     val search = PageSearch(query, onQuery = { query = it }, onOpen = { group ->
         query = ""
         pending = group

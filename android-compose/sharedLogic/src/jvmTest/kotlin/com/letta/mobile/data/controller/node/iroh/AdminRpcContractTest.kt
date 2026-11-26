@@ -121,6 +121,7 @@ class AdminRpcContractTest {
             "skill.uninstall",
             "group.list",
             "health.check",
+            "node.info",
             "identity.get",
             "identity.list",
             "job.get",

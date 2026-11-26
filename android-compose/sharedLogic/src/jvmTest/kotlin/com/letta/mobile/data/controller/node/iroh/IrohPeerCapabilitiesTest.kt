@@ -33,7 +33,7 @@ class IrohPeerCapabilitiesTest {
         router.registeredMethods.forEach { method ->
             val capability = IrohPeerCapabilities.forAdminMethod(method)
             assertTrue(
-                capability in IrohPeerCapabilities.ALL,
+                capability in IrohPeerCapabilities.ALL || capability in IrohPeerCapabilities.AUTHENTICATION_GATES,
                 "$method maps to unknown capability '$capability'",
             )
         }

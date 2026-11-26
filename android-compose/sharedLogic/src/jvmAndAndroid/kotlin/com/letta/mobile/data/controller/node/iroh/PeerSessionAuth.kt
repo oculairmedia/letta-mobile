@@ -123,10 +123,13 @@ internal class PeerSessionAuth(
         }
     }
 
-    /** Notebook handlers require authenticated identity, then enforce their exact document grant. */
+    /**
+     * Whether this session may call a method gated by [required]. An authentication-only gate (notebook handlers,
+     * which then enforce their exact document grant, and `node.info`) needs the authenticated identity alone.
+     */
     fun allowsAdminCapability(required: String): Boolean {
         val capabilities = effectiveCapabilities()
-        return authenticated.get() && (required == IrohPeerCapabilities.NOTEBOOK_AUTHENTICATED ||
+        return authenticated.get() && (required in IrohPeerCapabilities.AUTHENTICATION_GATES ||
             IrohPeerCapabilities.isAllowed(capabilities, required))
     }
 

@@ -22,6 +22,7 @@ import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.beads.BeadsRouteClient
 import com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes
 import com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore
+import com.letta.mobile.data.node.info.NodeFacts
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.subagents.AppServerProcessIdentity
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
@@ -73,6 +74,7 @@ import java.nio.file.Paths
  * @property shellStateRoutes the shared shell-state document routes; null registers none.
  * @property serviceCredentialRoutes the non-LLM service credential routes; null registers none.
  * @property feedRoutes `feed.subscribe` over the node's durable turn journal; null registers none.
+ * @property nodeFacts what `node.info` reports beyond the App Server; every field unknown by default.
  */
 @Suppress("LongParameterList")
 class NodeAdminRouterSpec(
@@ -103,6 +105,7 @@ class NodeAdminRouterSpec(
     val shellStateRoutes: AdminRpcRoutes? = null,
     val serviceCredentialRoutes: AdminRpcRoutes? = null,
     val feedRoutes: AdminRpcRoutes? = null,
+    val nodeFacts: NodeFacts = NodeFacts.UNKNOWN,
 ) {
     /** Assembles the router, starting the catalogs and registry on [eventScope] when there is an App Server. */
     fun build(): AdminRpcRouter {
@@ -194,6 +197,7 @@ class NodeAdminRouterSpec(
         },
         pluginRoutes = pluginRoutes,
         canvasMountRoutes = canvasMountRoutes,
+        nodeFacts = nodeFacts,
     )
 
     private fun wrapperRecords() = FileWrapperRecordStore(

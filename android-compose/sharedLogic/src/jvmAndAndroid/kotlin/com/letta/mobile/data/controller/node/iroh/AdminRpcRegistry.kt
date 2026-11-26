@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.node.info.NodeInfoService
+import com.letta.mobile.data.node.info.NodeInfoWire
+import com.letta.mobile.data.node.info.NodeRuntimeFacts
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 
 /**
@@ -76,6 +79,7 @@ object AdminRpcRegistry {
         "subagent.todos",
         "subagent.dismiss",
         "health.check",
+        NodeInfoWire.METHOD,
         "run.record", "lease.upsert", "lease.list",
         "approval.submit",
         "monitor.stop",
@@ -140,6 +144,8 @@ object AdminRpcRegistry {
         tiers: NativeReadTiers,
     ) {
         HealthAdminHandlers.register(router, services.controller)
+        val modelExposure = modelExposureStore(native.modelExposureFile)
+        registerNodeInfo(router, services, native.nativeClient, modelExposure)
         AgentAdminHandlers.register(router, services.controller, tiers)
         SubagentAdminHandlers.register(router, services.subagentRegistrySource)
         ConversationAdminHandlers.register(router, tiers, controller = services.controller)
@@ -148,7 +154,7 @@ object AdminRpcRegistry {
         RunAdminHandlers.register(router, tiers.localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, tiers, modelExposureStore(native.modelExposureFile))
+        ModelAdminHandlers.register(router, tiers, modelExposure)
         ScheduleAdminHandlers.register(router, native.nativeClient)
         ToolAdminHandlers.register(router, tiers.localBackendStore, native.nativeClient)
         McpAdminHandlers.register(router)
@@ -203,6 +209,24 @@ object AdminRpcRegistry {
         services.canvasMountRoutes?.register(router)
         // All six secret request routes or none, never under the anonymous policy or without a keystore.
         services.secretRequestRoutes?.register(router)
+    }
+
+    /**
+     * `node.info`: what this node is, for clients and peer nodes to judge compatibility. Answered by every node, with
+     * or without an App Server (the runtime's fields then read unknown); the models are the ones `model.list` shows.
+     */
+    private fun registerNodeInfo(
+        router: AdminRpcRouter,
+        services: AdminRpcHostServices,
+        nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient?,
+        exposure: ModelExposureStore,
+    ) {
+        val runtime = NodeRuntimeFacts.of(
+            lettaCodeVersion = { nativeClient?.serverInfo?.value?.lettaCodeVersion },
+            models = { if (nativeClient == null) emptyList() else ModelAdminHandlers.exposedHandles(nativeClient, exposure) },
+        )
+        val service = NodeInfoService(services.nodeFacts, runtime)
+        router.register(NodeInfoWire.METHOD) { service.readJson() }
     }
 
     private fun registerBeads(router: AdminRpcRouter, services: AdminRpcHostServices) {

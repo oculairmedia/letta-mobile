@@ -110,6 +110,21 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "node.info",
+      "handler": "NodeInfoService.kt",
+      "current_backend": "controller_native: host-configured facts plus the App Server's reported version and model list",
+      "owner": "controller_native",
+      "public_contract": "node identity for the version handshake (OS family, app and letta-code versions, store format, capabilities, models, runtime patch set)",
+      "authorization_class": "admin_read",
+      "data_store": "controller_memory",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "Readable by any authenticated peer (peer.authenticated gate). A missing or failing App Server reads unknown or empty, never a failure.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "agent.list",
       "handler": "AgentAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",

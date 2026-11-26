@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.node.info.NodeFacts
 
 /** Host integration services used by admin routes; missing optional services keep their routes unavailable. */
 class AdminRpcHostServices(
@@ -28,4 +29,6 @@ class AdminRpcHostServices(
      * build them, and only with a paired-peers-only auth policy and a keystore provider; they register nothing otherwise.
      */
     val secretRequestRoutes: AdminRpcRoutes? = null,
+    /** What the node is (OS, build, capabilities, runtime patch source) for `node.info`; unknown by default. */
+    val nodeFacts: NodeFacts = NodeFacts.UNKNOWN,
 )

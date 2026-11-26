@@ -1,5 +1,6 @@
 package com.letta.mobile.data.node
 
+import com.letta.mobile.data.node.info.RuntimePatchSetSource
 import com.letta.mobile.data.subagents.AppServerProcessIdentity
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import io.ktor.client.HttpClient
@@ -49,10 +50,13 @@ fun interface AppServerHttpClients {
  * @property processIdentity proof of which App Server process the node is talking to, used to
  *   reconcile durable subagent chips. Unknown (null) on hosts that cannot prove it.
  * @property toolsSocket the local tools listener, [NodeToolsSocket.None] where there is none.
+ * @property runtimePatches where the node reads the runtime patch set its App Server applied; unknown
+ *   on hosts that do not see the App Server's boot output.
  */
 class NodePorts(
     val httpClients: AppServerHttpClients,
     val log: NodeLog,
     val processIdentity: AppServerProcessIdentity = AppServerProcessIdentity { null },
     val toolsSocket: NodeToolsSocket = NodeToolsSocket.None,
+    val runtimePatches: RuntimePatchSetSource = RuntimePatchSetSource.Unknown,
 )

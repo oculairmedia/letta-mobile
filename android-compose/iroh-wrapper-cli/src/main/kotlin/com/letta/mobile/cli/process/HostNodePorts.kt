@@ -6,6 +6,7 @@ import com.letta.mobile.data.node.NodePorts
 import com.letta.mobile.data.node.NodeToolsSocket
 import com.letta.mobile.data.node.host.AppServerProcessSource
 import com.letta.mobile.data.node.host.NodeHostBindings
+import com.letta.mobile.data.node.info.RuntimePatchSetSource
 
 /** The wrapper's node log: status lines to stdout and failures to stderr, each tagged with [prefix]. */
 internal class ConsoleNodeLog(private val prefix: String) : NodeLog {
@@ -17,15 +18,19 @@ internal class ConsoleNodeLog(private val prefix: String) : NodeLog {
 /**
  * The wrapper's node ports on this OS's [bindings]: the App Server process identity from
  * [identitySource] (systemd MainPID file and `/proc` on Linux, PID plus creation time on Windows)
- * and the local tools socket.
+ * the runtime patch set, and the local tools socket.
+ *
+ * @param runtimePatches where the node reads its App Server's applied patch set; unknown by default.
  */
 internal fun hostNodePorts(
     bindings: NodeHostBindings,
     identitySource: AppServerProcessSource,
+    runtimePatches: RuntimePatchSetSource = RuntimePatchSetSource.Unknown,
     toolsSocket: NodeToolsSocket,
 ): NodePorts = NodePorts(
     httpClients = JvmAppServerHttpClients,
     log = ConsoleNodeLog("[iroh-app-server]"),
     processIdentity = bindings.processIdentity(identitySource),
     toolsSocket = toolsSocket,
+    runtimePatches = runtimePatches,
 )

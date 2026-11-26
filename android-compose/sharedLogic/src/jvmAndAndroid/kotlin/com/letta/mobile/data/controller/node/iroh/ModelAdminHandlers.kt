@@ -60,6 +60,12 @@ object ModelAdminHandlers {
         }
     }
 
+    /** The handles `model.list` shows by default (exposed rows only), for `node.info`. */
+    internal suspend fun exposedHandles(nativeClient: AppServerClient?, exposure: ModelExposureStore): List<String> =
+        listModels(nativeClient, exposure, params = null).mapNotNull { row ->
+            ((row as? JsonObject)?.get("handle") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        }
+
     private suspend fun listModels(
         nativeClient: AppServerClient?,
         exposure: ModelExposureStore,
