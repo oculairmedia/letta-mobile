@@ -1,6 +1,15 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import java.util.UUID
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -107,6 +116,75 @@ class NodeTurnHost internal constructor(
         }
     }
 
+    /**
+     * Relays the turns the App Server starts by itself (a background task finishing after the client's
+     * turn closed, a wake, a cron run, an inbox arrival) the way a client turn is relayed: each is opened,
+     * journaled and closed in its conversation's feed through a [ConversationTurnFanout] with no initiator,
+     * and fanned out to that conversation's viewers through [delivery].
+     *
+     * [frames] is every runtime-scoped App Server frame. Each frame is keyed on its own runtime scope. A
+     * frame a client turn answers for ([clientOwns]) is that turn's and is not relayed twice; a turn opened
+     * here keeps its conversation's frames until the server's `turn_finished` closes it.
+     */
+    internal fun relayServerStartedTurns(frames: Flow<AppServerReceivedFrame>, delivery: TurnFanoutDelivery): Job =
+        scope.launch {
+            val open = HashMap<AppServerRuntimeScope, NodeTurn>()
+            try {
+                frames.collect { received -> relayServerStartedFrame(received, open, delivery) }
+            } finally {
+                open.values.forEach { it.journal.close(terminalObserved = it.fanout.anyTerminalWritten) }
+            }
+        }
+
+    private suspend fun relayServerStartedFrame(
+        received: AppServerReceivedFrame,
+        open: MutableMap<AppServerRuntimeScope, NodeTurn>,
+        delivery: TurnFanoutDelivery,
+    ) {
+        val frame = received.frame
+        val runtime = frame.runtime ?: return
+        val key = AppServerRuntimeScope(runtime.agentId, runtime.conversationId)
+        val turn = open[key]
+        when (frame) {
+            is AppServerInboundFrame.StreamDelta -> {
+                if (frame.subagentId != null) return
+                val delta = frame.delta as? JsonObject ?: return
+                val started = turn ?: if (clientOwns(key.conversationId, delta.runIdOrNull())) {
+                    return
+                } else {
+                    openServerStartedTurn(key, delivery).also { open[key] = it }
+                }
+                started.fanout.relayServerStartedDelta(received.raw)
+            }
+            is AppServerInboundFrame.TurnFinished -> {
+                val finished = turn ?: return
+                open.remove(key)
+                finished.journal.close(terminalObserved = true)
+                Telemetry.event(
+                    "IrohNode", "turn.server_started_closed",
+                    "conversationId" attr key.conversationId,
+                    "stopReason" attr frame.stopReason,
+                )
+            }
+            else -> Unit
+        }
+    }
+
+    private fun openServerStartedTurn(runtime: AppServerRuntimeScope, delivery: TurnFanoutDelivery): NodeTurn {
+        val turnId = "turn-${UUID.randomUUID()}"
+        val writer = journal.openTurn(AgentId(runtime.agentId), ConversationId(runtime.conversationId), turnId)
+        val fanout = ConversationTurnFanout(
+            conversationId = runtime.conversationId,
+            runtime = runtime,
+            delivery = delivery,
+            initiatorViewer = null,
+            trackInitiatorFrame = writer::append,
+            turnId = turnId,
+        )
+        Telemetry.event("IrohNode", "turn.server_started_opened", "conversationId" attr runtime.conversationId)
+        return NodeTurn(runtime.conversationId, clientMessageId = null, fanout = fanout, journal = writer) {}
+    }
+
     /** Stops every live turn (node shutdown only). */
     fun shutdown() {
         scope.cancel(CancellationException("Iroh node turn host shut down"))
@@ -163,6 +241,8 @@ class NodeTurnHost internal constructor(
         }
     }
 }
+
+private fun JsonObject.runIdOrNull(): String? = (this["run_id"] as? JsonPrimitive)?.contentOrNull
 
 /** One turn handed to [NodeTurnHost]: its fanout, its journal writer, and its collector. */
 internal class NodeTurn(

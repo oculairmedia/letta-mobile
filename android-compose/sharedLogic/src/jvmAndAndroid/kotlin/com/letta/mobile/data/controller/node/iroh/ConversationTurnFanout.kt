@@ -4,6 +4,7 @@ import com.letta.mobile.data.runtime.admitsParentStreamDelta
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.runtime.StreamTextFrameSource
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -300,6 +301,17 @@ internal class ConversationTurnFanout(
      */
     suspend fun relayServerDelta(raw: JsonObject) {
         emitRawFrameBody(raw.toString())
+    }
+
+    /**
+     * Relay one raw App Server `stream_delta` [raw] of a turn the App Server started by itself. No
+     * engine stamped it, so it is stamped here with this turn's identity (cumulative text, logical ids)
+     * before it goes the way every relayed delta goes. A frame from a child agent is still refused.
+     */
+    suspend fun relayServerStartedDelta(raw: JsonObject) {
+        val stamped = synthesizedIdentity.stamp(raw.toString(), StreamTextFrameSource.AppServerDelta) ?: return
+        val terminal = emitRawFrameBody(stamped)
+        if (terminal) terminalWritten = true
     }
 
     /** The turn's terminal went out from the App Server's own frames. */

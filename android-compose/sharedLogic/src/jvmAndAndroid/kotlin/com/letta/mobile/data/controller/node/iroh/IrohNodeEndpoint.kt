@@ -379,6 +379,17 @@ class IrohNodeEndpoint(
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
         val host = NodeTurnHost.childOf(scope, turnJournal)
         turnHost = host
+        // Turns the App Server starts by itself reach the feed and the viewers like a client's turn.
+        controller.observeRuntimeFrames()?.let { frames ->
+            host.relayServerStartedTurns(
+                frames,
+                TurnFanoutDelivery(
+                    viewersFor = connectionRegistry::viewersFor,
+                    unregisterViewer = connectionRegistry::unregister,
+                    observerWrites = host.observerWrites,
+                ),
+            )
+        }
 
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
