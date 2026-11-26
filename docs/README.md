@@ -297,6 +297,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [lease.upsert v1](reference/contracts/lease.upsert/wrapper-records-v1.md)
 
+### reference/contracts/log
+
+- [Agent-state log v1 \(R1\) and \`baken/log/1\`](reference/contracts/log/log-v1.md)
+
 ### reference/contracts/message.list
 
 - [message.list: Byte-Bounded Pages v1](reference/contracts/message.list/pages-v1.md)
