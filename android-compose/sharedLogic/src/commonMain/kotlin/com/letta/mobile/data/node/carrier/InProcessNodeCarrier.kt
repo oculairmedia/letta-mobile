@@ -27,6 +27,10 @@ import kotlinx.coroutines.launch
  * node's end reports [NodePeerIdentity.LOCAL_SHELL], which the node admits as an admin peer by construction. The
  * carrier has no optional encodings, so it ignores [NodePeerLink.onPeerCapabilities].
  *
+ * Every lane is an unbounded channel: in one process there is no transport to push back, and the node's writes never
+ * suspend on a slow shell. The shell keeps collecting its link's frames for the link's whole life ([NodeSession] does
+ * so through its router); a carrier that serializes, when the node moves out of process, bounds its lanes instead.
+ *
  * @param name the node's in-process name; the carrier answers only [address], `in-process:<name>`.
  */
 class InProcessNodeCarrier(
@@ -113,9 +117,16 @@ private class InProcessLink(private val node: NodePeerIdentity) {
         override suspend fun openCall(request: NodeFrame): NodeCallLane {
             if (closureState.value != null) throw closed()
             val call = InProcessCall(this@InProcessLink)
+            // Registered first so a close that races the open still ends the lane; unregistered if the open fails.
             lanes.update { it + call }
-            call.shellEnd.send(request)
-            if (toNodeCalls.trySend(call.nodeEnd).isFailure) throw closed()
+            try {
+                call.shellEnd.send(request)
+                if (toNodeCalls.trySend(call.nodeEnd).isFailure) throw closed()
+            } catch (failure: NodeCarrierException) {
+                lanes.update { it - call }
+                call.close()
+                throw failure
+            }
             return call.shellEnd
         }
 
