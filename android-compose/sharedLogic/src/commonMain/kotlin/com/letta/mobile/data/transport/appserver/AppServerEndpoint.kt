@@ -61,3 +61,20 @@ data class AppServerEndpoint(
         }
     }
 }
+
+private val WEB_SOCKET_SCHEMES = setOf("ws", "wss")
+
+/**
+ * The WebSocket base URL to dial for this endpoint. An [AppServerEndpoint.address] that already
+ * carries a scheme (`ws://host:port`) is used as is; a bare `host:port` is prefixed with
+ * [AppServerEndpoint.scheme]. Any scheme other than ws or wss, on the endpoint or in the address,
+ * fails here with [IllegalArgumentException], before a connection is attempted.
+ */
+internal fun AppServerEndpoint.webSocketBaseUrl(): String {
+    val addressScheme = address.substringBefore("://", missingDelimiterValue = "")
+    val effective = addressScheme.ifEmpty { scheme }
+    require(scheme in WEB_SOCKET_SCHEMES && effective in WEB_SOCKET_SCHEMES) {
+        "App Server endpoint must use ws or wss, got scheme '$scheme' and address '$address'"
+    }
+    return if (addressScheme.isEmpty()) "$scheme://$address" else address
+}
