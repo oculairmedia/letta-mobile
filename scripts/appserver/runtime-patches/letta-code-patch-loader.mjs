@@ -2243,17 +2243,101 @@ const MEMORY_DIR_REPLACEMENT =
 // profile-provider mod installs (mods/profile-provider.mjs). A profile handle with no resolver,
 // or one the resolver does not bind, throws: it never falls through to another provider.
 const MODEL_PROFILE_PREFIX = "profile/";
+// The user's context cap on a profile-bound conversation. `/context-limit` (alias
+// `/set-max-context`, applySetMaxContext) stores the cap in context_window_limit, the field every
+// model switch also fills with the catalog default, and the profile resolver drops that field
+// because it cannot tell the two apart. So the cap is also recorded in its own field, in the
+// conversation record (or the agent record for the default conversation), which replicates with
+// the record. It is only valid while the stock field still holds it: a later write that stores a
+// different window there (a model switch to another default, a reset) removes it, so a user cap
+// is lost exactly when it is lost today, and the reader ignores it when the two differ (a node
+// without this patch keeps unknown conversation fields while it rewrites context_window_limit). On a profile turn the field rides in the turn's settings
+// from the same layer the stock cap comes from, the resolver gets it as its third argument, and
+// the effective window is the smallest of it, the binding's context_window_limit and the bound
+// model's own window. Without a user cap nothing changes. Local backend only.
+const USER_CAP_FIELD = "lcp_user_context_window_limit";
+const USER_CAP_MARKER = "// lcp-profile-user-cap";
+const USER_CAP_EFFECTIVE_TOKEN =
+  "function effectiveAgentForConversation(agent, conversation) {\n" +
+  "  const conversationRecord = conversation;\n";
+const USER_CAP_EFFECTIVE_REPLACEMENT =
+  `function effectiveAgentForConversation(agent, conversation) { ${USER_CAP_MARKER}: a profile turn carries the user's cap.\n` +
+  "  const effective = __lcpStockEffectiveAgentForConversation(agent, conversation);\n" +
+  `  if (typeof effective.model !== "string" || !effective.model.startsWith(${JSON.stringify(MODEL_PROFILE_PREFIX)})) return effective;\n` +
+  "  const conversationRecord = isRecord2(conversation) ? conversation : {};\n" +
+  '  const fromConversation = typeof conversationRecord.context_window_limit === "number";\n' +
+  '  const conversationDefault = isRecord2(conversationRecord.model_settings) && typeof conversationRecord.model_settings.context_window_limit === "number";\n' +
+  `  const userCap = fromConversation ? conversationRecord.${USER_CAP_FIELD} : conversationDefault ? undefined : agent?.${USER_CAP_FIELD};\n` +
+  "  const storedCap = fromConversation ? conversationRecord.context_window_limit : agent?.model_settings?.context_window_limit;\n" +
+  '  if (typeof userCap !== "number" || userCap !== storedCap) return effective;\n' +
+  `  return { ...effective, model_settings: { ...effective.model_settings, ${USER_CAP_FIELD}: userCap } };\n` +
+  "}\n" +
+  "function __lcpStockEffectiveAgentForConversation(agent, conversation) {\n" +
+  "  const conversationRecord = conversation;\n";
+const USER_CAP_CLAMP_TOKEN =
+  "  const contextWindow = configuredContextWindow && isLocalOllama ? Math.min(configuredContextWindow, hookedModel.contextWindow) : configuredContextWindow;\n";
+const USER_CAP_CLAMP_REPLACEMENT =
+  `  const contextWindow = configuredContextWindow && (isLocalOllama || lcpUserContextWindowLimit !== undefined) ? Math.min(configuredContextWindow, hookedModel.contextWindow) : configuredContextWindow; ${USER_CAP_MARKER}\n`;
+const USER_CAP_NORMALIZE_TOKEN =
+  "    model: model2,\n" +
+  "    model_settings: modelSettings,\n" +
+  "    ...hidden !== undefined ? { hidden } : {},\n";
+const USER_CAP_NORMALIZE_REPLACEMENT =
+  USER_CAP_NORMALIZE_TOKEN +
+  `    ...typeof value.${USER_CAP_FIELD} === "number" ? { ${USER_CAP_FIELD}: value.${USER_CAP_FIELD} } : {}, ${USER_CAP_MARKER}\n`;
+const USER_CAP_AGENT_UPDATE_TOKEN =
+  "      model_settings: nextModelSettings\n" +
+  "    };\n" +
+  "    this.agents.set(agentId, updated);\n";
+const USER_CAP_AGENT_UPDATE_REPLACEMENT =
+  "      model_settings: nextModelSettings\n" +
+  "    };\n" +
+  `    if (typeof bodyRecord.${USER_CAP_FIELD} === "number") updated.${USER_CAP_FIELD} = bodyRecord.${USER_CAP_FIELD}; ${USER_CAP_MARKER}\n` +
+  `    if (bodyRecord.${USER_CAP_FIELD} === null || updated.${USER_CAP_FIELD} !== updated.model_settings.context_window_limit) delete updated.${USER_CAP_FIELD};\n` +
+  "    this.agents.set(agentId, updated);\n";
+const USER_CAP_CONVERSATION_UPDATE_TOKEN =
+  "  if (isStringArray2(bodyRecord.tags)) {\n" +
+  "    next.tags = bodyRecord.tags;\n" +
+  "  }\n" +
+  "  return next;\n" +
+  "}";
+const USER_CAP_CONVERSATION_UPDATE_REPLACEMENT =
+  "  if (isStringArray2(bodyRecord.tags)) {\n" +
+  "    next.tags = bodyRecord.tags;\n" +
+  "  }\n" +
+  `  if (typeof bodyRecord.${USER_CAP_FIELD} === "number") next.${USER_CAP_FIELD} = bodyRecord.${USER_CAP_FIELD}; ${USER_CAP_MARKER}\n` +
+  `  if (bodyRecord.${USER_CAP_FIELD} === null || next.${USER_CAP_FIELD} !== next.context_window_limit) delete next.${USER_CAP_FIELD};\n` +
+  "  return next;\n" +
+  "}";
+// A reset (`/context-limit` with no value) stores the catalog default and sends null, which the
+// two update sites above turn into a removal. Only the local store gets the field.
+const USER_CAP_WRITE = `,\n      ...backend3.store ? { ${USER_CAP_FIELD}: reset ? null : contextWindow } : {} ${USER_CAP_MARKER}\n`;
+const USER_CAP_SET_AGENT_TOKEN =
+  "    const updatedAgent = await backend3.updateAgent(params.agentId, {\n" +
+  "      context_window_limit: contextWindow\n" +
+  "    });";
+const USER_CAP_SET_AGENT_REPLACEMENT =
+  "    const updatedAgent = await backend3.updateAgent(params.agentId, {\n" +
+  "      context_window_limit: contextWindow" + USER_CAP_WRITE +
+  "    });";
+const USER_CAP_SET_CONVERSATION_TOKEN =
+  "  const updatedConversation = await backend3.updateConversation(params.conversationId, {\n" +
+  "    context_window_limit: contextWindow\n" +
+  "  });";
 const MODEL_PROFILE_TOKEN =
   "async function resolvePiModelForAgent(modelHandle, modelSettings = {}, options = {}) {\n" +
   "  const concreteModelHandle = ";
 const MODEL_PROFILE_REPLACEMENT =
   "async function resolvePiModelForAgent(modelHandle, modelSettings = {}, options = {}) {\n" +
+  "  let lcpUserContextWindowLimit;\n" +
   `  if (typeof modelHandle === "string" && modelHandle.startsWith(${JSON.stringify(MODEL_PROFILE_PREFIX)})) { // lcp-model-profile\n` +
   "    const resolveModelProfile = globalThis.__lcpResolveModelProfile;\n" +
   '    if (typeof resolveModelProfile !== "function") {\n' +
   "      throw new Error(`Model profile ${modelHandle} cannot be resolved: the profile-provider mod is not installed on this node.`);\n" +
   "    }\n" +
-  "    const bound = resolveModelProfile(modelHandle, modelSettings);\n" +
+  `    const { ${USER_CAP_FIELD}: userCap, ...profileSettings } = modelSettings ?? {};\n` +
+  '    lcpUserContextWindowLimit = typeof userCap === "number" && Number.isFinite(userCap) && userCap > 0 ? userCap : undefined;\n' +
+  "    const bound = resolveModelProfile(modelHandle, profileSettings, lcpUserContextWindowLimit);\n" +
   `    if (!bound || typeof bound.handle !== "string" || !bound.handle || bound.handle.startsWith(${JSON.stringify(MODEL_PROFILE_PREFIX)})) {\n` +
   "      throw new Error(`Model profile ${modelHandle} is not bound to a provider handle on this node. Add it to LETTA_MODEL_PROFILE_BINDINGS.`);\n" +
   "    }\n" +
@@ -2261,6 +2345,11 @@ const MODEL_PROFILE_REPLACEMENT =
   "    modelSettings = bound.modelSettings ?? {};\n" +
   "  }\n" +
   "  const concreteModelHandle = ";
+
+const USER_CAP_SET_CONVERSATION_REPLACEMENT =
+  "  const updatedConversation = await backend3.updateConversation(params.conversationId, {\n" +
+  "    context_window_limit: contextWindow" + USER_CAP_WRITE.replace(/\n {6}/, "\n    ") +
+  "  });";
 
 // lcp-memory-dir-expand: file tools (Read, Write, Edit, Glob, Grep, ...) expand `$VAR` in a path
 // from the App Server's own process.env, where MEMORY_DIR is unset because one process serves
@@ -2545,8 +2634,17 @@ const memoryDirToken = exactOncePatch(
 
 const modelProfile = exactOncePatch(
   "lcp-model-profile",
-  [{ token: MODEL_PROFILE_TOKEN, replacement: MODEL_PROFILE_REPLACEMENT }],
-  "profile/<id> handles are not resolved through this node's bindings; their turns fail against the profile provider's unbound endpoint",
+  [
+    { token: MODEL_PROFILE_TOKEN, replacement: MODEL_PROFILE_REPLACEMENT },
+    { token: USER_CAP_EFFECTIVE_TOKEN, replacement: USER_CAP_EFFECTIVE_REPLACEMENT },
+    { token: USER_CAP_CLAMP_TOKEN, replacement: USER_CAP_CLAMP_REPLACEMENT },
+    { token: USER_CAP_NORMALIZE_TOKEN, replacement: USER_CAP_NORMALIZE_REPLACEMENT },
+    { token: USER_CAP_AGENT_UPDATE_TOKEN, replacement: USER_CAP_AGENT_UPDATE_REPLACEMENT },
+    { token: USER_CAP_CONVERSATION_UPDATE_TOKEN, replacement: USER_CAP_CONVERSATION_UPDATE_REPLACEMENT },
+    { token: USER_CAP_SET_AGENT_TOKEN, replacement: USER_CAP_SET_AGENT_REPLACEMENT },
+    { token: USER_CAP_SET_CONVERSATION_TOKEN, replacement: USER_CAP_SET_CONVERSATION_REPLACEMENT },
+  ],
+  "profile/<id> handles are not resolved through this node's bindings and a user's context cap is not kept for them; their turns fail against the profile provider's unbound endpoint",
 );
 
 const memoryDirExpand = exactOncePatch(

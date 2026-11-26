@@ -50,14 +50,27 @@ function readJsonObject(envName) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is number}
+ */
+function isPositiveNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+/**
  * Builds the resolver the lcp-model-profile patch calls. It throws for an unbound profile so
  * the turn fails with a message that names the missing binding.
  *
+ * `userContextWindowLimit` is the cap the user set on this conversation (the runtime patch reads it
+ * from its own record field; the stored context_window_limit cannot be trusted because every model
+ * switch writes the catalog default there). The resolved context_window_limit is the smaller of it
+ * and the binding's own; the runtime patch also caps the result at the bound model's window.
+ *
  * @param {Record<string, any>} bindings
- * @returns {(handle: string, modelSettings?: Record<string, unknown>) => ({ handle: string; modelSettings: Record<string, unknown> } | undefined)}
+ * @returns {(handle: string, modelSettings?: Record<string, unknown>, userContextWindowLimit?: number) => ({ handle: string; modelSettings: Record<string, unknown> } | undefined)}
  */
 function createResolver(bindings) {
-  return (handle, modelSettings) => {
+  return (handle, modelSettings, userContextWindowLimit) => {
     if (typeof handle !== "string" || !handle.startsWith(PREFIX)) return undefined;
     const id = handle.slice(PREFIX.length);
     const binding = Object.hasOwn(bindings, id) ? bindings[id] : undefined;
@@ -69,7 +82,12 @@ function createResolver(bindings) {
     }
     const intent = { ...(modelSettings ?? {}) };
     for (const key of PROVIDER_BOUND_SETTINGS) delete intent[key];
-    return { handle: binding.handle, modelSettings: { ...intent, ...(binding.model_settings ?? {}) } };
+    const resolved = { ...intent, ...(binding.model_settings ?? {}) };
+    if (isPositiveNumber(userContextWindowLimit)) {
+      const bindingLimit = resolved.context_window_limit;
+      resolved.context_window_limit = isPositiveNumber(bindingLimit) ? Math.min(bindingLimit, userContextWindowLimit) : userContextWindowLimit;
+    }
+    return { handle: binding.handle, modelSettings: resolved };
   };
 }
 
