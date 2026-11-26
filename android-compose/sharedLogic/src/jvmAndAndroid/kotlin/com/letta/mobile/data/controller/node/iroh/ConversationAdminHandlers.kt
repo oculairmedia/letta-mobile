@@ -98,7 +98,7 @@ object ConversationAdminHandlers {
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        router.conversationOwner = { id -> conversationOwner(nativeClient, id) }
+        router.conversationOwner = { conversation -> conversationOwner(nativeClient, conversation) }
         // Without a local store there is no cheap change signal, so every list is fetched as before.
         val heldList = tiers.localBackendStore?.let { store ->
             HeldListCache(
@@ -117,14 +117,14 @@ object ConversationAdminHandlers {
     }
 
     /**
-     * The agent that owns [conversationId] by the host's own records: a `conv-default-<agent>` alias names it, any
+     * The agent that owns [conversation] by the host's own records: a `conv-default-<agent>` alias names it, any
      * other id is the App Server's `conversation_retrieve` row. Null (no client, refused, no owner field) denies an
      * agent-scoped peer at [AdminRpcRouter.preauthorize].
      */
-    private suspend fun conversationOwner(client: AppServerClient?, conversationId: String): String? {
-        resolveConversationReadTarget(ConversationId(conversationId))?.second?.let { return it.value }
+    private suspend fun conversationOwner(client: AppServerClient?, conversation: ConversationId): String? {
+        resolveConversationReadTarget(conversation)?.second?.let { return it.value }
         val response = client?.conversationRetrieve(
-            AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = conversationId),
+            AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = conversation.value),
         ) ?: return null
         val owner = response.conversation?.get("agent_id") as? JsonPrimitive
         return owner?.takeIf { response.success && it.isString }?.content?.takeIf { it.isNotBlank() }

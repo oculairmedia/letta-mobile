@@ -38,14 +38,14 @@ interface ViewerHandle {
     fun receivesConversationEvents(): Boolean = false
 
     /**
-     * Whether this connection may receive the `conversation_updated` push of a conversation owned by [agentId] (null:
+     * Whether this connection may receive the `conversation_updated` push of a conversation owned by [owner] (null:
      * the frame names no agent). Beyond [receivesConversationEvents], an agent-scoped peer gets only conversations of
      * agents in its scope, and none naming no agent. Evaluated at send time.
      */
-    fun receivesConversationUpdateOf(agentId: String?): Boolean {
+    fun receivesConversationUpdateOf(owner: AgentId?): Boolean {
         if (!receivesConversationEvents()) return false
         val scope = adminContext()?.authorizedAgentIds ?: return true
-        return agentId != null && agentId in scope
+        return owner != null && owner.value in scope
     }
 
     /**

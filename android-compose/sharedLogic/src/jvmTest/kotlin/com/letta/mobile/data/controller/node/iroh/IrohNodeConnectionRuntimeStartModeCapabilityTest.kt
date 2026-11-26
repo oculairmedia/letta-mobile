@@ -386,7 +386,7 @@ private suspend fun IrohNodeConnection.invokeControlAdminRpc(frame: JsonObject):
 private suspend fun IrohNodeConnection.invokeConversationScopeViolation(frame: JsonObject): String? =
     suspendCoroutine { continuation ->
         val method = IrohNodeConnection::class.java.getDeclaredMethod(
-            "conversationScopeViolation",
+            "scopeViolation",
             JsonObject::class.java,
             Continuation::class.java,
         )

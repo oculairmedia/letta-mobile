@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import com.letta.mobile.data.controller.node.iroh.stream.AdminRpcStreamedHandler
 import com.letta.mobile.data.controller.node.iroh.timing.AdminRpcPhaseTimings
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
@@ -103,7 +104,7 @@ class AdminRpcRouter(
      * conversation id a request names, the owner, or null when the host cannot say. Null denies an
      * agent-scoped peer. [ConversationAdminHandlers] installs the App Server lookup; the default knows no owner.
      */
-    internal var conversationOwner: suspend (conversationId: String) -> String? = { null }
+    internal var conversationOwner: suspend (ConversationId) -> String? = { null }
 
     /** Owners already resolved: a conversation never changes agent, so a known owner is kept (unknowns never are). */
     private val knownOwners = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -257,7 +258,7 @@ class AdminRpcRouter(
     /** [conversationOwner] within [OWNER_LOOKUP_TIMEOUT_MS]; a failure or timeout answers null (a denial), a hit is kept. */
     private val lookUpOwner: suspend (String) -> String? = { conversation ->
         try {
-            withTimeoutOrNull(OWNER_LOOKUP_TIMEOUT_MS.milliseconds) { conversationOwner(conversation) }?.also { owner ->
+            withTimeoutOrNull(OWNER_LOOKUP_TIMEOUT_MS.milliseconds) { conversationOwner(ConversationId(conversation)) }?.also { owner ->
                 if (knownOwners.size >= MAX_KNOWN_OWNERS) knownOwners.clear()
                 knownOwners[conversation] = owner
             }

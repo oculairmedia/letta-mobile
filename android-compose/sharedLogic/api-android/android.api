@@ -21144,7 +21144,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
-	public fun receivesConversationUpdateOf (Ljava/lang/String;)Z
+	public fun receivesConversationUpdateOf-XmxTwY8 (Ljava/lang/String;)Z
 	public fun receivesFeedPushes ()Z
 	public fun receivesPinsEvents ()Z
 	public fun receivesShellStateEvents ()Z
@@ -21157,7 +21157,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$Defau
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
-	public static fun receivesConversationUpdateOf (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
+	public static fun receivesConversationUpdateOf-XmxTwY8 (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesFeedPushes (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesPinsEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesShellStateEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z

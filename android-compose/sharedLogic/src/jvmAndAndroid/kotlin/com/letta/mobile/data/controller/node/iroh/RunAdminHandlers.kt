@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.data.model.RunId
 
 /**
  * Run/step history is served from the on-disk local backend store
@@ -29,12 +30,12 @@ object RunAdminHandlers {
         }
         router.registerScoped("run.get") { params, context ->
             val runId = params.requireParam(AdminParamKey("run_id"))
-            requireRunInAgentScope(store, runId, context)
+            requireRunInAgentScope(store, RunId(runId), context)
             store.getRunProjected(runId) ?: adminError("run $runId not found")
         }
         router.registerScoped("step.list") { params, context ->
             val runId = params.requireParam(AdminParamKey("run_id"))
-            requireRunInAgentScope(store, runId, context)
+            requireRunInAgentScope(store, RunId(runId), context)
             // admin-shim 404s the steps route for an unknown run rather than
             // serving an empty page; preserve that so callers can tell "no such
             // run" from "run with no steps".
@@ -49,9 +50,9 @@ object RunAdminHandlers {
      * agent-scoped peer may read a run (or its steps) only when the run's recorded agent is in its scope; a run it
      * cannot see and a run that does not exist answer the same denial.
      */
-    private fun requireRunInAgentScope(store: LocalBackendAdminStore, runId: String, context: AdminRpcRequestContext) {
+    private fun requireRunInAgentScope(store: LocalBackendAdminStore, run: RunId, context: AdminRpcRequestContext) {
         val scope = context.authorizedAgentIds ?: return
-        val owner = store.getRunProjected(runId)?.get("agent_id")?.let { it as? JsonPrimitive }?.contentOrNull
+        val owner = store.getRunProjected(run.value)?.get("agent_id")?.let { it as? JsonPrimitive }?.contentOrNull
         if (owner == null || owner !in scope) adminError(AgentScopeGuard.DENIED)
     }
 
