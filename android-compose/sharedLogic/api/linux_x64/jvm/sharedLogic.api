@@ -20990,8 +20990,8 @@ public final class com/letta/mobile/data/controller/node/iroh/ProcessScopedClien
 	public fun <init> ()V
 	public fun <init> (II)V
 	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun contains (Ljava/lang/String;)Z
-	public final fun markHandled (Ljava/lang/String;)Z
+	public final fun contains-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun markHandled-eAxutHE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
 	public final fun size ()I
 }
 
