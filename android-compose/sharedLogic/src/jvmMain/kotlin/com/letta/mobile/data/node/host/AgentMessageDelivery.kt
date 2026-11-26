@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.iroh.IrohAgentMessageSender
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -28,7 +29,8 @@ object AgentMessageDelivery {
      * Resolves [message]'s recipient in the address book [addressStore], then dials it from an Iroh
      * endpoint bound with the sender's identity from [identityDir], so the recipient can verify who
      * sent it. A recipient that does not resolve is reported without binding an endpoint. The
-     * endpoint is shut down before this returns.
+     * endpoint is shut down before this returns. No relay reachable within five seconds is reported
+     * as a failure rather than waited out.
      */
     suspend fun send(message: IrohAgentMessage, identityDir: File, addressStore: File): AgentSendResult {
         val resolver = IrohAgentAddressResolver(HostEndpointAddressStore(addressStore))
@@ -45,10 +47,17 @@ object AgentMessageDelivery {
             ),
         )
         try {
-            endpoint.online()
-            return IrohAgentMessageSender(endpoint, resolver).send(message)
+            // online() has no bound of its own: with no reachable relay it would wait forever.
+            val online = withTimeoutOrNull(ONLINE_TIMEOUT_MS) { endpoint.online() } != null
+            return if (online) {
+                IrohAgentMessageSender(endpoint, resolver).send(message)
+            } else {
+                AgentSendResult.Failed(message.toAgentId, "relay_unreachable")
+            }
         } finally {
             runCatching { endpoint.shutdown() }
         }
     }
+
+    private const val ONLINE_TIMEOUT_MS = 5_000L
 }

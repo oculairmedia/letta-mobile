@@ -36,6 +36,7 @@ import com.letta.mobile.data.node.NodeComposition
 import com.letta.mobile.data.node.NodeConfig
 import com.letta.mobile.data.node.NodeEndpointConfig
 import com.letta.mobile.data.node.NodeEndpointParts
+import com.letta.mobile.data.node.NodeToolsSocket
 import com.letta.mobile.data.node.host.AppServerProcessSource
 import com.letta.mobile.data.node.host.NodeHostBindings
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
@@ -555,11 +556,15 @@ class AppServerServeIrohCommand : CliktCommand(
             serverUrl = appServerUrl.takeUnless { ownAppServer },
             pidFile = appServerPidFile?.let(java.nio.file.Path::of),
         ),
-        toolsSocket = hostBindings.toolsSocket(
-            meridianTools.config(cliServed = agentToolsPolicy.servesCli()),
-            productionToolRegistry,
-            ::println,
-        ),
+        // Built when the node starts the socket, not here: the registry must not be evaluated
+        // before the canvas relay has supplied the host's canvas tools.
+        toolsSocket = NodeToolsSocket { scope, client ->
+            hostBindings.toolsSocket(
+                meridianTools.config(cliServed = agentToolsPolicy.servesCli()),
+                productionToolRegistry,
+                ::println,
+            ).start(scope, client)
+        },
     )
 
     /** This OS's node bindings, chosen once for the process. */
@@ -686,11 +691,14 @@ class AppServerServeIrohCommand : CliktCommand(
         val policy = agentToolsPolicy
         println("[iroh-app-server] Agent tools mode: ${policy.describe()}")
         val messaging = hostBindings.agentMessaging(meridianBinary)
+        // An in-process sender reads this host's own a2a files (LETTA_IROH_HOME included); a
+        // `meridian` subprocess keeps its own defaults unless a flag names a path.
+        val a2aPaths = a2aConfig().takeIf { messaging?.runner != null }
         return policy.apply(
             buildProductionExternalToolRegistryForTesting(
                 binary = messaging?.binary.orEmpty(),
-                identityDir = a2aIdentityDir,
-                addressStore = a2aAddressBook,
+                identityDir = a2aPaths?.identityDir?.path ?: a2aIdentityDir,
+                addressStore = a2aPaths?.addressBook?.path ?: a2aAddressBook,
                 localBackendDir = localBackendDir,
                 hostTools = hostCanvasTools + com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.hostTools(appToolRelay),
                 runner = messaging?.runner,
