@@ -1,59 +1,94 @@
-# Smoke: seeded agent onboarding + create-new-agent flow against the Iroh mini.
+# Smoke: seeded-agent landing + create-new-agent reachability against the Iroh mini.
 #
 # Pre-conditions (operator runs BEFORE this flow):
 #   1. Mini's wrapper is up and serving UDP Iroh (run start-test-appserver.sh).
-#   2. scripts/test-sites/seed-test-site-agent.sh has been applied (so two
-#      agents + their default conversation rows are present on disk).
+#   2. scripts/test-sites/seed-test-site-agent.sh has been applied (so agents + their
+#      conversation rows, including mini-sender and mini-with-tool, are present on disk).
 #   3. Pixel is configured for Iroh transport — AUTOMATION_SERVER_URL injected
 #      as iroh://<ticket> from the wrapper's startup log.
 #
 # This flow verifies:
-#   (A) Seeded-state landing: Pixel dials Iroh, lists agents, taps into a
-#       conversation, asserts the chat header is visible (no Welcome card).
-#   (B) Onboarding flow: from the Agents tab, the user can still kick off
-#       Create Agent and reach the agent-creation surface, even when agents
-#       are pre-seeded (proves the create flow is reachable, not just on a
-#       blank install).
+#   (A) Seeded-state landing: the phone dials Iroh, Home lists the seeded agents and a recent
+#       conversation, and tapping a seeded agent's orb opens a chat with its composer.
+#   (B) Create-agent reachability: with agents already present, the header menu opens the
+#       agent rail, its "New" button opens the new-conversation picker, whose "Create new agent"
+#       action reaches the agent-creation surface (editor page with its Create/save button).
+#       The flow stops before saving, so it creates nothing.
+#
+# Selectors are resource-ids. Text is used only where the element exposes no id: the rail's "New"
+# button (content-description "New") and the picker's "Create new agent" row (the picker is a
+# separate window whose testTags are not exported as resource-ids). Both are listed as missing ids.
 
 appId: com.letta.mobile.dev
 ---
 # --- (A) Seeded-state landing ---
 - launchApp
-# State restore may drop the user into the most-recently-opened chat thread,
-# not the Conversations tab. Navigate explicitly before asserting seeded rows.
-# The composer placeholder uses U+2026, not three ASCII periods.
 - extendedWaitUntil:
-    visible: "Type a message…"
+    visible:
+      id: "home_page"
     timeout: 20000
-    optional: true
+# Home shows a mascot per agent and at least one recent conversation row (not a day label).
+- assertVisible:
+    id: "home_greeting_mascot_.+"
+- assertVisible:
+    id: "home_recent_(?!day_).+"
+- assertNotVisible:
+    id: "home_error"
+# The seeded agents are orbs in the rail (the id carries the agent name from the mini backend).
+- tapOn:
+    id: "shell-header-menu"
+- extendedWaitUntil:
+    visible:
+      id: "shell-agent-rail-orb-mini-sender"
+    timeout: 10000
+- assertVisible:
+    id: "shell-agent-rail-orb-mini-with-tool"
+- takeScreenshot: smoke-iroh-seeded-agents
+# Open a seeded agent from its orb: the chat opens (the drawer closes itself) with its composer.
+- tapOn:
+    id: "shell-agent-rail-orb-mini-sender"
+- extendedWaitUntil:
+    visible:
+      id: "composer-input"
+    timeout: 20000
+- assertVisible:
+    id: "agent_identity_pill"
+
+# --- (B) Create-agent path is still reachable with agents present ---
+- tapOn:
+    id: "shell-header-menu"
+- extendedWaitUntil:
+    visible:
+      id: "shell-agent-rail"
+    timeout: 10000
+- tapOn: "New"
+- extendedWaitUntil:
+    visible: "Create new agent"
+    timeout: 10000
+- takeScreenshot: smoke-iroh-seeded-new-picker
+- tapOn: "Create new agent"
+- extendedWaitUntil:
+    visible:
+      id: "agent-editor-page"
+    timeout: 10000
+# Nothing can be saved yet: Save is present but disabled until the blank agent is named.
+- assertVisible:
+    id: "agent-editor-save"
+    enabled: false
+- assertVisible:
+    id: "settings-option-starter-blank"
+- takeScreenshot: smoke-iroh-seeded-create-agent
+# Leave the editor without saving. Back returns to where the editor was opened from, which was
+# observed to be Home or the chat depending on timing, so press Back again only if Home is not
+# showing yet. Home is the known state for the next flow; nothing was created.
+- pressKey: back
 - runFlow:
     when:
-      visible: "Type a message…"
+      notVisible:
+        id: "home_page"
     commands:
-      - tapOn:
-          point: "1340,200"
-      - extendedWaitUntil:
-          visible: "Conversations"
-          timeout: 10000
-      - tapOn:
-          text: "Conversations"
+      - pressKey: back
 - extendedWaitUntil:
-    visible: "mini-sender"
-    timeout: 20000
-# Welcome to Letta card must NOT appear because agents exist.
-- assertNotVisible: "Welcome to Letta"
-# The seeded agents should be visible — names from the mini backend.
-- assertVisible: "mini-sender"
-- assertVisible: "mini-with-tool"
-- takeScreenshot: smoke-iroh-seeded-agents
-
-# --- (B) Onboarding path is still reachable ---
-# Tap into the Agents tab (top-right account/agents glyph varies; safest is the
-# "Agents" tab on the bottom navigation, present when configured).
-- tapOn:
-    "Agents"
-- extendedWaitUntil:
-    visible: "Agents"
+    visible:
+      id: "home_page"
     timeout: 10000
-# The Create flow is reachable from the Agents screen.
-- assertVisible: "Create"
