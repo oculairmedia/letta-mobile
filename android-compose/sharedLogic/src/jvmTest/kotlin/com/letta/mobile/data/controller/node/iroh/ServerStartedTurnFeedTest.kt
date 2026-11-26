@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -51,7 +52,9 @@ class ServerStartedTurnFeedTest {
         val host = NodeTurnHost(hostScope, journal)
         val frames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
         val node = Node(host, journal, frames)
-        host.relayServerStartedTurns(frames, TurnFanoutDelivery(viewersFor = { viewers() }), nowMs = { node.nowMs })
+        // The relay's clock is virtual time plus a manual offset, so tests can age a turn with or without running its timer.
+        val clock = { testScheduler.currentTime + node.nowMs }
+        host.relayServerStartedTurns(frames, TurnFanoutDelivery(viewersFor = { viewers() }), nowMs = clock)
         runCurrent()
         return node
     }
@@ -227,6 +230,78 @@ class ServerStartedTurnFeedTest {
         assertEquals(listOf("assistant_message", "stop_reason"), viewer.frames.map { it.delta().text("message_type") })
     }
 
+    /** A turn whose `turn_finished` was lost and whose runtime then sends nothing still closes on the bound, on a timer. */
+    @Test
+    fun aSilentServerStartedTurnClosesOnTheBoundWithoutAnotherFrame() = runTest {
+        val node = node { emptySet() }
+        serverStartedTurn().dropLast(2).forEach { node.frames.emit(it) }
+        runCurrent()
+
+        advanceTimeBy(SERVER_TURN_SILENCE_MS + SILENCE_CHECK_SLACK_MS)
+        runCurrent()
+
+        val closed = entries(node.journal).lastOrNull()
+        assertEquals("turn_closed", closed?.kind, "the turn closed with no further frame: ${entries(node.journal).map { it.kind }}")
+        assertEquals("false", closed?.payload?.get("terminal_observed").toString())
+    }
+
+    /**
+     * A server-started turn runs one client-side tool for longer than the bound. The App Server says so
+     * (`update_loop_status` EXECUTING_CLIENT_SIDE_TOOL) and then sends the tool's result on the same run: the run stays
+     * one turn, closed by the server's own `turn_finished`, with every frame once.
+     */
+    @Test
+    fun aLongToolDoesNotSplitAServerStartedRun() = runTest {
+        val viewer = RecordingViewer("phone")
+        val node = node { setOf(viewer) }
+        val call = frame(
+            delta(
+                mapOf(
+                    "message_type" to "tool_call_message", "run_id" to RUN, "type" to "message",
+                    "id" to "tool-call-toolu_long",
+                ),
+            ),
+        )
+        listOf(serverStartedTurn()[0], decode(call), decode(serverLoopStatus(RUN, "EXECUTING_CLIENT_SIDE_TOOL"))).forEach {
+            node.frames.emit(it)
+        }
+        runCurrent()
+
+        advanceTimeBy(2 * SERVER_TURN_SILENCE_MS)
+        runCurrent()
+        val result = frame(
+            delta(mapOf("message_type" to "tool_return_message", "run_id" to RUN, "type" to "message", "tool_call_id" to "toolu_long")),
+        )
+        listOf(decode(result), decode(stop(RUN)), turnFinished()).forEach { node.frames.emit(it) }
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_open" }, "one turn: ${journal.map { it.kind }}")
+        assertEquals(1, journal.count { it.kind == "turn_closed" })
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+        assertEquals(
+            listOf("user_message", "tool_call_message", "tool_return_message", "stop_reason"),
+            viewer.kinds(),
+            "every frame once",
+        )
+    }
+
+    /** A later frame on the open turn's own run proves it alive even after a quiet stretch with no loop status. */
+    @Test
+    fun aFrameOnTheOpenRunAfterSilenceKeepsTheTurn() = runTest {
+        val node = node { emptySet() }
+        serverStartedTurn().take(2).forEach { node.frames.emit(it) }
+        runCurrent()
+
+        node.nowMs += 2 * SERVER_TURN_SILENCE_MS
+        listOf(decode(stop(RUN)), turnFinished()).forEach { node.frames.emit(it) }
+        runCurrent()
+
+        val journal = entries(node.journal)
+        assertEquals(1, journal.count { it.kind == "turn_open" }, "${journal.map { it.kind }}")
+        assertEquals("true", journal.last().payload?.get("terminal_observed").toString())
+    }
+
     /** The same, when the client's run is bound by `update_loop_status` before the silence bound passes. */
     @Test
     fun aClientRunBoundWhileAServerStartedTurnLostItsFinishGoesToTheClientTurn() = runTest {
@@ -298,7 +373,7 @@ class ServerStartedTurnFeedTest {
 
         serverStartedTurn().forEach { node.frames.emit(it) }
         runCurrent()
-        testScheduler.advanceUntilIdle()
+        advanceTimeBy(POST_TURN_WINDOW_SLACK_MS)
 
         // The client's own prompt echo (otid = its client message id) is its turn's, not a relayed server frame.
         val tapDeltas = phone.stream
@@ -516,6 +591,17 @@ class ServerStartedTurnFeedTest {
                 """"client_message_ids_by_run_id":{"$run":["$clientMessageId"]}}"""
             put("loop_status", Json.parseToJsonElement(status))
         }
+
+        /** A loop status [status] for [run] with no client prompt bound to it (a turn the server started itself). */
+        fun serverLoopStatus(run: String, status: String): String = envelope("update_loop_status") {
+            put("loop_status", Json.parseToJsonElement("""{"status":"$status","active_run_ids":["$run"]}"""))
+        }
+
+        /** Past the client relay's 5 s post-turn queue window; bounded, because the relay's silence timer never idles. */
+        const val POST_TURN_WINDOW_SLACK_MS = 10_000L
+
+        /** Slack past the bound for the relay's periodic silence check (it runs every 30 s). */
+        const val SILENCE_CHECK_SLACK_MS = 60_000L
 
         fun decode(raw: String): AppServerReceivedFrame = AppServerProtocol.decodeFrame(raw, AppServerChannel.Stream)
 
