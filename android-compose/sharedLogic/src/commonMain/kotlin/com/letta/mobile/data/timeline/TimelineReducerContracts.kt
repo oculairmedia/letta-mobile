@@ -245,15 +245,13 @@ fun enrichTimelineFromSnapshot(timeline: Timeline, snapshot: List<LettaMessage>)
         ev.copy(
             approvalDecided = byResponse || byReturn || ev.approvalDecided,
             approvalDecision = ev.approvalOutcomeFromEvidence(evidence) ?: ev.approvalDecision,
-            toolReturnContent = matchingReturns.firstOrNull()?.first?.let { fold.contentByCallId[it] } ?: ev.toolReturnContent,
-            toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: ev.toolReturnIsError,
             toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
             attachments = ev.attachments.mergeIncomingImages(
                 matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
             ).toTimelinePersistentList(),
-        )
+        ).withRowReturnOfFirstCall(matchingReturns.map { it.first })
     }
     if (newEvents == timeline.events) return timeline
     val persisted = newEvents.toTimelinePersistentList()

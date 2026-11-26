@@ -129,13 +129,11 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 val body = contentByCallId.getValue(tcid)
                 val updated = match.copy(
                     approvalDecided = match.approvalDecided || match.willCompleteWith(tcid),
-                    toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
-                    toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
                     toolReturnIsErrorByCallId = (match.toolReturnIsErrorByCallId + (tcid to isError)).toTimelinePersistentMap(),
                     toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
                     attachments = match.attachments.mergeIncomingImages(message.attachments).toTimelinePersistentList(),
-                )
+                ).withRowReturnOfFirstCall(listOf(tcid))
                 timeline = timeline.replaceByServerId(updated)
                 pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
                 hotPathTelemetry(
@@ -688,9 +686,6 @@ internal fun applyPendingToolReturns(
     if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
     val matchingReturns = ev.takeMatchingPendingReturns(pendingToolReturnsByCallId)
     if (matchingReturns.isEmpty()) return ev
-    // The row's own return is its first call's (the UI shows it on call 0), not the first one that matched.
-    val firstCallId = ev.toolCalls.first().effectiveId
-    val firstReturn = matchingReturns.firstOrNull { it.first == firstCallId }?.second
     // letta-mobile-fe51r: shared fold keeps projected previews from
     // clobbering full bodies and tracks truncation markers per call id.
     val fold = foldToolReturnBodies(ev.toolReturnContentByCallId, ev.toolReturnTruncationByCallId, matchingReturns)
@@ -702,16 +697,14 @@ internal fun applyPendingToolReturns(
         "serverId" attr ev.serverId,
         "count" attr matchingReturns.size,
     )
+    val answered = matchingReturns.mapTo(mutableSetOf()) { it.first }
     return ev.copy(
-        approvalDecided = ev.approvalDecided ||
-            ev.willCompleteWith(matchingReturns.mapTo(mutableSetOf()) { it.first }),
-        toolReturnContent = fold.contentByCallId[firstCallId] ?: ev.toolReturnContent,
-        toolReturnIsError = firstReturn?.let { it.isErr == true || it.status == "error" } == true || ev.toolReturnIsError,
+        approvalDecided = ev.approvalDecided || ev.willCompleteWith(answered),
         toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
         toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
         attachments = ev.attachments.mergeIncomingImages(
             matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
         ).toTimelinePersistentList(),
-    )
+    ).withRowReturnOfFirstCall(answered)
 }

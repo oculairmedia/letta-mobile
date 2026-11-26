@@ -28,15 +28,18 @@ internal fun TimelineReducerInput.reduceToolReturn(returned: ToolReturnMessage):
         prev.replaceByLogicalId(answered),
         call,
         pendingToolReturnsByCallId,
-        returned.notificationFor(call, answered),
+        returned.notificationFor(call, answered.toolReturnContentByCallId[callId]),
     )
 }
 
 /**
- * The row that lists [call]. The row named after it (`tc-<id>`) is tried first; a later
- * call of the same message, or a row named otherwise (an approval request), is found by walking back
- * from the tail without allocating: a live call sits a few rows from the end, and only a call no row
- * lists walks the whole resident window.
+ * The row that lists [call]. The row named after it (`tc-<id>`) is tried first (one hash lookup); a
+ * later call of the same message, or a row named otherwise (an approval request), is found by walking
+ * back from the tail without allocating, and a live call sits a few rows from the end. A return whose
+ * call no row lists walks every resident row before it parks: at most
+ * [DEFAULT_MAX_RESIDENT_EVENTS] + [DEFAULT_EVICT_BUFFER] (2,200) rows, more only while the turn in
+ * flight holds the window open (only [Timeline.append] slides it). That is once per such return, not
+ * per frame.
  */
 private fun Timeline.rowListing(call: String): TimelineEvent.Confirmed? {
     findByLogicalId("tc-$call")?.let { return it }
@@ -60,25 +63,21 @@ private fun TimelineEvent.Confirmed.answeredBy(callId: String, returned: ToolRet
     val fold = foldToolReturnBodies(toolReturnContentByCallId, toolReturnTruncationByCallId, listOf(callId to returned))
     // A return with no body still completes the call.
     val bodies = if (callId in fold.contentByCallId) fold.contentByCallId else fold.contentByCallId + (callId to "")
-    val body = bodies.getValue(callId)
-    // The row's own return is its first call's (the UI shows it on call 0); a later call's return lives only in the maps.
-    val ownsRowReturn = toolCalls.firstOrNull()?.effectiveId == callId
     return copy(
         approvalDecided = approvalDecided || willCompleteWith(callId),
-        toolReturnContent = if (ownsRowReturn) body.ifBlank { toolReturnContent ?: body } else toolReturnContent,
-        toolReturnIsError = if (ownsRowReturn) isError else toolReturnIsError,
         toolReturnContentByCallId = bodies.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = (toolReturnIsErrorByCallId + (callId to isError)).toTimelinePersistentMap(),
         toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
         attachments = (attachments + returned.attachments).distinct().toTimelinePersistentList(),
-    )
+    ).withRowReturnOfFirstCall(listOf(callId))
 }
 
+/** The preview is the returning call's own body, not the row's single return (which is its first call's). */
 private fun ToolReturnMessage.notificationFor(
     call: TimelineEvent.Confirmed,
-    answered: TimelineEvent.Confirmed,
+    body: String?,
 ): PendingIngestNotification? =
-    answered.toolReturnContent?.takeIf { messageType == "tool_return_message" && it.isNotBlank() }
+    body?.takeIf { messageType == "tool_return_message" && it.isNotBlank() }
         ?.let { PendingIngestNotification(call.serverId, messageType, it.take(NOTIFICATION_PREVIEW)) }
 
 private const val NOTIFICATION_PREVIEW = 140
