@@ -23,13 +23,17 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -69,9 +73,30 @@ class IrohCrossAgentTimelineBleedTest {
 
     private val transportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Every chat scope the harness created; [quiesceHarness] cancels and joins each. */
+    private val chatScopes = CopyOnWriteArrayList<CoroutineScope>()
+
+    /** Every transport the harness created; [quiesceHarness] joins each transport job. */
+    private val transports = CopyOnWriteArrayList<IrohChannelTransport>()
+
     @AfterTest
     fun tearDown() {
-        transportScope.cancel()
+        runBlocking { quiesceHarness() }
+    }
+
+    /**
+     * Cancelling is not quiescence. Every send leaves a post-send reconcile on its chat's scope -
+     * a REAL delayed coroutine for up to 6s (ChatSendCoordinator's postSendReconcileDelaysMs)
+     * that writes ws.postSendReconcile telemetry when it wakes - and a cancelled transport's
+     * already-running tail still executes its non-suspending remainder (see
+     * TelemetryLifecycleAfterAbandonedTransportTest). Cancel AND join every chat scope and
+     * transport job before the JVM hands control to the next test class, so no straggler event
+     * can land in a later test's Telemetry recorder.
+     */
+    private suspend fun quiesceHarness() {
+        chatScopes.forEach { it.coroutineContext[Job]!!.cancelAndJoin() }
+        transports.forEach { it.transportJob.cancelAndJoin() }
+        transportScope.coroutineContext[Job]!!.cancelAndJoin()
     }
 
     @Test
@@ -170,6 +195,31 @@ class IrohCrossAgentTimelineBleedTest {
         )
     }
 
+    @Test
+    fun postSendReconcilesDieWithTheHarnessTeardown() = runBlocking {
+        // The CI leak: a send from a brand-new chat schedules real delayed reconciles on that
+        // chat's scope, and a teardown that only cancels the transport scope lets the last
+        // wake-up fire ws.postSendReconcile telemetry into whichever test runs next. Tear the
+        // harness down, then watch a recorder for longer than the whole reconcile schedule:
+        // nothing may fire.
+        val stack = stack()
+        val timeline = RecordingTimelineWriter()
+        val chatB = stack.chat(AGENT_B, conversation = null, timeline)
+        chatB.coordinator.send("hello B")
+        withTimeout(10.seconds) { while (chatB.currentConversation() == null) delay(10.milliseconds) }
+        quiesceHarness()
+
+        val recorder = TelemetryRecorder()
+        Telemetry.installRecorder(recorder).use {
+            delay(TEARDOWN_QUIET_WINDOW)
+            assertTrue(
+                recorder.snapshot().none { it.name.startsWith(POST_SEND_RECONCILE_EVENT_PREFIX) },
+                "a post-send reconcile fired after the harness teardown: " +
+                    recorder.snapshot().map { it.name }.distinct(),
+            )
+        }
+    }
+
     // ------------------------------------------------------------------ harness
 
     private suspend fun stack(): Stack {
@@ -190,6 +240,7 @@ class IrohCrossAgentTimelineBleedTest {
             },
             serverTerminalWaitMs = 200L,
         )
+        transports += transport
         transport.connect("iroh://ticket", "", "device", "test")
         withTimeout(10.seconds) { while (transport.state.value !is ChannelTransportState.Connected) delay(10.milliseconds) }
         withTimeout(10.seconds) { while (client.subscriberCount < 1) delay(5.milliseconds) }
@@ -247,6 +298,13 @@ class IrohCrossAgentTimelineBleedTest {
         timeline: RecordingTimelineWriter,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        init {
+            // quiesceHarness cancels and joins this scope, so the coordinator's post-send
+            // reconciles (real delayed coroutines) cannot outlive the test that created the chat.
+            chatScopes += scope
+        }
+
         @Volatile private var active: String? = conversation
         fun currentConversation(): String? = active
         val coordinator = ChatSendCoordinator(
@@ -409,6 +467,10 @@ class IrohCrossAgentTimelineBleedTest {
         const val CONV_A = "local-conv-a"
         const val CONV_B = "local-conv-b"
         const val CONV_A2 = "local-conv-a2"
+        const val POST_SEND_RECONCILE_EVENT_PREFIX = "ws.postSendReconcile"
+
+        /** Longer than the full sequential reconcile schedule (750 + 2_500 + 6_000 ms). */
+        val TEARDOWN_QUIET_WINDOW = 9_750.milliseconds
         val SETTLE = 400.milliseconds
     }
 }
