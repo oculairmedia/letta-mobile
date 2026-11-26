@@ -426,9 +426,12 @@ class DurableSubagentRegistry(
 
     /** The record holding [early] too, or null when it is no longer awaiting a receipt or holds it already. */
     private fun SubagentChipRecord.withEarlyTerminal(early: SubagentEarlyTerminal): SubagentChipRecord? {
-        if (state.isTerminal || taskId != null || early in earlyTerminals) return null
+        if (!awaitsReceipt() || early in earlyTerminals) return null
         return copy(earlyTerminals = (earlyTerminals + early).takeLast(MAX_EARLY_TERMINALS))
     }
+
+    /** Live, and no receipt has named its task yet. */
+    private fun SubagentChipRecord.awaitsReceipt(): Boolean = !state.isTerminal && taskId == null
 
     /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
     private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
