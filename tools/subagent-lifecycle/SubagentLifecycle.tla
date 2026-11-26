@@ -1,20 +1,19 @@
 ------------------------- MODULE SubagentLifecycle -------------------------
 EXTENDS Naturals, TLC
 (***************************************************************************
-Bounded executable abstraction of origin/main ae0984cf0152e526abe42210e1a97e6464531bf7,
+Bounded executable abstraction of origin/main edb652dae4 plus the lifecycle fixes in this change,
 NOT a Kotlin implementation. Recheck this code map when updating the source.
 
 Expected results (main / fixed / fixed-disciplined):
-  P1 EventuallyTerminal: FAIL / FAIL / PASS
-  P2 NoResurrection (including eviction): FAIL / FAIL / PASS
+  P1 EventuallyTerminal: PASS / PASS / PASS   (early completion kept, applied on receipt)
+  P2 NoResurrection (including eviction): PASS / PASS / PASS   (evicted tombstones)
      RetainedTerminalNeverRuns: PASS / PASS / PASS
   P3 ParentIsolation: FAIL / PASS / PASS
-  P4 NoPendingRow: FAIL / FAIL / PASS
-     NoPendingChildRow: FAIL / PASS / PASS (targeted foreign-row obligation)
+  P4 NoPendingRow: PASS / PASS / PASS   (turn_closed settles unanswered calls)
+     NoPendingChildRow: PASS / PASS / PASS (close settles any unanswered row it holds)
 Run ./check.sh, ./able-to-fail.sh; trace.py out/<config>.<property>.out
 prints one transition per line. Break mutations disable expiry, terminal guards,
-foreign-identity suppression, and the disciplined result-before-close premise.
-The disciplined PASS is not evidence that normal close settles pending tools.
+foreign-identity suppression, and close settlement (with the disciplined premise).
 A fair replay of stale RUNNING facts is allowed, not asserted to have happened
 in the production incident: this explains a possible forever-live mechanism,
 not a claim to have replayed the exact device trace.
@@ -29,15 +28,19 @@ No claim of unbounded proof, clock accuracy, parsing coverage, or arbitrary deli
 
 Code map (paths relative to android-compose/sharedLogic/src):
 commonMain/kotlin/com/letta/mobile/data/subagents/DurableSubagentRegistry.kt:
-  Dispatch / Receipt / RunningSnapshot: observeLocked:255, insertLocked:290;
-  terminal guard:268; mergedWith:331 updates lastSeen on accepted sightings.
+  Dispatch / Receipt / RunningSnapshot: observeLocked, insertLocked; terminal guard
+  canAdvanceTo; mergedWith updates lastSeen on accepted sightings EXCEPT while an early
+  completion is held (keepingSilenceWhileCompletionPending). Receipt applies a held early
+  completion by exact task id (withEarlyTerminalApplied). Evicted keys keep a terminal
+  tombstone (rememberEvictedLocked, refuseEvictedLocked), bounded by
+  MAX_EVICTED_TOMBSTONES=4096; the model assumes this key is within that bound.
   Restart: retirePreviousProcess:109/116, assuming a known changed process
   identity, uses CANCELLED (not ORPHANED);
   confirmed snapshot absence below uses ORPHANED. Sweep: expireStaleLocked:143 and
   SubagentStaleSweep.kt staleRunningChips:22 (lastSeen TTL, NOT lastActivity);
   ReconcileAbsent: reconcileLocked:476 (snapshot absence confirmation abstracted
   as one already-confirmed absence; reconcileSnapshot:446 has a grace window).
-  Dismiss: dismiss:553; Evict: enforceCapacityLocked:629, evictionCandidates:668.
+  Dismiss: dismiss; Evict: enforceCapacityLocked, evictionCandidates.
   ParentStop/Close do NOT terminate chips: markParentTurnEnded:537.
 commonMain/kotlin/com/letta/mobile/data/subagents/SubagentRegistryStore.kt:20,23:
   mutations below represent the synchronized registry transaction ending in a
@@ -47,8 +50,9 @@ jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/
 ControllerSubagentRegistrySource.kt:
   Dispatch: ParentStreamProjection.dispatchEntry:150;
   Receipt: receiptEntry:165 (requires existing dispatch);
-  Notify: terminalEntry:183, matchesDispatch:210: task-only notification is
-  discarded before the receipt supplies taskId. No inbox/retry exists here.
+  Notify: terminalEntry, matchesDispatch; with no match, rememberBeforeReceipt stores a
+  task-identified notification on live receipt-less dispatches (rememberEarlyTerminal,
+  persisted). Missing task id fails closed; titles never match.
   Lifecycle: ingestSubagentState:228/236 authoritative terminal observation.
   RunningSnapshot: same loop; ReconcileAbsent:251; Sweep: start:272/275.
 commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt:
@@ -58,8 +62,11 @@ commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt:
 commonMain/kotlin/com/letta/mobile/data/runtime/TurnDraftProcessor.kt:
   ParentStop: bufferTail:165; Close: publishTerminal:187 and settle window:214;
   ParentCall/ParentResult: process:111/117/135 (track then emit);
-  FailTurn: publishTerminal:187/188. Normal completion does not settle pending
-  tools, abnormal completion does. WorkerFinish and Tick are environment actions:
+  FailTurn: publishTerminal:187/188 (abnormal terminal settles pending tools).
+  Close also settles: the host journals turn_closed after every relayed frame of the
+  turn (NodeTurnHost.run finally); the shared feed projection
+  (FeedRowProjector.settleClosedTurn) settles each still-unanswered call of that turn
+  through TimelineMutation.SettleDanglingToolCalls. A later real result still replaces it. WorkerFinish and Tick are environment actions:
   a worker can finish without delivering a matching notification; time advances.
   Child identities abstract a mismatch in ANY of own agent/session/conversation,
   independent of the correctly scoped transport envelope. Tag presence is separate.
@@ -73,8 +80,7 @@ at non-expired ages are stuttering steps (the periodic scheduler still runs). NO
 accurate server snapshot or a terminal lifecycle event. Repeated accepted stale
 RUNNING sightings can reset TTL indefinitely, even with fair clock/sweep. Thus
 EventuallyTerminal fails in replay environments; quiet proves the TTL fallback.
-Fixed changes ONLY the fail-closed foreign-identity delta predicate. It does not
-repair notification correlation, capacity history, or normal pending settlement.
+Fixed changes ONLY the fail-closed foreign-identity delta predicate.
 Disciplined is an explicit *environment restriction*, not an implemented fix:
 no eviction/replayed RUNNING, and parent result precedes normal close. It gives
 positive baselines for mutation tests. Every production gap remains expected
@@ -82,8 +88,8 @@ in main/fixed; a new/unexpected failure (or disappearing witness) fails check.sh
 
 NoResurrection is deliberately global for this exact dispatch, including after
 capacity eviction. RetainedTerminalNeverRuns separately tests the actual guard.
-Eviction deletes ordinary history, so a later same-key RUNNING snapshot inserts
-anew. Dismissal tombstones, unlike ordinary terminals, cannot be evicted.
+Eviction deletes ordinary history but keeps a terminal tombstone, so a later same-key
+RUNNING snapshot is refused. Dismissal tombstones, unlike ordinary terminals, cannot be evicted.
 ***************************************************************************)
 CONSTANTS Fixed, Environment, Break
 VARIABLES chip, disk, receipt, finished, notified, ended, closed, age,
@@ -108,9 +114,13 @@ Dispatch == /\ chip = "ABSENT" /\ ~evicted
             /\ UNCHANGED <<receipt, finished, notified, ended, closed,
                  terminalSeen, evicted, dismissed, resurrected, leaked,
                  childSent, childReturned, parentSent, parentReturned, failed, reconnected>>
+\* A held early completion (notified before the receipt) is applied by exact task id.
 Receipt == /\ chip # "ABSENT" /\ ~receipt /\ receipt' = TRUE /\ age' = 0
-           /\ UNCHANGED <<chip, disk, finished, notified, ended, closed,
-                terminalSeen, evicted, dismissed, resurrected, leaked,
+           /\ chip' = IF notified /\ chip = "RUNNING" /\ "forgetEarly" \notin Break
+                       THEN "COMPLETED" ELSE chip
+           /\ disk' = chip' /\ terminalSeen' = (terminalSeen \/ chip' \in Terminal)
+           /\ UNCHANGED <<finished, notified, ended, closed,
+                evicted, dismissed, resurrected, leaked,
                 childSent, childReturned, parentSent, parentReturned, failed, reconnected>>
 WorkerFinish == /\ chip # "ABSENT" /\ ~finished /\ finished' = TRUE
                 /\ UNCHANGED <<chip, disk, receipt, notified, ended, closed, age,
@@ -135,11 +145,13 @@ Tick == /\ age < 2 /\ age' = age + 1
         /\ UNCHANGED <<chip, disk, receipt, finished, notified, ended, closed,
              terminalSeen, evicted, dismissed, resurrected, leaked, childSent,
              childReturned, parentSent, parentReturned, failed, reconnected>>
+\* An evicted key's tombstone refuses RUNNING; a held early completion stops TTL renewal.
 RunningSnapshot ==
     /\ (Environment = "replay" \/ "resurrect" \in Break)
-    /\ chip' = IF chip \in {"ABSENT", "RUNNING"} \/ "resurrect" \in Break
+    /\ chip' = IF chip = "RUNNING" \/ (chip = "ABSENT" /\ ~evicted) \/ "resurrect" \in Break
                 THEN "RUNNING" ELSE chip
-    /\ disk' = chip' /\ age' = IF chip' = "RUNNING" THEN 0 ELSE age
+    /\ disk' = chip'
+    /\ age' = IF chip' = "RUNNING" /\ ~(notified /\ ~receipt) THEN 0 ELSE age
     /\ resurrected' = (resurrected \/ (terminalSeen /\ chip' = "RUNNING"))
     /\ UNCHANGED <<receipt, finished, notified, ended, closed, terminalSeen,
          evicted, dismissed, leaked, childSent, childReturned, parentSent,
@@ -183,12 +195,15 @@ ChildResult == \E tagged \in BOOLEAN:
     /\ UNCHANGED <<chip, disk, receipt, finished, notified, ended, closed, age,
          terminalSeen, evicted, dismissed, resurrected, leaked, childSent,
          parentSent, parentReturned, failed, reconnected>>
+\* failed here means "every unanswered row visibly settled", exactly what FailTurn shows.
+Pending == (parentSent /\ ~parentReturned) \/ (childSent /\ ~childReturned)
 Close == /\ ended /\ ~closed
          /\ (Environment # "disciplined" \/ ~parentSent \/ parentReturned \/ "pending" \in Break)
          /\ closed' = TRUE
+         /\ failed' = (failed \/ (Pending /\ "pending" \notin Break))
          /\ UNCHANGED <<chip, disk, receipt, finished, notified, ended, age,
               terminalSeen, evicted, dismissed, resurrected, leaked, childSent,
-              childReturned, parentSent, parentReturned, failed, reconnected>>
+              childReturned, parentSent, parentReturned, reconnected>>
 FailTurn == /\ ~closed /\ closed' = TRUE /\ failed' = TRUE
             /\ UNCHANGED <<chip, disk, receipt, finished, notified, ended, age,
                  terminalSeen, evicted, dismissed, resurrected, leaked, childSent,

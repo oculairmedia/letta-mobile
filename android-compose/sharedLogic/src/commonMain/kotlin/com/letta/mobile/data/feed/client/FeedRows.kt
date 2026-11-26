@@ -9,18 +9,25 @@ import com.letta.mobile.data.feed.wire.ConversationFeedWire
 import com.letta.mobile.data.feed.wire.FeedDelta
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.runtime.admitsParentStreamDelta
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
+import com.letta.mobile.data.timeline.TimelineMutation
 import com.letta.mobile.data.timeline.TimelineReducerState
 import com.letta.mobile.data.timeline.keyedByOwnRecords
 import com.letta.mobile.data.timeline.reduceLive
+import com.letta.mobile.data.timeline.reduceProductionMutation
+import com.letta.mobile.data.timeline.unresolvedToolCallIds
 import com.letta.mobile.data.timeline.withPromptOwnedRunIds
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -35,6 +42,12 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
     private var reduction = empty
     private val conversationId = conversation.value
 
+    /**
+     * The parent tool calls each still-open turn emitted. A turn's entry is dropped when its
+     * `turn_closed` arrives, so this holds only turns the journal has not closed yet.
+     */
+    private val toolCallsByTurn = mutableMapOf<String, MutableSet<String>>()
+
     /** Entries that were pointers (too large to carry): they name a row that is not loaded, and draw nothing yet. */
     var pointerEntries: Int = 0
         private set
@@ -42,10 +55,12 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
     fun reset() {
         reduction = empty
         pointerEntries = 0
+        toolCallsByTurn.clear()
     }
 
     /** Folds [entry] into the rows and returns the messages it carried (for a consumer that ingests them itself). */
     fun apply(entry: FeedDelta): List<LettaMessage> {
+        if (entry.kind == ConversationFeedWire.KIND_TURN_CLOSED) settleClosedTurn(entry.turn)
         if (entry.kind != ConversationFeedWire.KIND_STREAM_DELTA) return emptyList()
         val payload = entry.payload
         if (payload == null) {
@@ -54,9 +69,34 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         }
         if (!admitsParentStreamDelta(payload, AppServerRuntimeScope(agent.value, conversationId))) return emptyList()
         return messagesOf(entry, payload).also { messages ->
-            messages.forEach { reduction = reduction.reduceLive(it, agent.value) }
+            messages.forEach { message ->
+                reduction = reduction.reduceLive(message, agent.value)
+                message.emittedToolCallIds().takeIf { it.isNotEmpty() }?.let { toolCallsByTurn.getOrPut(entry.turn) { mutableSetOf() } += it }
+            }
         }
     }
+
+    /**
+     * TLA+ NoPendingRow: the host journals `turn_closed` only after every frame it relayed for
+     * the turn (NodeTurnHost.run's finally), so a call of that turn still unanswered there gets no result in this
+     * turn, whether the turn ended normally or not. A conversation read through the feed runs no ledger sweep, so
+     * the shared projection settles each such call visibly, as the ledger's dangling sweep would ("No tool result
+     * recorded", an error). A real result journaled later (an async tool answering in a later turn) still replaces it.
+     */
+    private fun settleClosedTurn(turn: String) {
+        val calls = toolCallsByTurn.remove(turn) ?: return
+        val unanswered = reduction.timeline.unresolvedToolCallIds().intersect(calls)
+        if (unanswered.isEmpty()) return
+        val settle = TimelineMutation.SettleDanglingToolCalls(reduction.danglingSweepGeneration, reduction.lifecycleEpoch, unanswered)
+        reduction = reduceProductionMutation(reduction, settle).next
+        Telemetry.event(TAG, "turnClosed.settledUnanswered", "turn" attr turn, "count" attr unanswered.size)
+    }
+
+    private fun LettaMessage.emittedToolCallIds(): List<String> = when (this) {
+        is ToolCallMessage -> effectiveToolCalls
+        is ApprovalRequestMessage -> effectiveToolCalls
+        else -> emptyList()
+    }.map { it.effectiveId }.filter { it.isNotBlank() }
 
     private fun messagesOf(entry: FeedDelta, payload: JsonObject): List<LettaMessage> = RuntimeEventServerFrameMapper.map(
         payload = RuntimeEventPayload.RemoteStreamFrame(
@@ -81,6 +121,10 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
     }
 
     private fun JsonObject.text(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull
+
+    private companion object {
+        const val TAG = "FeedRows"
+    }
 }
 
 /** How one publication of rows differs from the one before it. */
