@@ -79,12 +79,25 @@ import org.robolectric.annotation.Config
 class RailChatBackTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private val viewModel: AdminChatViewModel = openedChatViewModel(
+    private val conversationA: AdminChatViewModel = openedChatViewModel(
         pagingHost(),
         TestData.agent(AGENT, "Bench"),
         "conversation-rail",
         "rail-back",
     )
+
+    /**
+     * The conversation the shell switches to in place: the composition stays (the workspace keeps the
+     * page), the route changes, so the page sees a new conversation while its remembered state lived on.
+     */
+    private val conversationB: AdminChatViewModel = openedChatViewModel(
+        pagingHost(),
+        TestData.agent(AGENT, "Bench"),
+        "conversation-switched",
+        "rail-back-switched",
+    )
+
+    private var switchedToB by mutableStateOf(false)
 
     /** What the person sees: Home, the chat's full page, or the conversation's canvas. */
     private enum class Seen { Home, Chat, Canvas }
@@ -102,7 +115,8 @@ class RailChatBackTest {
 
     @After
     fun tearDown() {
-        viewModel.viewModelScope.cancel()
+        conversationA.viewModelScope.cancel()
+        conversationB.viewModelScope.cancel()
     }
 
     @Test
@@ -191,6 +205,32 @@ class RailChatBackTest {
         assertEquals(Seen.Home, seen())
     }
 
+    /**
+     * A canvas seen in one conversation must not follow the person into the next. The shell switches
+     * conversations through the same composition, so the page's canvas-seen flag is keyed by the
+     * conversation: after A's canvas was open and its full page shown, switching to B (which opens on
+     * the full page A was left on) has Back land on Home — never on B's canvas, which nobody opened.
+     */
+    @Test
+    fun backFromAConversationSwitchedToAfterAnotherSCanvasWasSeenLandsOnHome() {
+        openOnCanvas = true
+        openChatFromTheRail()
+        assertEquals(Seen.Canvas, seen())
+        // A's canvas seen; the person opens its full page.
+        compose.onNodeWithTag(CHAT_HEAD_TAG).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(OPEN_CHAT_TAG).performClick()
+        assertEquals(Seen.Chat, seen())
+
+        // The shell switches to B's conversation: the same composition, a new route.
+        switchedToB = true
+        assertEquals("B opens on the full page A was left on", Seen.Chat, seen())
+
+        pressBack()
+        assertEquals("Back from B never shows a canvas nobody opened", Seen.Home, seen())
+        assertEquals("one Back reached the host", 1, hostBacks)
+    }
+
     private fun openChatFromTheRail() {
         compose.setContent { Workspace() }
         compose.waitForIdle()
@@ -243,7 +283,9 @@ class RailChatBackTest {
         when (page) {
             Page.Home -> Text("Home", modifier.testTag(HOME_TAG))
             Page.Chat -> Box(modifier.fillMaxSize()) {
-                CompositionLocalProvider(LocalChatCanvasSlot provides canvasSlot.takeIf { withCanvas }) { ChatPage() }
+                CompositionLocalProvider(LocalChatCanvasSlot provides canvasSlot.takeIf { withCanvas }) {
+                    ChatPage(if (switchedToB) conversationB else conversationA)
+                }
             }
         }
     }
@@ -252,7 +294,7 @@ class RailChatBackTest {
     private val canvasSlot = ChatCanvasSlot { _, _, _ -> Box(Modifier.fillMaxSize().testTag(CANVAS_TAG)) }
 
     @Composable
-    private fun ChatPage() {
+    private fun ChatPage(viewModel: AdminChatViewModel) {
         val navigation = remember { ChatScreenNavigationCallbacks() }
         SharedChatPage(
             SharedChatPageParams(
