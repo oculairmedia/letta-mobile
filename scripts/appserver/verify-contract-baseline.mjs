@@ -6,60 +6,78 @@ import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const args = process.argv.slice(2);
-const packageRootIndex = args.indexOf("--package-root");
-if (packageRootIndex < 0 || !args[packageRootIndex + 1]) {
-  throw new Error("Usage: verify-contract-baseline.mjs --package-root <installed-package-root> [--unions-only]");
+export const repositoryRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+export const fixtureRoot = join(repositoryRoot, "android-compose/sharedLogic/src/jvmTest/resources/appserver");
+
+/** The command and message unions an installed package declares, in declaration order. */
+export function installedUnions(packageRoot, protocolDeclaration) {
+  const corpus = loadDeclarationCorpus(packageRoot, join(packageRoot, protocolDeclaration)).map(({ text }) => text).join("\n");
+  return {
+    commands: extractDiscriminants(corpus, "WsProtocolCommand"),
+    messages: extractDiscriminants(corpus, "WsProtocolMessage"),
+  };
 }
 
-const packageRootArgument = resolve(args[packageRootIndex + 1]);
-// --unions-only: compare just the command/message unions, e.g. to ask whether a newer release
-// changed the protocol surface the Kotlin client is pinned to.
-const unionsOnly = args.includes("--unions-only");
-const repositoryRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const fixtureRoot = join(repositoryRoot, "android-compose/sharedLogic/src/jvmTest/resources/appserver");
-const matrix = readJson(join(fixtureRoot, "app-server-v2-contract-matrix.json"));
-const inventory = readJson(join(fixtureRoot, "installed-protocol-v2-inventory.json"));
-const packageRoot = resolveInstalledPackageRoot(packageRootArgument, matrix.baseline.package);
-if (unionsOnly) {
-  const corpus = loadDeclarationCorpus(packageRoot, join(packageRoot, inventory.source.protocol_declaration)).map(({ text }) => text).join("\n");
-  assertEqual("command union", inventory.commands, extractDiscriminants(corpus, "WsProtocolCommand"));
-  assertEqual("message union", inventory.messages, extractDiscriminants(corpus, "WsProtocolMessage"));
-  console.log(`Unions match the pinned App Server v2 inventory at ${packageRoot}.`);
-  process.exit(0);
+/** Protocol hashes and corpus files of an installed package, as the matrix and inventory record them. */
+export function installedProtocolSource(packageRoot, protocolDeclaration) {
+  const declaration = join(packageRoot, protocolDeclaration);
+  const declarations = loadDeclarationCorpus(packageRoot, declaration);
+  return {
+    protocol_sha256: sha256(readFileSync(declaration, "utf8")),
+    protocol_corpus_sha256: sha256DeclarationCorpus(declarations),
+    protocol_corpus_files: declarations.map(({ path }) => path),
+  };
 }
-const packageJson = readJson(join(packageRoot, "package.json"));
-const entrypoint = join(packageRoot, "letta.js");
-const declaration = join(packageRoot, inventory.source.protocol_declaration);
-const declarationText = readFileSync(declaration, "utf8");
-// 0.29.x re-exports app_server_info types from a sibling module; unions still
-// live in protocol_v2.d.ts but member interfaces may be declared next door.
-const declarations = loadDeclarationCorpus(packageRoot, declaration);
-const declarationCorpus = declarations.map(({ text }) => text).join("\n");
-const declarationCorpusHash = sha256DeclarationCorpus(declarations);
-const declarationPaths = declarations.map(({ path }) => path);
 
-assertEqual("package name", matrix.baseline.package, packageJson.name);
-assertEqual("package version", matrix.baseline.version, packageJson.version);
-assertEqual("Node version", matrix.baseline.node, process.version);
-assertEqual("protocol hash", matrix.baseline.protocol_sha256, sha256(declarationText));
-assertEqual("inventory protocol hash", inventory.source.protocol_sha256, sha256(declarationText));
-assertEqual("protocol corpus hash", matrix.baseline.protocol_corpus_sha256, declarationCorpusHash);
-assertEqual("inventory protocol corpus hash", inventory.source.protocol_corpus_sha256, declarationCorpusHash);
-assertEqual("protocol corpus files", matrix.baseline.protocol_corpus_files, declarationPaths);
-assertEqual("inventory protocol corpus files", inventory.source.protocol_corpus_files, declarationPaths);
-assertEqual("command union", inventory.commands, extractDiscriminants(declarationCorpus, "WsProtocolCommand"));
-assertEqual("message union", inventory.messages, extractDiscriminants(declarationCorpus, "WsProtocolMessage"));
+function main() {
+  const args = process.argv.slice(2);
+  const packageRootIndex = args.indexOf("--package-root");
+  if (packageRootIndex < 0 || !args[packageRootIndex + 1]) {
+    throw new Error("Usage: verify-contract-baseline.mjs --package-root <installed-package-root> [--unions-only]");
+  }
 
-const probes = new Map(matrix.cli_probes.map((probe) => [probe.classification, probe]));
-verifyProbe(probes.get("installed_node_version"), ["--version"], process.execPath);
-verifyProbe(probes.get("installed_version"), [entrypoint, "--version"]);
-verifyProbe(probes.get("server_listener"), [entrypoint, "server", "--help"]);
-verifyProbe(probes.get("app_server_v2"), [entrypoint, "app-server", "--help"]);
+  const packageRootArgument = resolve(args[packageRootIndex + 1]);
+  // --unions-only: compare just the command/message unions, e.g. to ask whether a newer release
+  // changed the protocol surface the Kotlin client is pinned to.
+  const unionsOnly = args.includes("--unions-only");
+  const matrix = readJson(join(fixtureRoot, "app-server-v2-contract-matrix.json"));
+  const inventory = readJson(join(fixtureRoot, "installed-protocol-v2-inventory.json"));
+  const packageRoot = resolveInstalledPackageRoot(packageRootArgument, matrix.baseline.package);
+  if (unionsOnly) {
+    const unions = installedUnions(packageRoot, inventory.source.protocol_declaration);
+    assertEqual("command union", inventory.commands, unions.commands);
+    assertEqual("message union", inventory.messages, unions.messages);
+    console.log(`Unions match the pinned App Server v2 inventory at ${packageRoot}.`);
+    return;
+  }
+  const packageJson = readJson(join(packageRoot, "package.json"));
+  const entrypoint = join(packageRoot, "letta.js");
+  const source = installedProtocolSource(packageRoot, inventory.source.protocol_declaration);
+  const unions = installedUnions(packageRoot, inventory.source.protocol_declaration);
 
-console.log(`Verified App Server v2 baseline for ${packageJson.name}@${packageJson.version} at ${packageRoot}.`);
+  assertEqual("package name", matrix.baseline.package, packageJson.name);
+  assertEqual("package version", matrix.baseline.version, packageJson.version);
+  assertEqual("Node version", matrix.baseline.node, process.version);
+  assertEqual("protocol hash", matrix.baseline.protocol_sha256, source.protocol_sha256);
+  assertEqual("inventory protocol hash", inventory.source.protocol_sha256, source.protocol_sha256);
+  assertEqual("protocol corpus hash", matrix.baseline.protocol_corpus_sha256, source.protocol_corpus_sha256);
+  assertEqual("inventory protocol corpus hash", inventory.source.protocol_corpus_sha256, source.protocol_corpus_sha256);
+  assertEqual("protocol corpus files", matrix.baseline.protocol_corpus_files, source.protocol_corpus_files);
+  assertEqual("inventory protocol corpus files", inventory.source.protocol_corpus_files, source.protocol_corpus_files);
+  assertEqual("command union", inventory.commands, unions.commands);
+  assertEqual("message union", inventory.messages, unions.messages);
 
-function resolveInstalledPackageRoot(candidate, expectedName) {
+  const probes = new Map(matrix.cli_probes.map((probe) => [probe.classification, probe]));
+  for (const probe of matrix.cli_probes) {
+    const expected = readFileSync(join(fixtureRoot, probe.fixture), "utf8");
+    assertEqual(`${probe.classification} output`, expected, runCliProbe(probe.classification, entrypoint));
+  }
+  if (probes.size !== CLI_PROBE_ARGS.size) throw new Error("Missing CLI probe classification");
+
+  console.log(`Verified App Server v2 baseline for ${packageJson.name}@${packageJson.version} at ${packageRoot}.`);
+}
+
+export function resolveInstalledPackageRoot(candidate, expectedName) {
   const directPackageJson = join(candidate, "package.json");
   try {
     if (readJson(directPackageJson).name === expectedName) return candidate;
@@ -79,11 +97,20 @@ function resolveInstalledPackageRoot(candidate, expectedName) {
   throw new Error(`Could not resolve installed package ${expectedName} from ${candidate}`);
 }
 
-function verifyProbe(probe, probeArgs, executable = process.execPath) {
-  if (!probe) throw new Error("Missing CLI probe classification");
-  const actual = execFileSync(executable, probeArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  const expected = readFileSync(join(fixtureRoot, probe.fixture), "utf8");
-  assertEqual(`${probe.classification} output`, expected, actual);
+// Each CLI probe the matrix records, as the arguments that produce its fixture. The Node probe
+// runs the Node binary itself; the others run the package entrypoint with it.
+const CLI_PROBE_ARGS = new Map([
+  ["installed_node_version", () => ["--version"]],
+  ["installed_version", (entrypoint) => [entrypoint, "--version"]],
+  ["server_listener", (entrypoint) => [entrypoint, "server", "--help"]],
+  ["app_server_v2", (entrypoint) => [entrypoint, "app-server", "--help"]],
+]);
+
+/** Stdout of the CLI probe `classification` against `entrypoint`, run with the current Node. */
+export function runCliProbe(classification, entrypoint) {
+  const probeArgs = CLI_PROBE_ARGS.get(classification);
+  if (!probeArgs) throw new Error(`Unknown CLI probe classification ${classification}`);
+  return execFileSync(process.execPath, probeArgs(entrypoint), { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
 function loadDeclarationCorpus(packageRoot, primaryPath) {
@@ -189,7 +216,7 @@ function bareTypeName(member) {
   return withoutImport.includes(".") ? withoutImport.slice(withoutImport.lastIndexOf(".") + 1) : withoutImport;
 }
 
-function readJson(path) {
+export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
@@ -201,4 +228,8 @@ function assertEqual(label, expected, actual) {
   if (JSON.stringify(expected) !== JSON.stringify(actual)) {
     throw new Error(`${label} mismatch\nexpected: ${JSON.stringify(expected)}\nactual:   ${JSON.stringify(actual)}`);
   }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
 }
