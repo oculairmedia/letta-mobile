@@ -178,7 +178,7 @@ fun MascotLive(
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
     val gestures = rememberMascotGestureEffects(entry, onClick, MotionPreference(reducedMotion))
     val engaged = mascotEngaged(presence) || gestures.petting
-    val moving = rememberMascotMoving(engaged, identity, gestures.touches + wake, pointer = cursor)
+    val moving = rememberMascotMoving(engaged, identity, gestures.touches + wake, pointer = cursor, wake = mascotPresenceWake(presence))
     // At rest the clock leaves composition and asks for no frames.
     if (moving) MascotClock(entry, registry)
     // Gaze: this tile vs the pointer, the composer / timeline rects, the other mascots and every

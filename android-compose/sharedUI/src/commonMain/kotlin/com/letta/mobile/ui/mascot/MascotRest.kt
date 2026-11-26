@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.data.presence.RunEdges
 import kotlin.time.Duration
@@ -28,13 +29,22 @@ import kotlinx.coroutines.delay
  */
 
 /**
- * Whether a live mascot has something to show right now: any presence but plain idle (working,
- * the user typing to it, an approval, an error). The run edge counts are history, not presence: an
- * agent that has finished runs and does nothing now is at rest. A pointer is not engagement by
- * being in the window; each move of it is a wake ([rememberMascotMoving]).
+ * Whether a live mascot has something to show for as long as it lasts: a turn in flight (thinking,
+ * working, delegating, speaking) or the user typing to it (it reacts to each keystroke). Everything
+ * else presence can say is a held pose - a dream (eyes closed), a parked approval, a failure - and
+ * can stand for hours: a background reflection that never reports its end kept an idle phone chat
+ * redrawing every vsync. Those wake the mascot when they change ([mascotPresenceWake]) so the
+ * transition plays, then it rests in the pose. A pointer is not engagement by being in the window;
+ * each move of it is a wake too.
  */
 internal fun mascotEngaged(presence: AgentPresence): Boolean =
-    presence.copy(edges = RunEdges.NONE) != AgentPresence.IDLE
+    presence.activity != AgentActivityKind.IDLE || presence.userTyping
+
+/**
+ * The part of [presence] whose every change is a beat to play: all of it but the run edge counts,
+ * which are history (an agent that has finished runs and does nothing now is at rest).
+ */
+internal fun mascotPresenceWake(presence: AgentPresence): AgentPresence = presence.copy(edges = RunEdges.NONE)
 
 /**
  * How long a mascot keeps moving after it stops being engaged (or first appears, or changes
@@ -46,16 +56,23 @@ internal val MASCOT_REST_DELAY: Duration = 3.seconds
 
 /**
  * True while [MascotLive]'s scene should advance: while [engaged], and for [MASCOT_REST_DELAY]
- * after it stops being engaged, [identity] changes, [touches] counts another gesture on it (a
- * poke on a resting mascot wakes it to play the reaction) or the [pointer] moves (the eyes follow
- * every move). False afterwards: the surface keeps its last frame and nothing asks for another.
- * On a desktop or in a browser the pointer is nearly always in the window, so a still one lets the
- * mascot rest like an absent one.
+ * after it stops being engaged, [identity] changes, [wake] changes (a held presence such as a dream
+ * or an approval begins or ends), [touches] counts another gesture on it (a poke on a resting
+ * mascot wakes it to play the reaction) or the [pointer] moves (the eyes follow every move). False
+ * afterwards: the surface keeps its last frame and nothing asks for another. On a desktop or in a
+ * browser the pointer is nearly always in the window, so a still one lets the mascot rest like an
+ * absent one.
  */
 @Composable
-internal fun rememberMascotMoving(engaged: Boolean, identity: MascotIdentity, touches: Int = 0, pointer: Offset? = null): Boolean {
+internal fun rememberMascotMoving(
+    engaged: Boolean,
+    identity: MascotIdentity,
+    touches: Int = 0,
+    pointer: Offset? = null,
+    wake: AgentPresence? = null,
+): Boolean {
     var moving by remember { mutableStateOf(true) }
-    LaunchedEffect(engaged, identity, touches, pointer) {
+    LaunchedEffect(engaged, identity, touches, pointer, wake) {
         moving = true
         if (!engaged) {
             delay(MASCOT_REST_DELAY)
