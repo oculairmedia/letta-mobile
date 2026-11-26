@@ -8,6 +8,7 @@ import com.letta.mobile.data.node.carrier.NodeLinkClosure
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
+import com.letta.mobile.util.runCatchingCancellable
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.RecvStream
@@ -84,15 +85,11 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
     /** Writes [frame] on [send] under [mutex]; [frameParts] lets a frame over one Iroh frame go as `frame_part`s. */
     suspend fun write(send: SendStream, mutex: Mutex, frame: NodeFrame, frameParts: Boolean) {
         if (closureState.value != null) throw closed()
-        try {
+        val failure = runCatchingCancellable {
             mutex.withLock { IrohFrameCodec.write(send, frame.encode(), MAX_FRAME_BYTES, allowFrameParts = frameParts) }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: IrohFrameCodec.FrameTooLargeException) {
-            throw error
-        } catch (_: Exception) {
-            throw closed()
-        }
+        }.exceptionOrNull() ?: return
+        // A frame too large is the caller's to handle; any other write failure means the link is gone.
+        throw failure as? IrohFrameCodec.FrameTooLargeException ?: closed()
     }
 
     /**
@@ -103,15 +100,20 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
      * held by QUIC flow control. [closeAtEnd] closes [sink] when the stream ends, for a call lane; the control and push
      * lanes close with the link.
      */
-    fun read(recv: RecvStream, sink: SendChannel<NodeFrame>, maxReassembledBytes: () -> Int, closeAtEnd: Boolean) {
+    fun read(recv: RecvStream, sink: SendChannel<NodeFrame>, maxReassembledBytes: () -> Int, closeAtEnd: Boolean) =
+        readFrom({ recv.read(it) }, sink, maxReassembledBytes, closeAtEnd)
+
+    /** [read] over any byte [source] (up to the given count per call, empty once the stream ended). */
+    internal fun readFrom(
+        source: suspend (UInt) -> ByteArray,
+        sink: SendChannel<NodeFrame>,
+        maxReassembledBytes: () -> Int,
+        closeAtEnd: Boolean,
+    ) {
         scope.launch {
             try {
-                IrohFrameCodec.readAll(recv, MAX_FRAME_BYTES, maxReassembledBytesProvider = maxReassembledBytes) { text ->
-                    val frame = decode(text)
-                    if (frame == null) {
-                        close(MALFORMED_FRAME)
-                        return@readAll
-                    }
+                readFrames(source, maxReassembledBytes) { text ->
+                    val frame = decode(text) ?: return@readFrames close(MALFORMED_FRAME)
                     sink.send(frame)
                 }
             } catch (error: CancellationException) {
@@ -126,6 +128,20 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
         }
     }
 
+    private suspend fun readFrames(
+        source: suspend (UInt) -> ByteArray,
+        maxReassembledBytes: () -> Int,
+        onFrame: suspend (String) -> Unit,
+    ) {
+        val decoder = IrohFrameCodec.Decoder(MAX_FRAME_BYTES, maxReassembledBytes)
+        while (true) {
+            val chunk = source(READ_CHUNK_BYTES.toUInt())
+            if (chunk.isEmpty()) break
+            decoder.feed(chunk).forEach { onFrame(it) }
+        }
+        decoder.finish()
+    }
+
     private fun decode(text: String): NodeFrame? = runCatching { NodeFrame.decode(text) }.getOrElse {
         Telemetry.event("IrohNodeCarrier", "frame.malformed", "bytes" attr text.length, level = Telemetry.Level.WARN)
         null
@@ -134,6 +150,8 @@ internal class IrohLinkCore(private val connection: Connection, parent: Coroutin
     companion object {
         /** The largest plain Iroh frame, and the largest one `frame_part` piece. */
         const val MAX_FRAME_BYTES: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
+
+        private const val READ_CHUNK_BYTES = 8192
 
         /** Frames read ahead of the node on one lane, and call lanes accepted ahead of it, before the read waits. */
         const val LANE_BUFFER: Int = 8
