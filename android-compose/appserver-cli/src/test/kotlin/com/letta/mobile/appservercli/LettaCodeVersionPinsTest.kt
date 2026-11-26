@@ -2,6 +2,12 @@ package com.letta.mobile.appservercli
 
 import com.letta.mobile.data.transport.appserver.LettaCodeContract
 import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -12,9 +18,12 @@ import org.junit.jupiter.api.Test
  * runtime are built from it, and the wire contract (the matrix's `baseline.version`), the desktop
  * runtime package files, the `appserver-contract-baseline` CI job, the README pin table,
  * [LettaCodeContract] and the pins quoted in CLAUDE.md / AGENTS.md / the CLI READMEs must all name
- * it; this test fails the moment one of them disagrees. The restart-replay evidence (needs a live
- * re-capture) is the one documented exception, checked against its own evidence file. See the
- * "letta-code version pins" table in sharedLogic's `data/transport/appserver/README.md`.
+ * it; this test fails the moment one of them disagrees. Where the version is written is listed once,
+ * in [SITES_FILE], which `scripts/appserver/letta-code-upgrade.mjs apply` also rewrites from: a site
+ * missing from that list is a pin neither the test nor the upgrade command knows about. The
+ * restart-replay evidence (needs a live re-capture) is the one documented exception, checked
+ * against its own evidence file. See the "letta-code version pins" table in sharedLogic's
+ * `data/transport/appserver/README.md`.
  */
 class LettaCodeVersionPinsTest {
     private val root = generateSequence(File("").absoluteFile) { it.parentFile }
@@ -36,18 +45,39 @@ class LettaCodeVersionPinsTest {
     private val table: String
         get() = read("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md")
 
-    @Test
-    fun theDesktopRuntimeFilesMirrorThePin() {
-        val manifest = first(Regex(""""lettaCode"\s*:\s*"([^"]+)""""), read("desktop/runtime/runtime-manifest.json"))
-        val pkg = first(Regex(""""@letta-ai/letta-code"\s*:\s*"([^"]+)""""), read("desktop/runtime/package.json"))
-        val lock = first(
-            Regex(""""node_modules/@letta-ai/letta-code": \{\s*"version": "([^"]+)""""),
-            read("desktop/runtime/package-lock.json"),
-        )
+    /** One entry of [SITES_FILE]: a file (relative to the repository root) and a regex whose group 1 is the version. */
+    private data class Site(val path: String, val pattern: Regex, val count: Int)
 
-        assertEquals(pin, manifest, "desktop/runtime/runtime-manifest.json")
-        assertEquals(pin, pkg, "desktop/runtime/package.json")
-        assertEquals(pin, lock, "desktop/runtime/package-lock.json")
+    private val sites: List<Site>
+        get() = Json.parseToJsonElement(File(root, SITES_FILE).readText()).jsonObject.getValue("sites").jsonArray.map {
+            val site = it.jsonObject
+            Site(site.string("path"), Regex(site.string("pattern")), site.getValue("count").jsonPrimitive.int)
+        }
+
+    private fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
+
+    @Test
+    fun everyListedVersionSiteNamesThePin() {
+        sites.forEach { site ->
+            val found = site.pattern.findAll(File(root.parentFile, site.path).readText()).map { it.groupValues[1] }.toList()
+            assertEquals(List(site.count) { pin }, found, "${site.path} /${site.pattern.pattern}/")
+        }
+    }
+
+    @Test
+    fun theSiteListCoversThePinFileTheDesktopRuntimeAndTheContract() {
+        val listed = sites.map { it.path }.toSet()
+        listOf(
+            "android-compose/$PIN_FILE",
+            "android-compose/desktop/runtime/runtime-manifest.json",
+            "android-compose/desktop/runtime/package.json",
+            "android-compose/desktop/runtime/package-lock.json",
+            "android-compose/$CONTRACT_MATRIX",
+            "CLAUDE.md",
+            "AGENTS.md",
+            "android-compose/cli/README.md",
+            "android-compose/appserver-cli/README.md",
+        ).forEach { assertTrue(it in listed, "$SITES_FILE must list $it") }
         assertTrue(
             PIN_FILE in read("desktop/build.gradle.kts"),
             "desktop/build.gradle.kts must read the pin file, not a literal",
@@ -89,12 +119,9 @@ class LettaCodeVersionPinsTest {
 
     @Test
     fun everyQuotedPinInTheGuidesIsTheContract() {
-        val guides = mapOf(
-            "CLAUDE.md" to File(root.parentFile, "CLAUDE.md").readText(),
-            "AGENTS.md" to File(root.parentFile, "AGENTS.md").readText(),
-            "cli/README.md" to read("cli/README.md"),
-            "appserver-cli/README.md" to read("appserver-cli/README.md"),
-        )
+        // The Markdown pin sites of SITES_FILE; none of them may quote another letta-code version.
+        val guides = sites.map { it.path }.filter { it.endsWith(".md") && !it.startsWith("docs/") }.distinct()
+            .associateWith { File(root.parentFile, it).readText() }
         guides.forEach { (name, text) ->
             val quoted = QUOTED_PIN.findAll(text).map { it.groupValues[1] }.toSet()
             assertEquals(setOf(contract), quoted, "$name must quote only the $contract contract")
@@ -119,6 +146,7 @@ class LettaCodeVersionPinsTest {
 
     private companion object {
         const val PIN_FILE = "letta-code-runtime/letta-code-runtime.properties"
+        const val SITES_FILE = "letta-code-runtime/letta-code-version-sites.json"
         const val CONTRACT_MATRIX = "sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json"
         val QUOTED_PIN = Regex("""@letta-ai/letta-code@(\d+\.\d+\.\d+)""")
     }

@@ -12,6 +12,7 @@ import struct
 import subprocess
 import tempfile
 import zipfile
+import zlib
 
 HOTKEY_SOURCE = Path(__file__).resolve().parents[2] / 'android-compose/native/nucleus_hotkey'
 hotkey_spec = importlib.util.spec_from_file_location('nucleus_hotkey_builder', HOTKEY_SOURCE / 'build.py')
@@ -210,10 +211,36 @@ def check_bundled_node(layout, env, work):
     require(version == 'v' + layout['manifest']['node'], 'Wrong bundled Node version')
     subprocess.run([layout['node'], '-e',
                     'const r = require("node:module").createRequire(process.argv[1]); '
-                    'for (const name of ["sharp", "@janhapke/sharp-electron", "node-pty"]) { '
+                    'for (const name of ["sharp", "node-pty"]) { '
                     'r(name); console.log("Loaded", name); }', layout['js']], cwd=work, env=env, check=True, timeout=60)
+    check_bundled_image_worker(layout, env, work)
     subprocess.run([layout['node'], layout['js'], '--version'], cwd=work, env=env, check=True, timeout=60)
     subprocess.run([layout['node'], layout['js'], 'server', '--help'], cwd=work, env=env, check=True, timeout=60)
+
+
+# A 3000x10 red PNG: wider than letta-code's 2000-pixel limit, so the worker must decode and resize it.
+WIDE_PNG_WIDTH, WIDE_PNG_HEIGHT, IMAGE_MAX_WIDTH = 3000, 10, 2000
+
+
+def wide_png():
+    rows = b''.join(b'\x00' + b'\xff\x00\x00' * WIDE_PNG_WIDTH for _ in range(WIDE_PNG_HEIGHT))
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+    header = struct.pack('>IIBBBBB', WIDE_PNG_WIDTH, WIDE_PNG_HEIGHT, 8, 2, 0, 0, 0)
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b'')
+
+
+def check_bundled_image_worker(layout, env, work):
+    # letta.js resizes every image in a child: process.execPath + image-resize-worker.js, which
+    # imports sharp. Run that worker from the packaged, relocated tree on a real PNG.
+    worker = Path(layout['js']).with_name('image-resize-worker.js')
+    require(worker.is_file(), f'letta-code image worker missing: {worker}')
+    output = subprocess.run([layout['node'], str(worker), 'image/png'], input=wide_png(), cwd=work, env=env,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=60).stdout
+    result = json.loads(output)
+    require(result.get('resized') is True and result.get('width') == IMAGE_MAX_WIDTH and result.get('mediaType') == 'image/png',
+            f'Image worker did not resize the probe image: {dict(result, data=len(result.get("data", "")))}')
+    print('Resized a', WIDE_PNG_WIDTH, 'px PNG to', result['width'], 'px through the bundled image worker')
 
 
 def run_checks(layout, evidence_dir=None):

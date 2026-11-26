@@ -79,13 +79,19 @@ test("lcp-model-catalog skips both sites when either anchor drifts or duplicates
   }
 });
 
-test("lcp-model-catalog preserves native future entries and tolerates absent templates", () => {
+test("lcp-model-catalog keeps native entries' metadata, clamps Haiku 5.5 to the route, and tolerates absent templates", () => {
   const { source } = patchLettaCodeSourceResultForTest(fixture);
-  const futureHaiku = { ...haiku, id: "claude-haiku-5-5", maxTokens: 70000 };
-  const futureTerra = { ...sol, id: "gpt-6.1-terra", contextWindow: 900000 };
+  // 0.34.70 ships claude-haiku-5-5 at 1M context / 128k output; our Anthropic route serves 200k / 65,536.
+  const futureHaiku = { ...haiku, id: "claude-haiku-5-5", name: "Upstream Haiku", contextWindow: 1000000, maxTokens: 128000, reasoning: true };
+  // 0.34.70 ships gpt-6.1-terra at the 272k default; the route's verified maximum is 872k.
+  const futureTerra = { ...sol, id: "gpt-6.1-terra", name: "Upstream Terra", contextWindow: 272000 };
   const result = evaluate(source, { [futureHaiku.id]: futureHaiku }, { [futureTerra.id]: futureTerra });
-  assert.equal(result.anthropic[futureHaiku.id]?.maxTokens, 70000);
-  assert.equal(result.openai[futureTerra.id]?.contextWindow, 900000);
+  assert.equal(result.anthropic[futureHaiku.id]?.contextWindow, 200000);
+  assert.equal(result.anthropic[futureHaiku.id]?.maxTokens, 65536);
+  assert.equal((result.anthropic[futureHaiku.id] as Record<string, unknown> | undefined)?.["reasoning"], true, "upstream metadata other than the limits is kept");
+  assert.equal(Object.keys(result.anthropic).length, 1, "no template is needed when upstream ships the entry");
+  assert.equal(result.openai[futureTerra.id]?.contextWindow, 872000);
+  assert.equal(result.openai[futureTerra.id]?.name, "Upstream Terra");
   assert.equal(Object.keys(evaluate(source, {}, {}).openai).length, 0);
 });
 

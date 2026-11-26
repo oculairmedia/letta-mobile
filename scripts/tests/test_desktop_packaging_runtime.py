@@ -73,31 +73,47 @@ class LinuxRuntimeStagingTests(LinuxPackageFixtures, unittest.TestCase):
         self.assertEqual(list(self.work.glob('cached-tools.*')), [])
 
 
-    def test_real_stager_keeps_linux_sharp_electron_and_prunes_other_platforms(self):
+    def stager_fixture(self, libvips=True):
         install = self.work / 'install'
         modules = install / 'node_modules'
         write(modules / '@letta-ai/letta-code/letta.js', '// fixture')
-        write(modules / '@letta-ai/letta-code/node_modules/@janhapke/sharp-electron/linux-x64/sharp.node', elf())
         for name in ['sharp-linux-x64', 'sharp-libvips-linux-x64', 'sharp-win32-x64', 'sharp-linuxmusl-x64']:
-            write(modules / '@img' / name / 'package.json', '{}')
+            if libvips or name != 'sharp-libvips-linux-x64':
+                write(modules / '@img' / name / 'package.json', '{}')
         write(modules / '@img/sharp-linux-x64/lib/sharp-linux-x64.node', elf())
-        write(modules / '@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.8', elf())
+        if libvips:
+            write(modules / '@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.8', elf())
         write(modules / '@vscode/ripgrep-win32-x64/package.json', '{"os":["win32"],"cpu":["x64"]}')
         write(modules / '@vscode/ripgrep-linux-x64/package.json', '{"os":["linux"],"cpu":["x64"]}')
         write(modules / '.bin/fixture', '#!/bin/sh\n', True)
         for name in ['package.json', 'package-lock.json', 'runtime-manifest.json']:
             write(install / name, '{}')
+        return install
+
+
+    def test_real_stager_keeps_linux_sharp_and_prunes_other_platforms(self):
+        # letta-code 0.34.70's image worker imports plain "sharp" (no @janhapke/sharp-electron), so the
+        # stager needs exactly sharp's glibc x64 binary and its libvips, nothing else.
+        install = self.stager_fixture()
         dest = self.work / 'staged'
         subprocess.run(['bash', str(SCRIPT), 'stage', str(self.node), str(install), str(dest)], check=True)
         self.assertTrue(os.access(dest / 'node', os.X_OK))
         self.assertTrue(os.access(dest / 'node_modules/.bin/fixture', os.X_OK))
-        self.assertTrue((dest / 'node_modules/@letta-ai/letta-code/node_modules/@janhapke/sharp-electron/linux-x64/sharp.node').exists())
         self.assertFalse((dest / 'node_modules/@img/sharp-win32-x64').exists())
         self.assertFalse((dest / 'node_modules/@img/sharp-linuxmusl-x64').exists())
         self.assertFalse((dest / 'node_modules/@vscode/ripgrep-win32-x64').exists())
         self.assertTrue((dest / 'node_modules/@vscode/ripgrep-linux-x64').exists())
         self.assertTrue((dest / 'node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node').is_file())
         self.assertTrue((dest / 'node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.8').is_file())
+
+
+    def test_real_stager_rejects_a_runtime_without_linux_libvips(self):
+        # sharp-linux-x64.node links libvips-cpp; without it every image resize fails at runtime.
+        install = self.stager_fixture(libvips=False)
+        result = subprocess.run(['bash', str(SCRIPT), 'stage', str(self.node), str(install), str(self.work / 'staged')],
+                                text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('sharp-libvips-linux-x64 missing from staged runtime', result.stderr)
 
 
     def test_download_rejects_bad_digest_without_replacing_cached_archive(self):
@@ -125,6 +141,7 @@ class LinuxRuntimeStagingTests(LinuxPackageFixtures, unittest.TestCase):
         modules = install / 'node_modules'
         write(modules / '@letta-ai/letta-code/letta.js', '// fixture')
         write(modules / '@img/sharp-linux-x64/package.json', '{}')
+        write(modules / '@img/sharp-libvips-linux-x64/package.json', '{}')
         pty = modules / '@letta-ai/letta-code/node_modules/node-pty'
         write(pty / 'package.json', '{"name":"node-pty"}')
         write(pty / 'build/Release/pty.node', elf(), True)

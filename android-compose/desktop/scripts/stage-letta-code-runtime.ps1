@@ -50,8 +50,9 @@ if ((Test-Path -LiteralPath $orphanLettaCode) -and -not (Test-Path -LiteralPath 
 # prebuilt binaries exactly that way. So every platform's libvips gets installed (macOS, Linux on
 # six CPUs, musl, Windows ia32/arm64, wasm): about 450 MB this Windows x64 runtime can never load,
 # which grew the v0.23.0 MSI from 292 to 462 MB. npm 10 installs only win32-x64 from the same
-# lockfile. Keep just the win32-x64 builds. sharp-electron's linux-x64 copy is only loaded on Linux;
-# on Windows it re-exports the real sharp.
+# lockfile. Keep just the win32-x64 builds: letta-code's image worker (image-resize-worker.js)
+# imports plain "sharp", which loads @img/sharp-win32-x64 (sharp 0.35.5 ships libvips inside it;
+# a separate sharp-libvips-win32-x64 is kept should a later sharp split it out).
 $keptSharpPlatforms = @('sharp-win32-x64', 'sharp-libvips-win32-x64')
 $foreignSharp = @(Get-ChildItem -LiteralPath $modulesDest -Recurse -Directory -Force -Filter 'sharp-*' | Where-Object {
     $_.Parent.Name -eq '@img' -and $keptSharpPlatforms -notcontains $_.Name
@@ -62,10 +63,6 @@ foreach ($dir in $foreignSharp) {
     if (Test-Path -LiteralPath $dir.FullName) {
         Remove-Item -LiteralPath $dir.FullName -Recurse -Force
     }
-}
-$sharpElectronLinux = Join-Path $modulesDest '@letta-ai\letta-code\node_modules\@janhapke\sharp-electron\linux-x64'
-if (Test-Path -LiteralPath $sharpElectronLinux) {
-    Remove-Item -LiteralPath $sharpElectronLinux -Recurse -Force
 }
 # The runtime still has to carry the sharp build it does load.
 if (-not (Get-ChildItem -LiteralPath $modulesDest -Recurse -Directory -Force -Filter 'sharp-win32-x64' | Select-Object -First 1)) {
