@@ -125,10 +125,12 @@ const MODEL_CATALOG_PATCHES = [
   {
     token: '  ANTHROPIC_MODELS = flattenChatModelCatalog("anthropic", anthropic_default);',
     addition: `
-  // lcp-model-catalog: retain an upstream entry if a future bundle adds it.
-  if (!ANTHROPIC_MODELS["claude-haiku-5-5"] && ANTHROPIC_MODELS["claude-haiku-4-5"]) {
+  // lcp-model-catalog: our Anthropic route (anthropic-claude-max-proxy models/specifications.py)
+  // serves claude-haiku-5-5 with a 200k context and 65,536 completion tokens. Keep an upstream
+  // entry's other metadata (0.34.70 ships one at 1M/128k) but clamp it to the route's limits.
+  if (ANTHROPIC_MODELS["claude-haiku-5-5"] || ANTHROPIC_MODELS["claude-haiku-4-5"]) {
     ANTHROPIC_MODELS["claude-haiku-5-5"] = {
-      ...ANTHROPIC_MODELS["claude-haiku-4-5"],
+      ...(ANTHROPIC_MODELS["claude-haiku-5-5"] ?? ANTHROPIC_MODELS["claude-haiku-4-5"]),
       id: "claude-haiku-5-5", name: "Claude Haiku 5.5",
       contextWindow: 200000, maxTokens: 65536
     };
@@ -137,8 +139,9 @@ const MODEL_CATALOG_PATCHES = [
   {
     token: '  OPENAI_MODELS = flattenChatModelCatalog("openai", openai_default);',
     addition: `
-  // lcp-model-catalog: use the ChatGPT upstream maximum, not its default.
-  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
+  // lcp-model-catalog: use the ChatGPT upstream maximum, not its default. Terra is listed too:
+  // 0.34.70 ships its own gpt-6.1-terra entry at the 272k default.
+  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra"]) {
     if (OPENAI_MODELS[id]) OPENAI_MODELS[id] = { ...OPENAI_MODELS[id], contextWindow: 872000 };
   }
   if (!OPENAI_MODELS["gpt-6.1-terra"] && OPENAI_MODELS["gpt-6.1-sol"]) {
