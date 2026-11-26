@@ -132,7 +132,7 @@ class AndroidNotificationLaunchTest {
         val owner = rememberShellWorkspaceState(ShellDestination.Home).also { workspace = it }
         val port = remember(owner) { AndroidShellChatPort(owner, { emptyList() }, { emptyList() }) }
         val launch = AndroidShellLaunch(target, { target = null; consumed++ }, {})
-        BindLaunchFocus(launch, owner, graph, source) { bindAndroidFocus(owner, graph, source, port, drawer, config, it) }
+        launch.BindFocus(owner, graph, source) { bindAndroidFocus(owner, graph, source, port, drawer, config, it) }
         AndroidShellLaunchEffect(shell(owner, port, drawer), launch)
     }
 
