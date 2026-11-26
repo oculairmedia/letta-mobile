@@ -1,27 +1,19 @@
 package com.letta.mobile.cli.commands
 
-import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.DefaultAppServerController
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource
-import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
-import com.letta.mobile.data.controller.node.iroh.NativeSlashCommandCatalog
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
+import com.letta.mobile.data.node.NodeAdminRouterSpec
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
-import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
-import com.letta.mobile.data.controller.node.iroh.AdminRpcNotifications
-import com.letta.mobile.data.controller.node.iroh.AdminRpcPairing
-import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
-import com.letta.mobile.data.controller.node.iroh.beads.BeadsRouteClient
-import com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 
+/**
+ * The wrapper's admin_rpc router: [NodeAdminRouterSpec] with this process's
+ * `LETTA_LOCAL_BACKEND_DIR` as the default backend root.
+ */
 fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
     subagentRegistrySource: SubagentRegistrySource? = null,
@@ -89,102 +81,32 @@ fun buildProductionAdminRouter(
     serviceCredentialRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     /** The conversation feed route (`feed.subscribe` over the host's durable turn journal); null registers none. */
     feedRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
-): AdminRpcRouter {
-    // Every skill.list re-reads the root (a symlink is the controllable unit and can
-    // change on disk at any time); the cold-start read below also logs what the host
-    // sees, so the first listing after a restart is already authoritative.
-    val resolvedSkillsDir = HostSkillsEnumerator
-        .resolveSkillsDir(skillsDir)
-    val skillsCatalog = NativeSkillsCatalog(hostEnumeration = { HostSkillsEnumerator.enumerate(resolvedSkillsDir) })
-    if (skillsCatalog.refreshFromHost()) {
-        Telemetry.event(
-            "SkillsCatalog",
-            "host.hydrated",
-            "skillsDir" attr resolvedSkillsDir,
-            "skills" attr skillsCatalog.snapshot().size.toString(),
-        )
-    } else {
-        Telemetry.event(
-            "SkillsCatalog",
-            "host.root_missing",
-            "skillsDir" attr resolvedSkillsDir,
-        )
-    }
-    val subagentStore = subagentRegistryFile
-        ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
-        ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
-    val nativeSource = if (subagentRegistrySource == null) {
-        ControllerSubagentRegistrySource(
-            com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore, processIdentity = appServerProcessIdentity),
-        ).also { source ->
-            subagentPublisher?.let { build -> source.changeListener = build(source) }
-            if (nativeClient != null && eventScope != null) {
-                source.start(eventScope, nativeClient.events)
-            }
-        }
-    } else {
-        null
-    }
-    val subagentSource = subagentRegistrySource ?: requireNotNull(nativeSource)
-    // letta-mobile-by4vm.84: slash commands ride update_device_status on the runtime lane.
-    val slashCommands = nativeClient?.let { NativeSlashCommandCatalog() }
-    if (nativeClient != null && eventScope != null) {
-        skillsCatalog.start(eventScope, nativeClient.events)
-        slashCommands?.start(eventScope, nativeClient.events)
-    }
-    return AdminRpcRegistry.buildRouter(
-        services = AdminRpcHostServices(
-            controller = controller,
-            subagentRegistrySource = subagentSource,
-            vibesyncBaseUrl = vibesyncBaseUrl,
-            beadsBaseUrl = beadsBaseUrl,
-            beadsTokenFile = beadsTokenFile,
-            beadsRoutes = beadsBaseUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                val client = BeadsRouteClient(url, beadsTokenFile)
-                AdminRpcRoutes { router ->
-                    (BeadsRoutes.reads + BeadsRoutes.writes).forEach { (method, operation) ->
-                        router.register(method) { params -> client.execute(operation, params) }
-                    }
-                }
-            },
-            pluginRoutes = pluginRoutes,
-            canvasMountRoutes = canvasMountRoutes,
-        ),
-        pairing = AdminRpcPairing(
-            pairingService = pairingService,
-            pairingQr = pairingQr,
-        ),
-        native = AdminRpcNativeSources(
-            nativeClient = nativeClient,
-            localBackendDir = localBackendDir,
-            skillsListing = skillsCatalog.asListingSource(),
-            slashCommands = slashCommands,
-            modelExposureFile = modelExposureFile,
-            wrapperRecords = com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore(
-                runRecordsFile?.let { java.nio.file.Path.of(it) }
-                    ?: modelExposureFile?.let { modelFile ->
-                        java.io.File(java.io.File(modelFile).absoluteFile.parentFile, "run-records.json").toPath()
-                    },
-                warn = { Telemetry.event("WrapperRecords", "store.corrupt", level = Telemetry.Level.WARN) },
-            ),
-        ),
-        notifications = AdminRpcNotifications(
-            agentChanges = agentChanges,
-            conversationChanges = conversationChanges,
-            turnIdentity = turnIdentity,
-            permissionModes = permissionModes,
-        ),
-    ).also { router ->
-        if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
-        // All seven voice endpoint routes or none; they advertise voice_endpoint_v1 themselves.
-        voiceRoutes?.register(router)
-        // Both pins routes or none; they advertise pinned_agents_v1 themselves.
-        pinsRoutes?.register(router)
-        // Both shell-state routes or none; they advertise shell_state_v1 themselves.
-        shellStateRoutes?.register(router)
-        // All four service credential routes or none; they advertise service_credentials_v1 themselves.
-        serviceCredentialRoutes?.register(router)
-        // The one feed method; it advertises conversation_feed_v1 itself.
-        feedRoutes?.register(router)
-    }
-}
+): AdminRpcRouter = NodeAdminRouterSpec(
+    controller = controller,
+    subagentRegistrySource = subagentRegistrySource,
+    subagentRegistryFile = subagentRegistryFile,
+    appServerProcessIdentity = appServerProcessIdentity,
+    pairingService = pairingService,
+    nativeClient = nativeClient,
+    vibesyncBaseUrl = vibesyncBaseUrl,
+    beadsBaseUrl = beadsBaseUrl,
+    beadsTokenFile = beadsTokenFile,
+    localBackendDir = localBackendDir,
+    skillsDir = skillsDir,
+    eventScope = eventScope,
+    agentChanges = agentChanges,
+    conversationChanges = conversationChanges,
+    modelExposureFile = modelExposureFile,
+    runRecordsFile = runRecordsFile,
+    turnIdentity = turnIdentity,
+    subagentPublisher = subagentPublisher,
+    pairingQr = pairingQr,
+    permissionModes = permissionModes,
+    pluginRoutes = pluginRoutes,
+    canvasMountRoutes = canvasMountRoutes,
+    voiceRoutes = voiceRoutes,
+    pinsRoutes = pinsRoutes,
+    shellStateRoutes = shellStateRoutes,
+    serviceCredentialRoutes = serviceCredentialRoutes,
+    feedRoutes = feedRoutes,
+).build()
