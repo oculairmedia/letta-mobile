@@ -53,13 +53,12 @@ internal class InProcessAgentMessageRunner(
         correlation = options.correlation,
     )
 
-    private suspend fun sendMessage(message: IrohAgentMessage, paths: IrohCliPaths): IrohCliSendResult = try {
-        deliver(message, paths).toCliResult()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        IrohCliSendResult.Failed(message.toAgentId, "in_process_send_failed: ${e.message ?: e::class.simpleName}")
-    }
+    private suspend fun sendMessage(message: IrohAgentMessage, paths: IrohCliPaths): IrohCliSendResult =
+        runCatching { deliver(message, paths).toCliResult() }.getOrElse { e ->
+            // Cancellation and JVM errors propagate; every other failure is the tool's answer.
+            if (e is CancellationException || e !is Exception) throw e
+            IrohCliSendResult.Failed(message.toAgentId, "in_process_send_failed: ${e.message ?: e::class.simpleName}")
+        }
 }
 
 /** The CLI runner's typed outcome for this delivery result, one for one. */

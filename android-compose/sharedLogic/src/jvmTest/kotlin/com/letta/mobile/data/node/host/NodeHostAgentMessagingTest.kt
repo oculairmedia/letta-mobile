@@ -39,7 +39,12 @@ class NodeHostAgentMessagingTest {
 
     @Test
     fun theToolSendsInProcessWithTheEnvelopeTheCliWouldBuild() = runBlocking {
-        val tool = CustomIrohMessagingTool(binary = "", identityDir = "ids", addressStore = "book.kv", runner = runner { AgentSendResult.Delivered(it.msgId) })
+        val tool = CustomIrohMessagingTool(
+            binary = "",
+            identityDir = "ids",
+            addressStore = "book.kv",
+            runner = runner { AgentSendResult.Delivered(it.msgId) },
+        )
 
         val result = tool.invoke(
             buildJsonObject {
@@ -55,7 +60,10 @@ class NodeHostAgentMessagingTest {
         val (message, paths) = sent.single()
         assertIs<ExternalToolResult.Success>(result)
         assertTrue(result.content.contains("\"delivered\":true"), result.content)
-        assertEquals(IrohAgentMessage("agent-a", "agent-b", "line one\nline \"two\"", "msg-fixed", 1_234L, conversationId = "conv-b"), message)
+        assertEquals(
+            IrohAgentMessage("agent-a", "agent-b", "line one\nline \"two\"", "msg-fixed", 1_234L, conversationId = "conv-b"),
+            message,
+        )
         assertEquals("ids", paths.identityDir)
         assertEquals("book.kv", paths.addressStore)
     }
@@ -64,12 +72,14 @@ class NodeHostAgentMessagingTest {
     fun everyDeliveryOutcomeMapsOneForOneAndFailuresNeverThrow() = runBlocking {
         val outcomes = listOf(
             AgentSendResult.Delivered("m") to IrohCliSendResult.Delivered("m"),
-            AgentSendResult.Accepted("m", "agent-b", "home_lane_forbidden") to IrohCliSendResult.Accepted("m", "agent-b", "home_lane_forbidden"),
+            AgentSendResult.Accepted("m", "agent-b", "home_lane_forbidden") to
+                IrohCliSendResult.Accepted("m", "agent-b", "home_lane_forbidden"),
             AgentSendResult.Unaddressable("agent-b", "unknown_host") to IrohCliSendResult.Unaddressable("agent-b", "unknown_host"),
             AgentSendResult.Failed("agent-b", "no_ack") to IrohCliSendResult.Failed("agent-b", "no_ack"),
         )
 
-        val mapped = outcomes.map { (outcome, _) -> runner { outcome }.send("", "agent-a", "agent-b", "hi", IrohCliPaths(message = IrohMessageOptions(msgId = "m"))) }
+        val paths = IrohCliPaths(message = IrohMessageOptions(msgId = "m"))
+        val mapped = outcomes.map { (outcome, _) -> runner { outcome }.send("", "agent-a", "agent-b", "hi", paths) }
         val thrown = runner { error("boom") }.send("", "agent-a", "agent-b", "hi")
 
         assertEquals(outcomes.map { it.second }, mapped)
