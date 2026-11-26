@@ -2,9 +2,9 @@ package com.letta.mobile.data.controller.node.link
 
 /**
  * The transport under one connection the node serves: what the node's protocol code reads frames from and writes
- * frames to. Two implementations exist: an accepted Iroh QUIC connection (its streams and its length-prefixed frame
- * codec), and a carrier's node end (the in-process carrier's link, whose frames cross whole). The node's auth,
- * capability gates, admin router, turns and feed are the same code over either; only this seam differs.
+ * frames to. It is a carrier's node end (a link of the Iroh carrier for a peer the endpoint accepted, or of the
+ * in-process carrier for the shell in this process), so the node's auth, capability gates, admin router, turns and
+ * feed are one code path over every carrier. Framing, `frame_part` chunking and frame limits belong to the carrier.
  *
  * Frames are wire text. A wire never interprets, rewrites or authenticates a frame, and [peerId] is the identity the
  * transport verified, never one a frame claimed.
@@ -19,32 +19,21 @@ internal interface NodeConnectionWire {
      */
     val localShell: Boolean
 
-    /** Waits until the peer has opened its control and push lanes. */
-    suspend fun openLanes()
-
     /**
-     * Hands every control frame the peer sends to [onFrame], in order, until the control lane ends. A wire that
-     * reassembles chunked frames bounds each logical frame by [maxReassembledBytes], read at every part.
+     * Hands every control frame the peer sends to [onFrame], in order, until the control lane ends; throws when it
+     * ended because the connection did. A wire that reassembles chunked frames bounds each logical frame, on this
+     * lane and on every call lane, by [maxReassembledBytes], read at every part.
      */
     suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit)
 
-    /** Writes [frame] on the control lane; [frameParts] allows a wire with optional chunking to split it. */
-    suspend fun writeControl(frame: String, frameParts: Boolean)
+    /** Writes [frame] on the control lane. */
+    suspend fun writeControl(frame: String)
 
-    /** Writes [frame] on the push lane; [frameParts] and [maxFrameBytes] govern a wire that chunks frames. */
-    suspend fun writePush(frame: String, frameParts: Boolean, maxFrameBytes: Int)
+    /** Writes [frame] on the push lane. */
+    suspend fun writePush(frame: String)
 
-    /** Waits for the peer's readiness signal on the push lane, or returns at once for a wire without one. */
-    suspend fun awaitPushReadiness()
-
-    /** Ends the node's half of the control lane once the node stops reading it. */
-    suspend fun finishControl()
-
-    /** Ends the node's half of the push lane once the connection is done. */
-    suspend fun finishPush()
-
-    /** The next call lane the peer opens, framed for the admin server by [framing]; null once the link ends. */
-    suspend fun nextCall(framing: NodeCallFraming): NodeCallExchange?
+    /** The next call lane the peer opens; null once the link ends. */
+    suspend fun nextCall(): NodeCallExchange?
 
     /** The transport capabilities the peer advertised in its accepted `auth` frame. */
     fun onPeerCapabilities(capabilities: Set<String>)
@@ -67,7 +56,7 @@ internal interface NodeCallExchange {
     /** Writes one frame (a streamed frame or an error envelope) on this lane. */
     suspend fun write(frame: String)
 
-    /** Writes the call's final response, which a chunking wire may split or replace when it is too large. */
+    /** Writes the call's final response, already bounded by the admin server to what the peer can receive. */
     suspend fun respond(response: String)
 
     /** Ends the node's half of this lane. */
@@ -75,10 +64,25 @@ internal interface NodeCallExchange {
 }
 
 /**
- * How the admin server frames a call lane that arrives as raw bytes (an Iroh bi-stream). A wire whose lanes already
- * carry whole frames ignores it.
+ * A wire with nothing under it: no frames arrive and writes and closes go nowhere. It backs a node connection that
+ * is driven through its handlers directly rather than served.
  */
-internal fun interface NodeCallFraming {
-    /** Frames the byte lane given by [read], [writeAll] and [finish] as one call exchange. */
-    fun frame(read: suspend (UInt) -> ByteArray, writeAll: suspend (ByteArray) -> Unit, finish: suspend () -> Unit): NodeCallExchange
+internal class DetachedNodeWire(override val peerId: String) : NodeConnectionWire {
+    override val localShell: Boolean = false
+
+    override suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit) = Unit
+
+    override suspend fun writeControl(frame: String) = Unit
+
+    override suspend fun writePush(frame: String) = Unit
+
+    override suspend fun nextCall(): NodeCallExchange? = null
+
+    override fun onPeerCapabilities(capabilities: Set<String>) = Unit
+
+    override fun close(code: Long, reason: String) = Unit
+
+    override fun recordClosed() = Unit
+
+    override fun closeAfterServe() = Unit
 }

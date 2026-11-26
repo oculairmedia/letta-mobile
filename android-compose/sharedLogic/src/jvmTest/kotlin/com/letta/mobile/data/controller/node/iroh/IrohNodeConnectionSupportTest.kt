@@ -2,10 +2,24 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
+import com.letta.mobile.data.node.NodePeerLinkWire
+import com.letta.mobile.data.node.carrier.NodeCallLane
+import com.letta.mobile.data.node.carrier.NodeCarrierException
+import com.letta.mobile.data.node.carrier.NodeCarrierFailure
+import com.letta.mobile.data.node.carrier.NodeFrame
+import com.letta.mobile.data.node.carrier.NodeLinkClosure
+import com.letta.mobile.data.node.carrier.NodePeerIdentity
+import com.letta.mobile.data.node.carrier.NodePeerLink
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import computer.iroh.Connection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -22,6 +36,7 @@ class IrohNodeConnectionSupportTest {
     fun endpointRejectsDuplicateProtocolAlpnsBeforeBinding() {
         assertFailsWith<IllegalArgumentException> {
             IrohNodeEndpoint(
+                appServerLinks = ::serveIrohCarrierLink,
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 binding = IrohEndpointBinding(
                     relayConfig = IrohRelayConfig.Default,
@@ -63,6 +78,7 @@ class IrohNodeConnectionSupportTest {
     @Test
     fun endpointRefusesUnregisteredOutboundProtocol() = runBlocking {
         val endpoint = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
@@ -78,15 +94,32 @@ class IrohNodeConnectionSupportTest {
     @Test
     fun peersThatConnectAndLeaveLeaveNoEntryBehind() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val endpoint = IrohNodeEndpoint(scope = scope, authPolicy = IrohAuthPolicy.PairedPeersOnly)
-        val turnHost = NodeTurnHost.childOf(scope)
+        val endpoint = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
+            scope = scope,
+            authPolicy = IrohAuthPolicy.PairedPeersOnly,
+        )
+        endpoint.startTurnHost(FakeAppServerController())
         repeat(FRESH_PEERS) { i ->
-            // A handle-less connection fails its first stream accept, as one whose peer hung up at once does.
-            endpoint.serveAppServer(Connection(computer.iroh.NoHandle), "%064x".format(i), FakeAppServerController(), turnHost)
+            // Every App Server connection is served as a carrier link; one whose peer hung up at once is a link that
+            // was lost before its first control frame.
+            coroutineScope { endpoint.serveWire(NodePeerLinkWire(HungUpLink("%064x".format(i)), this)) }
         }
         assertEquals(0, endpoint.appServerPeerCount, "a peer with no live connection keeps no entry")
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
+    }
+
+    /** A peer link that was lost before the peer sent anything. */
+    private class HungUpLink(id: String) : NodePeerLink {
+        override val peer = NodePeerIdentity(id)
+        override val control: Flow<NodeFrame> = emptyFlow()
+        override val calls: Flow<NodeCallLane> = emptyFlow()
+        override val closure: StateFlow<NodeLinkClosure?> = MutableStateFlow(NodeLinkClosure.LOST)
+        override suspend fun sendControl(frame: NodeFrame) = throw NodeCarrierException(NodeCarrierFailure.Closed(NodeLinkClosure.LOST))
+        override suspend fun push(frame: NodeFrame) = throw NodeCarrierException(NodeCarrierFailure.Closed(NodeLinkClosure.LOST))
+        override fun onPeerCapabilities(capabilities: Set<String>) = Unit
+        override suspend fun close(closure: NodeLinkClosure) = Unit
     }
 
     // ---- ProcessScopedClientMessageDedupe (P3-4, 3wq5g) --------------------

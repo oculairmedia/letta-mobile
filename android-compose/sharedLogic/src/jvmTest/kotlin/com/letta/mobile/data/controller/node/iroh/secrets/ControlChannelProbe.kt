@@ -7,8 +7,6 @@ import com.letta.mobile.data.controller.node.iroh.IrohConnectionAuthentication
 import com.letta.mobile.data.controller.node.iroh.IrohNodeConnection
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
-import computer.iroh.Connection
-import computer.iroh.NoHandle
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
@@ -27,7 +25,6 @@ internal fun controlConnection(
     policy: IrohAuthPolicy = IrohAuthPolicy.PairedPeersOnly,
     pairing: IrohPairingService = IrohPairingService(InMemoryPairedPeerStore()),
 ): IrohNodeConnection = IrohNodeConnection(
-    connection = Connection(NoHandle),
     controller = refusingController(),
     adminRpcRouter = routes.router,
     authentication = IrohConnectionAuthentication(

@@ -17,13 +17,13 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.controller.node.link.NodeConnectionWire
+import com.letta.mobile.data.controller.node.link.DetachedNodeWire
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
-import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -68,9 +68,9 @@ private suspend fun <T> recoverUnlessCancelled(
  * Serves the node protocol to one connected peer: auth, capability gates, runtime commands, admin_rpc, turns and the
  * feed, routed to the provided controller.
  *
- * The transport underneath is a [NodeConnectionWire]: an accepted Iroh connection (two bi-directional streams,
- * control + stream, then one per admin call), or a carrier's node end such as the in-process shell's link. The
- * protocol code is the same over both.
+ * The transport underneath is a [NodeConnectionWire], a carrier's node end: the Iroh carrier's link for a peer the
+ * endpoint accepted (control, push, then one lane per admin call), or the in-process shell's link. The protocol code
+ * is the same over every carrier.
  */
 class IrohNodeConnection internal constructor(
     private val wire: NodeConnectionWire,
@@ -99,9 +99,12 @@ class IrohNodeConnection internal constructor(
     /** The host's stream-to-stored identity join; null leaves rows unjoined. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
-    /** Serves one accepted Iroh [connection]; the other parameters are as for the primary constructor. */
+    /**
+     * A node connection with no transport under it, for driving its handlers directly (tools and tests): nothing
+     * arrives, and what it writes or closes goes nowhere. The parameters are as for the primary constructor; the peer
+     * is [IrohConnectionAuthentication.remoteEndpointId].
+     */
     constructor(
-        connection: Connection,
         controller: AppServerController,
         adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
         authentication: IrohConnectionAuthentication,
@@ -110,7 +113,7 @@ class IrohNodeConnection internal constructor(
         turnHost: NodeTurnHost = NodeTurnHost.SHARED,
         turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
     ) : this(
-        wire = irohConnectionWire(connection, authentication),
+        wire = DetachedNodeWire(authentication.remoteEndpointId),
         controller = controller,
         adminRpcRouter = adminRpcRouter,
         authentication = authentication,
@@ -144,17 +147,19 @@ class IrohNodeConnection internal constructor(
     private suspend fun writeControl(frame: String) {
         if (!controlOpen) return
         controlWriteMutex.withLock {
-            wire.writeControl(frame, frameParts = peerSupportsFrameParts())
+            wire.writeControl(frame)
         }
     }
 
-    /** This connection's push lane as a viewer sink: whole frames go to the wire, which frames them for its transport. */
+    /**
+     * This connection's push lane as a viewer sink: whole frames go to the wire, whose carrier frames them for its
+     * transport (splitting into `frame_part`s only for a peer that advertised them, as the viewer asks).
+     */
     private val pushSink = object : ViewerFrameSink {
         override suspend fun writeAll(bytes: ByteArray) =
             throw UnsupportedOperationException("the push lane is written in whole frames")
 
-        override suspend fun writeFrame(frame: String, frameParts: Boolean, maxFrameBytes: Int) =
-            wire.writePush(frame, frameParts, maxFrameBytes)
+        override suspend fun writeFrame(frame: String, frameParts: Boolean, maxFrameBytes: Int) = wire.writePush(frame)
     }
     /**
      * Auth + grants for this connection: pre-authenticated
@@ -303,11 +308,10 @@ class IrohNodeConnection internal constructor(
     /** Serves the connection until its control lane ends, then closes it. */
     suspend fun serve() = coroutineScope {
         try {
-            wire.openLanes()
-            // eaczz.3: build this connection's viewer handle now that its turn
-            // stream is open, so both subscription signals (runtime_start on the
-            // control channel, message.list on an admin_rpc stream) can register
-            // it as a conversation viewer.
+            // eaczz.3: build this connection's viewer handle up front (its push
+            // lane's writes wait for the lane to open), so both subscription signals
+            // (runtime_start on the control channel, message.list on an admin_rpc
+            // stream) can register it as a conversation viewer.
             val viewer = ensureSelfViewer(pushSink)
             connectionRegistry?.let { registry ->
                 val registration = registry.claim(viewer)
@@ -319,18 +323,12 @@ class IrohNodeConnection internal constructor(
                 serveControlChannel(pushSink)
             }
 
-            val streamJob = launch {
-                wire.awaitPushReadiness()
-            }
-
             val adminRpcAcceptJob = launch {
                 acceptAdminRpcStreams()
             }
 
             controlJob.join()
             adminRpcAcceptJob.cancelAndJoin()
-            streamJob.cancelAndJoin()
-            runCatching { wire.finishPush() }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -378,7 +376,7 @@ class IrohNodeConnection internal constructor(
             // register it as a viewer of X (de-scoping any prior conversation).
             onMethodObserved = ::observeAdminMethod,
         )
-        server.serveCalls { wire.nextCall(server.callFraming) }
+        server.serveCalls { wire.nextCall() }
     }
 
     /**
@@ -592,7 +590,6 @@ class IrohNodeConnection internal constructor(
             }
         } finally {
             drainTurnJobs(activeTurnJobs, activeTurnJobsMutex)
-            runCatching { wire.finishControl() }
         }
     }
 

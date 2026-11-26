@@ -9,8 +9,6 @@ import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import computer.iroh.Connection
-import computer.iroh.NoHandle
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import kotlin.coroutines.Continuation
@@ -38,7 +36,7 @@ internal fun notebookPeer(router: AdminRpcRouter, peer: String, peers: InMemoryP
         AppServerController::class.java.classLoader, arrayOf(AppServerController::class.java),
     ) { _, method, _ -> error("Unexpected controller call ${method.name}") })
     return IrohNodeConnection(
-        connection = Connection(NoHandle), controller = controller, adminRpcRouter = router,
+        controller = controller, adminRpcRouter = router,
         authentication = IrohConnectionAuthentication(
             authPolicy = IrohAuthPolicy.PairedPeersOnly,
             pairingService = IrohPairingService(peers), remoteEndpointId = peer,

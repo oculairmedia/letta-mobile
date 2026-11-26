@@ -76,6 +76,7 @@ class NodeComposition(
         scope = scope,
         binding = IrohEndpointBinding(bindAddr = config.endpoint.bindAddr, secretKeyPath = config.endpoint.secretKeyPath),
         authPolicy = parts.authPolicy,
+        appServerLinks = ::serveIrohCarrierLink,
         pairingService = parts.pairingService,
         canvasRelay = parts.canvasRelay,
         protocolHandlers = parts.protocolHandlers,

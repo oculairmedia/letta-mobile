@@ -20,6 +20,10 @@ import com.letta.mobile.data.controller.node.iroh.feed.FeedJournalStore
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.RunId
 import com.letta.mobile.data.runtime.LoopPhase
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.node.serveIrohCarrierLink
+import com.letta.mobile.data.transport.appserver.AppServerChannel
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.coroutines.CompletableDeferred
@@ -475,6 +479,7 @@ class ServerStartedTurnFeedTest {
         registry.register(CONVERSATION.value, viewer)
         val journal = FeedJournalStore()
         val endpoint = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = backgroundScope,
             authPolicy = com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.InsecureAnonymousForTestOnly,
             connectionRegistry = registry,

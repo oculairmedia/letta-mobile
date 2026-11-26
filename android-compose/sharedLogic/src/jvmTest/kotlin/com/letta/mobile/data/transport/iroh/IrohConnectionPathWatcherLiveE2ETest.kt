@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import computer.iroh.Connection
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEvent
@@ -42,6 +43,7 @@ class IrohConnectionPathWatcherLiveE2ETest {
         val serverAccepted = CompletableDeferred<Unit>()
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("unused-app-server-peer")),
             protocolHandlers = listOf(object : IrohNodeProtocolHandler {

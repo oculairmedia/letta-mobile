@@ -15,6 +15,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import kotlin.system.exitProcess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -172,6 +173,7 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
                 secretKeyPath = irohSecretKeyPath,
             ),
             authPolicy = authPolicy,
+            appServerLinks = ::serveIrohCarrierLink,
         )
     }
 

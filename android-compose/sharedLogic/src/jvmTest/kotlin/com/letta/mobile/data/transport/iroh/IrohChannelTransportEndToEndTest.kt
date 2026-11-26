@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -87,6 +88,7 @@ class IrohChannelTransportEndToEndTest {
         val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("other-app-server-peer")),
             protocolHandlers = listOf(createHandler(resultPeer)),
@@ -148,6 +150,7 @@ class IrohChannelTransportEndToEndTest {
     fun deviceSendOverIrohRoundTripsAssistantResponse() = runBlocking {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
@@ -218,6 +221,7 @@ class IrohChannelTransportEndToEndTest {
     fun multipleTurnsOverOneIrohConnectionEachGetResponse() = runBlocking {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
@@ -375,6 +379,7 @@ class IrohChannelTransportEndToEndTest {
         // second turn should still work after it completes (c0qm0 regression guard).
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
@@ -464,6 +469,7 @@ class IrohChannelTransportEndToEndTest {
     fun largeFrameDoesNotCauseOom() = runBlocking {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )

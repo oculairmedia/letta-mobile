@@ -12,6 +12,7 @@ import com.letta.mobile.data.node.carrier.NodeCredential
 import com.letta.mobile.data.node.carrier.NodeLinkClosure
 import com.letta.mobile.data.node.carrier.NodeOpenRequest
 import com.letta.mobile.data.node.carrier.NodeSession
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import java.util.UUID
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -31,8 +32,8 @@ import kotlinx.serialization.json.booleanOrNull
 import org.junit.Assume.assumeTrue
 
 /**
- * A [NodeSession] over [IrohNodeCarrier] against an Iroh host as it runs today ([IrohNodeEndpoint] serving through
- * its own connection handler, untouched): the carrier changes no frame, so the host accepts the session's `auth`,
+ * A [NodeSession] over [IrohNodeCarrier] against an Iroh host as it runs ([IrohNodeEndpoint], serving its accepted
+ * connections as Iroh carrier links): the carrier changes no frame, so the host accepts the session's `auth`,
  * answers `admin_rpc` on call lanes, refuses a wrong token, and sees a detach as an ordinary close.
  *
  * Live QUIC, so opt-in: `./gradlew :sharedLogic:jvmTest -DrunIrohLiveE2E=true --tests '<this class>'`.
@@ -75,6 +76,7 @@ class IrohNodeCarrierCompatibilityTest {
     private fun onHost(body: suspend (IrohNodeEndpoint, IrohNodeCarrier, CoroutineScope) -> Unit) = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val host = IrohNodeEndpoint(
+            appServerLinks = ::serveIrohCarrierLink,
             scope = scope,
             authPolicy = IrohAuthPolicy.BearerToken(TOKEN),
         )
