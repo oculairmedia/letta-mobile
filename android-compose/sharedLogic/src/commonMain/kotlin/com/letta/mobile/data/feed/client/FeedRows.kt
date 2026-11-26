@@ -18,12 +18,9 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMutation
 import com.letta.mobile.data.timeline.TimelineReducerState
-import com.letta.mobile.data.timeline.applyPendingToolReturns
 import com.letta.mobile.data.timeline.keyedByOwnRecords
 import com.letta.mobile.data.timeline.reduceLive
 import com.letta.mobile.data.timeline.reduceProductionMutation
-import com.letta.mobile.data.timeline.toTimelinePersistentList
-import com.letta.mobile.data.timeline.toTimelinePersistentMap
 import com.letta.mobile.data.timeline.unresolvedToolCallIds
 import com.letta.mobile.data.timeline.withPromptOwnedRunIds
 import com.letta.mobile.data.transport.WsFrameMapper
@@ -104,7 +101,6 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
     private fun settleClosedTurn(turn: String, turnEnded: Boolean) {
         val open = toolCallsByTurn.remove(turn) ?: OpenTurnCalls()
         val calls = open.all()
-        attachHeldReturns(calls)
         val unresolved = reduction.timeline.unresolvedToolCallIds()
         val settleable = if (turnEnded) calls + carriedApprovals else open.plain
         if (turnEnded) carriedApprovals.clear() else carriedApprovals += open.approvals.intersect(unresolved)
@@ -118,29 +114,6 @@ internal class FeedRowProjector(private val agent: AgentId, conversation: Conver
         )
         reduction = reduceProductionMutation(reduction, settle).next
         Telemetry.event(TAG, "turnClosed.settledUnanswered", "turn" attr turn, "count" attr unanswered.size)
-    }
-
-    /**
-     * A row is named by its first call (`tc-<first>`), so the return of a later call in the same message cannot join it
-     * live and is held. The turn is over: show each held return on its call, with its real status.
-     */
-    private fun attachHeldReturns(calls: Set<String>) {
-        if (reduction.pendingToolReturnsByCallId.keys.none { it in calls }) return
-        val held = LinkedHashMap(reduction.pendingToolReturnsByCallId)
-        val events = reduction.timeline.events.map<TimelineEvent, TimelineEvent> { event ->
-            if (event is TimelineEvent.Confirmed && event.toolCalls.any { it.effectiveId in calls }) {
-                applyPendingToolReturns(event, held)
-            } else {
-                event
-            }
-        }
-        reduction = reduction.copy(
-            timeline = reduction.timeline.copy(
-                events = events.toTimelinePersistentList(),
-                stablePrefixVersion = reduction.timeline.stablePrefixVersion + 1,
-            ),
-            pendingToolReturnsByCallId = held.toTimelinePersistentMap(),
-        )
     }
 
     private fun rememberToolCalls(turn: String, message: LettaMessage) {

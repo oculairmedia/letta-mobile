@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
@@ -12,6 +13,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -116,6 +119,102 @@ class LiveTurnReducerTest {
 
         assertEquals("early", fold.row("tc-call-9").toolReturnContentByCallId["call-9"])
         assertTrue(fold.pending.isEmpty())
+    }
+
+    /**
+     * A message carrying two calls is named after its first (`tc-<first>`). Each return must still join the row that
+     * lists its call while the turn runs, and leave the other call as it was.
+     */
+    @Test
+    fun eachReturnOfATwoCallMessageJoinsItsOwnCallLive() {
+        val fold = LiveFold().apply { feed(parallel("call-a", "call-b")) }
+
+        fold.feed(Tool("call-b").returned("second"))
+        val afterSecond = fold.row("tc-call-a")
+        assertEquals("second", afterSecond.toolReturnContentByCallId["call-b"])
+        assertFalse("call-a" in afterSecond.toolReturnContentByCallId, "the first call is still running")
+        assertNull(afterSecond.toolReturnContent, "the row's own return belongs to its first call, which has none yet")
+        assertTrue(fold.pending.isEmpty(), "nothing is parked for a call a row already lists")
+
+        fold.feed(Tool("call-a").returned("first"))
+        val afterBoth = fold.row("tc-call-a")
+        assertEquals(mapOf("call-a" to "first", "call-b" to "second"), afterBoth.toolReturnContentByCallId.toMap())
+        assertEquals("first", afterBoth.toolReturnContent)
+        assertTrue(fold.pending.isEmpty())
+    }
+
+    @Test
+    fun aReturnBeforeItsTwoCallMessageIsParkedAndAttachedToItsOwnCall() {
+        val fold = LiveFold().apply { feed(Tool("call-b").returned("early")) }
+        assertEquals(listOf("call-b"), fold.pending.keys.toList())
+
+        fold.feed(parallel("call-a", "call-b"))
+
+        val row = fold.row("tc-call-a")
+        assertEquals(mapOf("call-b" to "early"), row.toolReturnContentByCallId.toMap())
+        assertNull(row.toolReturnContent, "the first call has no return")
+        assertTrue(fold.pending.isEmpty())
+    }
+
+    /** A call the row learns of from a later, fuller emission collects the return that waited for it. */
+    @Test
+    fun aReturnParkedBeforeItsCallIsListedJoinsWhenARicherEmissionListsIt() {
+        val fold = LiveFold().apply { feed(Tool("call-a").call(Args.DATE), Tool("call-b").returned("waited")) }
+        assertEquals(listOf("call-b"), fold.pending.keys.toList())
+
+        fold.feed(parallel("call-a", "call-b"))
+
+        assertEquals("waited", fold.row("tc-call-a").toolReturnContentByCallId["call-b"])
+        assertTrue(fold.pending.isEmpty())
+    }
+
+    @Test
+    fun aReturnForACallNoRowListsStaysParkedAndTouchesNoRow() {
+        val fold = LiveFold().apply { feed(parallel("call-a", "call-b"), Tool("call-z").returned("stray")) }
+
+        assertEquals(listOf("call-z"), fold.pending.keys.toList())
+        val row = fold.row("tc-call-a")
+        assertTrue(row.toolReturnContentByCallId.isEmpty())
+        assertNull(row.toolReturnContent)
+    }
+
+    /** An approval row is minted its own logical id (not `tc-`); its return still joins it by call id. */
+    @Test
+    fun aReturnJoinsAnApprovalRowNamedWithoutItsCallId() {
+        val request = ApprovalRequestMessage(
+            id = "approval-1",
+            toolCall = ToolCall(toolCallId = "call-q", name = "Bash", arguments = Args.DATE.json),
+            logicalMessageId = "lm-approval",
+        )
+        val fold = LiveFold().apply { feed(request, Tool("call-q").returned("approved and ran")) }
+
+        assertEquals("approved and ran", fold.row("lm-approval").toolReturnContentByCallId["call-q"])
+        assertTrue(fold.pending.isEmpty())
+    }
+
+    /**
+     * Every ordering of a two-call message (first emitted with one call, then with both) and both returns ends with
+     * nothing parked and each call holding its own return: no later repair has anything left to attach.
+     */
+    @Test
+    fun everyOrderingOfATwoCallRoundLeavesNothingParked() {
+        val random = Random(SEED)
+        repeat(ITERATIONS) { iteration ->
+            val frames = listOf(Tool("call-a").returned("A"), Tool("call-b").returned("B"), parallel("call-a", "call-b"))
+                .shuffled(random)
+                .let { if (random.nextBoolean()) listOf(Tool("call-a").call(Args.DATE)) + it else it }
+            val fold = LiveFold()
+            frames.forEach { frame ->
+                fold.feed(frame)
+                val listed = fold.rows().flatMap { row -> row.toolCalls.map { it.effectiveId } }.toSet()
+                assertTrue(fold.pending.keys.none { it in listed }, "iteration $iteration: a listed call kept a parked return")
+            }
+
+            assertTrue(fold.pending.isEmpty(), "iteration $iteration: $frames left ${fold.pending.keys}")
+            val row = fold.row("tc-call-a")
+            assertEquals(mapOf("call-a" to "A", "call-b" to "B"), row.toolReturnContentByCallId.toMap(), "iteration $iteration")
+            assertEquals("A", row.toolReturnContent, "iteration $iteration")
+        }
     }
 
     @Test
@@ -248,6 +347,13 @@ class LiveTurnReducerTest {
             logicalMessageId = "tr-$callId",
         )
     }
+
+    /** One assistant message carrying several calls, stamped as the host stamps it: after its first call. */
+    private fun parallel(vararg callIds: String) = ToolCallMessage(
+        id = "toolcall-${callIds.first()}",
+        toolCalls = callIds.map { ToolCall(toolCallId = it, name = "Bash", arguments = Args.UPTIME.json) },
+        logicalMessageId = "tc-${callIds.first()}",
+    )
 
     private class LiveFold {
         private var state = TimelineReducerState(Timeline("conv"))

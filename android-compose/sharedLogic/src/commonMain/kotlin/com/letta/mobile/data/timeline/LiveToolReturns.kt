@@ -16,12 +16,13 @@ internal fun TimelineReducerInput.reduceApprovalResponse(response: ApprovalRespo
 }
 
 /**
- * A tool return joins the row named `tc-<tool_call_id>`. One that arrives before its call is parked
- * by call id and attached when the call row appends.
+ * A tool return joins the row that lists its call: the row named `tc-<tool_call_id>`, or the row of a
+ * multi-call message named after its first call. One that arrives before any row lists its call is
+ * parked by call id and attached when a row appends or is updated to list it.
  */
 internal fun TimelineReducerInput.reduceToolReturn(returned: ToolReturnMessage): TimelineReducerOutput {
     val callId = returned.toolCallId?.takeIf { it.isNotBlank() } ?: return unchanged()
-    val call = prev.findByLogicalId("tc-$callId") ?: return parked(callId, returned)
+    val call = prev.rowListing(callId) ?: return parked(callId, returned)
     val answered = call.answeredBy(callId, returned)
     return ingested(
         prev.replaceByLogicalId(answered),
@@ -29,6 +30,21 @@ internal fun TimelineReducerInput.reduceToolReturn(returned: ToolReturnMessage):
         pendingToolReturnsByCallId,
         returned.notificationFor(call, answered),
     )
+}
+
+/**
+ * The row that lists [call]. The row named after it (`tc-<id>`) is tried first; a later
+ * call of the same message, or a row named otherwise (an approval request), is found by walking back
+ * from the tail without allocating: a live call sits a few rows from the end, and only a call no row
+ * lists walks the whole resident window.
+ */
+private fun Timeline.rowListing(call: String): TimelineEvent.Confirmed? {
+    findByLogicalId("tc-$call")?.let { return it }
+    for (i in events.indices.reversed()) {
+        val row = events[i] as? TimelineEvent.Confirmed ?: continue
+        if (row.toolCalls.any { it.effectiveId == call }) return row
+    }
+    return null
 }
 
 private fun TimelineReducerInput.parked(callId: String, returned: ToolReturnMessage): TimelineReducerOutput =
