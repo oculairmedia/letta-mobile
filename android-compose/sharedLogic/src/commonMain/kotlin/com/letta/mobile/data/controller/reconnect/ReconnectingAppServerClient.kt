@@ -37,7 +37,10 @@ class AppServerClientGeneration(
     val close: (reason: String?) -> Unit,
 )
 
-/** Lifecycle callbacks the supervisor fires around generation transitions. */
+/**
+ * Lifecycle callbacks the supervisor fires around generation transitions. They are invoked from the
+ * supervisor's single supervise loop, never concurrently, so an implementation may rely on that.
+ */
 interface ReconnectingClientListener {
     /**
      * The active generation failed. Fired exactly once per generation, before
