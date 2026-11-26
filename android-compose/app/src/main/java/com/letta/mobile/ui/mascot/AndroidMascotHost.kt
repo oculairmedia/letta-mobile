@@ -75,12 +75,14 @@ class AndroidMascotHost(
     /**
      * Whether the worker's message poll must run. The runtime's default polls on every vsync for
      * the life of the activity, which keeps Compose's frame clock busy on every screen whether a
-     * mascot is drawn or not; here it runs only while a Rive surface is composed (a live companion,
-     * a still being captured) or the file is loading (the load completes through a polled message).
+     * mascot is drawn or not; here it runs only while a Rive surface is playing (a live companion),
+     * a still is being captured, or the file is loading (the load completes through a polled
+     * message). A surface frozen at rest is not counted: its one paused frame and every input
+     * write that redraws it are commands to the worker, and nothing it does waits on a reply.
      */
-    val pollNeeded: Boolean get() = loading || activeSurfaces > 0 || capturing > 0
+    val pollNeeded: Boolean get() = loading || playingSurfaces > 0 || capturing > 0
     private var loading by mutableStateOf(false)
-    private var activeSurfaces by mutableIntStateOf(0)
+    private var playingSurfaces by mutableIntStateOf(0)
     private var capturing by mutableIntStateOf(0)
 
     /**
@@ -132,12 +134,12 @@ class AndroidMascotHost(
         }
     }
 
-    /** A Rive surface for the duration of [content]'s composition, counted so the poll runs only then. */
+    /** A Rive surface, counted while [playing] so the poll runs only then and stops when it rests. */
     @Composable
-    private fun CountedSurface(content: @Composable () -> Unit) {
-        DisposableEffect(Unit) {
-            activeSurfaces++
-            onDispose { activeSurfaces-- }
+    private fun CountedSurface(playing: Boolean, content: @Composable () -> Unit) {
+        DisposableEffect(playing) {
+            if (playing) playingSurfaces++
+            onDispose { if (playing) playingSurfaces-- }
         }
         content()
     }
@@ -174,7 +176,7 @@ class AndroidMascotHost(
         var wasLive by remember { mutableStateOf(false) }
         if (drives) wasLive = true
         if (drives || wasLive) {
-            CountedSurface { RiveMascotSurface(live.scene, modifier, playing = drives) }
+            CountedSurface(playing = drives) { RiveMascotSurface(live.scene, modifier, playing = drives) }
         } else {
             MascotStill(live, modifier)
         }
