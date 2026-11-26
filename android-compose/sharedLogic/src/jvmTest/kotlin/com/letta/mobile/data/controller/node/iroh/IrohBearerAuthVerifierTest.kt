@@ -111,4 +111,93 @@ class IrohBearerAuthVerifierTest {
         }
         assertTrue(v.verify("peer-1", "wrong") is IrohBearerAuthVerifier.Outcome.Denied)
     }
+
+    /** The lockout rule on its own, no flood: it holds identically before and after the table got a ceiling. */
+    @Test
+    fun fiveFailuresInTheWindowLockOutUntilTheWindowPasses() {
+        val clock = FakeClock()
+        val v = verifier(clock)
+        repeat(IrohBearerAuthVerifier.MAX_FAILURES_PER_WINDOW - 1) {
+            assertEquals(IrohBearerAuthVerifier.Outcome.Denied("invalid_token"), v.verify("peer-1", "wrong-$it"), "inside the budget")
+            clock.now += 1_000
+        }
+        assertEquals(IrohBearerAuthVerifier.Outcome.RateLimited, v.verify("peer-1", "wrong-last"), "the fifth failure locks out")
+        assertEquals(IrohBearerAuthVerifier.Outcome.RateLimited, v.verify("peer-1", token), "locked out even for the valid token")
+
+        clock.now += IrohBearerAuthVerifier.LOCKOUT_WINDOW_MS + 1
+        assertEquals(IrohBearerAuthVerifier.Outcome.Authenticated, v.verify("peer-1", token), "admitted after the window")
+    }
+
+    private fun boundedVerifier(clock: FakeClock) = verifier(clock)
+
+    private fun freshNodeId(i: Int): String = "%064x".format(i)
+
+    @Test
+    fun aFloodOfFreshNodeIdsStaysWithinTheCeiling() {
+        val clock = FakeClock()
+        val v = boundedVerifier(clock)
+        repeat(FLOOD_SIZE) { i ->
+            v.verify(freshNodeId(i), "wrong")
+            clock.now += 1
+        }
+        assertTrue(v.trackedPeerCount() <= FLOOD_CEILING, "tracked ${v.trackedPeerCount()} NodeIds, ceiling $FLOOD_CEILING")
+    }
+
+    @Test
+    fun aLockedOutOffenderStaysLockedOutThroughAFlood() {
+        val clock = FakeClock()
+        val v = boundedVerifier(clock)
+        repeat(IrohBearerAuthVerifier.MAX_FAILURES_PER_WINDOW) { v.verify("offender", "wrong-$it") }
+        assertEquals(IrohBearerAuthVerifier.Outcome.RateLimited, v.verify("offender", token))
+
+        repeat(FLOOD_SIZE) { i -> v.verify(freshNodeId(i), "wrong") }
+
+        assertEquals(IrohBearerAuthVerifier.Outcome.RateLimited, v.verify("offender", token), "a flood must not lift a lockout")
+        assertTrue(v.trackedPeerCount() <= FLOOD_CEILING, "ceiling: tracked ${v.trackedPeerCount()} NodeIds, ceiling $FLOOD_CEILING")
+    }
+
+    @Test
+    fun aFloodDoesNotResetAPartlySpentBudget() {
+        val clock = FakeClock()
+        val v = boundedVerifier(clock)
+        repeat(IrohBearerAuthVerifier.MAX_FAILURES_PER_WINDOW - 1) { v.verify("guesser", "wrong-$it") }
+
+        repeat(FLOOD_SIZE) { i -> v.verify(freshNodeId(i), "wrong") }
+
+        assertEquals(
+            IrohBearerAuthVerifier.Outcome.RateLimited,
+            v.verify("guesser", "one-more"),
+            "the last failure in the budget still locks out",
+        )
+    }
+
+    @Test
+    fun aSaturatedTableFailsClosedForNewFailuresButStillAdmitsValidCredentials() {
+        val clock = FakeClock()
+        val v = boundedVerifier(clock)
+        repeat(FLOOD_CEILING) { i -> v.verify(freshNodeId(i), "wrong") }
+
+        assertEquals(IrohBearerAuthVerifier.Outcome.RateLimited, v.verify("newcomer", "wrong"), "no room to count it: refuse at once")
+        assertEquals(IrohBearerAuthVerifier.Outcome.Authenticated, v.verify("legit-peer", token), "a valid token is still admitted")
+    }
+
+    @Test
+    fun expiredFailuresMakeRoomAgain() {
+        val clock = FakeClock()
+        val v = boundedVerifier(clock)
+        repeat(FLOOD_CEILING) { i -> v.verify(freshNodeId(i), "wrong") }
+        clock.now += IrohBearerAuthVerifier.LOCKOUT_WINDOW_MS + 1
+
+        assertEquals(
+            IrohBearerAuthVerifier.Outcome.Denied("invalid_token"),
+            v.verify("newcomer", "wrong"),
+            "room again: counted, not refused",
+        )
+        assertTrue(v.trackedPeerCount() <= FLOOD_CEILING, "ceiling: tracked ${v.trackedPeerCount()} NodeIds, ceiling $FLOOD_CEILING")
+    }
+
+    private companion object {
+        const val FLOOD_CEILING = IrohBearerAuthVerifier.MAX_TRACKED_PEERS
+        const val FLOOD_SIZE = 5 * FLOOD_CEILING
+    }
 }
