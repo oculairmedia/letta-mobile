@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite"]
 
 [workspace.package]
 edition = "2024"
@@ -17,6 +17,9 @@ hex = "0.4.3"
 lru = { version = "0.19.2", default-features = false }
 core-proto = { path = "crates/core-proto" }
 core-testkit = { path = "crates/core-testkit" }
+core-store = { path = "crates/core-store" }
+rusqlite = { version = "0.37", features = ["bundled"] }
+tempfile = "3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
