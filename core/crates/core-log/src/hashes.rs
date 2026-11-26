@@ -64,7 +64,7 @@ pub fn log_digest(input: &[u8]) -> [u8; 32] {
 
 /// C2's divergence catalog node id: the first 16 bytes of
 /// `blake3("baken.divergence.v1" ‖ agentId ‖ 0x00 ‖ conversationId ‖ 0x00 ‖ u64be(n) ‖ claimant)`,
-/// with the UUID version set to 8 and the RFC 9562 variant bits.
+/// made an RFC 9562 version 8 UUID by the `uuid` crate (version and variant bits set).
 #[must_use]
 pub fn c2_divergence_node_id(agent: &str, conversation: &str, stranded: &Epoch) -> [u8; 16] {
     let mut input = Vec::new();
@@ -75,25 +75,17 @@ pub fn c2_divergence_node_id(agent: &str, conversation: &str, stranded: &Epoch) 
     input.push(0);
     input.extend_from_slice(&epoch_bytes(stranded));
     let digest = blake3_hash(&input);
-    let mut id = [0_u8; 16];
-    id.copy_from_slice(&digest[..16]);
-    id[6] = (id[6] & 0x0f) | 0x80;
-    id[8] = (id[8] & 0x3f) | 0x80;
-    id
+    let mut custom = [0_u8; 16];
+    custom.copy_from_slice(&digest[..16]);
+    uuid::Builder::from_custom_bytes(custom)
+        .into_uuid()
+        .into_bytes()
 }
 
 /// The UUID text form of 16 bytes (lowercase, hyphenated).
 #[must_use]
 pub fn uuid_text(id: &[u8; 16]) -> String {
-    let hex = hex(id);
-    format!(
-        "{}-{}-{}-{}-{}",
-        &hex[..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..]
-    )
+    uuid::Uuid::from_bytes(*id).hyphenated().to_string()
 }
 
 /// SHA-256 of `bytes` (checkpoint manifest entries and `file_put`).
@@ -143,16 +135,6 @@ pub fn git_oid(algo: GitAlgo, type_name: &str, content: &[u8]) -> Vec<u8> {
     }
 }
 
-pub(crate) fn hex(bytes: &[u8]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut text = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
-        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
-    }
-    text
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,7 +143,7 @@ mod tests {
     fn git_blob_oid_matches_git() {
         // `printf 'hello\n' | git hash-object --stdin`
         assert_eq!(
-            hex(&git_oid(GitAlgo::Sha1, "blob", b"hello\n")),
+            hex::encode(git_oid(GitAlgo::Sha1, "blob", b"hello\n")),
             "ce013625030ba8dba906f756967f9e9ca394464a"
         );
     }

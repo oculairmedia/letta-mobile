@@ -46,7 +46,7 @@ impl Signature {
 
 impl fmt::Debug for Signature {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "Signature({})", hex(&self.0))
+        write!(formatter, "Signature({})", hex::encode(self.0))
     }
 }
 
@@ -89,16 +89,6 @@ pub fn verify_strict(signer: &NodeId, message: &[u8; 32], signature: &Signature)
     };
     let signature = ed25519_dalek::Signature::from_bytes(&signature.0);
     key.verify_strict(message, &signature).is_ok()
-}
-
-fn hex(bytes: &[u8]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut text = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
-        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
-    }
-    text
 }
 
 #[cfg(test)]
@@ -152,7 +142,7 @@ mod tests {
         assert_ne!(derive_key("a", b"x"), derive_key("b", b"x"));
         // BLAKE3 of the empty input (the reference test vector).
         assert_eq!(
-            hex(&blake3_hash(b"")),
+            hex::encode(blake3_hash(b"")),
             "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
         );
     }

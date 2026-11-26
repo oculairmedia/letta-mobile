@@ -26,7 +26,9 @@ Rules marked **R-x** are normative. Test keys are Ed25519 seeds `k` repeated 32 
 - **R-1 BCBOR.** Payloads and wire messages use the BCBOR profile v1 (C1 §1.1, implemented once in
   `core_proto::bcbor`): unsigned ints, byte and text strings, arrays, maps with strictly ascending uint keys,
   `true`/`false`/`null`; shortest forms; no floats, tags, negative ints or indefinite lengths; depth at most 16; no
-  trailing bytes. Decoders reject anything else, so one value has one encoding.
+  trailing bytes. Decoders reject anything else, so one value has one encoding. The CBOR encoding and decoding are the
+  `minicbor` crate's; `core_proto::bcbor` adds only the profile checks (allowed types, shortest heads, key order,
+  limits), so the bytes are standard CBOR any library reads.
 - **R-2 Optional fields.** An optional map field is either absent or `null`; the two mean the same. Encoders omit it.
   Unknown keys are ignored by decoders and preserved by relays: a verifier hashes the payload bytes as received and
   never re-encodes them.
@@ -239,6 +241,8 @@ or 10 minutes after the tail last grew, and again with the same id if the tail g
 
 One bidirectional stream per connection. A frame is a `u32 BE` length, then a BCBOR map whose key 0 is the message
 type; at most `MAX_FRAME` = 1 MiB (a larger prefix is `too_large` and ends the stream). The version is in the ALPN.
+This is the default framing of `tokio_util`'s `LengthDelimitedCodec` (a 4-byte big-endian length that does not
+count itself), which the Rust core uses for it.
 
 ### 9.2 Messages
 
@@ -320,9 +324,9 @@ memory for the session only.
 
 ### 9.7 Driver and link
 
-The async driver (`core_log::driver::run_session`) runs one session over two halves of a byte stream (`ByteRead`,
-`ByteWrite`) with a `Clock`; it handles each frame in one store transaction and sends replies after the commit.
-`core-carrier`'s `Link` streams bind to these traits through an adapter when the carrier lands. A node's `Hub` fans
+The async driver (`core_log::driver::run_session`) runs one session over two halves of a byte stream (tokio's
+`AsyncRead` and `AsyncWrite`, framed by `tokio_util`; no tokio runtime needed) with a `Clock`; it handles each frame in
+one store transaction and sends replies after the commit. Iroh's QUIC streams implement those traits directly. A node's `Hub` fans
 stored-entry notices out to its sessions; the holder publishes its own appends there after committing them.
 
 ## 10. Retention and pruning

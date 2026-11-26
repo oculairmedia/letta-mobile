@@ -4,7 +4,7 @@
 use core_proto::{AgentId, ConversationId, Epoch};
 use core_store::{DivergenceId, EntryHash, LogId};
 
-use crate::hashes::{c2_divergence_node_id, divergence_id, hex, uuid_text};
+use crate::hashes::{c2_divergence_node_id, divergence_id, uuid_text};
 use crate::payload::{Action, DivergencePayload, DivergentConversation, RefEntry};
 use crate::value::Pos;
 
@@ -62,7 +62,7 @@ impl DivergenceInputs {
         format!(
             "refs/heads/divergence/{}-{}/{leaf}",
             self.stranded_epoch.n,
-            &hex(self.stranded_epoch.claimant.as_bytes())[..8]
+            &self.stranded_epoch.claimant.to_hex()[..8]
         )
     }
 
