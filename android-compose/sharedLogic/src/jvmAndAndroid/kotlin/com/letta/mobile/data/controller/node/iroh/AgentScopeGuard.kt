@@ -18,8 +18,7 @@ import kotlinx.serialization.json.contentOrNull
  *
  * Conversation-addressed requests (any `conversation_id`, top level or under
  * `runtime`) are resolved to their host-recorded owner by
- * [AdminRpcRouter.conversationsInScope] before dispatch or viewer observation
- * (letta-mobile-wisqe.2).
+ * [AdminRpcRouter.conversationsInScope] before dispatch or viewer observation.
  */
 object AgentScopeGuard {
     const val DENIED = "forbidden: agent not in this device's scope"

@@ -45,7 +45,7 @@ object RunAdminHandlers {
     }
 
     /**
-     * letta-mobile-wisqe.2: a run is addressed only by its id, so the router's agent guard never sees its agent. An
+     * A run is addressed only by its id, so the router's agent guard never sees its agent. An
      * agent-scoped peer may read a run (or its steps) only when the run's recorded agent is in its scope; a run it
      * cannot see and a run that does not exist answer the same denial.
      */

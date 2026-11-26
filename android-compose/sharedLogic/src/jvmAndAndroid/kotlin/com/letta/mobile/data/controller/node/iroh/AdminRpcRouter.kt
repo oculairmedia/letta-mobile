@@ -26,6 +26,12 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 fun adminError(message: String): Nothing = throw AdminRpcClientError(message)
 
+/** An owner lookup that takes longer than this answers no owner (a denial), never a hung request. */
+private const val OWNER_LOOKUP_TIMEOUT_MS = 2_000L
+
+/** Bound on the router's resolved-owner cache; past it the cache starts over rather than growing without limit. */
+private const val MAX_KNOWN_OWNERS = 4_096
+
 /** The fixed failure text for every handler exception that is not a deliberate client refusal. */
 internal const val ADMIN_RPC_INTERNAL_ERROR = "Internal error"
 
@@ -153,7 +159,7 @@ class AdminRpcRouter(
      * context as it was before any viewer change: the peer may read each one (its conversation-content scope), and for
      * an agent-scoped peer [preauthorize] (not the handler) proved each one's owner. Otherwise the transport dispatches
      * first and observes only once the handler answered successfully, so viewing a conversation can never grant
-     * access to it and a refused call never holds even a transient subscription (letta-mobile-wisqe.2 F2).
+     * access to it and a refused call never holds even a transient subscription.
      */
     internal fun mayObserveBeforeDispatch(invocation: AdminRpcInvocation): Boolean {
         val context = invocation.context
@@ -198,7 +204,7 @@ class AdminRpcRouter(
      *
      * Transport paths use this before attaching connection-local observation
      * state. For an agent-scoped peer it also resolves the owning agent of every
-     * conversation the request names (letta-mobile-wisqe.2): a conversation owned
+     * conversation the request names: a conversation owned
      * outside the scope, or whose owner the host cannot resolve, is denied here,
      * so no conversation-addressed handler can forget it.
      */
@@ -307,14 +313,6 @@ class AdminRpcRouter(
             "class" attr error::class.simpleName,
             "category" attr if (error is AdminRpcClientError) "client_refusal" else "internal",
         )
-    }
-
-    private companion object {
-        /** An owner lookup that takes longer than this answers no owner (a denial), never a hung request. */
-        const val OWNER_LOOKUP_TIMEOUT_MS = 2_000L
-
-        /** Bound on [knownOwners]; past it the cache starts over rather than growing without limit. */
-        const val MAX_KNOWN_OWNERS = 4_096
     }
 
     private fun encodeFailure(requestId: String, message: String): String =

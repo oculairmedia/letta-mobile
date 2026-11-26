@@ -40,7 +40,7 @@ interface ViewerHandle {
     /**
      * Whether this connection may receive the `conversation_updated` push of a conversation owned by [agentId] (null:
      * the frame names no agent). Beyond [receivesConversationEvents], an agent-scoped peer gets only conversations of
-     * agents in its scope, and none naming no agent (letta-mobile-wisqe.2). Evaluated at send time.
+     * agents in its scope, and none naming no agent. Evaluated at send time.
      */
     fun receivesConversationUpdateOf(agentId: String?): Boolean {
         if (!receivesConversationEvents()) return false

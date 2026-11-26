@@ -258,7 +258,7 @@ object IrohPeerCapabilities {
      *
      * Null is unrestricted only in conversation CONTENT: for an agent-scoped peer every conversation a request names
      * must still be owned by an agent in its scope, which [AdminRpcRouter.preauthorize] resolves from the host's own
-     * records before any handler or viewer change (letta-mobile-wisqe.2).
+     * records before any handler or viewer change.
      */
     fun conversationScope(capabilities: Set<String>, viewedConversationId: String?): Set<String>? =
         if (ADMIN_FULL in capabilities || CONVERSATION_MANAGE in capabilities) {

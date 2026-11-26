@@ -688,7 +688,7 @@ object ConversationAdminHandlers {
     ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
 
     /**
-     * letta-mobile-wisqe.2: an agent-scoped peer lists only conversations owned by an agent in its scope. A row naming
+     * An agent-scoped peer lists only conversations owned by an agent in its scope. A row naming
      * no agent is dropped too: the router's result filter keeps such rows, and this peer could never open one.
      */
     private fun ownerInAgentScope(row: JsonElement, scope: Set<String>?): Boolean {

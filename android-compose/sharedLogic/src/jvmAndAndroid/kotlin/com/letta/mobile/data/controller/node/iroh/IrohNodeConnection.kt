@@ -390,7 +390,7 @@ class IrohNodeConnection(
     }
 
     /**
-     * letta-mobile-wisqe.2: a runtime frame of an agent-scoped peer naming a conversation owned outside its scope (or
+     * A runtime frame of an agent-scoped peer naming a conversation owned outside its scope (or
      * whose owner the host cannot resolve) is denied before any upstream side effect or viewer registration, even
      * when the agent it names is in scope. Returns the denial frame, or null to proceed.
      */
