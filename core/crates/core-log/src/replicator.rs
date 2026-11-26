@@ -435,6 +435,15 @@ impl Session {
         events: &mut Vec<SessionEvent>,
     ) -> Result<(), StoreError> {
         if store.entry(&pos.hash)?.is_some() {
+            // Already held (another session brought it first). Still subscribe to the log's live
+            // tail on this session once: otherwise entries this peer stores later (a new holder's
+            // epoch_open after a failover) are never relayed over it.
+            if self.config.mode != Mode::HeadsOnly
+                && self.subscribed.insert(log_id)
+                && let Some(want) = live_want(store, log_id)?
+            {
+                self.control.push_back(want);
+            }
             return Ok(());
         }
         if self.config.mode == Mode::HeadsOnly {

@@ -1,0 +1,41 @@
+{
+  "description": "A letta-code 0.34.x local-backend store for one agent (layout from the X0 spike and the H1 inventory), with node-local files that must never be exported. Paths expand {agent}, {agent_b64} (base64url of the agent id), {default_b64} (the default conversation's directory) and {conv:<id>} (a named conversation's directory).",
+  "agent": "agent-local-212d08ba-fcef-4800-8a11-e58e415bc934",
+  "files": {
+    "agents/{agent_b64}.json": "{\"id\":\"agent-local-212d08ba-fcef-4800-8a11-e58e415bc934\",\"name\":\"x0-throwaway\",\"description\":\"A helper\",\"system\":\"You are a helpful agent.\",\"tags\":[\"origin:letta-code\"],\"model\":\"profile/main\",\"model_settings\":{}}\n",
+    "conversations/{default_b64}/conversation.json": "{\"id\":\"default\",\"agent_id\":\"agent-local-212d08ba-fcef-4800-8a11-e58e415bc934\",\"model\":null,\"in_context_message_ids\":[\"ui-msg-1\",\"ui-msg-2\"]}\n",
+    "conversations/{default_b64}/messages.jsonl": "{\"type\":\"session\",\"id\":\"a1b2c3d4\",\"version\":3,\"timestamp\":\"2026-11-25T20:00:00.000Z\"}\n{\"type\":\"message\",\"id\":\"e5f6a7b8\",\"parentId\":\"a1b2c3d4\",\"message\":{\"id\":\"ui-msg-1\",\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Remember the codeword HERON.\"}]}}\n{\"type\":\"message\",\"id\":\"c9d0e1f2\",\"parentId\":\"e5f6a7b8\",\"message\":{\"id\":\"ui-msg-2\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Saved HERON to memory.\"}]}}\n",
+    "conversations/{default_b64}/system-prompt.json": "{\"rawSystemHash\":\"5d41402abc4b2a76\",\"memfsRevision\":\"eb01bbc\",\"compiledAt\":\"2026-11-25T20:00:01.000Z\",\"prompt\":\"You are a helpful agent.\"}\n",
+    "conversations/{default_b64}/manifest.json": "{\"version\":1,\"messageCount\":2}\n",
+    "conversations/{conv:local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83}/conversation.json": "{\"id\":\"local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83\",\"agent_id\":\"agent-local-212d08ba-fcef-4800-8a11-e58e415bc934\",\"model\":\"profile/fast\",\"model_settings\":{\"context_window_limit\":64000},\"in_context_message_ids\":[\"ui-msg-3\"]}\n",
+    "conversations/{conv:local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83}/messages.jsonl": "{\"type\":\"session\",\"id\":\"0badf00d\",\"version\":3,\"timestamp\":\"2026-11-25T20:05:00.000Z\"}\n{\"type\":\"message\",\"id\":\"1badf00d\",\"parentId\":\"0badf00d\",\"message\":{\"id\":\"ui-msg-3\",\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the codeword?\"}]}}\n",
+    "conversations/{conv:local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83}/blobs/note.txt": "attachment bytes\n",
+    "conversations/{conv:local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83}/system-prompt.json": "{\"rawSystemHash\":\"5d41402abc4b2a76\",\"memfsRevision\":\"eb01bbc\"}\n",
+    "settings.json": "{\"agents\":[{\"agentId\":\"agent-local-212d08ba-fcef-4800-8a11-e58e415bc934\",\"baseUrl\":\"local:/root/.letta/lc-local-backend\",\"memfs\":true}],\"deviceId\":\"device-1\"}\n",
+    "providers/auth.json": "{\"lmstudio\":{\"baseUrl\":\"http://127.0.0.1:1234\"}}\n",
+    "agents/YWdlbnQtbG9jYWwtb3RoZXI.json": "{\"id\":\"agent-local-other\",\"name\":\"another agent on this node\",\"model\":\"profile/main\"}\n",
+    "conversations/{conv:local-conv-0f0f0f0f-0000-4000-8000-000000000000}/conversation.json": "{\"id\":\"local-conv-0f0f0f0f-0000-4000-8000-000000000000\",\"agent_id\":\"agent-local-other\",\"model\":null}\n"
+  },
+  "memfs": {
+    "repo": "memfs/{agent}/memory",
+    "commits": [
+      {"message": "init memory", "time": 1764100800, "files": {".gitattributes": "* text=auto eol=lf\n", "system/persona.md": "I am a helpful agent.\n"}},
+      {"message": "remember the codeword", "time": 1764100860, "files": {".gitattributes": "* text=auto eol=lf\n", "system/persona.md": "I am a helpful agent.\n", "x0-codeword.md": "The codeword is HERON.\n"}},
+      {"message": "note the conversation", "time": 1764100920, "files": {".gitattributes": "* text=auto eol=lf\n", "system/persona.md": "I am a helpful agent.\n", "x0-codeword.md": "The codeword is HERON.\n", "notes/conversations.md": "- default: codeword saved\n"}}
+    ],
+    "git_local": {
+      "hooks/pre-commit": "#!/bin/sh\nrun_memory_node='/opt/meridian/node/v22.23.4/bin/node'\nexec \"$run_memory_node\" .git/hooks/letta-memory-constraints.cjs\n",
+      "hooks/post-commit": "#!/bin/sh\nexit 0\n",
+      "letta-memory-layout-policy": "{\"version\":1}\n"
+    }
+  },
+  "never_exported": [
+    "conversations/{default_b64}/system-prompt.json",
+    "conversations/{default_b64}/manifest.json",
+    "conversations/{conv:local-conv-86c8046a-9245-4fd3-9a06-6fd7c3167c83}/system-prompt.json",
+    "settings.json",
+    "providers/auth.json",
+    "agents/YWdlbnQtbG9jYWwtb3RoZXI.json",
+    "conversations/{conv:local-conv-0f0f0f0f-0000-4000-8000-000000000000}/conversation.json"
+  ]
+}
