@@ -119,6 +119,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "storekey",
  "thiserror",
 ]
 
@@ -130,6 +131,7 @@ dependencies = [
  "core-store",
  "core-testkit",
  "rusqlite",
+ "rusqlite_migration",
  "serde",
  "tempfile",
 ]
@@ -299,6 +301,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
+name = "log"
+version = "0.4.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
+
+[[package]]
 name = "lru"
 version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,6 +444,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusqlite_migration"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fc9767ae49274bafd3e55be9d30405a033b7a59548327d87fd4971fbb58e264"
+dependencies = [
+ "log",
+ "rusqlite",
+]
+
+[[package]]
 name = "rustix"
 version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,6 +534,12 @@ name = "smallvec"
 version = "1.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
+
+[[package]]
+name = "storekey"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd9a94571bde7369ecaac47cec2e6844642d99166bd452fbd8def74b5b917b2f"
 
 [[package]]
 name = "syn"

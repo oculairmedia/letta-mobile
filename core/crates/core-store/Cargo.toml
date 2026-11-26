@@ -14,6 +14,7 @@ contract = ["dep:proptest"]
 
 [dependencies]
 core-proto.workspace = true
+storekey.workspace = true
 thiserror.workspace = true
 proptest = { workspace = true, optional = true }
 

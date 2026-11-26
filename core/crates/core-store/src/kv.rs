@@ -86,59 +86,48 @@ pub trait KvStore {
     fn kv_delete(&mut self, namespace: Namespace, key: &[u8]) -> Result<bool, StoreError>;
 }
 
-const TERMINATOR: u8 = 0x00;
-const ESCAPE: u8 = 0x01;
-
 /// Encodes a key path (a list of string components) so that the encoding of a component prefix is
 /// a byte prefix of the encoding of every path that extends it, and of no other path.
 ///
-/// Each component is its UTF-8 bytes with `0x00` written as `01 01` and `0x01` as `01 02`, followed
-/// by a `0x00` terminator.
+/// Each component is written in the `storekey` format: its UTF-8 bytes with `0x00` written as
+/// `01 00` and `0x01` as `01 01`, followed by a `0x00` terminator.
+///
+/// # Panics
+///
+/// Never: writing to a `Vec` cannot fail.
 #[must_use]
 pub fn encode_key_path<S: AsRef<str>>(components: &[S]) -> Vec<u8> {
     let mut out = Vec::new();
+    let mut writer = storekey::Writer::new(&mut out);
     for component in components {
-        for &byte in component.as_ref().as_bytes() {
-            match byte {
-                TERMINATOR => out.extend_from_slice(&[ESCAPE, 0x01]),
-                ESCAPE => out.extend_from_slice(&[ESCAPE, 0x02]),
-                other => out.push(other),
-            }
-        }
-        out.push(TERMINATOR);
+        writer
+            .write_slice(component.as_ref().as_bytes())
+            .expect("writing to a Vec cannot fail");
     }
     out
 }
 
 /// Decodes [`encode_key_path`] output.
 ///
+/// The `storekey` reader takes any byte after an escape literally, so the decoded path is encoded
+/// again and must give back the same bytes: one path has exactly one key.
+///
 /// # Errors
 ///
 /// [`StoreError::Corrupt`] for a bad escape, a missing terminator or a component that is not UTF-8.
 pub fn decode_key_path(bytes: &[u8]) -> Result<Vec<String>, StoreError> {
+    let corrupt =
+        |error: storekey::DecodeError| StoreError::Corrupt(format!("bad key path: {error}"));
+    let mut reader = storekey::Reader::new(bytes);
     let mut components = Vec::new();
-    let mut current = Vec::new();
-    let mut iter = bytes.iter();
-    while let Some(&byte) = iter.next() {
-        match byte {
-            TERMINATOR => {
-                let text = String::from_utf8(std::mem::take(&mut current))
-                    .map_err(|_| StoreError::Corrupt("key path component is not UTF-8".into()))?;
-                components.push(text);
-            }
-            ESCAPE => match iter.next() {
-                Some(0x01) => current.push(TERMINATOR),
-                Some(0x02) => current.push(ESCAPE),
-                _ => return Err(StoreError::Corrupt("bad escape in key path".into())),
-            },
-            other => current.push(other),
-        }
+    while !reader.is_empty().map_err(corrupt)? {
+        components.push(reader.read_string().map_err(corrupt)?);
     }
-    if current.is_empty() {
+    if encode_key_path(&components) == bytes {
         Ok(components)
     } else {
         Err(StoreError::Corrupt(
-            "key path ends without a terminator".into(),
+            "bad key path: non-canonical escape".into(),
         ))
     }
 }

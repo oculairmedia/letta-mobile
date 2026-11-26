@@ -1,14 +1,28 @@
-//! The versioned schema. `PRAGMA user_version` holds the version; migration `i` (0-based) moves a
-//! database from version `i` to `i + 1` in one transaction. Migrations are append-only: a shipped
-//! migration is never edited, and a database newer than this build is never opened.
+//! The versioned schema, as `rusqlite_migration` migrations. `PRAGMA user_version` holds the
+//! version; `to_latest` runs every pending migration in one transaction. Migrations are
+//! append-only: a shipped migration is never edited, and a database newer than this build is never
+//! opened.
+
+use rusqlite_migration::{M, Migrations};
 
 /// `PRAGMA application_id` of a Baken node store: `"BKN1"`.
 pub(crate) const APPLICATION_ID: i32 = 0x424B_4E31;
 
-/// Every migration, in order. The schema version is `MIGRATIONS.len()`.
-pub(crate) const MIGRATIONS: &[&str] = &[V1];
+/// Every migration's SQL, in order. The schema version is the number of migrations.
+const STEPS: &[&str] = &[V1];
 
+/// The latest schema version.
+pub(crate) const LATEST_VERSION: usize = STEPS.len();
+
+/// Every migration, in order.
+pub(crate) fn migrations() -> Migrations<'static> {
+    Migrations::new(STEPS.iter().map(|sql| M::up(sql)).collect())
+}
+
+/// Schema v1. Its first statement stamps [`APPLICATION_ID`] (in decimal: SQL has no hex integer
+/// for a pragma) inside the migration's transaction, so a file never has tables without the id.
 const V1: &str = r"
+PRAGMA application_id = 1112231473;
 CREATE TABLE log_entry (
     entry_hash     BLOB    NOT NULL PRIMARY KEY,
     log_id         BLOB    NOT NULL,
@@ -119,3 +133,20 @@ CREATE TABLE binding (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 ";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrations_are_valid_and_v1_stamps_the_application_id() {
+        migrations().validate().expect("valid migrations");
+        assert!(V1.contains(&format!("PRAGMA application_id = {APPLICATION_ID};")));
+        let mut connection = rusqlite::Connection::open_in_memory().expect("in-memory database");
+        migrations().to_latest(&mut connection).expect("migrates");
+        let version: usize = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .expect("user_version");
+        assert_eq!(version, LATEST_VERSION);
+    }
+}
