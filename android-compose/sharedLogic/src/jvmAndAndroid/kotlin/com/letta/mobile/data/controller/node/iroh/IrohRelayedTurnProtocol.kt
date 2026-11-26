@@ -18,6 +18,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -346,7 +347,9 @@ internal suspend fun relayTurn(
     onFailure: suspend (Throwable) -> Unit,
 ) = coroutineScope {
     val postTurnScope = protocol.postTurnScope
-    val tap = ServerFrameTap.open(controller.observeRuntimeFrames(protocol.runtime), postTurnScope ?: this)
+    val runtime = protocol.runtime
+    val frames = controller.observeRuntimeFrames()?.filter { it.frame.runtime?.sameRuntimeAs(runtime) == true }
+    val tap = ServerFrameTap.open(frames, postTurnScope ?: this)
     var tapHandedOff = false
     try {
         val relay = OrderedTurnRelay(protocol.fanout, protocol, tap)
@@ -369,6 +372,10 @@ internal suspend fun relayTurn(
         if (!tapHandedOff) tap?.close()
     }
 }
+
+/** Whether this scope names the same agent and conversation as [other]. */
+internal fun AppServerRuntimeScope.sameRuntimeAs(other: AppServerRuntimeScope): Boolean =
+    agentId == other.agentId && conversationId == other.conversationId
 
 /** Returns true when the post-turn relay took over closing [tap]. */
 private suspend fun relayQueueAfterTurn(

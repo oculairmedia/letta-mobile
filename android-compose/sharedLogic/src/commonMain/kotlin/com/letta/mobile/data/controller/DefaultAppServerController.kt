@@ -145,11 +145,8 @@ class DefaultAppServerController(
         get() = turnEngine.cancelledQueuedInputs
 
     /** A passive read of the client's frames, like the queue observer's. */
-    override fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame> =
-        client.events.filter { received ->
-            val scope = received.frame.runtime
-            scope != null && scope.agentId == runtime.agentId && scope.conversationId == runtime.conversationId
-        }
+    override fun observeRuntimeFrames(): Flow<AppServerReceivedFrame> =
+        client.events.filter { received -> received.frame.runtime != null }
 
     /**
      * (d): standing answerer for `external_tool_call_request` frames that

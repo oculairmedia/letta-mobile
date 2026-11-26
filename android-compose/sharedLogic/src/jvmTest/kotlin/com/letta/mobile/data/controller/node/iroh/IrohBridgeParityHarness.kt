@@ -16,7 +16,6 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -93,8 +92,7 @@ internal fun controllerRunning(
     object : AppServerController by FakeAppServerController() {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = turns(command)
 
-        override fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame>? =
-            frames?.filter { it.frame.runtime?.conversationId == runtime.conversationId }
+        override fun observeRuntimeFrames(): Flow<AppServerReceivedFrame>? = frames
     }
 
 /**
