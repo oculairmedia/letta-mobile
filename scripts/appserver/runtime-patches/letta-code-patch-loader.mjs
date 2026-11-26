@@ -38,6 +38,7 @@
  * original module unchanged. Better unpatched than refusing to start.
  */
 import { fileURLToPath } from "node:url";
+import { resolve as resolvePath } from "node:path";
 
 const TARGET_PATH = process.env["LETTA_CLI_PATH_REAL"] ?? "";
 
@@ -2351,7 +2352,15 @@ function targetPath(url) {
   if (!TARGET_PATH || !url.startsWith("file://")) return null;
   let path;
   try { path = fileURLToPath(url); } catch { return null; }
-  return path === TARGET_PATH ? path : null;
+  return samePath(path, TARGET_PATH) ? path : null;
+}
+
+// LETTA_CLI_PATH_REAL may use forward slashes or another drive-letter case on Windows,
+// while fileURLToPath returns backslashes, so compare resolved paths (case-insensitive on win32).
+function samePath(a, b) {
+  const ra = resolvePath(a);
+  const rb = resolvePath(b);
+  return process.platform === "win32" ? ra.toLowerCase() === rb.toLowerCase() : ra === rb;
 }
 
 function sourceText(source) {
