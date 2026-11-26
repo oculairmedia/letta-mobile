@@ -1,0 +1,16 @@
+[package]
+name = "core-testkit"
+version = "0.1.0"
+description = "Loads the shared contract fixtures under docs/reference/contracts for the Rust core's tests."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

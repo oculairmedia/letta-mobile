@@ -78,3 +78,6 @@ android-compose/app/libs/embedded-curl/
 android-compose/app/libs/embedded-node-cli/
 android-compose/local.properties
 .tools/
+
+# Rust core build output
+/core/target/

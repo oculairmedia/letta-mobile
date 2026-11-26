@@ -1,0 +1,141 @@
+{
+  "contract": "node-protocol",
+  "version": 1,
+  "spec": "docs/reference/contracts/node-protocol/node-protocol-v1.md",
+  "alpns": [
+    {"alpn": "/letta/appserver/0", "route": "app_server", "admission": "session", "refusal": {"code": 4403, "reason": "peer_not_allowed"}},
+    {"alpn": "meridian/canvas-relay/1", "route": "canvas_relay", "admission": "requires_authenticated_session", "refusal": {"code": 4401, "reason": "not_authenticated"}},
+    {"alpn": "/letta/a2a/0", "route": "agent_to_agent", "admission": "own_authorization", "refusal": {"code": 4403, "reason": "protocol_not_authorized"}},
+    {"alpn": "meridian/automerge-repo/1", "route": "automerge_repo", "admission": "own_authorization", "refusal": {"code": 4403, "reason": "protocol_not_authorized"}}
+  ],
+  "unknown_alpns": ["/letta/appserver/1", "letta/appserver/0", ""],
+  "closures": [
+    {"code": 0, "reason": "closed"},
+    {"code": 4401, "reason": "auth_failures"},
+    {"code": 4401, "reason": "not_authenticated"},
+    {"code": 4403, "reason": "peer_revoked"},
+    {"code": 4403, "reason": "peer_not_allowed"},
+    {"code": 4403, "reason": "protocol_not_authorized"},
+    {"code": 4404, "reason": "unknown_alpn"},
+    {"code": 4429, "reason": "auth_rate_limited"}
+  ],
+  "auth_errors": [
+    {"error": "request_id is required", "counts_against_session": false},
+    {"error": "missing_token", "counts_against_session": true},
+    {"error": "invalid_token", "counts_against_session": true},
+    {"error": "pairing_required", "counts_against_session": true},
+    {"error": "peer_not_allowlisted", "counts_against_session": true},
+    {"error": "invite_invalid", "counts_against_session": true},
+    {"error": "invite_expired", "counts_against_session": true},
+    {"error": "rate_limited", "counts_against_session": false}
+  ],
+  "limits": {
+    "max_frame_bytes": 1048576,
+    "max_reassembled_bytes": 33554432,
+    "pre_auth_max_reassembled_bytes": 1048576,
+    "max_failures_per_window": 5,
+    "lockout_window_ms": 60000,
+    "max_tracked_peers": 4096,
+    "max_failures_before_close": 3,
+    "min_token_length": 16,
+    "handshake_timeout_ms": 15000,
+    "admin_rpc_first_frame_timeout_ms": 15000,
+    "max_concurrent_admin_rpc_calls": 16
+  },
+  "capabilities": {
+    "frame_part": "frame_part",
+    "always_advertised": ["conversation_activity_v1", "frame_part", "event_seq_ordered_v1"]
+  },
+  "limiter_scenarios": [
+    {
+      "name": "the_fifth_failure_in_the_window_locks_out",
+      "summary": "Four refusals are reported with their reason; the fifth inside the window is rate_limited, and the lockout lasts until the oldest failure leaves the window.",
+      "steps": [
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 1000, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 2000, "reason": "missing_token", "expect": "missing_token"},
+        {"op": "deny", "peer": "a", "at_ms": 3000, "reason": "invite_invalid", "expect": "invite_invalid"},
+        {"op": "deny", "peer": "a", "at_ms": 4000, "reason": "invalid_token", "expect": "rate_limited"},
+        {"op": "check", "peer": "a", "at_ms": 30000, "expect_rate_limited": true},
+        {"op": "check", "peer": "a", "at_ms": 60000, "expect_rate_limited": true},
+        {"op": "check", "peer": "a", "at_ms": 60001, "expect_rate_limited": false}
+      ]
+    },
+    {
+      "name": "the_window_slides",
+      "summary": "Failures older than the window no longer count: a fifth failure after the first one expired is a plain refusal, and one more inside the window locks out.",
+      "steps": [
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 1, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 2, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 3, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 60001, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "a", "at_ms": 60001, "reason": "invalid_token", "expect": "rate_limited"}
+      ]
+    },
+    {
+      "name": "peers_are_counted_separately",
+      "summary": "One locked-out NodeId does not affect another.",
+      "steps": [
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "pairing_required", "expect": "pairing_required"},
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "pairing_required", "expect": "pairing_required"},
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "pairing_required", "expect": "pairing_required"},
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "pairing_required", "expect": "pairing_required"},
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "pairing_required", "expect": "rate_limited"},
+        {"op": "check", "peer": "b", "at_ms": 0, "expect_rate_limited": false},
+        {"op": "deny", "peer": "b", "at_ms": 0, "reason": "pairing_required", "expect": "pairing_required"}
+      ]
+    },
+    {
+      "name": "a_full_table_never_evicts_a_live_entry",
+      "summary": "With room for two NodeIds, a third NodeId's failure while both are inside their window is rate_limited and not tracked; once the oldest entry's newest failure leaves the window it is dropped to make room.",
+      "limits": {"max_failures_per_window": 5, "lockout_window_ms": 60000, "max_tracked_peers": 2},
+      "steps": [
+        {"op": "deny", "peer": "a", "at_ms": 0, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "b", "at_ms": 1, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "deny", "peer": "c", "at_ms": 2, "reason": "invalid_token", "expect": "rate_limited"},
+        {"op": "tracked", "expect": 2},
+        {"op": "check", "peer": "c", "at_ms": 2, "expect_rate_limited": false},
+        {"op": "deny", "peer": "c", "at_ms": 60001, "reason": "invalid_token", "expect": "invalid_token"},
+        {"op": "tracked", "expect": 2}
+      ]
+    }
+  ],
+  "control_frames": [
+    {"name": "auth_with_bootstrap_token", "lane": "control", "from": "peer", "type": "auth", "wire": "{\"type\":\"auth\",\"request_id\":\"node-1\",\"token\":\"0123456789abcdef\",\"peer_name\":\"Pixel 9\",\"capabilities\":[\"frame_part\"]}"},
+    {"name": "auth_redeeming_an_invite", "lane": "control", "from": "peer", "type": "auth", "wire": "{\"type\":\"auth\",\"request_id\":\"node-1\",\"token\":\"invite:5b1f0c2e9a7d4e38\",\"peer_name\":\"Pixel 9\",\"capabilities\":[\"frame_part\"]}"},
+    {"name": "auth_as_a_paired_node", "lane": "control", "from": "peer", "type": "auth", "wire": "{\"type\":\"auth\",\"request_id\":\"node-1\",\"capabilities\":[\"frame_part\"]}"},
+    {"name": "auth_accepted", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":true,\"capabilities\":[\"conversation_activity_v1\",\"frame_part\",\"event_seq_ordered_v1\"]}"},
+    {"name": "auth_accepted_invite_redeemed", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":true,\"paired\":true,\"capabilities\":[\"conversation_activity_v1\",\"frame_part\",\"event_seq_ordered_v1\"]}"},
+    {"name": "auth_accepted_already_paired", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":true,\"paired\":true,\"already_paired\":true,\"capabilities\":[\"conversation_activity_v1\",\"frame_part\",\"event_seq_ordered_v1\"]}"},
+    {"name": "auth_refused_invalid_token", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":false,\"error\":\"invalid_token\"}"},
+    {"name": "auth_refused_pairing_required", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":false,\"error\":\"pairing_required\"}"},
+    {"name": "auth_refused_invite_expired", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":false,\"error\":\"invite_expired\"}"},
+    {"name": "auth_refused_rate_limited", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"request_id\":\"node-1\",\"success\":false,\"error\":\"rate_limited\"}"},
+    {"name": "auth_refused_without_request_id", "lane": "control", "from": "node", "type": "auth_response", "wire": "{\"type\":\"auth_response\",\"success\":false,\"error\":\"request_id is required\"}"},
+    {"name": "runtime_start", "lane": "control", "from": "peer", "type": "runtime_start", "wire": "{\"type\":\"runtime_start\",\"request_id\":\"node-2\",\"agent_id\":\"agent-1\",\"conversation_id\":\"default\"}"},
+    {"name": "runtime_start_with_mode", "lane": "control", "from": "peer", "type": "runtime_start", "wire": "{\"type\":\"runtime_start\",\"request_id\":\"node-2\",\"agent_id\":\"agent-1\",\"conversation_id\":\"conv-7\",\"cwd\":\"/work\",\"mode\":\"default\"}"},
+    {"name": "runtime_start_accepted", "lane": "control", "from": "node", "type": "runtime_start_response", "wire": "{\"type\":\"runtime_start_response\",\"request_id\":\"node-2\",\"success\":true,\"runtime\":{\"agent_id\":\"agent-1\",\"conversation_id\":\"default\"}}"},
+    {"name": "runtime_start_missing_scope", "lane": "control", "from": "node", "type": "runtime_start_response", "wire": "{\"type\":\"runtime_start_response\",\"request_id\":\"node-2\",\"success\":false,\"error\":\"agent_id and conversation_id are required\"}"},
+    {"name": "runtime_start_unsupported_mode", "lane": "control", "from": "node", "type": "runtime_start_response", "wire": "{\"type\":\"runtime_start_response\",\"request_id\":\"node-2\",\"success\":false,\"error\":\"unsupported permission mode\"}"},
+    {"name": "runtime_start_without_request_id", "lane": "control", "from": "node", "type": "runtime_start_response", "wire": "{\"type\":\"runtime_start_response\",\"success\":false,\"error\":\"request_id is required\"}"},
+    {"name": "input_forwarded_unchanged", "lane": "control", "from": "peer", "type": "input", "wire": "{\"type\":\"input\",\"request_id\":\"input-3\",\"runtime\":{\"agent_id\":\"probe\",\"conversation_id\":\"local-conv-413\"},\"payload\":{\"kind\":\"create_message\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly the word: golden\",\"client_message_id\":\"golden-msg-1\"}]}}"},
+    {"name": "sync_without_request_id", "lane": "control", "from": "node", "type": "sync_response", "wire": "{\"type\":\"sync_response\",\"success\":false,\"error\":\"request_id is required\"}"},
+    {"name": "abort_without_request_id", "lane": "control", "from": "node", "type": "abort_message_response", "wire": "{\"type\":\"abort_message_response\",\"success\":false,\"error\":\"request_id is required\"}"},
+    {"name": "admin_rpc_on_control", "lane": "control", "from": "peer", "type": "admin_rpc", "wire": "{\"type\":\"admin_rpc\",\"request_id\":\"node-3\",\"method\":\"health.check\",\"params\":{}}"},
+    {"name": "admin_rpc_on_a_call_lane", "lane": "call", "from": "peer", "type": "admin_rpc", "wire": "{\"type\":\"admin_rpc\",\"request_id\":\"admin-9\",\"method\":\"agent.list\",\"params\":{\"limit\":50}}"},
+    {"name": "error_unauthorized", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"request_id\":\"node-2\",\"message\":\"unauthorized\"}"},
+    {"name": "error_unauthorized_without_request_id", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"request_id\":\"\",\"message\":\"unauthorized\"}"},
+    {"name": "error_capability_denied", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"request_id\":\"node-2\",\"message\":\"forbidden\",\"capability\":\"chat.send\"}"},
+    {"name": "error_agent_scope_denied", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"request_id\":\"node-2\",\"message\":\"forbidden\",\"reason\":\"agent_scope\"}"},
+    {"name": "error_unknown_command_type", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"message\":\"Unknown command type: frobnicate\"}"},
+    {"name": "error_command_without_type", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"message\":\"Unknown command type: null\"}"},
+    {"name": "error_parse_failure", "lane": "control", "from": "node", "type": "error", "wire": "{\"type\":\"error\",\"message\":\"Failed to parse frame (SerializationException)\"}"},
+    {"name": "admin_rpc_capability_denied", "lane": "call", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"admin-9\",\"success\":false,\"error\":\"forbidden\",\"capability\":\"admin.full\"}"},
+    {"name": "admin_rpc_unauthorized_on_a_call_lane", "lane": "call", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"admin-9\",\"success\":false,\"error\":\"unauthorized\"}"},
+    {"name": "admin_rpc_call_lane_wrong_first_frame", "lane": "call", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"\",\"success\":false,\"error\":\"Expected admin_rpc frame\"}"},
+    {"name": "admin_rpc_call_lane_no_request", "lane": "call", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"\",\"success\":false,\"error\":\"admin_rpc request stream closed before request\"}"},
+    {"name": "admin_rpc_missing_method", "lane": "control", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"node-3\",\"success\":false,\"error\":\"method and request_id are required\"}"},
+    {"name": "admin_rpc_success_keeps_method_fields", "lane": "call", "from": "node", "type": "admin_rpc_response", "wire": "{\"type\":\"admin_rpc_response\",\"request_id\":\"admin-9\",\"success\":true,\"result\":{\"status\":\"ok\",\"generation\":3}}"}
+  ]
+}
