@@ -38,9 +38,16 @@ EOF
 printf 'maestro output\n'
 printf '%s\n' "${MAESTRO_SECRET_OUTPUT:-}"
 printf 'maestro error\n' >&2
-if [[ "${MAESTRO_SKIP_SCREENSHOT:-0}" != 1 ]] && grep -q 'takeScreenshot:' "${@: -1}"; then
-  mkdir -p screenshots
-  printf 'fake png' > screenshots/fake.png
+# Like Maestro 2.x: takeScreenshot images land in <--test-output-dir>/<timestamp>/<flow>/takeScreenshot/<name>.png
+out_dir=""; flow="${@: -1}"
+while [[ $# -gt 0 ]]; do [[ "$1" == --test-output-dir ]] && out_dir="$2"; shift; done
+if [[ "${MAESTRO_SKIP_SCREENSHOT:-0}" != 1 && -n "$out_dir" ]]; then
+  shots="$out_dir/2026-01-01_000000/flow/takeScreenshot"
+  mkdir -p "$shots"
+  sed -nE 's/^- takeScreenshot: (.*)$/\1/p' "$flow" | while read -r name; do
+    name="${name//\"/}"
+    printf 'fake png' > "$shots/${MAESTRO_WRONG_SCREENSHOT_NAME:-$name}.png"
+  done
 fi
 exit "${MAESTRO_STATUS:-0}"
 EOF
@@ -101,6 +108,15 @@ status="$(run_case screenshot-pass bash "$ROOT/scripts/maestro/run-pixel2xl-smok
 status="$(MAESTRO_SKIP_SCREENSHOT=1 run_case screenshot-missing bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-shot.yaml)"
 [[ "$status" != 0 ]] || fail "missing expected screenshot passed"
 report="$(ls -d "$TMP/screenshot-missing"/*/ | head -n1)"; assert_json "$report/results.json" '"expected screenshot evidence missing" in data["flows"][0]["reason"]'
+
+status="$(MAESTRO_WRONG_SCREENSHOT_NAME=other-name run_case screenshot-wrong-name bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-shot.yaml)"
+[[ "$status" != 0 ]] || fail "screenshot with the wrong name passed"
+report="$(ls -d "$TMP/screenshot-wrong-name"/*/ | head -n1)"; assert_json "$report/results.json" '"expected screenshot evidence missing: smoke-ok" in data["flows"][0]["reason"]'
+
+printf 'appId: com.example\n---\n- launchApp\n- takeScreenshot: "smoke-a"\n- takeScreenshot: smoke-b\n' > "$TMP/flows/smoke-two-shots.yaml"
+status="$(CAPTURE_SENSITIVE_EVIDENCE=1 run_case screenshot-two bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-two-shots.yaml)"
+[[ "$status" == 0 ]] || fail "two named screenshots case failed"
+[[ -s "$(ls -d "$TMP/screenshot-two"/*/ | head -n1)/smoke-two-shots/screenshots/smoke-b.png" ]] || fail "screenshot not collected into the flow report"
 
 status="$(ADB_PACKAGE_STATUS=1 run_case package-missing bash "$ROOT/scripts/maestro/run-pixel2xl-smokes.sh" smoke-pass.yaml)"
 [[ "$status" != 0 ]] || fail "missing package passed"
