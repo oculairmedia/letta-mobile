@@ -1,14 +1,16 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.34.39",
+    "version": "0.34.70",
     "node": "v24.18.0",
     "package_engine": "^22.23.4 || ^24.22.1 || ^26.12.1",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "6c50a2345e42d6b9521127cd07c1e175c73f320b5e5724a2a0782fe963eb8881",
-    "protocol_corpus_sha256": "12203bda8d79504ea99db8144d01579f046d37fd506867a4995f520aea389ab0",
+    "protocol_sha256": "2568073ad0f1f18e3bb4b1635b065f0a75d5dcb62a5fca493d3cae8a7725f2f9",
+    "protocol_corpus_sha256": "f13642da6979e4ec2e6d65c8e3dbb20c4676df5127895b80bb766b497363c658",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
+      "dist/types/experiments/types.d.ts",
+      "dist/types/permissions/mode.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
       "dist/types/types/app-server-info.d.ts",
       "dist/types/types/app-server-protocol.d.ts",
@@ -24,6 +26,7 @@
       "dist/types/types/input-command.d.ts",
       "dist/types/types/input-create-message.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
+      "dist/types/types/protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
       "dist/types/types/provider-oauth-config.d.ts",
       "dist/types/types/queue-update-protocol.d.ts",
@@ -36,13 +39,13 @@
       "dist/types/types/toolset-protocol.d.ts",
       "dist/types/types/turn-finished-protocol.d.ts"
     ],
-    "captured_at": "2026-11-04",
+    "captured_at": "2026-11-26",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.34.39 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.34.70 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
     "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage",

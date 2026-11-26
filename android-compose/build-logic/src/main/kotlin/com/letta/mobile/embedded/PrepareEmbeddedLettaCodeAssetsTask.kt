@@ -266,8 +266,7 @@ private val SHARP_PACKAGE_JSON_PATHS = listOf(
  *  - node-pty's prebuilds (no android build exists; the bundle falls back to child_process), its
  *    Windows-only conpty/winpty sources and its node-gyp build output.
  *  - sharp's per-platform binaries: sharp looks up `@img/sharp-android-<arch>`, misses, and falls
- *    back to `@img/sharp-wasm32`, which IS kept (see installSharpWasm). `@janhapke/sharp-electron`
- *    is a linux-x64 Electron build letta-code only loads on Linux desktops.
+ *    back to `@img/sharp-wasm32`, which IS kept (see installSharpWasm).
  *  - FreeBSD and WebContainers sharp wrappers and their nested wasm copies cannot load on Android.
  *  - The nested letta-code sharp wasm copy duplicates the version-matched root install.
  *  - Cursor's SDK is used only by the separate worker, whose native binaries cannot run on Android;

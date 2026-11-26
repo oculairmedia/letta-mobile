@@ -1,8 +1,10 @@
 Usage:
   letta server [remote options]
   letta server --listen [url] [App Server options]
+  letta server --listen [url] --computer-name <name> [--org <id>] [App Server options]
 
 Run the local agent server as a remote computer, with messaging channels, or as an App Server.
+With --listen plus --computer-name, --org or --token, the App Server also registers this machine as a computer, so Cloud delivers its conversations' queued messages here.
 
 Remote computer options:
   --computer-name <name>  Friendly name for this computer (uses hostname if not provided)
@@ -34,3 +36,4 @@ Examples:
   letta server --listen
   letta server --listen ws://127.0.0.1:4500
   letta server --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file /path/to/token
+  letta server --listen --computer-name "gpu-box"

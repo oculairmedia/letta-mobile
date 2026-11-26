@@ -58,7 +58,7 @@ globalThis.__lcpReflectionLastOutcome = function(agentId) {
 };
 `;
 
-const REFLECTION_CONTROLS_PATCHES = [
+const REFLECTION_CONTROLS_PATCHES_0_34_39 = [
   {
     token: `function applyPersistedAgentScopedSettings(base2, raw2) {\n  if (!raw2) {\n    return base2;\n  }\n  return {\n    trigger: normalizeTrigger(raw2.trigger, base2.trigger),\n    stepCount: normalizeStepCount(raw2.stepCount, base2.stepCount),\n    merge: normalizeMerge(raw2.merge, base2.merge),\n    mergeInstructions: normalizeMergeInstructions(raw2.mergeInstructions, base2.mergeInstructions)\n  };\n}\nfunction legacyModeToReflectionSettings`,
     replacement: `function applyPersistedAgentScopedSettings(base2, raw2) {\n  if (!raw2) {\n    return base2;\n  }\n  return {\n    trigger: normalizeTrigger(raw2.trigger, base2.trigger),\n    stepCount: normalizeStepCount(raw2.stepCount, base2.stepCount),\n    merge: normalizeMerge(raw2.merge, base2.merge),\n    mergeInstructions: normalizeMergeInstructions(raw2.mergeInstructions, base2.mergeInstructions),\n    model: raw2.model === null || typeof raw2.model === "string" ? raw2.model : base2.model ?? null,\n    focusInstructions: typeof raw2.focusInstructions === "string" ? raw2.focusInstructions : base2.focusInstructions ?? ""\n  };\n}\nfunction legacyModeToReflectionSettings`,
@@ -101,6 +101,20 @@ const REFLECTION_CONTROLS_PATCHES = [
   },
 ];
 
+// The bundler renames these locals between releases (0.34.39: settings3, merge4, dependencies4,
+// error5; 0.34.70: settings, merge3, dependencies, error4); the code around them is unchanged.
+const REFLECTION_CONTROLS_BINDINGS = [
+  {},
+  { settings3: "settings", merge4: "merge3", dependencies4: "dependencies", error5: "error4" },
+];
+function renameBindings(text, renames) {
+  return Object.entries(renames).reduce((out, [from, to]) => out.replace(new RegExp(`\\b${from}\\b`, "g"), to), text);
+}
+const REFLECTION_CONTROLS_VARIANTS = REFLECTION_CONTROLS_BINDINGS.map((renames) =>
+  REFLECTION_CONTROLS_PATCHES_0_34_39.map(({ token, replacement }) => ({
+    token: renameBindings(token, renames),
+    replacement: renameBindings(replacement, renames),
+  })));
 
 // lcp-model-catalog: native provider catalogs are bundled, not /v1/models
 // discovery. Match the two flattening sites atomically so the catalog used by
@@ -111,10 +125,12 @@ const MODEL_CATALOG_PATCHES = [
   {
     token: '  ANTHROPIC_MODELS = flattenChatModelCatalog("anthropic", anthropic_default);',
     addition: `
-  // lcp-model-catalog: retain an upstream entry if a future bundle adds it.
-  if (!ANTHROPIC_MODELS["claude-haiku-5-5"] && ANTHROPIC_MODELS["claude-haiku-4-5"]) {
+  // lcp-model-catalog: our Anthropic route (anthropic-claude-max-proxy models/specifications.py)
+  // serves claude-haiku-5-5 with a 200k context and 65,536 completion tokens. Keep an upstream
+  // entry's other metadata (0.34.70 ships one at 1M/128k) but clamp it to the route's limits.
+  if (ANTHROPIC_MODELS["claude-haiku-5-5"] || ANTHROPIC_MODELS["claude-haiku-4-5"]) {
     ANTHROPIC_MODELS["claude-haiku-5-5"] = {
-      ...ANTHROPIC_MODELS["claude-haiku-4-5"],
+      ...(ANTHROPIC_MODELS["claude-haiku-5-5"] ?? ANTHROPIC_MODELS["claude-haiku-4-5"]),
       id: "claude-haiku-5-5", name: "Claude Haiku 5.5",
       contextWindow: 200000, maxTokens: 65536
     };
@@ -123,8 +139,9 @@ const MODEL_CATALOG_PATCHES = [
   {
     token: '  OPENAI_MODELS = flattenChatModelCatalog("openai", openai_default);',
     addition: `
-  // lcp-model-catalog: use the ChatGPT upstream maximum, not its default.
-  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
+  // lcp-model-catalog: use the ChatGPT upstream maximum, not its default. Terra is listed too:
+  // 0.34.70 ships its own gpt-6.1-terra entry at the 272k default.
+  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra"]) {
     if (OPENAI_MODELS[id]) OPENAI_MODELS[id] = { ...OPENAI_MODELS[id], contextWindow: 872000 };
   }
   if (!OPENAI_MODELS["gpt-6.1-terra"] && OPENAI_MODELS["gpt-6.1-sol"]) {
@@ -671,9 +688,11 @@ const LOCAL_VISION_INPUT_REPLACEMENT =
 // site, but this request-build site can read a model object that bypassed it.
 // Patch the gate directly to also honor the vision-model id check, reusing the
 // same helper (it accepts an input array and returns one including "image").
-const VISION_GATE_TOKEN = `toChatMessages(messages, model.input.includes("image"))`;
-const VISION_GATE_REPLACEMENT =
-  `toChatMessages(messages, globalThis.__lcpFixLocalVisionInput(undefined, model.id, model.input).includes("image"))`;
+// The model binding is `model` in 0.34.39 and `model2` in 0.34.70 (a top-level `model` now exists).
+const VISION_GATE_VARIANTS = ["model", "model2"].map((model) => ({
+  token: `toChatMessages(messages, ${model}.input.includes("image"))`,
+  replacement: `toChatMessages(messages, globalThis.__lcpFixLocalVisionInput(undefined, ${model}.id, ${model}.input).includes("image"))`,
+}));
 
 // lcp-qi2f: the ACTUAL inbound-user-image gate. downgradeUnsupportedImages(
 // messages, model) replaces user image blocks with NON_VISION_USER_IMAGE_
@@ -683,10 +702,16 @@ const VISION_GATE_REPLACEMENT =
 // Rewrite its early-return guard to honor the vision-model id check via the
 // same helper. Anchored on the unique function signature so we only touch
 // this site.
-const DOWNGRADE_IMAGES_TOKEN =
-  `function downgradeUnsupportedImages(messages, model) {\n  if (model.input.includes("image")) {`;
-const DOWNGRADE_IMAGES_REPLACEMENT =
-  `function downgradeUnsupportedImages(messages, model) {\n  if (globalThis.__lcpFixLocalVisionInput(undefined, model.id, model.input).includes("image")) {`;
+const DOWNGRADE_IMAGES_VARIANTS = ["model", "model2"].map((model) => ({
+  token: `function downgradeUnsupportedImages(messages, ${model}) {\n  if (${model}.input.includes("image")) {`,
+  replacement: `function downgradeUnsupportedImages(messages, ${model}) {\n  if (globalThis.__lcpFixLocalVisionInput(undefined, ${model}.id, ${model}.input).includes("image")) {`,
+}));
+
+/** The one variant whose token occurs exactly once while no other variant occurs at all, else null. */
+function uniqueVariant(source, variants) {
+  const counts = variants.map(({ token }) => countOccurrences(source, token));
+  return counts.reduce((sum, count) => sum + count, 0) === 1 ? variants[counts.indexOf(1)] : null;
+}
 
 // lcp-taqw: executeSingleDecision() emitted `tool_return_message` stream
 // chunks with getDisplayableToolReturn(toolResult.toolReturn). That helper is
@@ -1428,14 +1453,26 @@ function agentLazyload(state) {
   Object.assign(state, { patched, appliedPatches, skippedPatches });
 }
 
+// 0.34.39 binds the parse callback's argument as id2, 0.34.70 as id; the anchor is otherwise identical.
+const CONVERSATION_LIST_MTIME_CALLBACK = "(id2) => this.executionAgentIdForConversation(id2)";
+const CONVERSATION_LIST_MTIME_VARIANTS = ["id2", "id"].map((binding) => {
+  const callback = `(${binding}) => this.executionAgentIdForConversation(${binding})`;
+  return {
+    token: CONVERSATION_LIST_MTIME_TOKEN.replaceAll(CONVERSATION_LIST_MTIME_CALLBACK, callback),
+    replacement: CONVERSATION_LIST_MTIME_REPLACEMENT.replaceAll(CONVERSATION_LIST_MTIME_CALLBACK, callback),
+  };
+});
+
 function conversationListMtime(state) {
   let { patched, appliedPatches, skippedPatches } = state;
   const { path, warn } = state;
 
   {
-    const occurrences = countOccurrences(patched, CONVERSATION_LIST_MTIME_TOKEN);
-    if (occurrences === 1) {
-      patched = patched.replace(CONVERSATION_LIST_MTIME_TOKEN, CONVERSATION_LIST_MTIME_REPLACEMENT);
+    const counts = CONVERSATION_LIST_MTIME_VARIANTS.map(({ token }) => countOccurrences(patched, token));
+    const occurrences = counts.reduce((sum, count) => sum + count, 0);
+    const variant = CONVERSATION_LIST_MTIME_VARIANTS[counts.indexOf(1)];
+    if (occurrences === 1 && variant) {
+      patched = patched.replace(variant.token, () => variant.replacement);
       appliedPatches += 1;
     } else {
       skippedPatches += 1;
@@ -1565,8 +1602,9 @@ function visionGate(state) {
   const { path, warn } = state;
 
   // lcp-qi2f: inbound user-image gate at the request-build site.
-  if (patched.includes(VISION_GATE_TOKEN)) {
-    patched = patched.replace(VISION_GATE_TOKEN, VISION_GATE_REPLACEMENT);
+  const variant = uniqueVariant(patched, VISION_GATE_VARIANTS);
+  if (variant) {
+    patched = patched.replace(variant.token, () => variant.replacement);
     appliedPatches += 1;
     // Ensure the helper is present even if the input-construction token above
     // was absent (idempotent: the helper uses `|| function` guard).
@@ -1574,7 +1612,7 @@ function visionGate(state) {
   } else {
     skippedPatches += 1;
     if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: vision gate token (toChatMessages supportsImages) not found in ${path} — ` +
+      `[letta-code-patch] WARN: vision gate token (toChatMessages supportsImages) not found exactly once in ${path} — ` +
       `inbound user images may still be omitted\n`,
     );
   }
@@ -1587,14 +1625,15 @@ function downgradeImages(state) {
   const { path, warn } = state;
 
   // lcp-qi2f: downgradeUnsupportedImages — the real inbound user-image strip.
-  if (patched.includes(DOWNGRADE_IMAGES_TOKEN)) {
-    patched = patched.replace(DOWNGRADE_IMAGES_TOKEN, DOWNGRADE_IMAGES_REPLACEMENT);
+  const variant = uniqueVariant(patched, DOWNGRADE_IMAGES_VARIANTS);
+  if (variant) {
+    patched = patched.replace(variant.token, () => variant.replacement);
     appliedPatches += 1;
     patched = injectHelperAfterShebang(patched, LOCAL_VISION_INPUT_HELPER_DEFINITION);
   } else {
     skippedPatches += 1;
     if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: downgradeUnsupportedImages token not found in ${path} — ` +
+      `[letta-code-patch] WARN: downgradeUnsupportedImages token not found exactly once in ${path} — ` +
       `inbound user images may still be omitted\n`,
     );
   }
@@ -1885,17 +1924,19 @@ function reflectionControls(state) {
   // are dropped by persistence or a model that never reaches the subagent, so
   // every exact anchor must match once before any rewrite is made.
   {
-    const counts = REFLECTION_CONTROLS_PATCHES.map(({ token }) => countOccurrences(patched, token));
-    if (counts.every((count) => count === 1)) {
-      for (const { token, replacement } of REFLECTION_CONTROLS_PATCHES) {
-        patched = patched.replace(token, replacement);
+    const countsByVariant = REFLECTION_CONTROLS_VARIANTS.map((patches) => patches.map(({ token }) => countOccurrences(patched, token)));
+    const matching = REFLECTION_CONTROLS_VARIANTS.filter((_, index) => countsByVariant[index].every((count) => count === 1));
+    const counts = countsByVariant.map((variantCounts) => variantCounts.join(",")).join(" | ");
+    if (matching.length === 1) {
+      for (const { token, replacement } of matching[0]) {
+        patched = patched.replace(token, () => replacement);
       }
       patched = injectHelperAfterShebang(patched, REFLECTION_CONTROLS_HELPER);
       appliedPatches += 1;
     } else {
       skippedPatches += 1;
       if (warn) process.stderr.write(
-        `[letta-code-patch] WARN: lcp-reflection-controls anchors matched ${counts.join(",")} (expected 1 each) in ${path} — ` +
+        `[letta-code-patch] WARN: lcp-reflection-controls anchors matched ${counts} (expected 1 each in exactly one binding variant) in ${path} — ` +
         `running without per-agent reflection model/focus/outcomes\n`,
       );
     }
@@ -2019,20 +2060,36 @@ function subagentErrorLog(state) {
 
 // lcp-agent-task-status (letta-mobile-mdhuf): publish every running-state
 // transition together, or leave the bundle untouched if any anchor drifts.
+// One site list per release shape. 0.34.70 renamed the catch binding (errorMessage5 ->
+// errorMessage6) and added two failure transitions to the task stop path (a confirmed remote
+// stop that timed out, and a stopped conversation); both must notify like the others.
+const AGENT_TASK_STATUS_COMMON = [
+  ['  backgroundTasks.set(taskId, bgTask);\n  registerSubagentAbortHook(subagentId, buildBackgroundTaskAbortHook(taskId, abortController));', 'bgTask'],
+  ['    bgTask.status = result3.success ? "completed" : "failed";\n    if (result3.error) {', 'bgTask'],
+];
+const AGENT_TASK_STATUS_STOP = ['      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);', 'task'];
+const AGENT_TASK_STATUS_VARIANTS = [
+  [...AGENT_TASK_STATUS_COMMON, ['    bgTask.status = "failed";\n    bgTask.error = errorMessage5;', 'bgTask'], AGENT_TASK_STATUS_STOP],
+  [
+    ...AGENT_TASK_STATUS_COMMON,
+    ['    bgTask.status = "failed";\n    bgTask.error = errorMessage6;', 'bgTask'],
+    ['          task.status = "failed";\n          scheduleBackgroundTaskCleanup(task_id);\n          return {', 'task'],
+    ['          task.status = "failed";\n          scheduleBackgroundTaskCleanup(task_id);\n          task.cancelPendingWakes', 'task'],
+    AGENT_TASK_STATUS_STOP,
+  ],
+];
 function agentTaskStatus(state) {
   const token = "// lcp-agent-task-status";
   if (state.patched.includes(token)) return;
-  const sites = [
-    ['  backgroundTasks.set(taskId, bgTask);\n  registerSubagentAbortHook(subagentId, buildBackgroundTaskAbortHook(taskId, abortController));', 'bgTask'],
-    ['    bgTask.status = result3.success ? "completed" : "failed";\n    if (result3.error) {', 'bgTask'],
-    ['    bgTask.status = "failed";\n    bgTask.error = errorMessage5;', 'bgTask'],
-    ['      task.status = "failed";\n      scheduleBackgroundTaskCleanup(task_id);', 'task'],
-  ];
-  const counts = sites.map(([anchor]) => countOccurrences(state.patched, anchor));
-  if (!counts.every((count) => count === 1)) {
+  const matching = AGENT_TASK_STATUS_VARIANTS.filter((variant) =>
+    variant.every(([anchor]) => countOccurrences(state.patched, anchor) === 1));
+  // Exactly one release shape, or none: an ambiguous bundle is drift too.
+  const sites = matching.length === 1 ? matching[0] : null;
+  if (!sites) {
+    const counts = AGENT_TASK_STATUS_VARIANTS.map((variant) => variant.map(([anchor]) => countOccurrences(state.patched, anchor)).join(","));
     state.skippedPatches += 1;
     if (state.warn) process.stderr.write(
-      `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(",")} (expected 1 each) in ${state.path} — running without agent task status notifications\n`,
+      `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(" | ")} (expected 1 each in exactly one release variant; ${matching.length} matched) in ${state.path} — running without agent task status notifications\n`,
     );
     return;
   }
