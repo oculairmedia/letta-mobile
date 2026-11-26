@@ -37936,15 +37936,11 @@ public final class com/letta/mobile/data/node/NodeComposition {
 	public final fun getIdentityRows ()Lcom/letta/mobile/data/controller/node/iroh/LateBoundConversationRows;
 	public final fun getScope ()Lkotlinx/coroutines/CoroutineScope;
 	public final fun getTurnIdentity ()Lcom/letta/mobile/data/runtime/TurnIdentityLedger;
-	public final fun inProcessCarrier-QQn0qqI (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/InProcessNodeCarrier;
-	public static synthetic fun inProcessCarrier-QQn0qqI$default (Lcom/letta/mobile/data/node/NodeComposition;Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/InProcessNodeCarrier;
 	public final fun installAdminRpc (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lcom/letta/mobile/data/node/NodeAdminExtras;)V
-	public final fun peerAcceptor (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;)Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;
 	public final fun start (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/node/NodeComposition$Companion {
-	public final fun getIN_PROCESS_ADDRESS-HN4vsaY ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/node/NodeConfig {

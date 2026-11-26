@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 
 /** The contract suite against the in-process carrier, plus what is particular to it: identities and a stopped node. */
@@ -39,6 +40,16 @@ class InProcessNodeCarrierContractTest : NodeCarrierContractSuite() {
     fun aNodeThatFailsLosesTheLink() = runTest {
         val carrier = InProcessNodeCarrier(NAME, NODE, { error("node bug") }, backgroundScope)
         val link = carrier.dial(carrier.address)
+        assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null })
+    }
+
+    @Test
+    fun aNodeStoppedBeforeItServesLosesTheLink() = runTest {
+        // The serve is dispatched, not run, so the node stops before it starts: its own close never runs.
+        val node = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val carrier = InProcessNodeCarrier(NAME, NODE, { }, node)
+        val link = carrier.dial(carrier.address)
+        node.cancel()
         assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null })
     }
 
