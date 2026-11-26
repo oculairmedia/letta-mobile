@@ -173,7 +173,10 @@ abstract class NodeCarrierContractSuite {
             val outcome = runCatching { ScenarioRun(endpoint, node, scope).run(NodeCarrierFixture.scenario(name)) }
             // A mismatch closes the link, so the shell usually reports only Closed: the node's text is the real failure.
             if (node.failures.isNotEmpty()) {
-                fail("scenario $name: ${node.failures.joinToString("; ")} (shell saw: ${outcome.exceptionOrNull()})", outcome.exceptionOrNull())
+                fail(
+                    "scenario $name: ${node.failures.joinToString("; ")} (shell saw: ${outcome.exceptionOrNull()})",
+                    outcome.exceptionOrNull(),
+                )
             }
             outcome.exceptionOrNull()?.let { fail("scenario $name failed: $it", it) }
             assertEquals(emptyList(), node.unconsumed(), "scenario $name: frames the script expected but never received")
@@ -268,7 +271,10 @@ private class ScenarioRun(
             val failure = (outcome.exceptionOrNull() as? NodeCarrierException)?.failure
             val rejected = NodeCarrierFailure.AuthRejected(expect.string("auth_rejected"))
             val closed = expect.objOrNull("or_closed")?.let { NodeCarrierFailure.Closed(closureOf(it)) }
-            assertTrue(failure == rejected || (closed != null && failure == closed), "$label: open failed with $failure, expected $rejected or $closed")
+            assertTrue(
+                failure == rejected || (closed != null && failure == closed),
+                "$label: open failed with $failure, expected $rejected or $closed",
+            )
             return
         }
         val session = outcome.getOrThrow()
@@ -306,7 +312,9 @@ private class ScenarioRun(
     }
 
     private suspend fun resume(session: NodeSession, step: JsonObject) {
-        val from = step.objOrNull("from")?.let { FeedCursor(it.getValue("epoch").jsonPrimitive.long, it.getValue("seq").jsonPrimitive.long) }
+        val from = step.objOrNull("from")?.let {
+            FeedCursor(it.getValue("epoch").jsonPrimitive.long, it.getValue("seq").jsonPrimitive.long)
+        }
         val outcome = runCatching {
             session.resumeFeed(ConversationId(step.string("conversation_id")), AgentId(step.string("agent_id")), from)
         }
