@@ -209,7 +209,7 @@ class ServerStartedTurnFeedTest {
         // The App Server went away mid-turn: neither its stop_reason nor its turn_finished arrives.
         serverStartedTurn().dropLast(2).forEach { node.frames.emit(it) }
         runCurrent()
-        node.nowMs += ServerStartedTurnRelay.SILENCE_MS
+        node.nowMs += SERVER_TURN_SILENCE_MS
         viewer.frames.clear()
 
         val client = clientTurn(node) { setOf(viewer) }

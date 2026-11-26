@@ -45,8 +45,11 @@ class NodeTurnHost internal constructor(
     /** Turns currently running on this host, attached or detached (telemetry/tests). */
     val liveTurnCount: Int get() = live.get()
 
-    /** Frames already claimed (by `idempotency_key`) and the runs turns the App Server started by itself relay. */
-    private val claims = FrameClaims()
+    /** Frames already claimed (by `idempotency_key`), the most recent ones; guarded by itself, with [serverRuns]. */
+    private val claimedFrames = LinkedHashSet<String>()
+
+    /** Runs turns the App Server started by itself relay, the most recent ones; guarded by [claimedFrames]. */
+    private val serverRuns = LinkedHashSet<RunId>()
 
     /**
      * Claims one raw App Server frame for the one turn that relays it. The relay of turns the App Server starts by
@@ -55,13 +58,22 @@ class NodeTurnHost internal constructor(
      * turn keeps all of its run's frames; otherwise the first claim wins. A frame is therefore relayed exactly once, and
      * the relay never refuses a frame of a server-started run, so no frame is refused by both.
      */
-    internal fun claimFrame(frameKey: String, run: RunId?, server: Boolean): Boolean = claims.claim(frameKey, run, server)
+    internal fun claimFrame(frameKey: String, run: RunId?, server: Boolean): Boolean = synchronized(claimedFrames) {
+        if (server && run != null) serverRuns.rememberRecent(run, REMEMBERED_SERVER_RUNS)
+        when {
+            !server && run != null && run in serverRuns -> false
+            frameKey in claimedFrames -> false
+            else -> true.also { claimedFrames.rememberRecent(frameKey, REMEMBERED_FRAMES) }
+        }
+    }
 
     /**
      * [runs] were bound to a client turn's prompt (`update_loop_status`): they were never a server-started turn's, so
      * their later frames go to the client turn. Frames already relayed stay where they went (once).
      */
-    internal fun releaseServerRuns(runs: Collection<RunId>) = claims.release(runs)
+    internal fun releaseServerRuns(runs: Collection<RunId>) {
+        synchronized(claimedFrames) { serverRuns.removeAll(runs.toSet()) }
+    }
 
     /** Client turns running per conversation; an entry exists only while one runs. */
     private val clientTurns = ConcurrentHashMap<ConversationId, MutableList<NodeTurn>>()
@@ -95,8 +107,7 @@ class NodeTurnHost internal constructor(
         if (relayed.isNotEmpty()) {
             synchronized(clientRuns) {
                 val runs = clientRuns.getOrPut(conversation) { LinkedHashSet() }
-                runs += relayed
-                while (runs.size > REMEMBERED_CLIENT_RUNS) runs.remove(runs.first())
+                relayed.forEach { runs.rememberRecent(it, REMEMBERED_CLIENT_RUNS) }
             }
         }
         clientTurns.computeIfPresent(conversation) { _, running -> running.apply { remove(turn) }.takeIf { it.isNotEmpty() } }
@@ -217,39 +228,18 @@ class NodeTurnHost internal constructor(
     }
 }
 
-/** The bookkeeping behind [NodeTurnHost.claimFrame], all under one lock. */
-private class FrameClaims {
-    private val frames = LinkedHashSet<String>()
-    private val serverRuns = LinkedHashSet<RunId>()
-
-    @Synchronized
-    fun claim(frameKey: String, run: RunId?, server: Boolean): Boolean {
-        if (server && run != null) remember(serverRuns, run, REMEMBERED_SERVER_RUNS)
-        if (!server && run != null && run in serverRuns) return false
-        if (frameKey in frames) return false
-        remember(frames, frameKey, REMEMBERED_FRAMES)
-        return true
-    }
-
-    @Synchronized
-    fun release(runs: Collection<RunId>) {
-        serverRuns.removeAll(runs.toSet())
-    }
-
-    private fun <T> remember(set: LinkedHashSet<T>, value: T, cap: Int) {
-        set.remove(value)
-        set.add(value)
-        while (set.size > cap) set.remove(set.first())
-    }
-
-    private companion object {
-        /** Frames remembered; both sides see a frame within milliseconds of each other. */
-        const val REMEMBERED_FRAMES = 4_096
-
-        /** Server-started runs remembered, so a late frame of one never moves to a client turn. */
-        const val REMEMBERED_SERVER_RUNS = 1_024
-    }
+/** Adds [value] as the most recent entry, forgetting the oldest beyond [cap]. */
+private fun <T> LinkedHashSet<T>.rememberRecent(value: T, cap: Int) {
+    remove(value)
+    add(value)
+    while (size > cap) remove(first())
 }
+
+/** Frames remembered for [NodeTurnHost.claimFrame]; both sides see a frame within milliseconds of each other. */
+private const val REMEMBERED_FRAMES = 4_096
+
+/** Server-started runs remembered, so a late frame of one never moves to a client turn. */
+private const val REMEMBERED_SERVER_RUNS = 1_024
 
 /** One turn handed to [NodeTurnHost]: its fanout, its journal writer, and its collector. */
 internal class NodeTurn(

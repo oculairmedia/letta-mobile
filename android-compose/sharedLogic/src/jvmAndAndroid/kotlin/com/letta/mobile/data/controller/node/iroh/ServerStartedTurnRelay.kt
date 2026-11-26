@@ -23,7 +23,7 @@ import java.util.UUID
  *
  * Every frame is keyed on its own runtime scope. A turn opens on a stream delta no client turn answers for
  * ([NodeTurnHost.clientOwns]) and closes on the server's `turn_finished`. A turn whose `turn_finished` was lost
- * closes (`terminal_observed` false) when it had no frame for [SILENCE_MS], when the App Server connection generation
+ * closes (`terminal_observed` false) when it had no frame for [SERVER_TURN_SILENCE_MS], when the App Server connection generation
  * changed under it, or when `update_loop_status` binds the active run to a running client turn's prompt.
  *
  * Each raw frame is relayed by exactly one turn: this relay and a client turn's fanout both claim it through
@@ -34,9 +34,10 @@ internal class ServerStartedTurnRelay(
     private val delivery: TurnFanoutDelivery,
     private val nowMs: () -> Long,
 ) {
-    private class OpenTurn(val turn: NodeTurn, val generation: Long?, var seenAtMs: Long)
-
-    private val open = HashMap<AppServerRuntimeScope, OpenTurn>()
+    /** Open turns per runtime, with when each last had a frame and the App Server generation it began on. Collector-only. */
+    private val open = HashMap<AppServerRuntimeScope, NodeTurn>()
+    private val seenAtMs = HashMap<AppServerRuntimeScope, Long>()
+    private val generations = HashMap<AppServerRuntimeScope, Long>()
 
     /** Relays [frames] (every runtime-scoped App Server frame) until they end or the collector is cancelled. */
     suspend fun relay(frames: Flow<AppServerReceivedFrame>) {
@@ -67,9 +68,9 @@ internal class ServerStartedTurnRelay(
             if (host.clientOwns(ConversationId(key.conversationId), run)) return
             openTurn(key, received.connectionGeneration)
         }
-        current.seenAtMs = nowMs()
+        seenAtMs[key] = nowMs()
         if (!host.claimFrame(frame.idempotencyKey, run, server = true)) return
-        current.turn.fanout.relayServerStartedDelta(received.raw)
+        current.fanout.relayServerStartedDelta(received.raw)
     }
 
     /** The active run is a running client turn's: it is that turn's, whatever this relay assumed so far. */
@@ -83,15 +84,16 @@ internal class ServerStartedTurnRelay(
     }
 
     private fun closeIfLost(key: AppServerRuntimeScope, generation: Long?) {
-        val current = open[key] ?: return
-        val generationChanged = current.generation != null && generation != null && current.generation != generation
-        val silent = nowMs() - current.seenAtMs >= SILENCE_MS
+        if (key !in open) return
+        val began = generations[key]
+        val generationChanged = began != null && generation != null && began != generation
+        val silent = nowMs() - (seenAtMs[key] ?: 0L) >= SERVER_TURN_SILENCE_MS
         if (generationChanged || silent) {
             close(key, terminalObserved = false, why = if (generationChanged) "generation_changed" else "silent")
         }
     }
 
-    private fun openTurn(runtime: AppServerRuntimeScope, generation: Long?): OpenTurn {
+    private fun openTurn(runtime: AppServerRuntimeScope, generation: Long?): NodeTurn {
         val turnId = "turn-${UUID.randomUUID()}"
         val writer = host.journal.openTurn(AgentId(runtime.agentId), ConversationId(runtime.conversationId), turnId)
         val fanout = ConversationTurnFanout(
@@ -102,14 +104,18 @@ internal class ServerStartedTurnRelay(
             trackInitiatorFrame = writer::append,
             turnId = turnId,
         )
-        val opened = OpenTurn(NodeTurn(runtime.conversationId, clientMessageId = null, fanout, writer) {}, generation, nowMs())
+        val opened = NodeTurn(runtime.conversationId, clientMessageId = null, fanout, writer) {}
         open[runtime] = opened
+        seenAtMs[runtime] = nowMs()
+        generation?.let { generations[runtime] = it }
         Telemetry.event("IrohNode", "turn.server_started_opened", "conversationId" attr runtime.conversationId, "turnId" attr turnId)
         return opened
     }
 
     private fun close(key: AppServerRuntimeScope, terminalObserved: Boolean, why: String) {
-        val closed = open.remove(key)?.turn ?: return
+        val closed = open.remove(key) ?: return
+        seenAtMs.remove(key)
+        generations.remove(key)
         closed.journal.close(terminalObserved = terminalObserved || closed.fanout.anyTerminalWritten)
         Telemetry.event(
             "IrohNode", "turn.server_started_closed",
@@ -131,9 +137,7 @@ internal class ServerStartedTurnRelay(
 
     private fun JsonObject.runOrNull(): RunId? =
         (this["run_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let(::RunId)
-
-    companion object {
-        /** A server-started turn with no frame for this long lost its `turn_finished`: the engine's turn idle bound. */
-        const val SILENCE_MS = 300_000L
-    }
 }
+
+/** A server-started turn with no frame for this long lost its `turn_finished`: the engine's turn idle bound. */
+internal const val SERVER_TURN_SILENCE_MS = 300_000L
