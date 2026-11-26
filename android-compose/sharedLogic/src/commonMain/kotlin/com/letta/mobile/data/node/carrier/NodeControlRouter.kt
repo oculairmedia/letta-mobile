@@ -3,6 +3,7 @@ package com.letta.mobile.data.node.carrier
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -36,11 +37,12 @@ internal class NodeControlRouter private constructor(private val link: NodeLink)
         }
         try {
             link.sendControl(frame)
-        } catch (failure: NodeCarrierException) {
-            mutex.withLock { pending.remove(id) }
-            throw failure
+            return answer.await()
+        } finally {
+            // A failed send, a closed link or the caller giving up: drop this waiter (only if it is still ours), so a
+            // late answer goes to the unsolicited frames instead of an abandoned waiter. The link stays open.
+            withContext(NonCancellable) { mutex.withLock { if (pending[id] === answer) pending.remove(id) } }
         }
-        return answer.await()
     }
 
     private suspend fun route(inbound: NodeInbound) {
@@ -66,7 +68,9 @@ internal class NodeControlRouter private constructor(private val link: NodeLink)
         /** Starts routing [link]'s inbound frames in [scope] until the link closes. */
         fun start(link: NodeLink, scope: CoroutineScope): NodeControlRouter {
             val router = NodeControlRouter(link)
-            scope.launch {
+            // Undispatched, so the routing enters its try before start returns: even a scope that is already
+            // cancelled runs the cleanup below, closing the link and failing every pending request.
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 // Cancelled routing means the session's owner went away: close as a detach.
                 var closure = NodeLinkClosure.NORMAL
                 try {

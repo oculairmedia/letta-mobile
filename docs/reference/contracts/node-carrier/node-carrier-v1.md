@@ -189,7 +189,8 @@ running the real node behind the in-process carrier (next slice) and by the exis
   plus a channel pair per call lane, and one shared closure. The node end is handed to the node's `NodePeerAcceptor`
   on every dial. Address: `in-process:<name>`; peer identity: `NodePeerIdentity.LOCAL_SHELL`; node identity: the node's
   own Iroh endpoint id (so the shell sees the same node either way).
-- **Frames**: `JsonObject` is immutable, so frames may pass without re-encoding; nothing else may cross.
+- **Frames**: a `JsonObject` may wrap a map its builder still holds, so the in-process carrier hands the other end a
+  deep snapshot of each frame (no re-encoding), never the sender's tree; nothing else may cross.
 - **The node side is the real work**: `IrohNodeConnection` serves `computer.iroh.Connection` directly (control =
   first `acceptBi`, push = second, calls via `AdminRpcStreamServer` over later ones). Generalize it to serve a
   `NodePeerLink`: control frames from `link.control`, writes to `link.sendControl`/`link.push`, admin calls from

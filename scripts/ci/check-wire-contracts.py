@@ -61,15 +61,20 @@ def previous_baseline(root, diff_base):
 def contracts(root):
     # Only <method>/<name>-vN.md files are RPC specs; prose contracts (for example
     # conversation-lanes-v1.md) and the generated README.md sit directly in SPECS.
-    # A semantic fixture's own spec may sit in its fixture's directory (tree-hygiene only admits new
-    # specs as <dir>/<name>-vN.md); it documents that fixture, not an RPC method.
-    semantic_dirs = {name.split("/", 1)[0] for name in NON_RPC_FIXTURES}
-    specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md")
-             if p.parent != root / SPECS and p.relative_to(root / SPECS).parts[0] not in semantic_dirs}
+    specs = rpc_specs(root)
     fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")
                 if p.relative_to(root / FIXTURES).as_posix() not in NON_RPC_FIXTURES}
     require_pairs(specs, fixtures)
     return [contract_row(root, key, path, specs[key]) for key, path in sorted(fixtures.items())]
+
+
+def rpc_specs(root):
+    """RPC specs by key. A semantic fixture's own spec may sit in its fixture's directory (tree-hygiene only
+    admits new specs as <dir>/<name>-vN.md); it documents that fixture, not an RPC method."""
+    semantic_dirs = {name.split("/", 1)[0] for name in NON_RPC_FIXTURES}
+    nested = (p for p in (root / SPECS).rglob("*.md") if p.parent != root / SPECS)
+    return {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in nested
+            if p.relative_to(root / SPECS).parts[0] not in semantic_dirs}
 
 
 def require_pairs(specs, fixtures):
