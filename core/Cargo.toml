@@ -13,6 +13,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 proptest = "1"
+hex = "0.4.3"
+lru = { version = "0.19.2", default-features = false }
 core-proto = { path = "crates/core-proto" }
 core-testkit = { path = "crates/core-testkit" }
 

@@ -1,10 +1,11 @@
 //! Session authentication: the error vocabulary of a refused `auth` frame, the limits, and the
 //! per-NodeId failure limiter every session of one endpoint shares.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fmt;
 use std::hash::Hash;
 
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
 /// Failed credential attempts one NodeId may make inside [`LOCKOUT_WINDOW_MS`] before it is locked out.
@@ -147,21 +148,17 @@ pub enum FailureOutcome {
 /// from a new NodeId that cannot be tracked is answered [`FailureOutcome::RateLimited`].
 ///
 /// Time is passed in by the caller in milliseconds, so the limiter is deterministic and wasm-safe.
+///
+/// The table is an [`lru::LruCache`] ordered by each NodeId's newest failure, so the eviction
+/// candidate is always its least recently used entry.
 #[derive(Debug)]
-pub struct AuthFailureLimiter<K = crate::ids::NodeId> {
+pub struct AuthFailureLimiter<K: Eq + Hash = crate::ids::NodeId> {
     max_failures: usize,
     window_ms: u64,
     max_tracked: usize,
-    entries: HashMap<K, Entry>,
-    /// Tracked keys by the sequence number of their newest failure, oldest first.
-    order: BTreeMap<u64, K>,
-    sequence: u64,
-}
-
-#[derive(Debug)]
-struct Entry {
-    failures: VecDeque<u64>,
-    sequence: u64,
+    /// Each tracked NodeId's failure times, oldest first; the least recently used entry is the one
+    /// whose newest failure is oldest.
+    entries: LruCache<K, VecDeque<u64>>,
 }
 
 impl<K: Clone + Eq + Hash> AuthFailureLimiter<K> {
@@ -182,9 +179,9 @@ impl<K: Clone + Eq + Hash> AuthFailureLimiter<K> {
             max_failures,
             window_ms,
             max_tracked,
-            entries: HashMap::new(),
-            order: BTreeMap::new(),
-            sequence: 0,
+            // Unbounded: the limiter enforces `max_tracked` itself, because the cache's own
+            // eviction would drop a NodeId that is still inside its window.
+            entries: LruCache::unbounded(),
         }
     }
 
@@ -197,19 +194,18 @@ impl<K: Clone + Eq + Hash> AuthFailureLimiter<K> {
     /// Whether `peer` is locked out at `now_ms`. Forgets failures that left the window.
     pub fn is_rate_limited(&mut self, peer: &K, now_ms: u64) -> bool {
         let cutoff = now_ms.saturating_sub(self.window_ms);
-        let Some(entry) = self.entries.get_mut(peer) else {
+        // `peek_mut` leaves the recency order alone: only a new failure moves a NodeId.
+        let Some(failures) = self.entries.peek_mut(peer) else {
             return false;
         };
-        while entry.failures.front().is_some_and(|&at| at < cutoff) {
-            entry.failures.pop_front();
+        while failures.front().is_some_and(|&at| at < cutoff) {
+            failures.pop_front();
         }
-        if entry.failures.is_empty() {
-            let sequence = entry.sequence;
-            self.entries.remove(peer);
-            self.order.remove(&sequence);
+        if failures.is_empty() {
+            self.entries.pop(peer);
             return false;
         }
-        entry.failures.len() >= self.max_failures
+        failures.len() >= self.max_failures
     }
 
     /// Counts one failed attempt by `peer` with refusal `reason`, and decides the reply.
@@ -223,47 +219,30 @@ impl<K: Clone + Eq + Hash> AuthFailureLimiter<K> {
 
     /// False when `peer` is new and the table is full of NodeIds still inside their window.
     fn record_failure(&mut self, peer: &K, now_ms: u64) -> bool {
-        let entry = match self.entries.remove(peer) {
-            Some(entry) => {
-                self.order.remove(&entry.sequence);
-                entry
-            }
-            None if self.has_room(now_ms) => Entry {
-                failures: VecDeque::new(),
-                sequence: 0,
-            },
-            None => return false,
-        };
-        let mut entry = entry;
-        entry.failures.push_back(now_ms);
-        while entry.failures.len() > self.max_failures {
-            entry.failures.pop_front();
+        if !self.entries.contains(peer) && !self.has_room(now_ms) {
+            return false;
         }
-        self.sequence += 1;
-        entry.sequence = self.sequence;
-        self.order.insert(entry.sequence, peer.clone());
-        self.entries.insert(peer.clone(), entry);
+        let failures = self.entries.get_or_insert_mut(peer.clone(), VecDeque::new);
+        failures.push_back(now_ms);
+        while failures.len() > self.max_failures {
+            failures.pop_front();
+        }
         true
     }
 
-    /// Drops leading NodeIds whose newest failure left the window while the table is full; true when
-    /// a new NodeId then fits.
+    /// Drops least recently failed NodeIds whose newest failure left the window while the table is
+    /// full; true when a new NodeId then fits.
     fn has_room(&mut self, now_ms: u64) -> bool {
         let cutoff = now_ms.saturating_sub(self.window_ms);
         while self.entries.len() >= self.max_tracked {
-            let Some((&sequence, oldest)) = self.order.iter().next() else {
-                break;
-            };
-            let newest = self
+            let stale = self
                 .entries
-                .get(oldest)
-                .and_then(|entry| entry.failures.back().copied());
-            if newest.is_some_and(|at| at >= cutoff) {
+                .peek_lru()
+                .is_some_and(|(_, failures)| failures.back().is_none_or(|&at| at < cutoff));
+            if !stale {
                 break;
             }
-            let oldest = oldest.clone();
-            self.order.remove(&sequence);
-            self.entries.remove(&oldest);
+            self.entries.pop_lru();
         }
         self.entries.len() < self.max_tracked
     }
