@@ -59,7 +59,7 @@ class NodePeerLinkWireTest {
     }
 
     @Test
-    fun theNodeBoundsReassemblyByAuthAndSharesItsFramePartAnswer() = runBlocking {
+    fun theNodeBoundsReassemblyByAuthAndSharesItsFramePartAnswer() = runBlocking<Unit> {
         withTimeout(TIMEOUT) {
             val link = FakeLink()
             val closedReports = AtomicInteger()
@@ -87,7 +87,7 @@ class NodePeerLinkWireTest {
     }
 
     @Test
-    fun aViolationOnTheControlLaneEndsTheConnection() = runBlocking {
+    fun aViolationOnTheControlLaneEndsTheConnection() = runBlocking<Unit> {
         withTimeout(TIMEOUT) {
             val link = FakeLink(control = flow { throw IrohFrameCodec.ProtocolException("bad frame_part header") })
             val closedReports = AtomicInteger()
