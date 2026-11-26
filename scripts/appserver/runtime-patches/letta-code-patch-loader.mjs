@@ -2081,13 +2081,15 @@ const AGENT_TASK_STATUS_VARIANTS = [
 function agentTaskStatus(state) {
   const token = "// lcp-agent-task-status";
   if (state.patched.includes(token)) return;
-  const sites = AGENT_TASK_STATUS_VARIANTS.find((variant) =>
+  const matching = AGENT_TASK_STATUS_VARIANTS.filter((variant) =>
     variant.every(([anchor]) => countOccurrences(state.patched, anchor) === 1));
+  // Exactly one release shape, or none: an ambiguous bundle is drift too.
+  const sites = matching.length === 1 ? matching[0] : null;
   if (!sites) {
     const counts = AGENT_TASK_STATUS_VARIANTS.map((variant) => variant.map(([anchor]) => countOccurrences(state.patched, anchor)).join(","));
     state.skippedPatches += 1;
     if (state.warn) process.stderr.write(
-      `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(" | ")} (expected 1 each in one release variant) in ${state.path} — running without agent task status notifications\n`,
+      `[letta-code-patch] WARN: lcp-agent-task-status anchors matched ${counts.join(" | ")} (expected 1 each in exactly one release variant; ${matching.length} matched) in ${state.path} — running without agent task status notifications\n`,
     );
     return;
   }

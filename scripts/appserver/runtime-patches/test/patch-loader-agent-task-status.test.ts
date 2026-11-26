@@ -97,3 +97,15 @@ test("agent task patch matches every unique real bundle anchor and skips atomica
   const reapplied = patchLettaCodeSourceResultForTest(result.source).source;
   assert.equal(reapplied.split("// lcp-agent-task-status").length - 1, anchors.length);
 });
+
+test("agent task patch skips, untouched, a source that matches both release shapes", () => {
+  // Every anchor of both variants exactly once: an ambiguous bundle must not be patched as either.
+  const both = [...new Set(releases.flatMap(({ anchors }) => anchors))].join("\n// separator\n");
+  for (const { anchors } of releases) {
+    for (const anchor of anchors) assert.equal(both.split(anchor).length - 1, 1, "fixture holds each anchor once");
+  }
+  const result = patchLettaCodeSourceResultForTest(both);
+  assert.equal(result.source.includes("// lcp-agent-task-status"), false, "nothing of the patch may land");
+  const reference = patchLettaCodeSourceResultForTest("// unrelated\n");
+  assert.equal(result.skippedPatches, reference.skippedPatches, "the ambiguous bundle counts as a skip like any drift");
+});
