@@ -2702,6 +2702,297 @@ function memoryLineEndings(state) {
   state.appliedPatches += 1;
 }
 
+// lcp-conversation-turn-lock: one writer per local conversation, across processes.
+//
+// letta-code serialises turns per conversation only inside one process (the App Server's
+// TurnLifecycle per conversation runtime, HeadlessBackend.activeRunByConversation). A message
+// sent with SendAgentMessage on the local backend is a detached `letta -p --conv <id>` child
+// with its own LocalStore over the same files. It knows nothing of the turn already running in
+// the App Server or in a subagent's headless process, so it starts a second turn at once: its
+// startup closes the running turn's pending tool call as "stale" and both processes then
+// append to the same transcript (two final assistant messages on one parent).
+//
+// The lock is a file per conversation key under the OS temp dir (never in the replicated store),
+// holding the owner's pid and process start time; a dead owner's lock is reclaimed. Holders:
+//  - an App Server turn (handleIncomingMessage) for its whole duration, tool calls included;
+//  - a `letta -p` run from the moment its conversation is known until the process exits, so
+//    its stale-approval recovery and its turn only ever run when no other turn is live.
+// HeadlessBackend.executeConversationTurn refuses with the stock "busy with another active run"
+// error while another live process holds the key (the existing busy back-off retries it).
+// SendAgentMessage reports `queued` instead of `spawned` when the target has a turn in progress.
+const TURN_LOCK_MARK = "// lcp-conversation-turn-lock";
+
+const TURN_LOCK_HELPER = `
+${TURN_LOCK_MARK}: cross-process turn lock per local conversation.
+globalThis.__lcpTurnLock ??= (() => {
+  const getBuiltin = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule : null;
+  if (!getBuiltin) {
+    process.stderr.write("[lcp-turn-lock] WARN: process.getBuiltinModule unavailable; conversations are not locked across processes\\n");
+    const none = () => null;
+    return { acquire: async () => () => {}, holder: none, assertNotHeldElsewhere: () => {}, acquireForHeadless: async () => {} };
+  }
+  const fs = getBuiltin("node:fs");
+  const path = getBuiltin("node:path");
+  const os = getBuiltin("node:os");
+  const crypto = getBuiltin("node:crypto");
+  const POLL_MS = 250;
+  const NOTICE_MS = 30000;
+  const RECLAIM_GUARD_STALE_MS = 10000;
+  const startTime = (pid) => {
+    try {
+      return fs.readFileSync("/proc/" + pid + "/stat", "utf8").split(") ").pop().split(" ")[19] ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const self = { pid: process.pid, start: startTime(process.pid), token: crypto.randomUUID() };
+  const held = new Map();
+  const conversationKey = (agentId, conversationId) => {
+    const id = conversationId || "default";
+    if (id !== "default") return "conversation:" + id;
+    return agentId ? "default:" + agentId : null;
+  };
+  const storageDirOf = (backend) => {
+    try {
+      return typeof backend?.getLocalStorageDir === "function" ? backend.getLocalStorageDir() ?? null : null;
+    } catch {
+      return null;
+    }
+  };
+  const lockFile = (storageDir, key) => {
+    const uid = typeof process.getuid === "function" ? process.getuid() : "user";
+    const digest = crypto.createHash("sha256").update(path.resolve(storageDir) + "\\0" + key).digest("hex").slice(0, 40);
+    return path.join(os.tmpdir(), "letta-turn-locks-" + uid, digest + ".lock");
+  };
+  const readOwner = (file) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (error) {
+      return error?.code === "ENOENT" ? null : { unreadable: true };
+    }
+  };
+  const ownerAlive = (owner) => {
+    if (!owner) return false;
+    if (owner.unreadable || typeof owner.pid !== "number") return true;
+    try {
+      process.kill(owner.pid, 0);
+    } catch (error) {
+      if (error?.code !== "EPERM") return false;
+    }
+    if (owner.start) {
+      const current = startTime(owner.pid);
+      if (current !== null && current !== owner.start) return false;
+    }
+    return true;
+  };
+  const reclaimIfStale = (file, seen) => {
+    const guard = file + ".reclaim";
+    try {
+      fs.writeFileSync(guard, String(process.pid), { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - fs.statSync(guard).mtimeMs > RECLAIM_GUARD_STALE_MS) fs.unlinkSync(guard);
+      } catch {}
+      return;
+    }
+    try {
+      const now = readOwner(file);
+      if (now && !now.unreadable && now.token === seen.token && !ownerAlive(now)) {
+        fs.unlinkSync(file);
+        process.stderr.write("[lcp-turn-lock] reclaimed the turn lock of dead pid " + seen.pid + " (" + (seen.holder ?? "unknown") + ")\\n");
+      }
+    } finally {
+      try { fs.unlinkSync(guard); } catch {}
+    }
+  };
+  const tryTake = (file, holder, key) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    try {
+      fs.writeFileSync(file, JSON.stringify({ ...self, holder, key, at: new Date().toISOString() }), { flag: "wx", mode: 0o600 });
+      return null;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+    const owner = readOwner(file);
+    if (owner && !owner.unreadable && !ownerAlive(owner)) {
+      reclaimIfStale(file, owner);
+      return { retryNow: true };
+    }
+    return owner ?? { retryNow: true };
+  };
+  const releaseFile = (file) => {
+    const count = (held.get(file) ?? 0) - 1;
+    if (count > 0) {
+      held.set(file, count);
+      return;
+    }
+    held.delete(file);
+    try {
+      if (readOwner(file)?.token === self.token) fs.unlinkSync(file);
+    } catch {}
+  };
+  process.once("exit", () => {
+    for (const file of [...held.keys()]) {
+      held.set(file, 1);
+      releaseFile(file);
+    }
+  });
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function acquire(backend, agentId, conversationId, holder) {
+    const storageDir = storageDirOf(backend);
+    const key = conversationKey(agentId, conversationId);
+    if (!storageDir || !key) return () => {};
+    const file = lockFile(storageDir, key);
+    if (held.has(file)) {
+      held.set(file, held.get(file) + 1);
+      return () => releaseFile(file);
+    }
+    const startedWaiting = Date.now();
+    let noticed = false;
+    for (;;) {
+      let owner;
+      try {
+        owner = tryTake(file, holder, key);
+      } catch (error) {
+        process.stderr.write("[lcp-turn-lock] ERROR: cannot use the turn lock for " + key + " (" + (error?.message ?? error) + "); running this turn unlocked\\n");
+        return () => {};
+      }
+      if (owner === null) {
+        held.set(file, 1);
+        if (noticed) process.stderr.write("[lcp-turn-lock] " + holder + " acquired " + key + " after waiting " + (Date.now() - startedWaiting) + "ms\\n");
+        let released = false;
+        return () => {
+          if (released) return;
+          released = true;
+          releaseFile(file);
+        };
+      }
+      if (owner.retryNow) continue;
+      if (!noticed && Date.now() - startedWaiting >= NOTICE_MS) {
+        noticed = true;
+        process.stderr.write("[lcp-turn-lock] " + holder + " is waiting for the turn of pid " + owner.pid + " (" + (owner.holder ?? "unknown") + ") on " + key + "\\n");
+      }
+      await sleep(POLL_MS);
+    }
+  }
+  function holder(backend, agentId, conversationId) {
+    const storageDir = storageDirOf(backend);
+    const key = conversationKey(agentId, conversationId);
+    if (!storageDir || !key) return null;
+    const file = lockFile(storageDir, key);
+    if (held.has(file)) return { pid: process.pid, holder: "this process" };
+    const owner = readOwner(file);
+    return ownerAlive(owner) ? owner : null;
+  }
+  function assertNotHeldElsewhere(backend, conversationId, agentId) {
+    const owner = holder(backend, agentId, conversationId);
+    if (owner && owner.pid !== process.pid) {
+      throw new Error("Conversation " + conversationId + " is busy with another active run (a turn in process " + owner.pid + ", " + (owner.holder ?? "unknown") + ")");
+    }
+  }
+  async function acquireForHeadless(backend, agentId, conversationId, options) {
+    if (options.remote) return;
+    if (options.bidirectional) {
+      process.stderr.write("[lcp-turn-lock] WARN: --input-format stream-json sessions do not hold the conversation turn lock\\n");
+      return;
+    }
+    await acquire(backend, agentId, conversationId, "letta -p pid " + process.pid);
+  }
+  return { acquire, holder, assertNotHeldElsewhere, acquireForHeadless };
+})();
+`;
+
+const TURN_LOCK_SITES = [
+  {
+    // App Server: every listener turn, recovery continuations included, runs through here.
+    token:
+      "async function handleIncomingMessage(...args) {\n" +
+      "  const [msg] = args;\n" +
+      "  notifyTurnStarted(msg);\n" +
+      "  try {\n" +
+      "    await handleIncomingMessageInner(...args);\n" +
+      "  } finally {\n" +
+      "    notifyTurnFinished(msg);\n" +
+      "  }\n" +
+      "}\n",
+    replacement:
+      "async function handleIncomingMessage(...args) {\n" +
+      "  const [msg] = args;\n" +
+      `  const lcpReleaseTurnLock = await globalThis.__lcpTurnLock.acquire(getBackend(), msg?.agentId, msg?.conversationId || "default", "app-server pid " + process.pid); ${TURN_LOCK_MARK}\n` +
+      "  notifyTurnStarted(msg);\n" +
+      "  try {\n" +
+      "    await handleIncomingMessageInner(...args);\n" +
+      "  } finally {\n" +
+      "    notifyTurnFinished(msg);\n" +
+      "    lcpReleaseTurnLock();\n" +
+      "  }\n" +
+      "}\n",
+  },
+  {
+    // letta -p: the conversation is known here and nothing has touched its transcript yet; the
+    // stale-approval recovery and the turn come after.
+    token:
+      '  markMilestone("HEADLESS_CONVERSATION_READY");\n' +
+      "  setConversationId(conversationId);\n",
+    replacement:
+      '  markMilestone("HEADLESS_CONVERSATION_READY");\n' +
+      `  await globalThis.__lcpTurnLock.acquireForHeadless(backend3, agent.id, conversationId, { remote: usesRemoteEnvironment, bidirectional: isBidirectionalMode }); ${TURN_LOCK_MARK}\n` +
+      "  setConversationId(conversationId);\n",
+  },
+  {
+    // Any other path into a local turn refuses while another live process owns the conversation.
+    token:
+      "    if (activeRun && !isTerminalRun(activeRun)) {\n" +
+      "      throw new Error(`Conversation ${conversationId} already has an active run (${activeRun.id})`);\n" +
+      "    }\n",
+    replacement:
+      "    if (activeRun && !isTerminalRun(activeRun)) {\n" +
+      "      throw new Error(`Conversation ${conversationId} already has an active run (${activeRun.id})`);\n" +
+      "    }\n" +
+      `    globalThis.__lcpTurnLock.assertNotHeldElsewhere(this, conversationId, turnAgentId); ${TURN_LOCK_MARK}\n`,
+  },
+  {
+    // SendAgentMessage on the local backend: say the message is queued when the target is busy.
+    token:
+      "      (deps.spawnLocal ?? spawnDetached)(launcher.command, launcher.args);\n" +
+      "      return {\n" +
+      "        content: JSON.stringify({\n" +
+      '          status: "spawned",\n' +
+      "          conversation_id: destination.conversationId\n" +
+      "        }),\n",
+    replacement:
+      `      const lcpBusyTurn = globalThis.__lcpTurnLock.holder(backend3, destination.agentId, destination.conversationId); ${TURN_LOCK_MARK}\n` +
+      "      (deps.spawnLocal ?? spawnDetached)(launcher.command, launcher.args);\n" +
+      "      return {\n" +
+      "        content: JSON.stringify(lcpBusyTurn ? {\n" +
+      '          status: "queued",\n' +
+      "          conversation_id: destination.conversationId,\n" +
+      '          delivery: "after_current_turn",\n' +
+      "          note: \"The recipient has a turn in progress. Your message is queued and will run as the recipient's next turn when that turn ends; don't resend it.\"\n" +
+      "        } : {\n" +
+      '          status: "spawned",\n' +
+      "          conversation_id: destination.conversationId\n" +
+      "        }),\n",
+  },
+];
+
+function conversationTurnLock(state) {
+  if (state.patched.includes(TURN_LOCK_MARK)) return;
+  const counts = TURN_LOCK_SITES.map(({ token }) => countOccurrences(state.patched, token));
+  if (!counts.every((count) => count === 1)) {
+    state.skippedPatches += 1;
+    if (state.warn) process.stderr.write(
+      `[letta-code-patch] WARN: lcp-conversation-turn-lock anchors matched ${counts.join(",")} (expected 1 each) in ${state.path} — ` +
+      `running without it; a message to a busy local agent starts a concurrent turn on its conversation\n`,
+    );
+    return;
+  }
+  for (const { token, replacement } of TURN_LOCK_SITES) state.patched = state.patched.replace(token, () => replacement);
+  state.patched = injectHelperAfterShebang(state.patched, TURN_LOCK_HELPER);
+  state.appliedPatches += 1;
+}
+
 // Patch order is significant: each step receives the previous step's output.
 const PATCH_STEPS = [
   agentTaskStatus,
@@ -2740,6 +3031,7 @@ const PATCH_STEPS = [
   memoryDirExpand,
   skillDir,
   systemPromptTracking,
+  conversationTurnLock,
 ];
 
 /**
