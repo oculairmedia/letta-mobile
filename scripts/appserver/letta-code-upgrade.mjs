@@ -72,7 +72,7 @@ function majorLine(range) {
 
 /** Added, removed and changed dependencies between two `dependencies` maps; `major` marks a breaking range move. */
 export function dependencyDiff(before = {}, after = {}) {
-  const names = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+  const names = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort((left, right) => left.localeCompare(right));
   return {
     added: names.filter((name) => !(name in before)).map((name) => ({ name, to: after[name] })),
     removed: names.filter((name) => !(name in after)).map((name) => ({ name, from: before[name] })),
