@@ -333,6 +333,7 @@ internal fun AgentText(params: AgentTextParams) {
                 // A reply's wide table may break out of the reading column into the timeline's spare width.
                 CompositionLocalProvider(LocalMarkdownBreakoutLane provides LocalTimelineBreakoutLane.current) {
                     SharedMarkdownText(
+                        modifier = Modifier.testTag(ChatRowTestTags.AGENT_TEXT_BODY),
                         text = displayText,
                         textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                         // A rich host renderer owns the streaming reveal (cursor, committed blocks,

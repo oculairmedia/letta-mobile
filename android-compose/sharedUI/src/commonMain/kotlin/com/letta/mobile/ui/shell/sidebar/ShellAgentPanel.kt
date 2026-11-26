@@ -77,6 +77,8 @@ import org.jetbrains.compose.resources.stringResource
 object ShellAgentPanelTags {
     const val PANEL = "shell-agent-panel"
     const val AGENT_MENU = "shell-agent-panel-agent-menu"
+    /** The New chat row, whatever the lens calls it. */
+    const val NEW_CHAT = "shell-agent-panel-new-chat"
     /** The focused agent's mascot (or its orb) at the head of the panel. */
     const val HERO = "shell-agent-panel-hero"
     /** The host's model-and-context card under the agent's name. */
@@ -378,5 +380,6 @@ private fun ShellPanelNewChat(state: ShellAgentPanelState, actions: ShellAgentPa
     ShellNavRow(
         model = ShellNavRowModel(label = WorkPlayLens.newConversationLabel(state.mode), icon = Icons.Outlined.Edit, selected = false),
         onClick = actions.onNewChat,
+        modifier = Modifier.testTag(ShellAgentPanelTags.NEW_CHAT),
     )
 }

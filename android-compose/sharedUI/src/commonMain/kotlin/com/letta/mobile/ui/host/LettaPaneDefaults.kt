@@ -71,7 +71,7 @@ private fun SheetContainer(spec: PaneSpec, content: @Composable ColumnScope.() -
             skipPartiallyExpanded = true,
             confirmValueChange = { it != SheetValue.Hidden || purpose.dismissesOnOutside },
         ),
-        modifier = spec.modifier.testTag(LettaPaneTags.SHEET),
+        modifier = spec.modifier.then(LocalPaneWindowSemantics.current).testTag(LettaPaneTags.SHEET),
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = purpose.dismissesOnKey),
     ) {
         Column(modifier = Modifier.navigationBarsPadding().then(rememberPaneFocus(spec.keyDismiss())).tagged(spec.testTag)) {
@@ -86,7 +86,7 @@ private fun PopoverContainer(spec: PaneSpec, content: @Composable ColumnScope.()
     val gapPx = with(LocalDensity.current) { LettaDimens.Space.sm.roundToPx() }
     val provider = remember(spec.anchor, gapPx) { AnchoredPanePositionProvider(spec.anchor, gapPx) }
     Popup(popupPositionProvider = provider, onDismissRequest = spec.onDismiss, properties = PopupProperties(focusable = true)) {
-        PaneEnter { LettaPopoverFrame(spec, content) }
+        PaneEnter(LocalPaneWindowSemantics.current) { LettaPopoverFrame(spec, content) }
     }
 }
 
@@ -98,7 +98,7 @@ private fun DialogContainer(spec: PaneSpec, width: Dp, tag: String, content: @Co
         usePlatformDefaultWidth = false,
     )
     Dialog(onDismissRequest = spec.onDismiss, properties = properties) {
-        PaneEnter { LettaDialogFrame(spec, width, tag, content) }
+        PaneEnter(LocalPaneWindowSemantics.current) { LettaDialogFrame(spec, width, tag, content) }
     }
 }
 
@@ -107,7 +107,7 @@ private fun MenuContainer(expanded: Boolean, spec: PaneSpec, content: @Composabl
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = spec.onDismiss,
-        modifier = spec.modifier,
+        modifier = spec.modifier.then(LocalPaneWindowSemantics.current),
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         content = content,
@@ -180,7 +180,7 @@ private fun PaneTitle(title: String?) {
 
 /** Enters with a short fade and settle, or at once under reduced motion. */
 @Composable
-private fun PaneEnter(content: @Composable () -> Unit) {
+private fun PaneEnter(windowSemantics: Modifier, content: @Composable () -> Unit) {
     val reduced = LocalReducedMotion.current
     val visible = remember { MutableTransitionState(reduced).apply { targetState = true } }
     val enter = if (reduced) {
@@ -188,7 +188,7 @@ private fun PaneEnter(content: @Composable () -> Unit) {
     } else {
         fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + scaleIn(tween(LettaMotionTokens.ENTER_MILLIS), initialScale = ENTER_SCALE)
     }
-    AnimatedVisibility(visibleState = visible, enter = enter, exit = ExitTransition.None) { content() }
+    AnimatedVisibility(visibleState = visible, modifier = windowSemantics, enter = enter, exit = ExitTransition.None) { content() }
 }
 
 /**

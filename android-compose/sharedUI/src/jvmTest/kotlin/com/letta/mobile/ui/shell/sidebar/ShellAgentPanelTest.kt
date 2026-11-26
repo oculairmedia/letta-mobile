@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -114,6 +115,8 @@ class ShellAgentPanelTest {
         onNodeWithText("Characters").assertExists()
         onNodeWithText("Worlds & Lore").assertExists()
         onNodeWithText("New scene").assertExists()
+        // The id the device flows select by does not follow the lens's label.
+        onNodeWithTag(ShellAgentPanelTags.NEW_CHAT).assertHasClickAction()
         onNodeWithText("Channels").assertDoesNotExist()
     }
 
@@ -132,6 +135,7 @@ class ShellAgentPanelTest {
         setContent { Panel(state, actions) }
 
         onNodeWithText("Memory").performClick()
+        onNodeWithTag(ShellAgentPanelTags.NEW_CHAT).assertHasClickAction()
         onNodeWithText("New chat").performClick()
         onNodeWithText("Archived").performClick()
         onNodeWithText("Handoff from local-code").performClick()

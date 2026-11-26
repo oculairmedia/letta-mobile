@@ -2,6 +2,7 @@ package com.letta.mobile.ui.host
 
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.host.purpose.PanePurpose
 
@@ -73,6 +74,14 @@ private fun LettaPaneKind.anchorOrDefault(): PaneAnchor = when (this) {
     is LettaPaneKind.Adaptive -> anchor
     else -> PaneAnchor.BelowStart
 }
+
+/**
+ * Semantics the default containers add inside their window. A sheet, dialog, popover or menu is a
+ * window of its own, so semantics set at the activity's root do not reach it; the platform root
+ * provides here what its root sets (Android's debug builds: test tags as resource ids), and every
+ * container applies it once.
+ */
+val LocalPaneWindowSemantics = staticCompositionLocalOf<Modifier> { Modifier }
 
 /** Tags the default containers put on their frames, and the confirmation's content. */
 object LettaPaneTags {
