@@ -430,6 +430,7 @@ class IrohChannelTransportEndToEndTest {
     fun theSameClientMessageIdInAnotherConversationRunsItsOwnTurn() = runBlocking {
         val server = IrohNodeEndpoint(
             binding = loopbackHostBinding(),
+            appServerLinks = ::serveIrohCarrierLink,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
         )
