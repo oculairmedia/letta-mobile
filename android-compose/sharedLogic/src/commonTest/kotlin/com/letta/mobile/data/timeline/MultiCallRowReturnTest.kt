@@ -100,9 +100,9 @@ class MultiCallRowReturnTest {
     }
 
     /**
-     * The mapper never yields a blank call id (IrohStreamDeltaServerFrameMapper.toToolCallPayload falls back to the
-     * frame id), but a model-level row can carry one. A blank first call is never answered (no writer matches a blank
-     * id), so a later call's return still stays off it.
+     * A blank call id can reach a row: the mapper falls back to the frame id only when the id is absent, and keeps an
+     * explicit `"tool_call_id": ""` (IrohStreamDeltaServerFrameMapper.toToolCallPayload). A blank first call is never
+     * answered (every writer skips a blank id), so a later call's return still stays off it.
      */
     @Test
     fun aBlankFirstCallIdNeverReceivesALaterCallsReturn() {
