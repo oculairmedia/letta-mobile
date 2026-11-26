@@ -91,10 +91,11 @@ These are carried by provided trait methods, so every backend enforces them iden
 - Namespaces match `^[a-z][a-z0-9_.-]{0,63}$`. Keys order bytewise within a namespace. `kv_scan_prefix` returns every
   key starting with the prefix, ordered; an empty prefix scans the namespace and never another.
 - **Key paths** (samod's storage keys are lists of strings, and `load_range` takes a component prefix):
-  each component is its UTF-8 bytes with `0x00` written `01 01` and `0x01` written `01 02`, then a `0x00`
-  terminator. The encoding of a component prefix is a byte prefix of every path extending it and of no other path, so
-  `load_range(prefix)` is `kv_scan_prefix(SAMOD, encode(prefix))`. A decoder refuses a missing terminator, a bad
-  escape and non-UTF-8 components. Vectors: `key_paths`, `invalid_key_paths`.
+  each component is a byte string in the `storekey` crate's format: its UTF-8 bytes with `0x00` written `01 00` and
+  `0x01` written `01 01`, then a `0x00` terminator. The encoding of a component prefix is a byte prefix of every path
+  extending it and of no other path, so `load_range(prefix)` is `kv_scan_prefix(SAMOD, encode(prefix))`. A decoder
+  refuses a missing terminator, an escape of any byte other than `00` or `01` (it re-encodes and compares, so one path
+  has one key) and non-UTF-8 components. Vectors: `key_paths`, `invalid_key_paths`.
 
 The samod storage adapter itself lands with `core-catalog`; it is a thin mapping onto these calls, so a catalog write
 and a membership op can share one transaction where needed (C2 §5.4).
@@ -120,8 +121,8 @@ bindings; credentials stay in platform secure storage. Vectors: `binding_keys`, 
 - **D-3 Connections.** A writer (every `write` is one `BEGIN IMMEDIATE` transaction), a read-only reader (every `read`
   is one deferred transaction, a WAL snapshot), and a bindings connection. Only the bindings connection touches the
   `binding` table.
-- **D-4 Schema version** is `PRAGMA user_version`. Migration `i` takes version `i` to `i + 1` in one transaction,
-  which also sets `user_version` and `application_id`. Migrations are append-only. A file whose version is above the
+- **D-4 Schema version** is `PRAGMA user_version`, managed by `rusqlite_migration`: opening runs every pending
+  migration and sets `user_version` in one transaction. Migration 1 also stamps `application_id`. Migrations are append-only. A file whose version is above the
   build's is refused with `SchemaTooNew` and never touched. A file with a foreign `application_id`, or a non-zero
   `user_version` and no application id, is refused with `Corrupt`. The schema version is the store format node.info
   reports.
@@ -160,7 +161,7 @@ epoch total order. State codes are fixed by the vectors (`codes`): payload `0 mi
   over, never left poisoned).
 - **Seq reuse** after a crash is impossible: the segment head commits with each entry (C1 §3.7). Restoring an older
   database file can reuse a seq; that is detected as equivocation by `core-log` (C1 §3.8), not prevented here.
-- **Migrations** are one transaction each: a crash mid-migration leaves the previous version, which migrates again on
+- **Migrations** run in one transaction: a crash mid-migration leaves the previous version, which migrates again on
   the next open.
 
 ## 8. In-memory store and wasm

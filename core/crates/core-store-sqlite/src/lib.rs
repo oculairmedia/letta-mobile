@@ -31,7 +31,7 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// The schema version this build migrates to.
 #[must_use]
 pub fn latest_schema_version() -> u32 {
-    u32::try_from(schema::MIGRATIONS.len()).unwrap_or(u32::MAX)
+    u32::try_from(schema::LATEST_VERSION).unwrap_or(u32::MAX)
 }
 
 /// A node's store in one SQLite database file.
@@ -102,7 +102,8 @@ fn connect(path: &Path, read_only: bool) -> Result<Connection, StoreError> {
     Ok(connection)
 }
 
-/// Brings the schema to the latest version, one transaction per migration.
+/// Checks the file is a Baken node store no newer than this build, then brings the schema to the
+/// latest version with `rusqlite_migration` (all pending migrations in one transaction).
 fn migrate(connection: &mut Connection) -> Result<u32, StoreError> {
     let application_id: i32 = connection
         .query_row("PRAGMA application_id", [], |row| row.get(0))
@@ -122,20 +123,9 @@ fn migrate(connection: &mut Connection) -> Result<u32, StoreError> {
             supported: latest,
         });
     }
-    for version in found..latest {
-        let index = usize::try_from(version).unwrap_or(usize::MAX);
-        let tx = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .sql()?;
-        tx.execute_batch(schema::MIGRATIONS[index]).sql()?;
-        tx.execute_batch(&format!(
-            "PRAGMA application_id = {}; PRAGMA user_version = {};",
-            schema::APPLICATION_ID,
-            version + 1
-        ))
-        .sql()?;
-        tx.commit().sql()?;
-    }
+    schema::migrations()
+        .to_latest(connection)
+        .map_err(|error| StoreError::Backend(format!("migrating the schema: {error}")))?;
     Ok(latest)
 }
 

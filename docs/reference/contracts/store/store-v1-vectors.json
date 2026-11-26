@@ -41,8 +41,8 @@
       "components": ["doc1", "incremental", "h1"],
       "hex": "646f633100696e6372656d656e74616c00683100"
     },
-    { "name": "NUL is escaped", "components": ["a\u0000b"], "hex": "6101016200" },
-    { "name": "the escape byte is escaped", "components": ["\u0001"], "hex": "010200" },
+    { "name": "NUL is escaped", "components": ["a\u0000b"], "hex": "6101006200" },
+    { "name": "the escape byte is escaped", "components": ["\u0001"], "hex": "010100" },
     { "name": "non-ASCII", "components": ["é"], "hex": "c3a900" }
   ],
   "invalid_key_paths": [

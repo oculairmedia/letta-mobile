@@ -1,7 +1,7 @@
 [package]
 name = "core-store-sqlite"
 version = "0.1.0"
-description = "The SQLite Store for a Baken node: rusqlite with bundled SQLite, WAL mode, one database file per node, versioned schema migrations. Native only."
+description = "The SQLite Store for a Baken node: rusqlite with bundled SQLite, WAL mode, one database file per node, rusqlite_migration schema migrations. Native only."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -11,6 +11,7 @@ publish.workspace = true
 core-proto.workspace = true
 core-store.workspace = true
 rusqlite.workspace = true
+rusqlite_migration.workspace = true
 
 [dev-dependencies]
 core-store = { workspace = true, features = ["contract"] }
