@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh.secrets
 
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.node.iroh.AdminRpcBiStream
+import com.letta.mobile.data.controller.node.iroh.handleStream
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRecvStream
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext

@@ -22,9 +22,14 @@ internal interface NodeConnectionWire {
     /**
      * Hands every control frame the peer sends to [onFrame], in order, until the control lane ends; throws when it
      * ended because the connection did. A wire that reassembles chunked frames bounds each logical frame, on this
-     * lane and on every call lane, by [maxReassembledBytes], read at every part.
+     * lane and on every call lane, by [maxReassembledBytes], read at every part, and splits its writes into
+     * `frame_part`s exactly when [peerFrameParts] says so: the node's answer, so the two cannot disagree.
      */
-    suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit)
+    suspend fun readControl(
+        maxReassembledBytes: () -> Int,
+        peerFrameParts: () -> Boolean,
+        onFrame: suspend (String) -> Unit,
+    )
 
     /** Writes [frame] on the control lane. */
     suspend fun writeControl(frame: String)
@@ -70,7 +75,11 @@ internal interface NodeCallExchange {
 internal class DetachedNodeWire(override val peerId: String) : NodeConnectionWire {
     override val localShell: Boolean = false
 
-    override suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit) = Unit
+    override suspend fun readControl(
+        maxReassembledBytes: () -> Int,
+        peerFrameParts: () -> Boolean,
+        onFrame: suspend (String) -> Unit,
+    ) = Unit
 
     override suspend fun writeControl(frame: String) = Unit
 
