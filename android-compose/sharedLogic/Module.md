@@ -307,6 +307,10 @@ A bounded, change-aware view of the local backend's agent records on disk. Admin
 
 Full App Server lists the host holds and reuses while the files they are built from are unchanged, so a client paging a list or reading it agent by agent costs one App Server fetch per change rather than one per request. A held list is dropped by a host write, by a change in its files' signature or after a short age bound; a list too large to hold falls back to the request's own fetch. Keep the per-request slicing, which must match the App Server's own paging, with the admin handlers that serve it.
 
+# Package com.letta.mobile.data.controller.node.link
+
+The seam under each connection the JVM/Android node serves. `NodeConnectionWire` is what the node's protocol code reads frames from and writes frames to: an accepted Iroh QUIC connection or a carrier's node end. Auth, capability gates, the admin router, turns and the feed are the same code over either; a wire never interprets, rewrites or authenticates a frame, and its peer id is the identity the transport verified. Keep protocol handling in the node packages; this package holds only the transport seam.
+
 # Package com.letta.mobile.data.controller.node.iroh
 
 JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.auth/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).
