@@ -1,4 +1,4 @@
-package com.letta.mobile.cli.meridian
+package com.letta.mobile.data.meridian.socket
 
 import com.letta.mobile.data.meridian.endpoint.MeridianToolsService
 import com.letta.mobile.data.meridian.endpoint.MeridianToolsWire
@@ -27,8 +27,8 @@ import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 
 /**
- * Moves `meridian/tools/1` lines between a listening socket and [MeridianToolsService]
- * (letta-mobile-jna0o.4): accept, read one request line (capped at
+ * Moves `meridian/tools/1` lines between a listening socket and [MeridianToolsService]:
+ * accept, read one request line (capped at
  * [MeridianToolsWire.MAX_REQUEST_LINE_BYTES], within [readTimeoutMs]), answer one response line,
  * close. At most [maxConcurrent] calls run at once; more wait for a slot.
  */
@@ -94,7 +94,10 @@ class MeridianToolsSocketServer(
     }
 
     companion object {
+        /** How long a caller has to send its request line. */
         const val DEFAULT_READ_TIMEOUT_MS = 30_000L
+
+        /** Calls answered at once; more wait for a slot. */
         const val DEFAULT_MAX_CONCURRENT = 16
         private val SOCKET_MODE = PosixFilePermissions.fromString("rw-rw----")
 

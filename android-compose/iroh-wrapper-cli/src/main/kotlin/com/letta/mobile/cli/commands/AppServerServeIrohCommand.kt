@@ -13,10 +13,9 @@ import com.letta.mobile.cli.commands.mounts.HostCanvasRecords
 import com.letta.mobile.cli.commands.mounts.upgradePairedDevicesForCanvasMounts
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
 import com.letta.mobile.cli.commands.records.WrapperStoreOptions
-import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
 import com.letta.mobile.cli.meridian.MeridianToolsOptions
 import com.letta.mobile.cli.meridian.servesCli
-import com.letta.mobile.cli.process.linuxNodePorts
+import com.letta.mobile.cli.process.hostNodePorts
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.AgentDiscoveryTool
@@ -37,6 +36,8 @@ import com.letta.mobile.data.node.NodeComposition
 import com.letta.mobile.data.node.NodeConfig
 import com.letta.mobile.data.node.NodeEndpointConfig
 import com.letta.mobile.data.node.NodeEndpointParts
+import com.letta.mobile.data.node.host.AppServerProcessSource
+import com.letta.mobile.data.node.host.NodeHostBindings
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.runtime.host.ownedLocalAppServerHost
@@ -324,7 +325,8 @@ class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_MERIDIAN_BINARY",
         help = "Path to the `meridian` CLI binary whose `agent-message send` subcommand " +
             "the wrapper invokes when an agent calls `agent_message_send`. Empty disables " +
-            "the tool. Default: empty (no Iroh agent-to-agent tool advertised).",
+            "the tool. Default: empty (no Iroh agent-to-agent tool advertised). On Windows the " +
+            "tool always sends in-process and this option is ignored.",
     ).default("")
 
     /** letta-mobile-jna0o.4: the local `meridian/tools/1` endpoint; off unless --agent-tools-mode cli. */
@@ -445,21 +447,6 @@ class AppServerServeIrohCommand : CliktCommand(
         backendDir,
     )
 
-    /**
-     * letta-mobile-jna0o.4: serve the router over the registry the controller advertises, binding
-     * callers to the shell calls seen on the App Server frames this host relays. Needs a live App
-     * Server (Iroh-only stub mode has no runtimes, so nothing to bind to).
-     */
-    private suspend fun startMeridianTools(scope: CoroutineScope, client: AppServerClient?) {
-        val config = meridianTools.config(cliServed = agentToolsPolicy.servesCli())
-        if (!config.enabled) return
-        if (client == null) {
-            println("[iroh-app-server] meridian tools endpoint: DISABLED (no App Server to relay)")
-            return
-        }
-        MeridianToolsEndpoint(config, productionToolRegistry, client.events, ::println).start(scope)
-    }
-
     private fun a2aConfig(): A2aWiringConfig {
         val irohHome = java.io.File(
             System.getenv("LETTA_IROH_HOME") ?: "${System.getProperty("user.home")}/.letta/iroh",
@@ -556,11 +543,27 @@ class AppServerServeIrohCommand : CliktCommand(
         ),
     )
 
-    /** The Linux node ports: the external App Server's MainPID identity and the meridian tools socket. */
-    private fun nodePorts() = linuxNodePorts(
-        externalServerUrl = appServerUrl.takeUnless { ownAppServer },
-        pidFile = appServerPidFile?.let(java.nio.file.Path::of),
-    ) { scope, client -> startMeridianTools(scope, client) }
+    /**
+     * The node ports on this OS's bindings: the external App Server's identity from its PID file and
+     * the local `meridian/tools/1` endpoint over the registry the controller advertises, binding
+     * callers to the shell calls seen on the App Server frames this host relays. An owned App Server
+     * leaves the identity unknown here.
+     */
+    private fun nodePorts() = hostNodePorts(
+        bindings = hostBindings,
+        identitySource = AppServerProcessSource.PidFile(
+            serverUrl = appServerUrl.takeUnless { ownAppServer },
+            pidFile = appServerPidFile?.let(java.nio.file.Path::of),
+        ),
+        toolsSocket = hostBindings.toolsSocket(
+            meridianTools.config(cliServed = agentToolsPolicy.servesCli()),
+            productionToolRegistry,
+            ::println,
+        ),
+    )
+
+    /** This OS's node bindings, chosen once for the process. */
+    private val hostBindings: NodeHostBindings by lazy { NodeHostBindings.current() }
 
     /** The notebook grant methods over [notebooks], or null without `--notebook-grants-file`. */
     private fun notebookGrantRoutes(notebooks: NotebookLocalStore?): AdminRpcRoutes? = notebookGrantsFile?.let { file ->
@@ -684,13 +687,15 @@ class AppServerServeIrohCommand : CliktCommand(
     private fun buildProductionExternalToolRegistry(): ExternalToolRegistry {
         val policy = agentToolsPolicy
         println("[iroh-app-server] Agent tools mode: ${policy.describe()}")
+        val messaging = hostBindings.agentMessaging(meridianBinary)
         return policy.apply(
             buildProductionExternalToolRegistryForTesting(
-                binary = meridianBinary,
+                binary = messaging?.binary.orEmpty(),
                 identityDir = a2aIdentityDir,
                 addressStore = a2aAddressBook,
                 localBackendDir = localBackendDir,
                 hostTools = hostCanvasTools + com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.hostTools(appToolRelay),
+                runner = messaging?.runner,
             ),
         )
     }
@@ -836,10 +841,11 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
  * invocation.
  *
  * Behavior:
- *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.hostTools] of
+ *  - `binary` blank and no [runner] => [ExternalToolRegistry.hostTools] of
  *    [hostTools] alone (nothing else; with none, the pre-1vuec behavior).
- *  - `binary` non-blank => registry advertises the Iroh agent-message tool
- *    with `agentMessaging` capability enabled, and [hostTools].
+ *  - `binary` non-blank, or a [runner] (the in-process sender of the Windows
+ *    bindings, which needs no binary) => registry advertises the Iroh
+ *    agent-message tool with `agentMessaging` capability enabled, and [hostTools].
  *  - [hostTools] (the host's canvas_* tools, letta-mobile-aknkw) are advertised either way:
  *    they need no binary, only the canvas relay this host runs.
  *
@@ -853,8 +859,9 @@ internal fun buildProductionExternalToolRegistryForTesting(
     addressStore: String?,
     localBackendDir: String? = null,
     hostTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList(),
+    runner: com.letta.mobile.data.controller.extras.IrohCliRunner? = null,
 ): ExternalToolRegistry {
-    if (binary.isBlank()) {
+    if (binary.isBlank() && runner == null) {
         return ExternalToolRegistry.hostTools(hostTools)
     }
     val capabilities = RemoteCapabilities(agentMessaging = true)
@@ -862,6 +869,7 @@ internal fun buildProductionExternalToolRegistryForTesting(
         binary = binary,
         identityDir = identityDir,
         addressStore = addressStore,
+        runner = runner,
     )
     val discovery = localBackendDir?.takeIf { it.isNotBlank() }?.let {
         AgentDiscoveryTool(LocalBackendAgentDiscoverySource(LocalBackendAdminStore(java.io.File(it))))

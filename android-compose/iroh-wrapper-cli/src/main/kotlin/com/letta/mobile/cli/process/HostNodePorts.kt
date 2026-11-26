@@ -4,7 +4,8 @@ import com.letta.mobile.data.node.JvmAppServerHttpClients
 import com.letta.mobile.data.node.NodeLog
 import com.letta.mobile.data.node.NodePorts
 import com.letta.mobile.data.node.NodeToolsSocket
-import java.nio.file.Path
+import com.letta.mobile.data.node.host.AppServerProcessSource
+import com.letta.mobile.data.node.host.NodeHostBindings
 
 /** The wrapper's node log: status lines to stdout and failures to stderr, each tagged with [prefix]. */
 internal class ConsoleNodeLog(private val prefix: String) : NodeLog {
@@ -14,20 +15,17 @@ internal class ConsoleNodeLog(private val prefix: String) : NodeLog {
 }
 
 /**
- * The Linux host's node ports: App Server process identity from an operator-bound systemd MainPID
- * file and `/proc`, and the wrapper's local tools socket.
- *
- * @param externalServerUrl the external App Server URL; null when the node owns its App Server or
- *   has none, which leaves the process identity unknown.
- * @param pidFile the trusted MainPID file of that App Server.
+ * The wrapper's node ports on this OS's [bindings]: the App Server process identity from
+ * [identitySource] (systemd MainPID file and `/proc` on Linux, PID plus creation time on Windows)
+ * and the local tools socket.
  */
-internal fun linuxNodePorts(
-    externalServerUrl: String?,
-    pidFile: Path?,
+internal fun hostNodePorts(
+    bindings: NodeHostBindings,
+    identitySource: AppServerProcessSource,
     toolsSocket: NodeToolsSocket,
 ): NodePorts = NodePorts(
     httpClients = JvmAppServerHttpClients,
     log = ConsoleNodeLog("[iroh-app-server]"),
-    processIdentity = LinuxAppServerProcessIdentity(externalServerUrl, pidFile),
+    processIdentity = bindings.processIdentity(identitySource),
     toolsSocket = toolsSocket,
 )
