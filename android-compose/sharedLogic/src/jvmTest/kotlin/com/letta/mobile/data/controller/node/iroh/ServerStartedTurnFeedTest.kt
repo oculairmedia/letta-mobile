@@ -202,7 +202,8 @@ class ServerStartedTurnFeedTest {
     fun aServerStartedTurnThatNeverFinishesClosesAfterSilenceAndStealsNothing() = runTest {
         val viewer = RecordingViewer("phone")
         val node = node { setOf(viewer) }
-        serverStartedTurn().dropLast(1).forEach { node.frames.emit(it) }
+        // The App Server went away mid-turn: neither its stop_reason nor its turn_finished arrives.
+        serverStartedTurn().dropLast(2).forEach { node.frames.emit(it) }
         runCurrent()
         node.nowMs += NodeTurnHost.SERVER_TURN_SILENCE_MS
         viewer.frames.clear()
@@ -291,7 +292,8 @@ class ServerStartedTurnFeedTest {
         runCurrent()
         testScheduler.advanceUntilIdle()
 
-        val tapDeltas = phone.stream.filter { it.type == "stream_delta" }.map { it.kind }
+        // The client's own prompt echo (otid = its client message id) is its turn's, not a relayed server frame.
+        val tapDeltas = phone.stream.filter { it.type == "stream_delta" && it.json["delta"]?.jsonObject?.text("otid") != CLIENT_TURN }.map { it.kind }
         assertEquals(listOf("assistant_message", "stop_reason"), tapDeltas, "the client relay carries only its own run")
         assertEquals(listOf("user_message", "assistant_message", "usage_statistics", "stop_reason"), phoneViewer.frames.map { it.delta().text("message_type") })
         assertEquals(1, entries(node.journal).count { it.kind == "turn_open" && it.turn != CLIENT_TURN })
