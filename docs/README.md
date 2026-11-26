@@ -148,7 +148,6 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Current focus v1: contract proposal](reference/contracts/current-focus-v1.md)
 - [Keystore v1: provider contract](reference/contracts/keystore-v1.md)
 - [Lane inbox v1](reference/contracts/lane-inbox-v1.md)
-- [Node carrier v1: one client stack over any transport](reference/contracts/node-carrier-v1.md)
 - [Object verbs v1: contract proposal](reference/contracts/object-verbs-v1.md)
 - [Pins v1: the host's pinned agents, one list shared by every device](reference/contracts/pins-v1.md)
 - [Project registry v1: host-owned project record, project file and read methods](reference/contracts/project-registry-v1.md)
@@ -305,6 +304,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/monitor.stop
 
 - [monitor.stop: Background process stop v1](reference/contracts/monitor.stop/process-v1.md)
+
+### reference/contracts/node-carrier
+
+- [Node carrier v1: one client stack over any transport](reference/contracts/node-carrier/node-carrier-v1.md)
 
 ### reference/contracts/pins.get
 

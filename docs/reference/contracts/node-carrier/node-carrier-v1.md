@@ -40,8 +40,8 @@ shell code ──> NodeSession ──> NodeCarrier.dial ──> NodeLink  ══
 | Lane | Direction | Carries | Iroh today |
 | --- | --- | --- | --- |
 | `CONTROL` | both | `auth`/`auth_response`, `runtime_start`, `input`/`input_accepted`, `sync`, `abort_message`, queue controls, `error`, `app_tool_call` and its response | first bi-stream the client opens |
-| `PUSH` | node to shell | `stream_delta`, `feed_delta`, agent and conversation events, `pins_updated`, `shell_state_updated`, ... | second bi-stream (the client finishes its send half at once) |
-| `CALL` | both, one per call | one `admin_rpc` request, then the node's frames ending in `admin_rpc_response`; the shell may write `admin_rpc_cancel` while its send half is open | every later bi-stream |
+| `PUSH` | node to shell | the `event_seq` frames of a turn (`stream_delta`, `update_loop_status`, `update_queue` and `turn_finished`, in `event_seq` order, so `turn_finished` follows its deltas), `feed_delta`, agent and conversation events, `pins_updated`, `shell_state_updated`, ... | second bi-stream (the client finishes its send half at once) |
+| `CALL` | both, one per call | one `admin_rpc` request, then the node's frames ending in `admin_rpc_response`. A streamed method (`voice.speech`, `voice.transcribe`) sends `admin_rpc_stream` frames before its response. While its send half is open the shell may write `admin_rpc_cancel` carrying the call's `request_id` (the node matches the cancel by it); finishing the shell's send half also cancels a streamed call | every later bi-stream |
 
 Frames on one lane arrive in send order. There is no order across lanes (a control response and a push may arrive in
 either order), exactly as between QUIC streams.
@@ -67,8 +67,11 @@ Every carrier keeps these; the suite checks them.
    the frames already sent. Lanes are independent: answering one never waits for another.
 7. **Closure, delivered unchanged.** `close(closure)` ends the link once (later closes do nothing). Both ends' `closure`
    becomes the same `NodeLinkClosure(code, reason)`; the closing end's is set before `close` returns. A transport loss with
-   no close from either end is `NodeLinkClosure.LOST`. Codes the node uses: `0 closed` (orderly; a detach), `4401
-   auth_failures`, `4403 peer_revoked`, `4429 auth_rate_limited`.
+   no close from either end is `NodeLinkClosure.LOST`. A carrier delivers any code and reason unchanged; it never maps
+   or filters them. The codes today's node uses (the list is not exhaustive, and a shell treats an unknown code as a
+   closure like any other): `0 closed` (orderly; a detach), `4401 auth_failures`, `4401 not_authenticated`, `4403
+   peer_revoked`, `4403 peer_not_allowed`, `4403 protocol_not_authorized`, `4404 unknown_alpn`, `4429
+   auth_rate_limited`.
 8. **Frames written before a close are delivered before it** wherever the transport allows. Iroh may drop unacknowledged
    stream data when a connection is closed, so the contract lets a session that the node refuses and then closes fail with
    either the refusal or the closure (fixture: `auth`, session `b`).
@@ -76,8 +79,8 @@ Every carrier keeps these; the suite checks them.
    call lane ends, and `inbound`/`control`/`calls` complete.
 10. **Closing never cancels node work.** A turn the shell started keeps running on the node (it is detached); the shell
     catches up from the feed.
-11. **Optional encodings.** The node calls `NodePeerLink.onPeerCapabilities(set)` with what the peer advertised in its
-    accepted `auth`. The Iroh carrier uses it to decide whether it may split node-to-peer frames into `frame_part`s; the
+11. **Optional encodings.** The node calls `NodePeerLink.onPeerCapabilities(set)` once, after the peer authenticated,
+    with what the peer advertised in its accepted `auth`; the link trusts what it is given, so nothing calls it earlier. The Iroh carrier uses it to decide whether it may split node-to-peer frames into `frame_part`s; the
     in-process carrier ignores it.
 
 ## Session protocol
@@ -100,13 +103,21 @@ Then:
 | --- | --- |
 | `request(frame)` | writes a control frame carrying `request_id`; returns the control frame answering it (`runtime_start_response`, `input_accepted`, `sync_response`, or `error` such as a capability denial). |
 | `send(frame)` | writes a control frame and waits for nothing. |
-| `adminRpc(method, params)` | opens a call lane with `{"type":"admin_rpc","request_id":..,"method":..,"params"?:..}`, finishes sending, returns the `admin_rpc_response` (success or not). A lane that ends without one throws `Closed`. |
-| `resumeFeed(conversation, agent, from)` | `feed.subscribe` with `{"conversation_id","agent_id","from"?:{epoch,seq}}`, again from each page's `cursor` while `has_more` (at most 256 pages); returns the pages. `success: false` throws `Refused("feed.subscribe", error)`. Pages are applied by [conversation-feed-v1.md](conversation-feed-v1.md). |
-| `inbound` | pushes and unanswered control frames, per lane in order. |
+| `adminRpc(method, params)` | for one-shot methods only. Opens a call lane with `{"type":"admin_rpc","request_id":..,"method":..,"params"?:..}`, finishes sending, returns the `admin_rpc_response` (success or not). A lane that ends without one throws `Closed`. Finishing the send half cancels a streamed method, so a streamed method (`voice.speech`, `voice.transcribe`) must not be called through it; a session method for streamed calls is out of scope for v1. |
+| `resumeFeed(conversation, agent, from)` | `feed.subscribe` with `{"conversation_id","agent_id","from"?:{epoch,seq}}`, again from each page's `cursor` while `has_more`; returns the pages. `success: false` throws `Refused("feed.subscribe", error)`. A node still answering `has_more` after 256 pages throws `Incomplete("feed.subscribe", 256)`, never a truncated history that looks complete. Pages are applied by [conversation-feed-v1.md](../conversation-feed-v1.md). |
+| `inbound` | pushes and unanswered control frames, per lane in order. The session buffers them without bound until they are collected, so a shell collects `inbound` for the session's whole life (or closes the session). |
 | `close()` | closes the link with `0 closed`: a detach. |
 
 Request ids come from `requestIds` (default `AppServerRequestIdFactory("node")`). The wire frames are today's node
-frames; nothing new is added to the protocol, so an existing Iroh host serves a `NodeSession` unchanged.
+frames, so an existing Iroh host serves a `NodeSession` that authenticates with a token unchanged. One thing is new on
+the wire: an `auth` frame without `token` (`NodeCredential.CarrierIdentity`). Today's clients always send a token and
+today's node denies an unpaired peer that sends none; admitting the in-process shell this way is the in-process slice's
+node-side change.
+
+If the open fails or is cancelled at any point after the dial (a refusal, a closure, the caller's cancellation), the
+session closes the dialled link before it rethrows, so no link is left without an owner. If the routing coroutine ends
+because its scope was cancelled, the session closes the link as `0 closed` (a detach) and pending requests fail with
+that closure.
 
 ## Scenarios
 
@@ -118,7 +129,7 @@ Each scenario in the fixture is a script of steps. The suite runs it from the sh
 | `auth` | A refused token fails the open with the node's reason; a refusal followed by a node close (`4429`) fails it with the reason or the closure; an accepted token yields the node's capabilities and `paired`; a carrier-verified identity authenticates with no token; an orderly close reaches the node as `0 closed`. |
 | `capability_gate` | Capability negotiation (`supports`); a denied `admin_rpc` and a denied runtime command are ordinary responses naming the missing capability, on the call lane and the control lane; a permitted call on the same session still succeeds. |
 | `admin_rpc` | Two concurrent calls on their own lanes, answered in reverse order, each resolve with their own response; an unknown method is a response, not a carrier failure. |
-| `turn` | `runtime_start`, then `input`; `input_accepted` answers on the control lane while the turn's `stream_delta` frames arrive on the push lane, in order. |
+| `turn` | `runtime_start`, then `input`; `input_accepted` answers on the control lane while the turn's `stream_delta` frames and its closing `turn_finished` arrive on the push lane, in `event_seq` order. |
 | `detach` | Closing mid-turn reaches the node as an orderly close; a new session reads the rest of the turn from the feed from the cursor the first session last applied. |
 | `feed_resume` | A cursor from an earlier node start gets a `snapshot` page with `has_more`; the session continues from that page's cursor with a `replay` read; a refused read fails the resume with the node's error. |
 
@@ -152,7 +163,20 @@ class InProcessNodeCarrierContractTest : NodeCarrierContractSuite() {
 
 The suite supplies the acceptor (the scripted node); the harness only wires the carrier's node end to it. A carrier
 that needs real I/O (Iroh) puts its subclass in `jvmTest`; the suite runs scenarios on `Dispatchers.Default` with real
-timeouts. A carrier is conformant when all seven tests pass: the six scenarios and `dialingAnAddressWhereNoNodeAnswersIsUnreachable`.
+timeouts. A carrier is conformant when every test passes: the six scenarios, `dialingAnAddressWhereNoNodeAnswersIsUnreachable`,
+and the rule tests that need no fixture:
+
+- `aNodeCloseEndsOpenCallsAndRefusesLaterWrites` (rules 7 and 9): the node closes the link with `4403 peer_revoked`
+  while a call lane is open. Both ends see that closure, the open call lane completes, and `sendControl`, `openCall`,
+  `push` and `NodeCallLane.send` all throw `Closed` afterwards.
+- `peerCapabilitiesReachTheCarrier` (rule 11): after the node reports `frame_part`, a push frame larger than one Iroh
+  frame (1.5 MiB) arrives whole and unchanged.
+- `aTransportLossIsLost` (rule 7): the harness drops the transport under an open link (`NodeCarrierEndpoint.sever`)
+  and both ends see `NodeLinkClosure.LOST`. A carrier whose transport a test cannot drop passes `sever = null` and
+  says why in its test; the suite then skips only this test.
+
+When the scripted node sees a frame that does not match the script, its mismatch text is the failure message, whatever
+the shell's end reported (usually `Closed` with `4900 contract_mismatch`).
 
 The suite proves the transport and the session. That the real node serves the same frames is proven separately, by
 running the real node behind the in-process carrier (next slice) and by the existing `WireContractsTest`.

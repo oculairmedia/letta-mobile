@@ -471,7 +471,7 @@ One Baken node composed from configuration and ports: the runtime controller ove
 
 # Package com.letta.mobile.data.node.carrier
 
-The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarrier`, `NodeLink`, `NodePeerLink`) moves node protocol frames on three lanes (control, push, one per admin_rpc call) between a shell and a node and reports the verified identity of the other end; it never authenticates or interprets frames. `NodeSession` speaks the node protocol over any carrier: auth and capability negotiation, control requests, admin_rpc and feed resume, with close as a detach. Contract: `docs/reference/contracts/node-carrier-v1.md`. No Iroh types and no in-process object references belong here.
+The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarrier`, `NodeLink`, `NodePeerLink`) moves node protocol frames on three lanes (control, push, one per admin_rpc call) between a shell and a node and reports the verified identity of the other end; it never authenticates or interprets frames. `NodeSession` speaks the node protocol over any carrier: auth and capability negotiation, control requests, admin_rpc and feed resume, with close as a detach. Contract: `docs/reference/contracts/node-carrier/node-carrier-v1.md`. No Iroh types and no in-process object references belong here.
 
 # Package com.letta.mobile.data.pairing
 

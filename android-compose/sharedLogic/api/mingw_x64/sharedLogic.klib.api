@@ -14132,6 +14132,22 @@ sealed interface com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.
         final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Closed.toString|toString(){}[0]
     }
 
+    final class Incomplete : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete|null[0]
+        constructor <init>(kotlin/String, kotlin/Int) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.<init>|<init>(kotlin.String;kotlin.Int){}[0]
+
+        final val method // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.method|{}method[0]
+            final fun <get-method>(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.method.<get-method>|<get-method>(){}[0]
+        final val pages // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.pages|{}pages[0]
+            final fun <get-pages>(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.pages.<get-pages>|<get-pages>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.component1|component1(){}[0]
+        final fun component2(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/Int = ...): com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.copy|copy(kotlin.String;kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Incomplete.toString|toString(){}[0]
+    }
+
     final class Refused : com.letta.mobile.data.node.carrier/NodeCarrierFailure { // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused|null[0]
         constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.node.carrier/NodeCarrierFailure.Refused.<init>|<init>(kotlin.String;kotlin.String){}[0]
 

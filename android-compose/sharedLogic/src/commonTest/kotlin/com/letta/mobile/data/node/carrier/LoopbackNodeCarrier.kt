@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The reference carrier: both ends in one process, joined by channels. It keeps every rule of the carrier contract
@@ -22,11 +24,15 @@ class LoopbackNodeCarrier(
     private val scope: CoroutineScope,
     private val address: NodeAddress = ADDRESS,
 ) : NodeCarrier {
+    private val lock = Mutex()
+    private val wires = mutableListOf<LoopbackWire>()
+
     override suspend fun dial(address: NodeAddress): NodeLink {
         if (address != this.address) {
             throw NodeCarrierException(NodeCarrierFailure.Unreachable("no loopback node at ${address.value}"))
         }
         val wire = LoopbackWire()
+        lock.withLock { wires += wire }
         scope.launch {
             try {
                 acceptor.serve(wire.nodeEnd)
@@ -35,6 +41,11 @@ class LoopbackNodeCarrier(
             }
         }
         return wire.shellEnd
+    }
+
+    /** Drops every link's transport, as a lost connection would: neither end closed it, so both see [NodeLinkClosure.LOST]. */
+    suspend fun sever() {
+        lock.withLock { wires.toList() }.forEach { it.close(NodeLinkClosure.LOST) }
     }
 
     companion object {

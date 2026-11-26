@@ -7,10 +7,13 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -82,7 +85,8 @@ class NodeSession private constructor(
 
     /**
      * Node pushes and control frames that answer no request of this session (for example an app tool call), in order
-     * per lane. Collect once.
+     * per lane. Collect once. The session buffers these frames without bound until they are collected, so collect
+     * this for the session's whole life (or close the session).
      */
     val inbound: Flow<NodeInbound> get() = router.unsolicited
 
@@ -100,8 +104,13 @@ class NodeSession private constructor(
     suspend fun request(frame: NodeFrame): NodeFrame = router.request(frame)
 
     /**
-     * Calls `admin_rpc` [method] with [params] on a call lane of its own and returns the `admin_rpc_response` frame,
-     * success or not. Throws [NodeCarrierException] with [NodeCarrierFailure.Closed] if the lane ends without one.
+     * Calls the one-shot `admin_rpc` [method] with [params] on a call lane of its own and returns the
+     * `admin_rpc_response` frame, success or not. Throws [NodeCarrierException] with [NodeCarrierFailure.Closed] if the
+     * lane ends without one.
+     *
+     * For one-shot methods only. It finishes its send half at once, and the node treats a finished send half as the
+     * cancel of a streamed method (one that sends `admin_rpc_stream` frames before its response, such as
+     * `voice.speech`), so a streamed method called through this is cancelled and its frames are dropped.
      */
     suspend fun adminRpc(method: String, params: JsonObject?): NodeFrame {
         val lane = link.openCall(adminRpcFrame(requestIds(), method, params))
@@ -114,7 +123,9 @@ class NodeSession private constructor(
      * Reads [conversation]'s feed from [from] (null asks for a snapshot) with `feed.subscribe`, page after page while
      * the node says `has_more`, each read continuing from the previous page's cursor. Returns the pages in order; the
      * caller applies them by the feed contract (a `snapshot` page replaces, a `replay` page appends). Throws
-     * [NodeCarrierException] with [NodeCarrierFailure.Refused] when the node refuses a read.
+     * [NodeCarrierException] with [NodeCarrierFailure.Refused] when the node refuses a read, and with
+     * [NodeCarrierFailure.Incomplete] when the node still says `has_more` after [MAX_RESUME_PAGES] pages, so a
+     * truncated history never looks complete.
      */
     suspend fun resumeFeed(conversation: ConversationId, agent: AgentId, from: FeedCursor?): List<FeedPage> {
         val pages = mutableListOf<FeedPage>()
@@ -125,6 +136,9 @@ class NodeSession private constructor(
             pages += page
             cursor = page.cursor
         } while (page.hasMore && pages.size < MAX_RESUME_PAGES)
+        if (pages.last().hasMore) {
+            throw NodeCarrierException(NodeCarrierFailure.Incomplete(ConversationFeedWire.SUBSCRIBE, pages.size))
+        }
         return pages
     }
 
@@ -132,14 +146,15 @@ class NodeSession private constructor(
     suspend fun close() = link.close(NodeLinkClosure.NORMAL)
 
     companion object {
-        /** A resume stops after this many pages even if the node keeps saying `has_more`, so a broken node cannot loop it. */
+        /** A resume gives up after this many pages if the node keeps saying `has_more`, so a broken node cannot loop it. */
         const val MAX_RESUME_PAGES: Int = 256
 
         /**
          * Dials [request]'s address with [carrier], sends the `auth` frame and returns the accepted session. Its
          * routing runs in [scope] until the link closes. Throws [NodeCarrierException]: [NodeCarrierFailure.Unreachable]
          * when the dial fails, [NodeCarrierFailure.AuthRejected] when the node refuses the credential, and
-         * [NodeCarrierFailure.Closed] when the node closes the link before answering (a rate limit may do either).
+         * [NodeCarrierFailure.Closed] when the node closes the link before answering (a rate limit may do either). On
+         * every exit that does not return a session, cancellation included, the dialled link is closed first.
          */
         suspend fun open(
             carrier: NodeCarrier,
@@ -148,19 +163,20 @@ class NodeSession private constructor(
             requestIds: () -> String = AppServerRequestIdFactory("node"),
         ): NodeSession {
             val link = carrier.dial(request.address)
-            val router = NodeControlRouter.start(link, scope)
-            val answer = try {
-                router.request(authFrame(requestIds(), request))
-            } catch (failure: NodeCarrierException) {
-                link.close()
-                throw failure
+            var session: NodeSession? = null
+            try {
+                val router = NodeControlRouter.start(link, scope)
+                val answer = router.request(authFrame(requestIds(), request))
+                if (answer.json[NodeCarrierWire.SUCCESS].booleanValue() != true) {
+                    val reason = answer.json[NodeCarrierWire.ERROR].stringValue() ?: "denied"
+                    throw NodeCarrierException(NodeCarrierFailure.AuthRejected(reason))
+                }
+                session = NodeSession(link, router, requestIds, capabilitiesOf(answer))
+                return session
+            } finally {
+                // A refusal, a closure or the caller's cancellation: the link has no other owner, so close it here.
+                if (session == null) withContext(NonCancellable) { runCatchingCancellable { link.close() } }
             }
-            if (answer.json[NodeCarrierWire.SUCCESS].booleanValue() != true) {
-                link.close()
-                val reason = answer.json[NodeCarrierWire.ERROR].stringValue() ?: "denied"
-                throw NodeCarrierException(NodeCarrierFailure.AuthRejected(reason))
-            }
-            return NodeSession(link, router, requestIds, capabilitiesOf(answer))
         }
     }
 }

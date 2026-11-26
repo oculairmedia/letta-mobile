@@ -1,7 +1,7 @@
 {
   "contract": "node-carrier",
   "version": 1,
-  "spec": "docs/reference/contracts/node-carrier-v1.md",
+  "spec": "docs/reference/contracts/node-carrier/node-carrier-v1.md",
   "note": "Synthetic ids and tokens only. Each scenario is a script of steps run in order by NodeCarrierContractSuite over the carrier under test, against ScriptedContractNode, which serves the same script from the node's end. Sessions are named by label; the node maps the n-th link it accepts to the n-th session the scenario opens. A session's request ids are <label>-1, <label>-2, ... in the order the session mints them (the auth frame is always <label>-1). Every frame a step lists is matched exactly, as a JSON object, at the end that receives it.",
   "scenarios": [
     {
@@ -125,7 +125,7 @@
     },
     {
       "name": "turn",
-      "summary": "A turn is runtime_start then input on the control lane; the node acknowledges input with input_accepted on the control lane and streams the turn's frames on the push lane, in order.",
+      "summary": "A turn is runtime_start then input on the control lane; the node acknowledges input with input_accepted on the control lane and streams the turn's event_seq frames on the push lane, in order, ending with turn_finished.",
       "steps": [
         {
           "op": "open", "session": "a",
@@ -150,7 +150,8 @@
             {"lane": "control", "frame": {"type": "input_accepted", "request_id": "a-3", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "accepted": true}},
             {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 1, "emitted_at": "2026-01-01T00:00:00Z", "delta": {"message_type": "assistant_message", "id": "msg-1", "content": "Hi", "turn_id": "cm-1"}}},
             {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 2, "emitted_at": "2026-01-01T00:00:01Z", "delta": {"message_type": "assistant_message", "id": "msg-1", "content": "Hi there", "turn_id": "cm-1"}}},
-            {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 3, "emitted_at": "2026-01-01T00:00:02Z", "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "turn_id": "cm-1"}}}
+            {"lane": "push", "frame": {"type": "stream_delta", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 3, "emitted_at": "2026-01-01T00:00:02Z", "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "turn_id": "cm-1"}}},
+            {"lane": "push", "frame": {"type": "turn_finished", "runtime": {"agent_id": "agent-a", "conversation_id": "conv-1"}, "event_seq": 4, "emitted_at": "2026-01-01T00:00:03Z", "idempotency_key": "turn_finished:4:cm-1", "turn_id": "cm-1", "stop_reason": "end_turn"}}
           ]
         },
         {"op": "close", "session": "a"}

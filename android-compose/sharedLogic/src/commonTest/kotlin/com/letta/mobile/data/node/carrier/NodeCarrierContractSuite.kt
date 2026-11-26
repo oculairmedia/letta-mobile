@@ -10,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -35,8 +37,8 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 
 /**
- * A running node end for the suite: a carrier that dials it at [address], an address nothing answers, and how to
- * stop it.
+ * A running node end for the suite: a carrier that dials it at [address], an address nothing answers, how to stop it,
+ * and how to drop its transport.
  */
 class NodeCarrierEndpoint(
     /** The carrier under test, dialling the node end. */
@@ -47,6 +49,11 @@ class NodeCarrierEndpoint(
     val unreachable: NodeAddress,
     /** Stops the node end and releases what [NodeCarrierHarness.start] opened. */
     val stop: suspend () -> Unit,
+    /**
+     * Drops the transport under every open link without a close from either end, as a lost connection does. Null only
+     * for a carrier whose transport a test cannot drop; its test says why, and the suite skips only the loss test.
+     */
+    val sever: (suspend () -> Unit)? = null,
 )
 
 /** How the suite gets a carrier under test. Each carrier's test supplies one. */
@@ -61,7 +68,9 @@ fun interface NodeCarrierHarness {
 
 /**
  * The node-carrier contract, one test per scenario of `contracts/node-carrier/v1.json`: auth, capability gate,
- * admin_rpc, turn, detach and feed resume. A carrier is conformant when a subclass that supplies its [harness] passes.
+ * admin_rpc, turn, detach and feed resume, plus the carrier rules no fixture can script (a node close mid-call, writes
+ * after close, capabilities reaching the carrier, a transport loss). A carrier is conformant when a subclass that
+ * supplies its [harness] passes.
  * Each scenario runs [NodeSession] over the carrier against [ScriptedContractNode] serving the same scenario, so a
  * frame lost, reordered, altered or delivered on the wrong lane fails it, as does a closure not delivered unchanged.
  */
@@ -93,18 +102,84 @@ abstract class NodeCarrierContractSuite {
         assertTrue((failure as? NodeCarrierException)?.failure is NodeCarrierFailure.Unreachable, "dial failed with $failure")
     }
 
+    @Test
+    fun aNodeCloseEndsOpenCallsAndRefusesLaterWrites() {
+        val revoked = NodeLinkClosure(4403L, "peer_revoked")
+        val nodeWrites = CompletableDeferred<List<Throwable?>>()
+        val node = NodePeerAcceptor { link ->
+            link.calls.first().incoming.first()
+            link.close(revoked)
+            nodeWrites.complete(
+                listOf(
+                    runCatching { link.sendControl(syncFrame()) }.exceptionOrNull(),
+                    runCatching { link.push(syncFrame()) }.exceptionOrNull(),
+                ),
+            )
+        }
+        onCarrier(node) { endpoint, _ ->
+            val link = endpoint.carrier.dial(endpoint.address)
+            val lane = link.openCall(adminRpcRequest("call-1"))
+            assertEquals(emptyList(), lane.incoming.toList(), "an open call lane completes when the node closes the link")
+            assertEquals(revoked, link.closure.first { it != null }, "the shell sees the node's closure unchanged")
+            nodeWrites.await().forEach { assertClosed(it, "a node write after its close") }
+            assertClosed(runCatching { link.sendControl(syncFrame()) }.exceptionOrNull(), "sendControl after close")
+            assertClosed(runCatching { link.openCall(adminRpcRequest("call-2")) }.exceptionOrNull(), "openCall after close")
+            assertClosed(runCatching { lane.send(syncFrame()) }.exceptionOrNull(), "a call lane send after close")
+        }
+    }
+
+    @Test
+    fun peerCapabilitiesReachTheCarrier() {
+        val large = largeFrame()
+        val node = NodePeerAcceptor { link ->
+            link.control.first()
+            link.onPeerCapabilities(setOf(NodeCarrierWire.FRAME_PART_CAPABILITY))
+            link.push(large)
+            link.closure.first { it != null }
+        }
+        onCarrier(node) { endpoint, _ ->
+            val link = endpoint.carrier.dial(endpoint.address)
+            link.sendControl(syncFrame())
+            val received = link.inbound.first()
+            assertEquals(NodeLane.PUSH, received.lane)
+            assertEquals(large.json, received.frame.json, "a frame larger than one Iroh frame arrives whole and unchanged")
+            link.close()
+        }
+    }
+
+    @Test
+    fun aTransportLossIsLost() {
+        val nodeSaw = CompletableDeferred<NodeLinkClosure?>()
+        val node = NodePeerAcceptor { link ->
+            link.control.collect { }
+            nodeSaw.complete(link.closure.value)
+        }
+        onCarrier(node) { endpoint, _ ->
+            val sever = endpoint.sever ?: return@onCarrier
+            val link = endpoint.carrier.dial(endpoint.address)
+            link.sendControl(syncFrame())
+            sever()
+            assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null }, "the shell sees a lost transport")
+            assertEquals(emptyList(), link.inbound.toList(), "inbound completes")
+            assertEquals(NodeLinkClosure.LOST, nodeSaw.await(), "the node sees a lost transport")
+        }
+    }
+
     private fun runScenario(name: String) {
         val node = ScriptedContractNode(NodeCarrierFixture.scenario(name))
         onCarrier(node) { endpoint, scope ->
             val outcome = runCatching { ScenarioRun(endpoint, node, scope).run(NodeCarrierFixture.scenario(name)) }
-            outcome.exceptionOrNull()?.let { fail("scenario $name failed: $it; node saw: ${node.failures}", it) }
-            assertEquals(emptyList(), node.failures, "scenario $name: node-side mismatches")
+            // A mismatch closes the link, so the shell usually reports only Closed: the node's text is the real failure.
+            if (node.failures.isNotEmpty()) {
+                fail("scenario $name: ${node.failures.joinToString("; ")} (shell saw: ${outcome.exceptionOrNull()})", outcome.exceptionOrNull())
+            }
+            outcome.exceptionOrNull()?.let { fail("scenario $name failed: $it", it) }
             assertEquals(emptyList(), node.unconsumed(), "scenario $name: frames the script expected but never received")
         }
     }
 
     private fun onCarrier(
-        node: ScriptedContractNode,
+        node: NodePeerAcceptor,
         body: suspend (NodeCarrierEndpoint, CoroutineScope) -> Unit,
     ) = runTest(timeout = SCENARIO_TIMEOUT) {
         withContext(Dispatchers.Default) {
@@ -123,6 +198,30 @@ abstract class NodeCarrierContractSuite {
         val SCENARIO_TIMEOUT = 20.seconds
 
         fun emptyScenario(): JsonObject = buildJsonObject { put("steps", JsonArray(emptyList())) }
+
+        fun syncFrame(): NodeFrame = NodeFrame(buildJsonObject { put("type", "sync") })
+
+        fun adminRpcRequest(requestId: String): NodeFrame = NodeFrame(
+            buildJsonObject {
+                put("type", "admin_rpc")
+                put("request_id", requestId)
+                put("method", "health.check")
+            },
+        )
+
+        /** A push frame of about 1.5 MiB: more than one Iroh frame, so Iroh must split it into parts. */
+        fun largeFrame(): NodeFrame = NodeFrame(
+            buildJsonObject {
+                put("type", "contract_large")
+                put("body", "x".repeat(LARGE_FRAME_CHARS))
+            },
+        )
+
+        fun assertClosed(failure: Throwable?, what: String) {
+            assertTrue((failure as? NodeCarrierException)?.failure is NodeCarrierFailure.Closed, "$what failed with $failure")
+        }
+
+        const val LARGE_FRAME_CHARS = 1_572_864
     }
 }
 
