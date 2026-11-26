@@ -85,9 +85,9 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    ```bash
    install -m 0755 <checkout>/scripts/deploy/letta-code-host-cutover.sh /usr/local/sbin/
    systemd-run --unit=letta-code-cutover --collect --no-block \
-     env EXPECTED_PATCHES=36 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
+     env EXPECTED_PATCHES=37 /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
-   Always pass `EXPECTED_PATCHES` (36 for the 0.34.70 loader): the script's default, 28, predates the
+   Always pass `EXPECTED_PATCHES` (37 for the 0.34.70 loader): the script's default, 28, predates the
    current loader and would roll back a healthy cutover. It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
    `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts once, and requires a new
    boot line `lcp-patches applied=<N> skipped=0`, the new node and env in the live process and the
