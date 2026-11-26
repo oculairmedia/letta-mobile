@@ -101,7 +101,11 @@ class NotebookLocalStore(
     private val poller = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "notebook-projection-poller").apply { isDaemon = true }
     }
+    /** Guards [polling] alone, so starting or stopping never waits for a poll holding the store. */
+    private val pollingLock = Any()
     private var polling: ScheduledFuture<*>? = null
+
+    @Volatile
     private var closed = false
     private var grantProtected = false
     private var syncExposed = false
@@ -123,20 +127,25 @@ class NotebookLocalStore(
      * A notebook whose version and projected files are unchanged since its last sync is skipped
      * (a few file stats instead of reading and formatting it), so [onResult] hears only about the
      * notebooks a poll actually synced. Every [FULL_SYNC_EVERY] polls every notebook is synced, in
-     * case an external edit kept a file's timestamp and size.
+     * case an external edit kept a file's timestamp and size. The first poll after a start is a
+     * full one, so a restart after [stopPolling] picks up anything edited while stopped.
+     *
+     * Starting and stopping never wait for a poll in progress, so a lifecycle callback on the main
+     * thread can call them.
      */
-    @Synchronized
     fun startPolling(intervalMillis: Long, onResult: (DocumentId, NotebookProjectionResult) -> Unit = { _, _ -> }) {
         require(intervalMillis > 0)
-        check(!closed) { "Notebook store is closed" }
-        check(polling == null) { "Projection polling already started" }
-        val polls = AtomicLong()
-        polling = poller.scheduleWithFixedDelay({
-            try {
-                val full = polls.getAndIncrement() % FULL_SYNC_EVERY == 0L
-                listDocuments().forEach { id -> pollProjection(id, full)?.let { result -> report(onResult, id, result) } }
-            } catch (_: Exception) { /* Index errors are retried on the next poll. */ }
-        }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS)
+        synchronized(pollingLock) {
+            check(!closed) { "Notebook store is closed" }
+            check(polling == null) { "Projection polling already started" }
+            val polls = AtomicLong()
+            polling = poller.scheduleWithFixedDelay({
+                try {
+                    val full = polls.getAndIncrement() % FULL_SYNC_EVERY == 0L
+                    listDocuments().forEach { id -> pollProjection(id, full)?.let { result -> report(onResult, id, result) } }
+                } catch (_: Exception) { /* Index errors are retried on the next poll. */ }
+            }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS)
+        }
     }
 
     /** Sync [id]'s projection unless nothing changed since its last sync; null when skipped. */
@@ -158,14 +167,16 @@ class NotebookLocalStore(
     /** [id]'s current version (its heads), or null when it cannot be read now. */
     private fun headsOf(id: DocumentId): String? = runCatching {
         open(id)?.withDocument { document ->
-            document.heads.joinToString(",") { head -> head.bytes.joinToString("") { "%02x".format(it) } }
+            document.heads.joinToString(",") { head -> head.bytes.toHexString() }
         }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }.getOrNull()
 
-    @Synchronized
+    /** Stop polling; a poll already running finishes, and no further poll starts. */
     fun stopPolling() {
-        polling?.cancel(false)
-        polling = null
+        synchronized(pollingLock) {
+            polling?.cancel(false)
+            polling = null
+        }
     }
 
     /**
@@ -759,7 +770,7 @@ class NotebookLocalStore(
     @Synchronized
     override fun close() {
         if (closed) return
-        closed = true
+        synchronized(pollingLock) { closed = true }
         stopPolling()
         poller.shutdownNow()
         saveHints()
@@ -768,9 +779,7 @@ class NotebookLocalStore(
         health.close()
     }
 
-    private fun DocumentId.stableKey(): String = getBytes().joinToString("") { byte ->
-        (byte.toInt() and 255).toString(16).padStart(2, '0')
-    }
+    private fun DocumentId.stableKey(): String = getBytes().toHexString()
 
     private companion object {
         const val TIMEOUT_SECONDS = 10L

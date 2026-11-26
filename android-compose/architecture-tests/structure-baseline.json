@@ -892,7 +892,7 @@
   "packageTypeLimits": {
     "com.letta.mobile.cli.commands": 79,
     "com.letta.mobile.data.a2ui": 60,
-    "com.letta.mobile.data.canvas": 422,
+    "com.letta.mobile.data.canvas": 421,
     "com.letta.mobile.data.canvas.compose": 116,
     "com.letta.mobile.data.chat.runtime": 81,
     "com.letta.mobile.data.controller.node.iroh": 288,
