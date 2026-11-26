@@ -53,6 +53,22 @@ write the same bytes on every machine, with no translation step:
 Server environment next to `NODE_OPTIONS`. They add six to the boot count. The tests are in
 `test/patch-loader-host-neutral.test.ts`.
 
+Skills and per-agent settings:
+
+| Patch | Effect |
+| --- | --- |
+| `lcp-memory-dir-expand` | File tools (Read, Write, Edit, Glob, Grep and the rest of `expandPathArgs`' list) expand `$MEMORY_DIR`, `${MEMORY_DIR}` and `$LETTA_MEMORY_DIR` to the running agent's memory root. Stock letta-code expands them only from the App Server's own environment, where they are unset, so a literal `$MEMORY_DIR/...` path resolved against the cwd. An environment that already sets them wins. |
+| `lcp-skill-dir` | Skill content (`<SKILL_DIR>`, `${CLAUDE_SKILL_DIR}` and the `Skill directory:` line, all persisted in the `<skill_content>` tool result) names a skill under the agent's memory root as `$MEMORY_DIR/skills/<name>`. It applies only together with `lcp-memory-dir-expand`. Bundled, global and project skills keep their install path: that is history, not agent state, and no node acts on another node's install path. |
+| `lcp-system-prompt-tracking` | Whether the agent's system prompt is a managed preset (preset, hash, letta-code version) or custom moves from the node-local `settings.json` into the agent record as `system_prompt_tracking`, so it replicates. The getters read the record first and fall back to `settings.json`, copying an existing entry into the record on first read. The setters still write `settings.json` too, so a rollback keeps working. Local backend only. |
+
+The `memfs` flag in `settings.json` `agents[]` stays node-local: on the local backend it holds no
+intent of its own. The opt-out is the replicated `memfs:disabled` tag (written by `create_agent`
+with `memfs: false`, next to the flag), which `LocalBackend.isMemfsEnabledForAgent` reads
+directly, and the flag is otherwise refilled from the node's process state
+(`isMemfsEnabledOnServer`) when a memory command runs. Until then a node can read it as unset,
+which is a stale cache rather than lost state. These three patches add three to the boot count. The tests are in
+`test/patch-loader-host-neutral-skills.test.ts`.
+
 ## Model profiles
 
 Replicated agent and conversation records store a model profile handle, `profile/<id>`, never a
