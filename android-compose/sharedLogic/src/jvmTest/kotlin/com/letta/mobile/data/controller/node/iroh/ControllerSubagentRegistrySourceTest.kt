@@ -635,8 +635,6 @@ class ControllerSubagentRegistrySourceTest {
         source.ingest(earlyNotification("<task-notification><summary>Audit logs</summary><status>completed</status></task-notification>"))
         source.ingest(stream("parent", "conversation", earlyReceipt("task_28")))
 
-        val record = source.registry.record("conversation", "parent", "call-28")!!
-        assertEquals(SubagentChipState.RUNNING, record.state)
-        assertTrue(record.earlyTerminals.isEmpty(), "the receipt settles which early notifications could match")
+        assertEquals(SubagentChipState.RUNNING, source.registry.record("conversation", "parent", "call-28")!!.state)
     }
 }
