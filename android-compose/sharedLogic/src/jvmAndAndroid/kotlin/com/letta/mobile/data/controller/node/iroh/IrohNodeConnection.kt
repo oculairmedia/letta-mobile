@@ -884,7 +884,7 @@ class IrohNodeConnection(
             unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
             observerWrites = turnHost.observerWrites,
             initiatorWrites = observerWrites,
-            serverTurnOwns = turnHost::serverTurnOwns,
+            claimFrame = { key, run -> turnHost.claimFrame(key, run, server = false) },
         ),
         initiatorViewer = ensureSelfViewer(streamSend),
         trackInitiatorFrame = journal::append,
