@@ -56,7 +56,7 @@ internal val MASCOT_REST_DELAY: Duration = 3.seconds
 
 /**
  * True while [MascotLive]'s scene should advance: while [engaged], and for [MASCOT_REST_DELAY]
- * after it stops being engaged, [identity] changes, [wake] changes (a held presence such as a dream
+ * after it stops being engaged, this identity changes, [wake] changes (a held presence such as a dream
  * or an approval begins or ends), [touches] counts another gesture on it (a poke on a resting
  * mascot wakes it to play the reaction) or the [pointer] moves (the eyes follow every move). False
  * afterwards: the surface keeps its last frame and nothing asks for another. On a desktop or in a
@@ -64,15 +64,14 @@ internal val MASCOT_REST_DELAY: Duration = 3.seconds
  * absent one.
  */
 @Composable
-internal fun rememberMascotMoving(
+internal fun MascotIdentity.rememberMascotMoving(
     engaged: Boolean,
-    identity: MascotIdentity,
     touches: Int = 0,
     pointer: Offset? = null,
     wake: AgentPresence? = null,
 ): Boolean {
     var moving by remember { mutableStateOf(true) }
-    LaunchedEffect(engaged, identity, touches, pointer, wake) {
+    LaunchedEffect(engaged, this, touches, pointer, wake) {
         moving = true
         if (!engaged) {
             delay(MASCOT_REST_DELAY)
