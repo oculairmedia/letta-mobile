@@ -67,14 +67,17 @@ test("agent task status transitions notify listeners with the task scope", (t) =
   task.status = 'running';
   run({ start: 'bgTask.status = "failed";', end: `bgTask.error = ${catchBinding};`,
     args: ['bgTask', 'notifyBackgroundProcessStateChanged'], values: [task, notify] });
-  // Every task-stop failure transition: run the patched two lines at each site, in bundle order.
+  // Every task-stop failure transition, each located by its whole patched text (first line, the
+  // inserted notification with its marker, then the rest of the anchor): 0.34.70's stop sites share
+  // their first line, so a first-line lookup would run one site twice and miss another.
   const stopSites = anchors.filter((anchor) => anchor.trimStart().startsWith("task.status"));
   for (const anchor of stopSites) {
     task.status = 'running';
-    const marked = patched.split(anchor.slice(0, anchor.indexOf("\n"))).length - 1;
-    assert.ok(marked >= 1);
-    const at = patched.indexOf(anchor.slice(0, anchor.indexOf("\n")) + "\n" + anchor.match(/^ */)![0] + "notifyBackgroundProcessStateChanged(task.runtimeScope);");
-    assert.notEqual(at, -1, `stop site must notify: ${anchor.slice(0, 60)}`);
+    const newline = anchor.indexOf("\n");
+    const indent = anchor.match(/^ */)![0];
+    const patchedSite = `${anchor.slice(0, newline)}\n${indent}notifyBackgroundProcessStateChanged(task.runtimeScope); // lcp-agent-task-status${anchor.slice(newline)}`;
+    assert.equal(patched.split(patchedSite).length - 1, 1, `stop site must notify exactly once: ${anchor.slice(newline + 1, newline + 80)}`);
+    const at = patched.indexOf(patchedSite);
     const body = patched.slice(at, patched.indexOf("scheduleBackgroundTaskCleanup(task_id);", at));
     new Function('task', 'notifyBackgroundProcessStateChanged', body)(task, notify);
     assert.equal(task.status, 'failed');
