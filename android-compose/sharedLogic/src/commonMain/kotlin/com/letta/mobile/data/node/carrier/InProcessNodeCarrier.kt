@@ -46,7 +46,8 @@ class InProcessNodeCarrier(
         if (address != this.address) throw unreachable("no in-process node at ${address.value}")
         if (!scope.isActive) throw unreachable("the in-process node has stopped")
         val link = InProcessLink(node)
-        scope.launch { serve(link) }
+        // A node stopped before the serve even started still ends the link: the serve's own close never runs then.
+        scope.launch { serve(link) }.invokeOnCompletion { link.close(NodeLinkClosure.LOST) }
         return link.shellEnd
     }
 
