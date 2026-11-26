@@ -379,14 +379,9 @@ class AppServerServeIrohCommand : CliktCommand(
             upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enableCanvasMounts, irohSecretKeyPath), access.pairedPeerStorePath())
                 ?.let { println("[iroh-app-server] Canvas mounts: paired-device capability upgrade $it") }
             pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
-            // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
-            // bind); its App Server client is created after, so the receiver reads it late.
-            val a2aClient = java.util.concurrent.atomic.AtomicReference<AppServerClient?>()
-            val activityTarget = com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget { frame ->
-                irohEndpoint?.conversationActivityTarget()?.broadcast(frame)
-            }
             val backendDir = effectiveA2aBackendDir(localBackendDir, ownAppServer, System.getProperty("user.home"))
-            val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget, backendDir)
+            val a2aClient = java.util.concurrent.atomic.AtomicReference<AppServerClient?>()
+            val a2a = earlyA2aWiring(a2aClient, scope, backendDir) { irohEndpoint }
 
             val endpoint = node.endpoint(
                 NodeEndpointParts(authPolicy, pairingService, canvasRelay, listOfNotNull(notebookProtocol, a2a?.receiver)),
@@ -430,6 +425,25 @@ class AppServerServeIrohCommand : CliktCommand(
             awaitServerLoop()
         }
     }
+
+    /**
+     * The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at bind); its
+     * App Server client is created after, so the receiver reads [client] late and the activity
+     * target reads the endpoint through [endpoint] once it exists.
+     */
+    private fun earlyA2aWiring(
+        client: java.util.concurrent.atomic.AtomicReference<AppServerClient?>,
+        scope: CoroutineScope,
+        backendDir: java.io.File?,
+        endpoint: () -> IrohNodeEndpoint?,
+    ) = a2aWiringOrNull(
+        client::get,
+        scope,
+        com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget { frame ->
+            endpoint()?.conversationActivityTarget()?.broadcast(frame)
+        },
+        backendDir,
+    )
 
     /**
      * letta-mobile-jna0o.4: serve the router over the registry the controller advertises, binding
