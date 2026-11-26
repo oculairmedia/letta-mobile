@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.Application
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.StrictMode
 import androidx.metrics.performance.JankStats
 import androidx.metrics.performance.PerformanceMetricsState
@@ -106,7 +108,9 @@ object DebugPerformanceMonitor {
             }
         }
 
-        StrictMode.setThreadPolicy(threadPolicyBuilder.build())
+        // A thread policy binds only the thread that sets it; startup calls this on an IO-shared worker.
+        val threadPolicy = threadPolicyBuilder.build()
+        Handler(Looper.getMainLooper()).post { StrictMode.setThreadPolicy(threadPolicy) }
         StrictMode.setVmPolicy(vmPolicyBuilder.build())
     }
 

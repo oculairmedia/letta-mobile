@@ -19,8 +19,15 @@ import org.automerge.repo.DocumentId
 /** Explicit polling avoids watcher feedback: call reconcile when external edits should be imported. */
 enum class NotebookProjectionResult { UNCHANGED, EXPORTED, IMPORTED, CONFLICT, ERROR }
 
-internal class NotebookFilesystemProjection(private val root: Path) {
+internal class NotebookFilesystemProjection(
+    private val root: Path,
+    /** Names a notebook's projection folder from its id; tests count the calls. */
+    private val folderName: (String) -> String = ::digest,
+) {
     private enum class SyncMode { EXPORT_ONLY, RECONCILE }
+
+    /** Each notebook's folder, named once: idle polls ask for it every second. */
+    private val folders = ConcurrentHashMap<String, Path>()
 
     /** Per notebook, its version and its files' timestamps and sizes when it was last synced. */
     private val syncedStamps = ConcurrentHashMap<String, String>()
@@ -103,7 +110,7 @@ internal class NotebookFilesystemProjection(private val root: Path) {
     fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
         SyncSession(store, id, SyncMode.EXPORT_ONLY).execute()
 
-    private fun folder(id: NotebookDocumentId): Path = root.resolve(digest(id.value))
+    private fun folder(id: NotebookDocumentId): Path = folders.getOrPut(id.value) { root.resolve(folderName(id.value)) }
 
     fun reconcile(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
         SyncSession(store, id, SyncMode.RECONCILE).execute()
@@ -215,14 +222,12 @@ internal class NotebookFilesystemProjection(private val root: Path) {
             Files.deleteIfExists(temp)
         }
     }
-
-    private companion object {
-        fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(UTF_8)).joinToString("") { "%02x".format(it) }
-    }
 }
 
-private fun DocumentId.hexKey(): String = getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+/** Lowercase hex SHA-256 of [value]: baseline content digests and projection folder names. */
+private fun digest(value: String): String = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(UTF_8)).toHexString()
+
+private fun DocumentId.hexKey(): String = getBytes().toHexString()
 
 /** Modification time and size, or "-" when the file is absent. */
 private fun Path.fileStamp(): String =

@@ -24,6 +24,10 @@ import io.ktor.client.plugins.HttpTimeout
 import okio.Path.Companion.toOkioPath
 import okhttp3.ConnectionPool
 import javax.inject.Inject
+import androidx.lifecycle.lifecycleScope
+import com.letta.mobile.data.canvas.pollProjectionsWhile
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class LettaApplication : Application(), SingletonImageLoader.Factory {
@@ -111,8 +115,18 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         if (isRobolectricRuntime()) {
             return
         }
-        deps.notebookLocalStore.startPolling(1_000)
+        followNotebookProjections()
         appStartupCoordinator.start(this)
+    }
+
+    /**
+     * Notebook projection polling reads every notebook each second, so it runs only while the app
+     * is in the foreground; returning catches up on anything edited meanwhile.
+     */
+    private fun followNotebookProjections() {
+        val process = androidx.lifecycle.ProcessLifecycleOwner.get()
+        val foreground = process.lifecycle.currentStateFlow.map { it.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) }
+        process.lifecycleScope.launch { deps.notebookLocalStore.pollProjectionsWhile(foreground, NOTEBOOK_POLL_MILLIS) }
     }
 
     override fun onTrimMemory(level: Int) {
@@ -159,5 +173,10 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         return runCatching {
             Class.forName("org.robolectric.RuntimeEnvironment")
         }.isSuccess
+    }
+
+    private companion object {
+        /** How often a foreground app reconciles notebooks with their projected files. */
+        const val NOTEBOOK_POLL_MILLIS = 1_000L
     }
 }
