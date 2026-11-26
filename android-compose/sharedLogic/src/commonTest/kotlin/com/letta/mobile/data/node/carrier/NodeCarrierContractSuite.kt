@@ -158,11 +158,12 @@ abstract class NodeCarrierContractSuite {
             val sever = endpoint.sever ?: return@onCarrier
             val link = endpoint.carrier.dial(endpoint.address)
             link.sendControl(syncFrame())
+            val nodeLink = nodeEnd.await()
             sever()
             assertEquals(NodeLinkClosure.LOST, link.closure.first { it != null }, "the shell sees a lost transport")
             assertEquals(emptyList(), link.inbound.toList(), "inbound completes")
             // Read from outside the acceptor: a carrier may lose the link by cancelling the node's serving.
-            assertEquals(NodeLinkClosure.LOST, nodeEnd.await().closure.first { it != null }, "the node sees a lost transport")
+            assertEquals(NodeLinkClosure.LOST, nodeLink.closure.first { it != null }, "the node sees a lost transport")
         }
     }
 
