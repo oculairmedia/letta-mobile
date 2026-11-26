@@ -469,6 +469,10 @@ The review contract is `docs/reference/contracts/object-verbs-v1.md` (letta-mobi
 
 One Baken node composed from configuration and ports: the runtime controller over its App Server, the admin_rpc router and its publishers, the durable turn journal and feed, and the Iroh endpoint that serves them. Hosts (the Linux service, the desktop) differ only in the ports they bind: App Server HTTP clients, the node log, App Server process identity and the local tools socket. Keep command-line parsing and platform process handling in the host's binding, not here.
 
+# Package com.letta.mobile.data.node.carrier
+
+The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarrier`, `NodeLink`, `NodePeerLink`) moves node protocol frames on three lanes (control, push, one per admin_rpc call) between a shell and a node and reports the verified identity of the other end; it never authenticates or interprets frames. `NodeSession` speaks the node protocol over any carrier: auth and capability negotiation, control requests, admin_rpc and feed resume, with close as a detach. Contract: `docs/reference/contracts/node-carrier-v1.md`. No Iroh types and no in-process object references belong here.
+
 # Package com.letta.mobile.data.pairing
 
 Pair-invite parsing, flow state, device access and paired-host storage ports. Scanned data moves through explicit invite/session states before becoming a stored connection. Keep scanners, QR drawing and platform storage outside pairing state; provide effects through [PairingRedeemer](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-pairing-redeemer/index.html), [PairedHostStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-paired-host-store/index.html), [QrEncoder](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) and [BackendConfigSink](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-backend-config-sink/index.html).
