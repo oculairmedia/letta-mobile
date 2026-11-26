@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { resolveDeployedLettaBundle } from "./bundle-fixtures.ts";
 import { patchLettaCodeSourceResultForTest } from "../letta-code-patch-loader.mjs";
 
+const DEAD_PID_SCRIPT = "process.stdout.write(String(process.pid) + '\\n'); setInterval(() => {}, 1000);";
 const MARK = "// lcp-conversation-turn-lock";
 const HELPER_START = "globalThis.__lcpTurnLock ??= (() => {";
 const HELPER_END = "\n})();\n";
@@ -22,6 +23,11 @@ const SITES = {
   syncRecovery: '  if (sameActiveScope && runtime.turnLifecycle.kind !== "idle") {\n    clearRecoveredApprovalState(runtime);\n    return;\n  }\n',
   sendReceipt: '      (deps.spawnLocal ?? spawnDetached)(launcher.command, launcher.args);\n      return {\n        content: JSON.stringify({\n          status: "spawned",\n',
 };
+
+/** What a child process runs and the temp dir that holds its lock directory. */
+type ChildSpec = { script: string; tmp: string };
+/** A scratch dir, its store and the helper source: enough to start a process that takes a lock. */
+type HolderSpec = { helper: string; storageDir: string; tmp: string; agentId?: string };
 
 type TurnLock = {
   acquire: (backend: unknown, agentId: string | null, conversationId: string, holder: string,
@@ -50,7 +56,7 @@ function patchedOrSkip(t: { skip: (reason: string) => void }): string | null {
 }
 
 /** The injected helper as a standalone script that leaves `globalThis.__lcpTurnLock` behind. */
-function helperSource(patched: string): string {
+function helperSource({ patched }: { patched: string }): string {
   const from = patched.indexOf(HELPER_START);
   assert.notEqual(from, -1, "the patched bundle carries the turn-lock helper");
   const to = patched.indexOf(HELPER_END, from);
@@ -77,7 +83,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 }
 
 /** Starts the helper in a child with its lock directory under [tmp]; resolves on its first stdout line. */
-function startChild(script: string, tmp: string): { child: ChildProcess; firstLine: Promise<string> } {
+function startChild({ script, tmp }: ChildSpec): { child: ChildProcess; firstLine: Promise<string> } {
   const child = spawn(process.execPath, ["-e", script], { env: { PATH: process.env.PATH ?? "", TMPDIR: tmp }, stdio: ["ignore", "pipe", "inherit"] });
   children.add(child);
   child.once("exit", () => children.delete(child));
@@ -90,19 +96,19 @@ function startChild(script: string, tmp: string): { child: ChildProcess; firstLi
 }
 
 /** A process that loads the helper, takes the lock for one conversation and holds it until killed. */
-function startHolder(helper: string, storageDir: string, tmp: string, agentId = "agent-a"): Promise<ChildProcess> {
+function startHolder({ helper, storageDir, tmp, agentId = "agent-a" }: HolderSpec): Promise<ChildProcess> {
   const script = `${helper}
 const backend = { getLocalStorageDir: () => ${JSON.stringify(storageDir)} };
 globalThis.__lcpTurnLock.acquire(backend, ${JSON.stringify(agentId)}, "default", "holder test").then(() => {
   process.stdout.write("held\\n");
   setInterval(() => {}, 1000);
 });`;
-  const { child, firstLine } = startChild(script, tmp);
+  const { child, firstLine } = startChild({ script, tmp });
   return firstLine.then(() => child);
 }
 
 /** Loads the helper in this process with its lock directory under [tmp]; returns the restore hook. */
-function loadHelperHere(helper: string, tmp: string): { lock: TurnLock; restore: () => void } {
+function loadHelperHere({ helper, tmp }: { helper: string; tmp: string }): { lock: TurnLock; restore: () => void } {
   const previous = process.env.TMPDIR;
   process.env.TMPDIR = tmp;
   delete (globalThis as { __lcpTurnLock?: unknown }).__lcpTurnLock;
@@ -123,8 +129,8 @@ function scratch(t: { skip: (reason: string) => void }) {
   const tmp = mkdtempSync(join(BASE_TMP, "lcp-turn-lock-"));
   scratchDirs.add(tmp);
   const storageDir = join(tmp, "store");
-  const helper = helperSource(patched);
-  const { lock, restore } = loadHelperHere(helper, tmp);
+  const helper = helperSource({ patched });
+  const { lock, restore } = loadHelperHere({ helper, tmp });
   const backend = { getLocalStorageDir: () => storageDir };
   const lockDir = () => readdirSync(tmp).find((entry) => entry.startsWith("letta-turn-locks-"));
   const lockFiles = () => {
@@ -222,7 +228,7 @@ test("lcp-conversation-turn-lock: one counted patch on the deployed bundle, ever
 test("lcp-conversation-turn-lock: the receipt says queued for a busy target and spawned for an idle one", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     const from = s.patched.indexOf("    if (!backend3.capabilities.environmentRouting) {\n      const launcher = resolveSubagentLauncher(");
     assert.notEqual(from, -1);
@@ -255,7 +261,7 @@ test("lcp-conversation-turn-lock: the receipt says queued for a busy target and 
 test("lcp-conversation-turn-lock: a second writer waits for a live holder and takes over when it dies", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     assert.throws(() => s.lock.assertNotHeldElsewhere(s.backend, "default", "agent-a"), /busy with another active run/);
     assert.equal(s.lock.heldElsewhere(s.backend, "agent-a"), true, "a cancel by agent id sees the other process's turn");
@@ -341,17 +347,17 @@ test("lcp-conversation-turn-lock: two contenders racing to reclaim one stale loc
     const release = await s.lock.acquire(s.backend, "agent-a", "default", "probe");
     const [name] = s.lockFiles();
     release();
-    const dead = startChild("process.stdout.write(String(process.pid) + '\\n'); setInterval(() => {}, 1000);", s.tmp);
+    const dead = startChild({ script: DEAD_PID_SCRIPT, tmp: s.tmp });
     const deadPid = Number(await dead.firstLine);
     dead.child.kill("SIGKILL");
     await new Promise((resolve) => dead.child.once("exit", resolve));
     writeFileSync(join(s.lockDirPath(), name!), JSON.stringify({ pid: deadPid, start: null, token: "dead-owner", holder: "dead" }));
-    const contender = (label: string) => startChild(`${s.helper}
+    const contender = (label: string) => startChild({ tmp: s.tmp, script: `${s.helper}
 const backend = { getLocalStorageDir: () => ${JSON.stringify(s.storageDir)} };
 globalThis.__lcpTurnLock.acquire(backend, "agent-a", "default", ${JSON.stringify(label)}).then(() => {
   process.stdout.write("held\\n");
   setInterval(() => {}, 1000);
-});`, s.tmp);
+});` });
     const racers = [contender("racer 1"), contender("racer 2")];
     const held: number[] = [];
     racers.forEach((racer, index) => racer.firstLine.then(() => held.push(index), () => {}));
@@ -376,7 +382,7 @@ test("lcp-conversation-turn-lock: a contender that reclaims while another is mid
     const [name] = s.lockFiles();
     release();
     const file = join(s.lockDirPath(), name!);
-    const dead = startChild("process.stdout.write(String(process.pid) + '\\n'); setInterval(() => {}, 1000);", s.tmp);
+    const dead = startChild({ script: DEAD_PID_SCRIPT, tmp: s.tmp });
     const deadPid = Number(await dead.firstLine);
     dead.child.kill("SIGKILL");
     await new Promise((resolve) => dead.child.once("exit", resolve));
@@ -419,7 +425,7 @@ test("lcp-conversation-turn-lock: a release by a former owner cannot remove a lo
     const file = join(s.lockDirPath(), name!);
     // The lock was reclaimed from under the former owner and retaken by another process.
     rmSync(file);
-    const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+    const holder = await startHolder(s);
     const retaken = readFileSync(file, "utf8");
     staleRelease();
     assert.equal(existsSync(file), true, "the former owner's release leaves the new owner's lock in place");
@@ -449,7 +455,7 @@ test("lcp-conversation-turn-lock: the lock file is created complete, never empty
 test("lcp-conversation-turn-lock: a cancelled wait ends at once and leaves no lock behind", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     const controller = new AbortController();
     const waits: unknown[] = [];
@@ -478,7 +484,7 @@ test("lcp-conversation-turn-lock: a cancelled wait ends at once and leaves no lo
 test("lcp-conversation-turn-lock: an App Server turn waits inside its lifecycle, shows it, and Stop ends the wait", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     const emitted: unknown[] = [];
     const finished: string[] = [];
@@ -545,7 +551,7 @@ test("lcp-conversation-turn-lock: a default-conversation turn without an agent i
 test("lcp-conversation-turn-lock: App Server sync does not turn another process's live tool call into a stale denial", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     const from = s.patched.indexOf("async function recoverApprovalStateForSync(runtime, scope, deps = {}, opts = {}) {");
     const to = s.patched.indexOf("  const initialEligibility = await getRecoveryEligibility(runtime);", from);
@@ -574,7 +580,7 @@ test("lcp-conversation-turn-lock: App Server sync does not turn another process'
 test("lcp-conversation-turn-lock: a cancel with no local run leaves another process's tool calls alone", async (t) => {
   const s = scratch(t);
   if (!s) return;
-  const holder = await startHolder(s.helper, s.storageDir, s.tmp);
+  const holder = await startHolder(s);
   try {
     const from = s.patched.indexOf("  async cancelConversation(...args) {\n    const [conversationIdOrAgentId] = args;");
     assert.notEqual(from, -1);

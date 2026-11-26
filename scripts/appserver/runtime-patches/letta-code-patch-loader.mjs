@@ -2784,6 +2784,23 @@ globalThis.__lcpTurnLock ??= (() => {
     const digest = crypto.createHash("sha256").update(path.resolve(storageDir) + "\\0" + key).digest("hex").slice(0, 40);
     return path.join(os.tmpdir(), "letta-turn-locks-" + uid, digest + ".lock");
   };
+  const hasFieldOfType = (value, field, type) => typeof value?.[field] === type;
+  const isOwnerRecord = (value) => hasFieldOfType(value, "pid", "number") && hasFieldOfType(value, "token", "string");
+  const parseOwner = (text) => {
+    try {
+      const owner = JSON.parse(text);
+      return isOwnerRecord(owner) ? owner : null;
+    } catch {
+      return null;
+    }
+  };
+  const mtimeOf = (file) => {
+    try {
+      return fs.statSync(file).mtimeMs;
+    } catch {
+      return null;
+    }
+  };
   const readOwner = (file) => {
     let text;
     try {
@@ -2792,15 +2809,7 @@ globalThis.__lcpTurnLock ??= (() => {
       if (error?.code === "ENOENT") return null;
       return { unreadable: true, mtimeMs: null };
     }
-    try {
-      const owner = JSON.parse(text);
-      if (owner && typeof owner.pid === "number" && typeof owner.token === "string") return owner;
-    } catch {}
-    let mtimeMs = null;
-    try {
-      mtimeMs = fs.statSync(file).mtimeMs;
-    } catch {}
-    return { unreadable: true, mtimeMs };
+    return parseOwner(text) ?? { unreadable: true, mtimeMs: mtimeOf(file) };
   };
   const ownerAlive = (owner) => {
     if (!owner) return false;
@@ -2822,27 +2831,43 @@ globalThis.__lcpTurnLock ??= (() => {
     ? owner.mtimeMs !== null && Math.abs(Date.now() - owner.mtimeMs) > UNREADABLE_STALE_MS
     : !ownerAlive(owner);
   const sameOwner = (a, b) => a.unreadable ? b.unreadable === true : b.token === a.token;
-  const reclaimIfStale = (file, seen) => {
-    const guard = file + ".reclaim";
+  const unlinkQuietly = (file) => {
+    try { fs.unlinkSync(file); } catch {}
+  };
+  const dropExpiredGuard = (guard) => {
+    try {
+      if (Date.now() - fs.statSync(guard).mtimeMs > RECLAIM_GUARD_STALE_MS) fs.unlinkSync(guard);
+    } catch {}
+  };
+  // True when this process now holds the reclaim guard; a guard another process holds is dropped
+  // only once it is old enough to be abandoned.
+  const takeReclaimGuard = (guard) => {
     try {
       fs.writeFileSync(guard, String(process.pid), { flag: "wx", mode: 0o600 });
+      return true;
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
-      try {
-        if (Date.now() - fs.statSync(guard).mtimeMs > RECLAIM_GUARD_STALE_MS) fs.unlinkSync(guard);
-      } catch {}
-      return;
+      dropExpiredGuard(guard);
+      return false;
     }
+  };
+  const reclaimMessage = (file, seen) => seen.unreadable
+    ? "[lcp-turn-lock] reclaimed an unreadable turn lock " + file + "\\n"
+    : "[lcp-turn-lock] reclaimed the turn lock of dead pid " + seen.pid + " (" + (seen.holder ?? "unknown") + ")\\n";
+  const reclaimUnderGuard = (file, seen) => {
+    const now = readOwner(file);
+    if (!now) return;
+    if (!sameOwner(seen, now) || !stale(now)) return;
+    fs.unlinkSync(file);
+    process.stderr.write(reclaimMessage(file, seen));
+  };
+  const reclaimIfStale = (file, seen) => {
+    const guard = file + ".reclaim";
+    if (!takeReclaimGuard(guard)) return;
     try {
-      const now = readOwner(file);
-      if (now && sameOwner(seen, now) && stale(now)) {
-        fs.unlinkSync(file);
-        process.stderr.write(seen.unreadable
-          ? "[lcp-turn-lock] reclaimed an unreadable turn lock " + file + "\\n"
-          : "[lcp-turn-lock] reclaimed the turn lock of dead pid " + seen.pid + " (" + (seen.holder ?? "unknown") + ")\\n");
-      }
+      reclaimUnderGuard(file, seen);
     } finally {
-      try { fs.unlinkSync(guard); } catch {}
+      unlinkQuietly(guard);
     }
   };
   // Atomic create with content: the lock file never exists half-written.
@@ -2901,64 +2926,75 @@ globalThis.__lcpTurnLock ??= (() => {
     signal?.addEventListener("abort", onAbort, { once: true });
   });
   const describe = (owner) => owner.unreadable ? "an unreadable lock" : "pid " + owner.pid + " (" + (owner.holder ?? "unknown") + ")";
+  const makeRelease = (file) => {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      releaseFile(file);
+    };
+  };
+  // One take attempt: a failure to use the lock at all is reported once and ends the wait.
+  const attemptTake = (wait) => {
+    try {
+      return { owner: tryTake(wait.file, wait.holder, wait.key) };
+    } catch (error) {
+      process.stderr.write("[lcp-turn-lock] ERROR: cannot use the turn lock for " + wait.key + " (" + (error?.message ?? error) + "); running this turn unlocked\\n");
+      return { failed: true };
+    }
+  };
+  const takeOwnership = (wait) => {
+    held.set(wait.file, 1);
+    if (wait.waited) process.stderr.write("[lcp-turn-lock] " + wait.holder + " acquired " + wait.key + " after waiting " + (Date.now() - wait.startedWaiting) + "ms\\n");
+    return makeRelease(wait.file);
+  };
+  const noteBusy = (wait, owner) => {
+    if (!wait.waited) {
+      wait.waited = true;
+      try { wait.options.onWait?.(owner); } catch {}
+    }
+    if (wait.noticed || Date.now() - wait.startedWaiting < NOTICE_MS) return;
+    wait.noticed = true;
+    process.stderr.write("[lcp-turn-lock] " + wait.holder + " is waiting for the turn of " + describe(owner) + " on " + wait.key + "\\n");
+  };
+  const lockTarget = (backend, agentId, conversationId) => {
+    const storageDir = storageDirOf(backend);
+    const key = conversationKey(backend, agentId, conversationId);
+    return storageDir && key ? { file: lockFile(storageDir, key), key } : null;
+  };
+  const throwIfAborted = (signal) => {
+    if (signal?.aborted) throw abortError(signal);
+  };
+  const reenter = (file) => {
+    held.set(file, held.get(file) + 1);
+    return makeRelease(file);
+  };
   /**
    * Waits until this process owns the conversation and returns the release function.
    * options.signal ends the wait with its abort reason; options.onWait(owner) runs once when the
    * conversation is first found busy.
    */
   async function acquire(backend, agentId, conversationId, holder, options = {}) {
-    const storageDir = storageDirOf(backend);
-    const key = conversationKey(backend, agentId, conversationId);
-    if (!storageDir || !key) return () => {};
-    const file = lockFile(storageDir, key);
-    if (held.has(file)) {
-      held.set(file, held.get(file) + 1);
-      let releasedNested = false;
-      return () => {
-        if (releasedNested) return;
-        releasedNested = true;
-        releaseFile(file);
-      };
-    }
-    const startedWaiting = Date.now();
-    let waited = false;
-    let noticed = false;
+    const target = lockTarget(backend, agentId, conversationId);
+    if (!target) return () => {};
+    const { file, key } = target;
+    if (held.has(file)) return reenter(file);
+    const wait = { file, holder, key, options, startedWaiting: Date.now(), waited: false, noticed: false };
     for (;;) {
-      if (options.signal?.aborted) throw abortError(options.signal);
-      let owner;
-      try {
-        owner = tryTake(file, holder, key);
-      } catch (error) {
-        process.stderr.write("[lcp-turn-lock] ERROR: cannot use the turn lock for " + key + " (" + (error?.message ?? error) + "); running this turn unlocked\\n");
-        return () => {};
+      throwIfAborted(options.signal);
+      const attempt = attemptTake(wait);
+      if (attempt.failed) return () => {};
+      if (attempt.owner === null) return takeOwnership(wait);
+      if (!attempt.owner.retryNow) {
+        noteBusy(wait, attempt.owner);
+        await sleep(POLL_MS, options.signal);
       }
-      if (owner === null) {
-        held.set(file, 1);
-        if (waited) process.stderr.write("[lcp-turn-lock] " + holder + " acquired " + key + " after waiting " + (Date.now() - startedWaiting) + "ms\\n");
-        let released = false;
-        return () => {
-          if (released) return;
-          released = true;
-          releaseFile(file);
-        };
-      }
-      if (owner.retryNow) continue;
-      if (!waited) {
-        waited = true;
-        try { options.onWait?.(owner); } catch {}
-      }
-      if (!noticed && Date.now() - startedWaiting >= NOTICE_MS) {
-        noticed = true;
-        process.stderr.write("[lcp-turn-lock] " + holder + " is waiting for the turn of " + describe(owner) + " on " + key + "\\n");
-      }
-      await sleep(POLL_MS, options.signal);
     }
   }
   function holder(backend, agentId, conversationId) {
-    const storageDir = storageDirOf(backend);
-    const key = conversationKey(backend, agentId, conversationId);
-    if (!storageDir || !key) return null;
-    const file = lockFile(storageDir, key);
+    const target = lockTarget(backend, agentId, conversationId);
+    if (!target) return null;
+    const { file } = target;
     if (held.has(file)) return { pid: process.pid, holder: "this process" };
     const owner = readOwner(file);
     return ownerAlive(owner) ? owner : null;
