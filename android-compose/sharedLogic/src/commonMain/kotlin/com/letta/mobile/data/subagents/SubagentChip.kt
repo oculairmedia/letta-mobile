@@ -190,6 +190,12 @@ data class SubagentChipRecord(
     @SerialName("todo_revision") val todoRevision: Int = 0,
     /** Host-proven App Server process identity at first observation; null in legacy records. */
     @SerialName("app_server_process_identity") val appServerProcessIdentity: String? = null,
+    /**
+     * Completions this dispatch might own, seen before its receipt supplied [taskId].
+     * Applied by exact task identity when the receipt arrives, then
+     * cleared; bounded by [DurableSubagentRegistry.MAX_EARLY_TERMINALS].
+     */
+    @SerialName("early_terminals") val earlyTerminals: List<SubagentEarlyTerminal> = emptyList(),
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
@@ -230,6 +236,31 @@ data class SubagentChipRecord(
 
         /** The user hid this record without stopping its worker. */
         const val TERMINAL_REASON_USER_DISMISSED = "user_dismissed"
+
+        /** Tombstone of a terminal record capacity eviction dropped; never shown, only refuses replays. */
+        const val TERMINAL_REASON_CAPACITY_EVICTED = "capacity_evicted"
+    }
+}
+
+/**
+ * A terminal task notification that arrived before the dispatch receipt naming its task id.
+ * It names a task, never a title, so it can only ever apply to the dispatch whose receipt
+ * later reports exactly this [taskId] (and, when both carry one, this [subagentAgentId]).
+ */
+@Serializable
+data class SubagentEarlyTerminal(
+    @SerialName("task_id") val taskId: String,
+    val state: SubagentChipState,
+    @SerialName("subagent_agent_id") val subagentAgentId: String? = null,
+    @SerialName("duration_ms") val durationMs: Long? = null,
+) {
+    /**
+     * True when this notification names the child [record]'s receipt identified: the same task, and
+     * the same child agent when both carry one. A record with no task id yet never matches.
+     */
+    fun matches(record: SubagentChipRecord): Boolean {
+        if (record.taskId == null || taskId != record.taskId) return false
+        return subagentAgentId == null || record.subagentAgentId == null || subagentAgentId == record.subagentAgentId
     }
 }
 

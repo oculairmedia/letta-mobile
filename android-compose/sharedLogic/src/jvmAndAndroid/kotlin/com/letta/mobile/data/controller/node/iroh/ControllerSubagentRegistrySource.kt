@@ -15,6 +15,8 @@ import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
 import com.letta.mobile.data.subagents.SubagentChipRecord
 import com.letta.mobile.data.subagents.SubagentChipSource
+import com.letta.mobile.data.subagents.SubagentChipState
+import com.letta.mobile.data.subagents.SubagentEarlyTerminal
 import com.letta.mobile.data.subagents.withNativeTodos
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -184,15 +186,44 @@ class ControllerSubagentRegistrySource(
             val notification = extractSubagentNotification(delta["content"].wireText().orEmpty()) ?: return null
             val status = SubagentStatus.normalize(notification.status)
                 ?.takeIf { it != SubagentStatus.RUNNING } ?: return null
-            // Task ids, tool ids and child agent ids are separate namespaces. Require
-            // a unique dispatch in this exact parent scope; never use display titles.
-            val matches = registry.replaySnapshot(frame.runtime.conversationId).filterNot { it.state.isTerminal }.filter { record ->
-                record.agentId == frame.runtime.agentId &&
-                    (notification.taskId != null || notification.toolCallId != null) &&
-                    notification.matchesDispatch(record)
-            }
+            val matches = liveDispatchesMatching(frame, notification)
+            if (matches.isEmpty()) rememberBeforeReceipt(frame, notification, SubagentChipState.fromWireStatus(status))
             val entry = matches.singleUnambiguousEntry(notification) ?: return null
             return entry.copy(status = status, durationMs = notification.durationMs ?: entry.durationMs)
+        }
+
+        /**
+         * Task ids, tool ids and child agent ids are separate namespaces. Only live dispatches in this exact
+         * parent scope whose every supplied identity matches count; display titles never do.
+         */
+        private fun liveDispatchesMatching(
+            frame: AppServerInboundFrame.StreamDelta,
+            notification: UiSubagentNotification,
+        ): List<SubagentChipRecord> {
+            if (notification.taskId == null && notification.toolCallId == null) return emptyList()
+            return liveDispatchesOf(frame).filter { notification.matchesDispatch(it) }
+        }
+
+        private fun liveDispatchesOf(frame: AppServerInboundFrame.StreamDelta): List<SubagentChipRecord> =
+            registry.replaySnapshot(frame.runtime.conversationId)
+                .filter { it.agentId == frame.runtime.agentId && !it.state.isTerminal }
+
+        /**
+         * A completion can overtake the dispatch receipt that names its task. Keep it, by exact task id only, on
+         * each live dispatch of this parent still awaiting a receipt; the registry applies it when a receipt reports
+         * that task. No task id, no memory.
+         */
+        private fun rememberBeforeReceipt(
+            frame: AppServerInboundFrame.StreamDelta,
+            notification: UiSubagentNotification,
+            state: SubagentChipState,
+        ) {
+            val taskId = notification.taskId ?: return
+            val candidates = liveDispatchesOf(frame).filter { record ->
+                record.taskId == null && (notification.toolCallId == null || notification.toolCallId == record.toolCallId)
+            }.map { it.key }
+            val early = SubagentEarlyTerminal(taskId, state, notification.subagentAgentId, notification.durationMs)
+            registry.rememberEarlyTerminal(candidates, early)
         }
 
         private fun List<SubagentChipRecord>.singleUnambiguousEntry(notification: UiSubagentNotification): SubagentEntry? {

@@ -439,7 +439,30 @@ class DurableSubagentRegistryTest {
         assertNotNull(reg.record("conv-a", "agent-1", "live/1"))
         assertNotNull(reg.record("conv-a", "agent-1", "live/2"))
         // Eviction is durable, not just in-memory.
-        assertEquals(3, store.load().size)
+        assertEquals(3, store.load().ordinary().size)
+        assertEquals(listOf("term/1"), store.load().evictedTombstones().map { it.toolCallId })
+    }
+
+    /** TLA+ NoResurrection: eviction must not forget that a key ended. */
+    @Test
+    fun evictedTerminalKeyCannotBeResurrectedAsRunning() {
+        val store = InMemorySubagentRegistryStore()
+        val reg = registry(store, maxEntries = 1)
+        now = 100
+        reg.observe(observation(toolCallId = "done"))
+        reg.observe(observation(toolCallId = "done", state = SubagentChipState.COMPLETED))
+        now = 200
+        reg.observe(observation(toolCallId = "other", state = SubagentChipState.COMPLETED))
+        assertNull(reg.record("conv-a", "agent-1", "done"), "the old terminal was evicted")
+
+        now = 300
+        assertIs<DurableSubagentRegistry.ObserveResult.IllegalTransition>(reg.observe(observation(toolCallId = "done")))
+        assertNull(reg.record("conv-a", "agent-1", "done"))
+        assertEquals(0, reg.liveCount())
+        // The refusal survives a restart.
+        val restarted = registry(store, maxEntries = 1)
+        assertIs<DurableSubagentRegistry.ObserveResult.IllegalTransition>(restarted.observe(observation(toolCallId = "done")))
+        assertEquals(0, restarted.liveCount())
     }
 
     @Test
@@ -481,7 +504,8 @@ class DurableSubagentRegistryTest {
         }
 
         assertEquals(2, reg.size(), "the registry must shrink back to the cap once chips are evictable")
-        assertEquals(2, store.load().size, "the durable snapshot must shrink too")
+        assertEquals(2, store.load().ordinary().size, "the durable snapshot must shrink too")
+        assertEquals(3, store.load().evictedTombstones().size, "evicted keys keep only their terminal fact")
     }
 
     /** The same re-enforcement, but driven by the reconciler orphaning chips. */
@@ -501,7 +525,7 @@ class DurableSubagentRegistryTest {
 
         assertEquals(5, result.orphaned.size)
         assertEquals(2, reg.size(), "orphaning makes chips evictable, so the cap must be re-applied")
-        assertEquals(2, store.load().size)
+        assertEquals(2, store.load().ordinary().size)
     }
 
     // -------------------------------------------------------------- plumbing
@@ -540,4 +564,10 @@ class DurableSubagentRegistryTest {
 
         assertEquals(0, reg.size())
     }
+
+    private fun List<SubagentChipRecord>.evictedTombstones() =
+        filter { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED }
+
+    private fun List<SubagentChipRecord>.ordinary() =
+        filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_CAPACITY_EVICTED }
 }

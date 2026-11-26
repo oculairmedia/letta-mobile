@@ -24,7 +24,7 @@ for cfg in "${cfgs[@]}"; do
     expected=PASS
     if [[ "${RAW:-0}" != 1 ]]; then
       case "$cfg:$prop" in
-        main:EventuallyTerminal|fixed:EventuallyTerminal|main:NoResurrection|fixed:NoResurrection|main:ParentIsolation|main:NoPendingRow|fixed:NoPendingRow|main:NoPendingChildRow) expected=FAIL ;;
+        main:ParentIsolation) expected=FAIL ;;
       esac
     fi
     actual=ERROR
