@@ -289,6 +289,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [feed.subscribe: conversation feed v1](reference/contracts/feed.subscribe/feed-v1.md)
 
+### reference/contracts/ffi
+
+- [FFI v1: the combined library and its exported surface \(core-ffi\)](reference/contracts/ffi/ffi-v1.md)
+
 ### reference/contracts/health.check
 
 - [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)
