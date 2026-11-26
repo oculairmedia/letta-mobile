@@ -27958,6 +27958,77 @@ public final class com/letta/mobile/data/meridian/endpoint/MeridianWireRefusal :
 	public final fun getResponse ()Lcom/letta/mobile/data/meridian/MeridianResponse;
 }
 
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsConfig {
+	public static final field Companion Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig$Companion;
+	public static final field DEFAULT_CALLS_PER_MINUTE I
+	public static final field DEFAULT_SOCKET Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (ZLcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;I)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()I
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;
+	public final fun component7 ()I
+	public final fun copy (ZLcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;I)Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;ZLcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;IILjava/lang/Object;)Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBinding ()Lcom/letta/mobile/data/meridian/endpoint/MeridianCallerBindingMode;
+	public final fun getCallsPerMinute ()I
+	public final fun getEnabled ()Z
+	public final fun getEndpointFile ()Ljava/lang/String;
+	public final fun getSocketPath ()Ljava/lang/String;
+	public final fun getTcpPort ()I
+	public final fun getTransport ()Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsConfig$Companion {
+	public final fun defaultEndpointFile ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsEndpoint {
+	public static final field Companion Lcom/letta/mobile/data/meridian/socket/MeridianToolsEndpoint$Companion;
+	public fun <init> (Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun start (Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsEndpoint$Companion {
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsSocketServer {
+	public static final field Companion Lcom/letta/mobile/data/meridian/socket/MeridianToolsSocketServer$Companion;
+	public static final field DEFAULT_MAX_CONCURRENT I
+	public static final field DEFAULT_READ_TIMEOUT_MS J
+	public fun <init> (Lcom/letta/mobile/data/meridian/endpoint/MeridianToolsService;Lkotlin/jvm/functions/Function1;JI)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/meridian/endpoint/MeridianToolsService;Lkotlin/jvm/functions/Function1;JIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun serve (Ljava/nio/channels/ServerSocketChannel;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsSocketServer$Companion {
+	public final fun bindLoopback (I)Ljava/nio/channels/ServerSocketChannel;
+	public final fun bindUnix (Ljava/nio/file/Path;)Ljava/nio/channels/ServerSocketChannel;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsTransport : java/lang/Enum {
+	public static final field AUTO Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public static final field Companion Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport$Companion;
+	public static final field TCP Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public static final field UNIX Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+	public static fun values ()[Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+}
+
+public final class com/letta/mobile/data/meridian/socket/MeridianToolsTransport$Companion {
+	public final fun parse (Ljava/lang/String;)Lcom/letta/mobile/data/meridian/socket/MeridianToolsTransport;
+}
+
 public final class com/letta/mobile/data/messaging/AgentMessageClientId {
 	public static final field INSTANCE Lcom/letta/mobile/data/messaging/AgentMessageClientId;
 	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/messaging/AgentMessageClientId$Decoded;
@@ -38403,6 +38474,72 @@ public final class com/letta/mobile/data/node/carrier/NodeSession {
 public final class com/letta/mobile/data/node/carrier/NodeSession$Companion {
 	public final fun open (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun open$default (Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/host/AgentMessageDelivery {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/host/AgentMessageDelivery;
+	public final fun defaultAddressStore ()Ljava/io/File;
+	public final fun defaultIdentityDir ()Ljava/io/File;
+	public final fun send (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/io/File;Ljava/io/File;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/host/AgentMessagingBinding {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/IrohCliRunner;)V
+	public final fun getBinary ()Ljava/lang/String;
+	public final fun getRunner ()Lcom/letta/mobile/data/controller/extras/IrohCliRunner;
+}
+
+public abstract interface class com/letta/mobile/data/node/host/AppServerProcessSource {
+}
+
+public final class com/letta/mobile/data/node/host/AppServerProcessSource$Owned : com/letta/mobile/data/node/host/AppServerProcessSource {
+	public fun <init> (Lkotlin/jvm/functions/Function0;)V
+	public final fun getPid ()Lkotlin/jvm/functions/Function0;
+}
+
+public final class com/letta/mobile/data/node/host/AppServerProcessSource$PidFile : com/letta/mobile/data/node/host/AppServerProcessSource {
+	public fun <init> (Ljava/lang/String;Ljava/nio/file/Path;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/nio/file/Path;
+	public final fun copy (Ljava/lang/String;Ljava/nio/file/Path;)Lcom/letta/mobile/data/node/host/AppServerProcessSource$PidFile;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/host/AppServerProcessSource$PidFile;Ljava/lang/String;Ljava/nio/file/Path;ILjava/lang/Object;)Lcom/letta/mobile/data/node/host/AppServerProcessSource$PidFile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPidFile ()Ljava/nio/file/Path;
+	public final fun getServerUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/host/NodeHostBindings {
+	public static final field Companion Lcom/letta/mobile/data/node/host/NodeHostBindings$Companion;
+	public abstract fun agentMessaging (Ljava/lang/String;)Lcom/letta/mobile/data/node/host/AgentMessagingBinding;
+	public abstract fun getOs ()Lcom/letta/mobile/data/node/host/NodeHostOs;
+	public abstract fun processIdentity (Lcom/letta/mobile/data/node/host/AppServerProcessSource;)Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;
+	public abstract fun toolsConfig (Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;)Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;
+	public fun toolsSocket (Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/node/NodeToolsSocket;
+}
+
+public final class com/letta/mobile/data/node/host/NodeHostBindings$Companion {
+	public final fun current ()Lcom/letta/mobile/data/node/host/NodeHostBindings;
+	public final fun forOs (Lcom/letta/mobile/data/node/host/NodeHostOs;)Lcom/letta/mobile/data/node/host/NodeHostBindings;
+}
+
+public final class com/letta/mobile/data/node/host/NodeHostBindings$DefaultImpls {
+	public static fun toolsSocket (Lcom/letta/mobile/data/node/host/NodeHostBindings;Lcom/letta/mobile/data/meridian/socket/MeridianToolsConfig;Lcom/letta/mobile/data/controller/extras/ExternalToolRegistry;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/node/NodeToolsSocket;
+}
+
+public final class com/letta/mobile/data/node/host/NodeHostOs : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/node/host/NodeHostOs$Companion;
+	public static final field LINUX Lcom/letta/mobile/data/node/host/NodeHostOs;
+	public static final field WINDOWS Lcom/letta/mobile/data/node/host/NodeHostOs;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/node/host/NodeHostOs;
+	public static fun values ()[Lcom/letta/mobile/data/node/host/NodeHostOs;
+}
+
+public final class com/letta/mobile/data/node/host/NodeHostOs$Companion {
+	public final fun current ()Lcom/letta/mobile/data/node/host/NodeHostOs;
+	public final fun of (Ljava/lang/String;)Lcom/letta/mobile/data/node/host/NodeHostOs;
 }
 
 public final class com/letta/mobile/data/notify/ApprovalAttentionMonitor {
