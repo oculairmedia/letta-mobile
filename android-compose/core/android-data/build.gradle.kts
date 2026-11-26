@@ -1,5 +1,6 @@
 plugins {
     id("com.letta.mobile.android.library")
+    id("com.letta.mobile.robolectric-deps")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.allopen")
     id("com.google.dagger.hilt.android")

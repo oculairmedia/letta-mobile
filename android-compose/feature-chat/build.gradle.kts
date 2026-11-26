@@ -1,5 +1,6 @@
 plugins {
     id("com.letta.mobile.android.library")
+    id("com.letta.mobile.robolectric-deps")
     id("io.github.takahirom.roborazzi")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")

@@ -1,6 +1,6 @@
 package com.letta.mobile.docs
 
-import org.gradle.testkit.runner.GradleRunner
+import com.letta.mobile.testkit.FixtureRunner
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -105,8 +105,8 @@ class ApiContractPluginTest {
         assertTrue(otherHost.readText() == "Other host evidence must remain unchanged")
     }
 
-    private fun runner(task: String) = GradleRunner.create()
-        .withProjectDir(projectDir)
-        .withPluginClasspath()
-        .withArguments(task, "--max-workers=1", "-Dorg.gradle.daemon=false", "-Pkotlin.compiler.execution.strategy=in-process")
+    private fun runner(task: String) = FixtureRunner.create(
+        projectDir,
+        listOf(task, "--max-workers=1", "-Dorg.gradle.daemon=false", "-Pkotlin.compiler.execution.strategy=in-process"),
+    )
 }

@@ -1,6 +1,6 @@
 package com.letta.mobile.architecture
 
-import org.gradle.testkit.runner.GradleRunner
+import com.letta.mobile.testkit.FixtureRunner
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -18,11 +18,7 @@ class ArchitectureGraphPluginTest {
         fixture("lib.gradle.kts", "lib/build.gradle.kts")
 
         val arguments = listOf("exportArchitectureGraph", "--configuration-cache", "--stacktrace")
-        GradleRunner.create()
-            .withProjectDir(projectDir)
-            .withPluginClasspath()
-            .withArguments(arguments)
-            .build()
+        FixtureRunner.create(projectDir, arguments).build()
 
         val output = projectDir.resolve("build/reports/architecture/graph.jsonl")
         val first = output.readText()
@@ -31,11 +27,7 @@ class ArchitectureGraphPluginTest {
         assertFalse(first.contains("org.example:ignored"))
         assertContractFiles(first)
 
-        GradleRunner.create()
-            .withProjectDir(projectDir)
-            .withPluginClasspath()
-            .withArguments(arguments)
-            .build()
+        FixtureRunner.create(projectDir, arguments).build()
         assertEquals(first, output.readText())
         assertContractFiles(first)
     }

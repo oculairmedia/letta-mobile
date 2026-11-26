@@ -1,6 +1,6 @@
 package com.letta.mobile.docs
 
-import org.gradle.testkit.runner.GradleRunner
+import com.letta.mobile.testkit.FixtureRunner
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -63,13 +63,13 @@ class ApiDocumentationPluginTest {
             writeText("package com.letta.mobile.data.timeline.api; class MissingExtensionDoc")
         }
         shared.resolve("src/main/kotlin/Outside.kt").writeText("package example; class ExistingUngatedDebt")
-        val runner = GradleRunner.create()
-            .withProjectDir(projectDir)
-            .withPluginClasspath()
-            .withArguments(
+        val runner = FixtureRunner.create(
+            projectDir,
+            listOf(
                 "dokkaGeneratePublicationHtml", "-PdokkaSourceRef=fixture-sha", "--configuration-cache",
                 "--build-cache", "--no-parallel", "--max-workers=2", "-Pkotlin.compiler.execution.strategy=in-process",
-            )
+            ),
+        )
         val result = runner.build()
         val repeated = runner.build()
         assertEquals(TaskOutcome.SUCCESS, repeated.task(":core:runtime:dokkaGenerateModuleHtml")?.outcome)

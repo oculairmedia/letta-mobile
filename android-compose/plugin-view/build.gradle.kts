@@ -7,6 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
     id("com.letta.mobile.kmp.library")
+    id("com.letta.mobile.robolectric-deps")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
