@@ -59,12 +59,12 @@ interface AppServerController {
         get() = emptyFlow()
 
     /**
-     * Every App Server frame scoped to [runtime], as it arrives, for a relay
-     * that must pass on the server's own terminal and queue frames (the Iroh node). The turn
-     * engine consumes those into its lifecycle, so they never appear in [runTurn]. Collecting
-     * subscribes; null when this controller cannot observe raw frames.
+     * Every runtime-scoped App Server frame, as it arrives, for a relay that must pass on what
+     * no [runTurn] shows (the Iroh node): the server's own terminal and queue frames, and the
+     * whole of a turn the App Server started by itself. Each frame names its own runtime.
+     * Collecting subscribes; null when this controller cannot observe raw frames.
      */
-    fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame>? = null
+    fun observeRuntimeFrames(): Flow<AppServerReceivedFrame>? = null
 
     /**
      * Starts a runtime for the given agent and conversation.

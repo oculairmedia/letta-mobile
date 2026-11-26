@@ -21,11 +21,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-class AdminProxyHttpException(
-    statusCode: Int,
-    bodyText: String,
-) : RuntimeException("HTTP $statusCode: $bodyText")
-
 data class AdminProxyResponse(
     val statusCode: Int,
     val body: JsonElement,
