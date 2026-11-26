@@ -38082,6 +38082,292 @@ public final class com/letta/mobile/data/node/NodeToolsSocket$Companion {
 	public final fun getNone ()Lcom/letta/mobile/data/node/NodeToolsSocket;
 }
 
+public final class com/letta/mobile/data/node/carrier/NodeAddress {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeAddress;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodeCallLane {
+	public abstract fun finishSending (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getIncoming ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun send-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCapabilities {
+	public fun <init> (Ljava/util/Set;Z)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/util/Set;Z)Lcom/letta/mobile/data/node/carrier/NodeCapabilities;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeCapabilities;Ljava/util/Set;ZILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHost ()Ljava/util/Set;
+	public final fun getPaired ()Z
+	public fun hashCode ()I
+	public final fun supports (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodeCarrier {
+	public abstract fun dial-VM31NQ8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierException : java/lang/Exception {
+	public fun <init> (Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure;)V
+	public final fun getFailure ()Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodeCarrierFailure {
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierFailure$AuthRejected : com/letta/mobile/data/node/carrier/NodeCarrierFailure {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$AuthRejected;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$AuthRejected;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$AuthRejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierFailure$Closed : com/letta/mobile/data/node/carrier/NodeCarrierFailure {
+	public fun <init> (Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;)V
+	public final fun component1 ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public final fun copy (Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Closed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Closed;Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Closed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClosure ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierFailure$Refused : com/letta/mobile/data/node/carrier/NodeCarrierFailure {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Refused;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Refused;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/String;
+	public final fun getMethod ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierFailure$Unreachable : com/letta/mobile/data/node/carrier/NodeCarrierFailure {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Unreachable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Unreachable;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeCarrierFailure$Unreachable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCarrierWire {
+	public static final field ADMIN_RPC Ljava/lang/String;
+	public static final field ADMIN_RPC_CANCEL Ljava/lang/String;
+	public static final field ADMIN_RPC_RESPONSE Ljava/lang/String;
+	public static final field AUTH Ljava/lang/String;
+	public static final field AUTH_RESPONSE Ljava/lang/String;
+	public static final field CAPABILITIES Ljava/lang/String;
+	public static final field ERROR Ljava/lang/String;
+	public static final field FRAME_PART_CAPABILITY Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/node/carrier/NodeCarrierWire;
+	public static final field METHOD Ljava/lang/String;
+	public static final field PAIRED Ljava/lang/String;
+	public static final field PARAMS Ljava/lang/String;
+	public static final field PEER_NAME Ljava/lang/String;
+	public static final field REQUEST_ID Ljava/lang/String;
+	public static final field RESULT Ljava/lang/String;
+	public static final field SUCCESS Ljava/lang/String;
+	public static final field TOKEN Ljava/lang/String;
+	public static final field TYPE Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodeCredential {
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCredential$CarrierIdentity : com/letta/mobile/data/node/carrier/NodeCredential {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/carrier/NodeCredential$CarrierIdentity;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeCredential$Token : com/letta/mobile/data/node/carrier/NodeCredential {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getSecret ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeFrame {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/NodeFrame$Companion;
+	public static final synthetic fun box-impl (Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/node/carrier/NodeFrame;
+	public static fun constructor-impl (Lkotlinx/serialization/json/JsonObject;)Lkotlinx/serialization/json/JsonObject;
+	public static final fun encode-impl (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Lkotlinx/serialization/json/JsonObject;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;)Z
+	public final fun getJson ()Lkotlinx/serialization/json/JsonObject;
+	public static final fun getRequestId-impl (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+	public static final fun getType-impl (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Lkotlinx/serialization/json/JsonObject;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Lkotlinx/serialization/json/JsonObject;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeFrame$Companion {
+	public final fun decode-VPiXyk0 (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeInbound {
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/carrier/NodeLane;Lkotlinx/serialization/json/JsonObject;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public final fun component2-r7rEKvE ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy-ut2U2uA (Lcom/letta/mobile/data/node/carrier/NodeLane;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/node/carrier/NodeInbound;
+	public static synthetic fun copy-ut2U2uA$default (Lcom/letta/mobile/data/node/carrier/NodeInbound;Lcom/letta/mobile/data/node/carrier/NodeLane;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeInbound;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFrame-r7rEKvE ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getLane ()Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeLane : java/lang/Enum {
+	public static final field CALL Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public static final field CONTROL Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public static final field PUSH Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeLane;
+	public static fun values ()[Lcom/letta/mobile/data/node/carrier/NodeLane;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodeLink {
+	public abstract fun close (Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun close$default (Lcom/letta/mobile/data/node/carrier/NodeLink;Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getClosure ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getInbound ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getNode--sylO0U ()Ljava/lang/String;
+	public abstract fun openCall-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun sendControl-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeLink$DefaultImpls {
+	public static synthetic fun close$default (Lcom/letta/mobile/data/node/carrier/NodeLink;Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeLinkClosure {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/NodeLinkClosure$Companion;
+	public fun <init> (JLjava/lang/String;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (JLjava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;JLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()J
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeLinkClosure$Companion {
+	public final fun getAUTH_FAILURES ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public final fun getAUTH_RATE_LIMITED ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public final fun getLOST ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public final fun getNORMAL ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+	public final fun getPEER_REVOKED ()Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeOpenRequest {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/node/carrier/NodeCredential;Ljava/lang/String;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/node/carrier/NodeCredential;Ljava/lang/String;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-HN4vsaY ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/node/carrier/NodeCredential;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/Set;
+	public final fun copy-GunVq6M (Ljava/lang/String;Lcom/letta/mobile/data/node/carrier/NodeCredential;Ljava/lang/String;Ljava/util/Set;)Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;
+	public static synthetic fun copy-GunVq6M$default (Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Ljava/lang/String;Lcom/letta/mobile/data/node/carrier/NodeCredential;Ljava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddress-HN4vsaY ()Ljava/lang/String;
+	public final fun getClientCapabilities ()Ljava/util/Set;
+	public final fun getCredential ()Lcom/letta/mobile/data/node/carrier/NodeCredential;
+	public final fun getPeerName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodePeerAcceptor {
+	public abstract fun serve (Lcom/letta/mobile/data/node/carrier/NodePeerLink;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodePeerIdentity {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/NodePeerIdentity$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/node/carrier/NodePeerIdentity;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodePeerIdentity$Companion {
+	public final fun getLOCAL_SHELL--sylO0U ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/carrier/NodePeerLink {
+	public abstract fun close (Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun close$default (Lcom/letta/mobile/data/node/carrier/NodePeerLink;Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getCalls ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getClosure ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getControl ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getPeer--sylO0U ()Ljava/lang/String;
+	public abstract fun onPeerCapabilities (Ljava/util/Set;)V
+	public abstract fun push-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun sendControl-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodePeerLink$DefaultImpls {
+	public static synthetic fun close$default (Lcom/letta/mobile/data/node/carrier/NodePeerLink;Lcom/letta/mobile/data/node/carrier/NodeLinkClosure;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeSession {
+	public static final field Companion Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;
+	public static final field MAX_RESUME_PAGES I
+	public final fun adminRpc-kXg03rg (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getCapabilities ()Lcom/letta/mobile/data/node/carrier/NodeCapabilities;
+	public final fun getClosure ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getInbound ()Lkotlinx/coroutines/flow/Flow;
+	public final fun getNode--sylO0U ()Ljava/lang/String;
+	public final fun nextRequestId ()Ljava/lang/String;
+	public final fun request-bshftnc (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun resumeFeed-urFYdz0 (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/feed/wire/FeedCursor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun send-BGYAGBY (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/carrier/NodeSession$Companion {
+	public final fun open (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun open$default (Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/notify/ApprovalAttentionMonitor {
 	public fun <init> (Lcom/letta/mobile/data/notify/AttentionGate;)V
 	public final fun watch (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
