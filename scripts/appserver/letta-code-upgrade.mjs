@@ -90,15 +90,20 @@ export function readSites(root = repositoryRoot) {
 
 /** `text` with group 1 of every `pattern` match replaced by `value`; throws unless it matched `count` times. */
 export function replaceGroup(text, pattern, value, count, label) {
-  let seen = 0;
-  const result = text.replace(pattern, (match, ...rest) => {
-    seen += 1;
-    const offset = match.indexOf(rest[0]);
-    return match.slice(0, offset) + value + match.slice(offset + rest[0].length);
-  });
-  if (count !== undefined && seen !== count) throw new Error(`${label}: expected ${count} match(es) of /${pattern.source}/, found ${seen}`);
-  if (seen === 0) throw new Error(`${label}: /${pattern.source}/ matched nothing`);
-  return result;
+  // The `d` flag records where group 1 really sits; searching the match for its text would find an
+  // earlier equal span (for example the command count when it equals the message count).
+  const indexed = new RegExp(pattern.source, `${pattern.flags.replace(/[dg]/g, "")}dg`);
+  const matches = [...text.matchAll(indexed)];
+  if (count !== undefined && matches.length !== count) throw new Error(`${label}: expected ${count} match(es) of /${pattern.source}/, found ${matches.length}`);
+  if (matches.length === 0) throw new Error(`${label}: /${pattern.source}/ matched nothing`);
+  let result = "";
+  let cursor = 0;
+  for (const match of matches) {
+    const [start, end] = match.indices[1];
+    result += text.slice(cursor, start) + value;
+    cursor = end;
+  }
+  return result + text.slice(cursor);
 }
 
 /** Rewrites every site of `writers` under `root` to `version`. Returns the paths it changed. */

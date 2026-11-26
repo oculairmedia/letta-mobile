@@ -45,6 +45,16 @@ test("replaceGroup rewrites only group 1 and refuses an unexpected match count",
   assert.throws(() => replaceGroup("nothing", pattern, "9.9.9", undefined, "f"), /matched nothing/);
 });
 
+test("replaceGroup rewrites the captured span even when an earlier equal number precedes it", () => {
+  // The README union-count site: after the command count was rewritten to 117, the message count
+  // still reads 117 and must be the one that changes.
+  const pattern = /\d+ commands, (\d+) messages\. Mirrors/g;
+  assert.equal(replaceGroup("x 117 commands, 117 messages. Mirrors y", pattern, "118", 1, "f"), "x 117 commands, 118 messages. Mirrors y");
+  const versions = /v(\d+\.\d+\.\d+) next (\d+\.\d+\.\d+)/g;
+  assert.equal(replaceGroup("v1.2.3 next 1.2.3", /v\d+\.\d+\.\d+ next (\d+\.\d+\.\d+)/g, "9.9.9", 1, "f"), "v1.2.3 next 9.9.9");
+  assert.equal(replaceGroup("v1.2.3 next 4.5.6", versions, "0.0.1", 1, "f"), "v0.0.1 next 4.5.6");
+});
+
 test("bumpPinFile moves version and integrity and bumps assetRevision", () => {
   const text = "# c\nlettaCodeVersion=0.34.39\nlettaCodeIntegrity=sha512-old==\nassetRevision=38\nlibnodeVersion=v18.20.4\n";
   assert.equal(bumpPinFile(text, "0.34.70", "sha512-new=="),
