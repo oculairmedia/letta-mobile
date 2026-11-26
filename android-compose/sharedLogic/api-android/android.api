@@ -54904,7 +54904,7 @@ public final class com/letta/mobile/data/subagents/SubagentEarlyTerminal {
 	public final fun getSubagentAgentId ()Ljava/lang/String;
 	public final fun getTaskId ()Ljava/lang/String;
 	public fun hashCode ()I
-	public final fun matches (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun matches (Lcom/letta/mobile/data/subagents/SubagentChipRecord;)Z
 	public fun toString ()Ljava/lang/String;
 }
 

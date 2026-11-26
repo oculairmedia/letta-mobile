@@ -65390,7 +65390,7 @@ final class com.letta.mobile.data.subagents/SubagentEarlyTerminal { // com.letta
     final fun copy(kotlin/String = ..., com.letta.mobile.data.subagents/SubagentChipState = ..., kotlin/String? = ..., kotlin/Long? = ...): com.letta.mobile.data.subagents/SubagentEarlyTerminal // com.letta.mobile.data.subagents/SubagentEarlyTerminal.copy|copy(kotlin.String;com.letta.mobile.data.subagents.SubagentChipState;kotlin.String?;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentEarlyTerminal.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.subagents/SubagentEarlyTerminal.hashCode|hashCode(){}[0]
-    final fun matches(kotlin/String, kotlin/String?): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentEarlyTerminal.matches|matches(kotlin.String;kotlin.String?){}[0]
+    final fun matches(com.letta.mobile.data.subagents/SubagentChipRecord): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentEarlyTerminal.matches|matches(com.letta.mobile.data.subagents.SubagentChipRecord){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.subagents/SubagentEarlyTerminal.toString|toString(){}[0]
 
     final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.subagents/SubagentEarlyTerminal> { // com.letta.mobile.data.subagents/SubagentEarlyTerminal.$serializer|null[0]
