@@ -57,7 +57,6 @@ class IrohCanvasPresenceTransport(
 
     companion object {
         val CANVAS_PRESENCE_ALPN = "meridian/canvas-presence/1".encodeToByteArray()
-        private const val PREFIX_BYTES = 4
         private const val MAX_PAYLOAD_BYTES = 1024 * 1024 // 1MB
     }
 
@@ -80,26 +79,12 @@ class IrohCanvasPresenceTransport(
         acceptJob?.cancel()
         val ep = endpoint ?: return Job().apply { complete() }
         val job = scope.launch {
-            runCanvasAcceptLoop(ep, "CanvasPresence") { handleIncomingConnection(it) }
+            runCanvasAcceptLoop(ep, CANVAS_PRESENCE_ALPN, "CanvasPresence") { registerConnection(it, isInbound = true) }
         }
         acceptJob = job
         return job
     }
 
-    private suspend fun handleIncomingConnection(incoming: Incoming) {
-        runCatching {
-            val accepting = incoming.accept()
-            val peerAlpn = accepting.alpn()
-            if (peerAlpn.contentEquals(CANVAS_PRESENCE_ALPN)) {
-                val connection = accepting.connect()
-                Telemetry.event("CanvasPresence", "incoming.connected")
-                registerConnection(connection, isInbound = true)
-            }
-        }.onFailure { t ->
-            val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "incoming.error", "error" attr errorMsg)
-        }
-    }
 
     private fun startReaper(): Job {
         reaperJob?.cancel()
@@ -135,46 +120,26 @@ class IrohCanvasPresenceTransport(
         return changed
     }
 
-    suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection {
-        val ep = endpoint ?: error("Iroh endpoint is not configured")
-        Telemetry.event("CanvasPresence", "dial.start")
-        val connection = ep.connect(endpointAddr, CANVAS_PRESENCE_ALPN)
-        Telemetry.event("CanvasPresence", "dial.connected")
-        registerConnection(connection, isInbound = false)
-        return connection
-    }
+    suspend fun connectToPeer(endpointAddr: EndpointAddr): Connection =
+        dialCanvasPeer(endpoint, endpointAddr, CANVAS_PRESENCE_ALPN, "CanvasPresence")
+            .also { registerConnection(it, isInbound = false) }
 
-    suspend fun connectToPeerByTicket(ticketString: String): Connection {
-        val ticket = EndpointTicket.fromString(ticketString)
-        return connectToPeer(ticket.endpointAddr())
-    }
+    suspend fun connectToPeerByTicket(ticketString: String): Connection =
+        connectToPeer(EndpointTicket.fromString(ticketString).endpointAddr())
 
     fun registerConnection(connection: Connection, isInbound: Boolean = false): Job = scope.launch {
-        try {
-            val biStream = if (isInbound) connection.acceptBi() else connection.openBi()
-            val sendStream = biStream.send()
-            val recvStream = biStream.recv()
-
-            mutex.withLock {
-                activeSendStreams.add(sendStream)
-            }
-
-            try {
-                consumePackets(recvStream)
-            } finally {
-                removeActiveSendStream(sendStream)
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "connection.error", "error" attr errorMsg)
+        mutex.runCanvasStream(
+            { connection.canvasBiStream(isInbound) },
+            activeSendStreams,
+            "CanvasPresence",
+        ) { recv, _ ->
+            consumePackets(recv)
         }
     }
 
     private suspend fun consumePackets(recvStream: RecvStream) {
         while (true) {
-            val frameBytes = readFrame(recvStream) ?: break
+            val frameBytes = readCanvasFrame(recvStream, MAX_PAYLOAD_BYTES) ?: break
             dispatchIncomingPacket(frameBytes)
         }
     }
@@ -189,22 +154,13 @@ class IrohCanvasPresenceTransport(
         fallback.updatePresence(canvasId, packet.presence)
     }
 
-    private suspend fun removeActiveSendStream(sendStream: SendStream) {
-        withContext(NonCancellable) {
-            mutex.withLock {
-                activeSendStreams.remove(sendStream)
-            }
-            runCatching { sendStream.finish() }
-        }
-    }
-
     override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
         applyPresenceInternal(canvasId, presence)
         fallback.updatePresence(canvasId, presence)
 
         val packet = CanvasPresenceWirePacket(canvasId = canvasId.value, presence = presence)
         val payload = json.encodeToString(packet).encodeToByteArray()
-        val frame = encodeFrame(payload)
+        val frame = encodeCanvasFrame(payload, MAX_PAYLOAD_BYTES, "Canvas presence")
 
         mutex.withLock {
             val iterator = activeSendStreams.iterator()
@@ -247,48 +203,118 @@ class IrohCanvasPresenceTransport(
         flow.value = list
     }
 
-    private fun encodeFrame(payload: ByteArray): ByteArray {
-        require(payload.size <= MAX_PAYLOAD_BYTES) { "Canvas presence frame too large: ${payload.size}" }
-        val frame = ByteArray(PREFIX_BYTES + payload.size)
-        frame[0] = (payload.size ushr 24).toByte()
-        frame[1] = (payload.size ushr 16).toByte()
-        frame[2] = (payload.size ushr 8).toByte()
-        frame[3] = payload.size.toByte()
-        payload.copyInto(frame, destinationOffset = PREFIX_BYTES)
-        return frame
-    }
+}
 
-    private suspend fun readFrame(stream: RecvStream): ByteArray? {
-        val prefix = ByteArray(PREFIX_BYTES)
-        var offset = 0
-        while (offset < PREFIX_BYTES) {
-            val chunk = stream.read((PREFIX_BYTES - offset).toUInt())
-            if (chunk.isEmpty()) return null
-            chunk.copyInto(prefix, destinationOffset = offset)
-            offset += chunk.size
+/** Dials [endpointAddr] on [alpn] through [endpoint], reporting the dial under [telemetryTag]. */
+internal suspend fun dialCanvasPeer(
+    endpoint: Endpoint?,
+    endpointAddr: EndpointAddr,
+    alpn: ByteArray,
+    telemetryTag: String,
+): Connection {
+    val ep = endpoint ?: error("Iroh endpoint is not configured")
+    Telemetry.event(telemetryTag, "dial.start")
+    val connection = ep.connect(endpointAddr, alpn)
+    Telemetry.event(telemetryTag, "dial.connected")
+    return connection
+}
+
+/**
+ * Accepts [this] incoming connection when its ALPN is [alpn] and hands it to [register]; any other
+ * ALPN is ignored. Failures are reported under [telemetryTag] and never escape the accept loop.
+ */
+private suspend fun Incoming.acceptCanvasConnection(
+    alpn: ByteArray,
+    telemetryTag: String,
+    register: (Connection) -> Unit,
+) {
+    runCatching {
+        val accepting = accept()
+        if (accepting.alpn().contentEquals(alpn)) {
+            val connection = accepting.connect()
+            Telemetry.event(telemetryTag, "incoming.connected")
+            register(connection)
         }
-        val length = decodePrefixLength(prefix)
-        if (length !in 0..MAX_PAYLOAD_BYTES) return null
-        return stream.readExact(length.toUInt())
+    }.onFailure { t ->
+        Telemetry.event(telemetryTag, "incoming.error", "error" attr (t.message ?: t.toString()))
     }
+}
 
-    private fun decodePrefixLength(prefix: ByteArray): Int {
-        return ((prefix[0].toInt() and 0xff) shl 24) or
-            ((prefix[1].toInt() and 0xff) shl 16) or
-            ((prefix[2].toInt() and 0xff) shl 8) or
-            (prefix[3].toInt() and 0xff)
+/** Accepts the peer's canvas stream when it dialled us, otherwise opens one to it. */
+internal suspend fun Connection.canvasBiStream(isInbound: Boolean): BiStream =
+    if (isInbound) acceptBi() else openBi()
+
+/**
+ * Runs one canvas bidirectional stream from [openStream], registering its send side in
+ * [activeSendStreams] (guarded by this mutex) for the stream's lifetime. Errors other than
+ * cancellation are reported under [telemetryTag] and end only this stream.
+ */
+internal suspend fun Mutex.runCanvasStream(
+    openStream: suspend () -> BiStream,
+    activeSendStreams: MutableList<SendStream>,
+    telemetryTag: String,
+    consume: suspend (RecvStream, SendStream) -> Unit,
+) {
+    try {
+        val biStream = openStream()
+        val sendStream = biStream.send()
+        val recvStream = biStream.recv()
+        withLock { activeSendStreams.add(sendStream) }
+        try {
+            consume(recvStream, sendStream)
+        } finally {
+            withContext(NonCancellable) {
+                withLock { activeSendStreams.remove(sendStream) }
+                runCatching { sendStream.finish() }
+            }
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (t: Throwable) {
+        Telemetry.event(telemetryTag, "connection.error", "error" attr (t.message ?: t.toString()))
     }
+}
+
+private const val CANVAS_PREFIX_BYTES = 4
+
+internal fun encodeCanvasFrame(payload: ByteArray, maxPayloadBytes: Int, description: String): ByteArray {
+    require(payload.size <= maxPayloadBytes) { "$description frame too large: ${payload.size}" }
+    val frame = ByteArray(CANVAS_PREFIX_BYTES + payload.size)
+    frame[0] = (payload.size ushr 24).toByte()
+    frame[1] = (payload.size ushr 16).toByte()
+    frame[2] = (payload.size ushr 8).toByte()
+    frame[3] = payload.size.toByte()
+    payload.copyInto(frame, destinationOffset = CANVAS_PREFIX_BYTES)
+    return frame
+}
+
+internal suspend fun readCanvasFrame(stream: RecvStream, maxPayloadBytes: Int): ByteArray? {
+    val prefix = ByteArray(CANVAS_PREFIX_BYTES)
+    var offset = 0
+    while (offset < CANVAS_PREFIX_BYTES) {
+        val chunk = stream.read((CANVAS_PREFIX_BYTES - offset).toUInt())
+        if (chunk.isEmpty()) return null
+        chunk.copyInto(prefix, destinationOffset = offset)
+        offset += chunk.size
+    }
+    val length = ((prefix[0].toInt() and 0xff) shl 24) or
+        ((prefix[1].toInt() and 0xff) shl 16) or
+        ((prefix[2].toInt() and 0xff) shl 8) or
+        (prefix[3].toInt() and 0xff)
+    if (length !in 0..maxPayloadBytes) return null
+    return stream.readExact(length.toUInt())
 }
 
 internal suspend fun CoroutineScope.runCanvasAcceptLoop(
     endpoint: Endpoint,
+    alpn: ByteArray,
     telemetryTag: String,
-    handle: suspend (Incoming) -> Unit,
+    register: (Connection) -> Unit,
 ) {
     while (isActive) {
         try {
             val incoming = endpoint.acceptNext() ?: return
-            launch { handle(incoming) }
+            launch { incoming.acceptCanvasConnection(alpn, telemetryTag, register) }
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
