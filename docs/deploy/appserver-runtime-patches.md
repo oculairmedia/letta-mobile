@@ -78,7 +78,7 @@ written back. Two pieces do this:
 | Piece | Where it lives | Replicates? |
 | --- | --- | --- |
 | `mods/profile-provider.mjs` (letta-code mod) | `$LETTA_CONFIG_DIR/mods/profile-provider.mjs` on every node | No: node-local |
-| `lcp-model-profile` (runtime patch, one anchor) | in `letta-code-patch-loader.mjs` | No: node-local |
+| `lcp-model-profile` (runtime patch, one counted patch, eight anchors applied together) | in `letta-code-patch-loader.mjs` | No: node-local. The user cap field it writes, `lcp_user_context_window_limit`, replicates with the record |
 | Profile catalog, `LETTA_MODEL_PROFILES` | any path, named in the App Server environment | Yes: shared, the same on every node |
 | Profile bindings, `LETTA_MODEL_PROFILE_BINDINGS` | any node-local path, named in the App Server environment | No: node-local, never replicated |
 
@@ -119,6 +119,27 @@ stored settings for this node only. The stored `provider_type`, `context_window_
 overlay and the real provider derives its own; other stored settings (reasoning, temperature)
 are profile-level intent and are kept.
 
+**The user's context cap.** `/context-limit` (alias `/set-max-context`) stores the cap in the
+same `context_window_limit` that every model switch fills with the catalog default, so the stored
+value cannot be trusted on a profile turn. `lcp-model-profile` therefore also writes the user's
+cap to its own field, `lcp_user_context_window_limit`, in the conversation record (the agent
+record for the default conversation), next to the stock field, which is still written as before.
+On a profile turn the effective window is the smallest of: the user's cap, the binding's
+`model_settings.context_window_limit` if it sets one, and the bound model's own window. With no
+user cap the turn runs exactly as before (the binding's window, or the bound model's). The field
+is valid only while the stock field holds the same value: a reset (`/context-limit` with no
+value) removes it, and so does any later write that stores a different window there (a model
+switch to another default), so the cap is lost exactly when letta-code loses it today; a switch
+that keeps the stored window keeps the cap. Non-profile conversations are untouched: their turn
+settings never carry the field. Local backend only.
+
+**Every node that shares agent state must run a loader with this change before a profile is
+bound.** Stock `normalizeAgentRecord` rebuilds the agent record from a whitelist, so a node
+without it drops the default conversation's cap from the agent record on its next save of that
+agent. Conversation records keep unknown fields, but a stock node that rewrites
+`context_window_limit` leaves a stale cap behind; the reader ignores the field whenever it differs
+from the stock field, so a stale cap never applies.
+
 Failure is loud, never a silent fallback to another provider: a `profile/<id>` turn throws when
 the mod is not installed (no resolver), when the profile has no binding on this node, or when a
 binding points at another profile. If the patch itself fails open, the mod's provider points at a
@@ -130,5 +151,7 @@ and `letta model list` do not load mods and reject the handle, and headless mode
 profile/<id>`) loads mods after it handles `-m`, so it persists a mangled handle
 (`openai/profile/<id>` with `provider_type: "openai"`).
 
-`lcp-model-profile` adds one to the boot count. The tests, including a two-node App Server
-contract test with fake upstreams, are in `test/patch-loader-model-profile.test.ts`.
+`lcp-model-profile` adds one to the boot count; its anchors apply together or not at all. The
+tests, including a two-node App Server contract test with fake upstreams, are in
+`test/patch-loader-model-profile.test.ts`; the user cap tests are in
+`test/patch-loader-model-profile-user-cap.test.ts`.
