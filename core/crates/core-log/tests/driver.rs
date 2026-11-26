@@ -13,7 +13,9 @@ use std::rc::Rc;
 use common::{agent, append_payload, genesis_payload, key, log, node};
 use core_log::driver::{Clock, Hub, Notice, run_session};
 use core_log::payload::Payload;
-use core_log::{AgentLog, Mode, SessionConfig, StructuralJudge};
+use core_log::replicator::digest;
+use core_log::wire::{Hello, VERSION};
+use core_log::{AgentLog, Message, Mode, Pos, Session, SessionConfig, StructuralJudge};
 use core_store::{MemoryStore, Store, StoreError};
 use futures::executor::LocalPool;
 use futures::task::LocalSpawnExt as _;
@@ -159,4 +161,70 @@ fn catch_up_then_live_tail_relayed_through_a_third_node() {
             "live tail relayed"
         );
     }
+}
+
+/// A session that subscribed to no log (both stores were empty at `hello`) learns of a log by a
+/// `head` it already holds (another session brought the entry first). It must still subscribe to
+/// the peer's live tail, or entries the peer stores later (a new holder's `epoch_open` after a
+/// failover) are never relayed over this session.
+#[test]
+fn an_announced_head_already_held_still_subscribes_to_the_live_tail() {
+    let judge = StructuralJudge;
+    let agent_log = AgentLog::for_agent(&agent(), &judge);
+    let store = MemoryStore::new();
+    let mut session = Session::new(config(3));
+    store.read(|t| session.start(t, 0)).expect("start");
+    let hello = Message::Hello(Hello {
+        version: VERSION,
+        node_id: node(2),
+        constellation_id: [0xc0; 32],
+        member_heads: vec![[1; 32]],
+        log_digest: store.read(|t| digest(t)).expect("digest"),
+        mode: Mode::Live,
+        store_format: 1,
+    });
+    store
+        .write(|t| session.handle(t, &judge, hello, 0))
+        .expect("hello");
+    while store
+        .read(|t| session.poll_transmit(t, 0))
+        .expect("poll")
+        .is_some()
+    {}
+    // The entry arrives over another session.
+    let genesis = store
+        .write(|t| {
+            agent_log
+                .genesis(
+                    t,
+                    &key(1),
+                    match genesis_payload() {
+                        Payload::EpochOpen(o) => o,
+                        _ => unreachable!(),
+                    },
+                    0,
+                )
+                .map_err(common::to_store)
+        })
+        .expect("genesis");
+    let head = Message::Head {
+        log_id: log(),
+        epoch: genesis.header().epoch,
+        pos: Pos {
+            seq: 0,
+            hash: genesis.hash(),
+        },
+    };
+    store
+        .write(|t| session.handle(t, &judge, head, 1))
+        .expect("head");
+    let mut sent = Vec::new();
+    while let Some(message) = store.read(|t| session.poll_transmit(t, 1)).expect("poll") {
+        sent.push(message);
+    }
+    assert!(
+        sent.iter()
+            .any(|m| matches!(m, Message::Want { log_id, live: true, .. } if *log_id == log())),
+        "{sent:?}"
+    );
 }

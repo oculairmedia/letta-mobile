@@ -471,6 +471,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-sim"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "core-carrier",
+ "core-log",
+ "core-membership",
+ "core-placement",
+ "core-proto",
+ "core-store",
+ "hex",
+ "proptest",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "core-store"
 version = "0.1.0"
 dependencies = [

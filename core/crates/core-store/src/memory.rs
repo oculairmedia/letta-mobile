@@ -70,6 +70,17 @@ impl MemoryStore {
         Self::default()
     }
 
+    /// A copy of the committed state, as a backup taken now would hold it. Later writes to either
+    /// store do not reach the other. Bindings are node-local and are not copied.
+    #[must_use]
+    pub fn backup(&self) -> Self {
+        Self {
+            writer: Mutex::new(()),
+            state: Mutex::new(self.snapshot()),
+            bindings: MemoryBindings::default(),
+        }
+    }
+
     /// The last committed state. A panic elsewhere never leaves a half-applied state behind (a
     /// write swaps in a whole new state), so a poisoned lock is safe to take over.
     fn snapshot(&self) -> Arc<State> {
