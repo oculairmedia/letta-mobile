@@ -40,6 +40,7 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -132,8 +133,18 @@ class CanvasWorkspaceDrawingHandoffTest {
         changeBackground()
         val draft = controller.state.value.bgColor
         store.reportFaultOnly = true
+        // Spend the one-shot debounced autosave here, while every write still reports the fault:
+        // on a slow runner its delay expires inside the last select, and a save that reaches
+        // storage after the fault is lifted would acknowledge the draft without this handoff.
+        mainClock.advanceTimeBy(AUTOSAVE_MILLIS + 100L)
+        waitUntil { store.writes.get() > 0 && store.writesSettled() }
+        val beforeFirstAttempt = store.writes.get()
         select(CanvasDocumentViewerId.TEXT)
-        waitUntil { mainClock.advanceTimeByFrame(); store.storageFaults.value.isNotEmpty() }
+        waitUntil {
+            // Drive the clock only until the attempt starts a write; its outcome is sealed off the clock.
+            if (store.writes.get() == beforeFirstAttempt) mainClock.advanceTimeByFrame()
+            store.writes.get() > beforeFirstAttempt && store.writesSettled()
+        }
         waitForIdle()
         onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertDoesNotExist()
         onNodeWithContentDescription("Canvas board").assertIsDisplayed()
@@ -144,13 +155,18 @@ class CanvasWorkspaceDrawingHandoffTest {
         val firstFailure = store.storageFaults.value.single()
         val beforeRetry = store.writes.get()
         select(CanvasDocumentViewerId.TEXT)
-        waitUntil { mainClock.advanceTimeByFrame(); store.writes.get() > beforeRetry }
+        waitUntil {
+            if (store.writes.get() == beforeRetry) mainClock.advanceTimeByFrame()
+            store.writes.get() > beforeRetry && store.writesSettled()
+        }
         waitForIdle()
         assertEquals(firstFailure, store.storageFaults.value.single(), "identical diagnostics may be conflated")
         onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertDoesNotExist()
         onNodeWithContentDescription("Canvas board").assertIsDisplayed()
         assertEquals(draft, controller.state.value.bgColor)
 
+        // Safe to lift now: every write the failed attempts started has finished and had its
+        // durability answered, and the spent autosave leaves no other write in flight.
         store.reportFaultOnly = false
         val beforeSuccess = store.writes.get()
         select(CanvasDocumentViewerId.TEXT)
@@ -372,16 +388,29 @@ class CanvasWorkspaceDrawingHandoffTest {
         val faults = CanvasStorageFaults()
         override val storageFaults = faults.faults
         override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
-        override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = !reportFaultOnly
+
+        /** Each canvas's last write outcome, as the real completion barrier reports it. */
+        private val durableLastWrites = ConcurrentHashMap<CanvasId, Boolean>()
         val writes = AtomicInteger()
         val loads = AtomicInteger()
         val failures = AtomicInteger()
+        val writeCompletions = AtomicInteger()
+        val durabilityChecks = AtomicInteger()
         @Volatile var writeGate: CompletableDeferred<Unit>? = null
         @Volatile var loadGate: CompletableDeferred<Unit>? = null
         @Volatile var failLoadsRemaining = 0
         @Volatile var cancelLoads = false
         @Volatile var failWrites = false
         @Volatile var reportFaultOnly = false
+
+        /** True when every started write finished and had its durability answered. */
+        fun writesSettled(): Boolean =
+            writeCompletions.get() == writes.get() && durabilityChecks.get() == writes.get()
+
+        override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean {
+            durabilityChecks.incrementAndGet()
+            return durableLastWrites[canvasId] ?: true
+        }
 
         override suspend fun get(id: CanvasId): CanvasDocument? {
             loads.incrementAndGet()
@@ -396,16 +425,22 @@ class CanvasWorkspaceDrawingHandoffTest {
 
         override suspend fun upsert(doc: CanvasDocument) {
             writes.incrementAndGet()
-            writeGate?.await()
-            if (failWrites) {
-                failures.incrementAndGet()
-                error("test storage failure")
+            try {
+                writeGate?.await()
+                if (failWrites) {
+                    failures.incrementAndGet()
+                    error("test storage failure")
+                }
+                if (reportFaultOnly) {
+                    faults.record(CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, null, doc.id, null, "test reported failure", 1))
+                    durableLastWrites[doc.id] = false
+                    return
+                }
+                backing.upsert(doc)
+                durableLastWrites[doc.id] = true
+            } finally {
+                writeCompletions.incrementAndGet()
             }
-            if (reportFaultOnly) {
-                faults.record(CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, null, doc.id, null, "test reported failure", 1))
-                return
-            }
-            backing.upsert(doc)
         }
 
         suspend fun saved(id: CanvasId): CanvasDocument? = backing.get(id)
@@ -413,6 +448,9 @@ class CanvasWorkspaceDrawingHandoffTest {
         fun resetCounts() {
             writes.set(0)
             loads.set(0)
+            writeCompletions.set(0)
+            durabilityChecks.set(0)
+            durableLastWrites.clear()
         }
     }
 
