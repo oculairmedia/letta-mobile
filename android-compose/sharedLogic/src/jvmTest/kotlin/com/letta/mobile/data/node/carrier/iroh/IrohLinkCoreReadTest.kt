@@ -47,12 +47,19 @@ class IrohLinkCoreReadTest {
             frame
         }
         core.readFrom(source, Channel(IrohLinkCore.LANE_BUFFER), { IrohLinkCore.MAX_FRAME_BYTES }, closeAtEnd = true)
-        delay(SETTLE)
+        // Deterministic readiness: the reader takes the lane's whole read-ahead allowance, then the frame after it
+        // parks in its send on the full lane, and no read after that can happen until the node consumes. The count
+        // reaching LANE_BUFFER+1 is exactly that state, so the test waits for it instead of guessing at a sleep.
+        withTimeout(READ_AHEAD_TIMEOUT) { while (reads.get() <= IrohLinkCore.LANE_BUFFER) delay(POLL) }
         val read = reads.get()
         // The buffer holds LANE_BUFFER frames and one more waits in the suspended send.
         assertTrue(read <= IrohLinkCore.LANE_BUFFER + 1, "the node read $read of the peer's $PEER_FRAMES frames")
-        delay(SETTLE)
-        assertEquals(read, reads.get(), "and reads no more while the node is not consuming")
+        // The parked send cannot complete while nothing takes a frame off the lane, so the count must hold still
+        // however long the node refuses to read; every sample of the hold window asserts it.
+        repeat(HOLD_POLLS) {
+            delay(POLL)
+            assertEquals(read, reads.get(), "and reads no more while the node is not consuming")
+        }
     }
 
     @Test
@@ -100,7 +107,15 @@ class IrohLinkCoreReadTest {
 
     private companion object {
         const val PEER_FRAMES = 1_000
-        val SETTLE = 300.milliseconds
+
+        /** How long the peer waits for the reader to take the lane's whole read-ahead allowance. */
+        val READ_AHEAD_TIMEOUT = 10.seconds
+
+        /** The interval at which the test samples the count of frames the reader has taken off the peer. */
+        val POLL = 25.milliseconds
+
+        /** Samples in a row, while the node consumes nothing, over which the reader must stay parked. */
+        const val HOLD_POLLS = 12
         val TIMEOUT = 5.seconds
     }
 }
