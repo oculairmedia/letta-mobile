@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
             val overlays = rememberOverlayHost()
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
-            val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = false)
             SnackbarForwardingEffect(snackbarDispatcher, overlays)
             LastCrashSnackbarEffect(overlays)
             ChatPushServiceStartEffect()

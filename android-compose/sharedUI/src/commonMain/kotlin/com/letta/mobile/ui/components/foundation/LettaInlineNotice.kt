@@ -70,7 +70,7 @@ fun LettaInlineNotice(
     val tone = notice.tone
     val title = notice.title
     val shadow = if (notice.elevated) Modifier.shadow(LettaComponentDimens.floatingNoticeElevation, LettaShapes.panel) else Modifier
-    LettaPanel(modifier = modifier.fillMaxWidth().then(shadow), tone = tone, border = false) {
+    LettaPanel(modifier = modifier.fillMaxWidth().then(shadow), tone = tone) {
         Row(
             modifier = Modifier
                 .testTag(notice.contentTag)

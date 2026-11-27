@@ -104,6 +104,7 @@ internal fun VoiceModeCard(
                 paneTitle = label
                 isTraversalGroup = true
             },
+        border = true,
     ) {
         Box {
             // The glow rising from the seam with the prompt bar, under the words.

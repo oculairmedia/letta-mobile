@@ -76,7 +76,7 @@ internal fun MemoryGraphZoomControls(
     fitOnly: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    LettaPanel(modifier = modifier) {
+    LettaPanel(modifier = modifier, border = true) {
         Column {
             if (!fitOnly) {
                 IconButton(onClick = { viewportState.zoomBy(ZOOM_STEP) }) {

@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.ui.theme.tokens.LocalLettaHighContrast
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,7 +56,12 @@ val LocalHighContrastPreference: ProvidableCompositionLocal<HighContrastPreferen
 val LocalAccessibilityPolicy: ProvidableCompositionLocal<AccessibilityPolicy> =
     staticCompositionLocalOf { AccessibilityPolicy() }
 
-val LocalHighContrast: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }
+/**
+ * The ambient high-contrast flag; defined beside the leaf tokens, see
+ * [com.letta.mobile.ui.theme.tokens.LocalLettaHighContrast]. The same local under its theme name,
+ * so call sites that read it through ui.theme need no change.
+ */
+val LocalHighContrast: ProvidableCompositionLocal<Boolean> = LocalLettaHighContrast
 
 /** Session/persistent override for the high-contrast toggle on Settings; null follows the OS. */
 internal val LocalHighContrastChoice: ProvidableCompositionLocal<(Boolean) -> Unit> =
