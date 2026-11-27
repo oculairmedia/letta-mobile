@@ -112,6 +112,7 @@ class IrohNodeConnectionDrainingTest {
             runtime: AppServerRuntimeScope,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
+            resumeInterruptedTurn: Boolean,
         ): AppServerInboundFrame.SyncResponse =
             AppServerInboundFrame.SyncResponse(requestId = "sync", runtime = runtime, success = true)
 
