@@ -6,6 +6,7 @@ import androidx.compose.runtime.State
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.media.UiMediaAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatRenderItemState
@@ -43,6 +44,17 @@ internal data class ChatRowContext(
     /** True on the row holding the conversation's newest message. */
     val isNewest: Boolean get() = newestMessageId != null
 }
+
+/**
+ * Whether [item] draws nothing under these options ([ChatRowMessage]'s early return): the row
+ * then takes no space either. The paged list cannot drop a row Paging owns, so a hidden row that
+ * kept its leading space would stack its phantom gap onto its visible neighbours' — two hidden
+ * rows between visible ones opening exactly the ~48–60 dp voids the phone screenshot shows (the
+ * legacy list's display-options filter drops the row outright, and so takes its space). A run
+ * block filters its own messages and folds to nothing when none show.
+ */
+internal fun ChatDisplayOptions.suppressesRow(item: ChatRenderItem): Boolean =
+    item is ChatRenderItem.Single && hides(item.message)
 
 /**
  * What a subagent row asks the host to open: the dispatch's activity (its todo sheet on

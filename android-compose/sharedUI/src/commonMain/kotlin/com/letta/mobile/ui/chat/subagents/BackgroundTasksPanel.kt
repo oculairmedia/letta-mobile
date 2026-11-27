@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
@@ -193,5 +195,18 @@ fun BackgroundTasksLauncher(runningCount: Int, onOpen: (() -> Unit)?, modifier: 
     if (onOpen == null || runningCount <= 0) return
     BackgroundTasksToggle(runningCount = runningCount, onClick = onOpen, modifier = modifier)
 }
+
+/**
+ * The floating [BackgroundTasksLauncher]'s vertical band over the timeline's top, while [showing]:
+ * the overlay column's top inset plus the floating toggle's height (the orb between its two
+ * insets). The page adds it to `ChatSurfacePlatform.timelineOverlayReserve`, so the timeline rests
+ * its rows below the orb's band and the orb never covers the prompt bubble resting at the list's
+ * top. Zero while the launcher hides (nothing runs, or no pane to open).
+ */
+fun backgroundTasksLauncherReserve(showing: Boolean): Dp =
+    if (showing) LettaDimens.Space.sm + backgroundTasksFloatingToggleHeight else 0.dp
+
+/** The floating toggle's height: the orb between its two [LettaDimens.Space.sm] insets. */
+private val backgroundTasksFloatingToggleHeight: Dp = LettaDimens.Space.sm + LettaDimens.Space.xl + LettaDimens.Space.sm
 
 private const val BACKGROUND_TASKS_TITLE = "Background tasks"

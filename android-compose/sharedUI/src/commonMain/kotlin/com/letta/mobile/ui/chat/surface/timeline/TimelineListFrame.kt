@@ -42,6 +42,8 @@ import com.letta.mobile.ui.chat.surface.LANE_TIMELINE
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
@@ -51,6 +53,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompactio
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalNoticeContinued
 import com.letta.mobile.ui.chat.surface.timeline.rows.isBareStepRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.isCompletedNotice
+import com.letta.mobile.ui.chat.surface.timeline.rows.suppressesRow
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotAttention
 import com.letta.mobile.ui.mascot.mascotGazeTarget
@@ -280,17 +283,33 @@ internal fun TimelineItemRow(
 ) {
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     val context = bindings.contexts.forItem(item)
+    // A row the chat options hide draws nothing (ChatMessageRow's early return). The paged list
+    // cannot drop a row Paging owns, so the row must also give up its leading space: a hidden row
+    // that kept it would stack its phantom gap onto its visible neighbours' — two hidden rows
+    // between visible ones opening exactly the ~48–60 dp voids the phone screenshot shows (the
+    // legacy list's letta-mobile-zxk2n.5 filter drops the row, and so takes its space).
+    val hidden = context.displayOptions.suppressesRow(item)
     Box(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .hiddenUnderStickyCopy(sticky, item.key)
-            .padding(top = spacing?.first ?: 0.dp)
+            .layout { measurable, constraints ->
+                val child = measurable.measure(constraints.copy(minHeight = 0))
+                val leading = if (hidden || child.height == 0) 0 else (spacing?.first ?: 0.dp).roundToPx()
+                layout(child.width, constraints.constrainHeight(child.height + leading)) {
+                    child.placeRelative(0, leading)
+                }
+            }
             // The newest message (your prompt as it lands, then the reply as it streams) draws the
             // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
-            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = spacing != null && context.isNewest),
+            .mascotAttention(
+                AttentionKey("message:${item.key}"),
+                AttentionKind.MESSAGE,
+                enabled = !hidden && spacing != null && context.isNewest,
+            ),
     ) {
-        CompositionLocalProvider(LocalNoticeContinued provides (spacing?.second == true)) {
+        CompositionLocalProvider(LocalNoticeContinued provides (!hidden && spacing?.second == true)) {
             ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
         }
     }
@@ -359,14 +378,8 @@ private fun ownLeadingSpace(item: ChatRenderItem, older: ChatRenderItem?): Dp = 
 
 private fun blockLeadingSpace(item: ChatRenderItem): Dp = when (item) {
     // A run is a new turn: the section break above it, the same one the next speaker takes
-    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11). A run
-    // of nothing but tool calls continues the turn above it and takes the tight beat, as the
-    // legacy list's ChatMessageListRenderRunParams did (letta-mobile-bglj6.1.23).
-    is ChatRenderItem.RunBlock -> if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) {
-        ChatRowSpacing.grouped
-    } else {
-        ChatRowSpacing.ungrouped
-    }
+    // below it, so its summary line sits evenly between the two.
+    is ChatRenderItem.RunBlock -> ChatRowSpacing.ungrouped
     is ChatRenderItem.Single -> when {
         item.stableRunKey != null -> ChatRowSpacing.ungrouped
         item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped
