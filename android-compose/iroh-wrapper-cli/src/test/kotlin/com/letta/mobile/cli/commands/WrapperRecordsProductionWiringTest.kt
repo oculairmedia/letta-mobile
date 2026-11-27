@@ -70,7 +70,7 @@ class WrapperRecordsProductionWiringTest {
             voice.setup.get voice.setup.set voice.setup.clear voice.setup.test voice.models.list voice.transcribe voice.speech
             pins.get pins.set shell.state.get shell.state.propose service.credential.list service.credential.set
             service.credential.test service.credential.remove secret.request secret.request.status secret.request.list
-            secret.request.get secret.request.submit secret.request.cancel
+            secret.request.get secret.request.submit secret.request.cancel node.info
         """),
     )
 
