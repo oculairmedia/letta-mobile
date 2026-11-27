@@ -1,7 +1,5 @@
 package com.letta.mobile.data.node.info
 
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.ModelControlException
 import com.letta.mobile.data.rpcwire.AdminRpcErrors
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -106,7 +104,7 @@ class NodeInfoServiceTest {
         val reference = NodeInfo(lettaCodeVersion = "0.34.70")
         val calls = mutableListOf<String>()
 
-        val result = NodeHandshake(AdminRpcInvoker { method, _ -> calls += method; wire }) { reference }.run()
+        val result = NodeHandshake(NodeInfoRpc { method, _ -> calls += method; wire }) { reference }.run()
 
         assertEquals(listOf(NodeInfoWire.METHOD), calls)
         val checked = assertIs<NodeHandshakeResult.Checked>(result)
@@ -115,9 +113,9 @@ class NodeInfoServiceTest {
 
     @Test
     fun handshakeTreatsAnUnknownMethodOrAdminGateAsALegacyNode() = runTest {
-        val unknown = NodeHandshake(AdminRpcInvoker { _, _ -> throw ModelControlException(AdminRpcErrors.unknownMethod("node.info")) })
-        val gated = NodeHandshake(AdminRpcInvoker { _, _ -> throw ModelControlException("forbidden") })
-        val broken = NodeHandshake(AdminRpcInvoker { _, _ -> throw ModelControlException("Not connected to a host") })
+        val unknown = NodeHandshake(NodeInfoRpc { _, _ -> throw IllegalStateException(AdminRpcErrors.unknownMethod("node.info")) })
+        val gated = NodeHandshake(NodeInfoRpc { _, _ -> throw IllegalStateException("forbidden") })
+        val broken = NodeHandshake(NodeInfoRpc { _, _ -> throw IllegalStateException("Not connected to a host") })
 
         assertEquals(NodeHandshakeResult.Legacy, unknown.run())
         assertEquals(NodeHandshakeResult.Legacy, gated.run())

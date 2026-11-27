@@ -9,7 +9,7 @@ import com.letta.mobile.data.node.info.NodeHandshake
 import com.letta.mobile.data.node.info.NodeHandshakeResult
 import com.letta.mobile.data.node.info.NodeIncompatibility
 import com.letta.mobile.data.node.info.NodeIncompatibilityKind
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.node.info.NodeInfoRpc
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
@@ -22,7 +22,7 @@ const val NODE_COMPATIBILITY_KEY: String = "backend-node"
  * to a newly connected host ([rpc]), and is null while there is none or before it answers.
  */
 @Composable
-fun rememberNodeHandshake(rpc: AdminRpcInvoker?): NodeHandshakeResult? {
+fun rememberNodeHandshake(rpc: NodeInfoRpc?): NodeHandshakeResult? {
     val result: State<NodeHandshakeResult?> = produceState<NodeHandshakeResult?>(initialValue = null, rpc) {
         value = rpc?.let { NodeHandshake(it).run() }
     }

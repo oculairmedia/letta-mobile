@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.data.node.info.NodeInfoRpc
 import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.data.shell.ShellSettingsSection
@@ -162,7 +163,8 @@ internal fun rememberSettingsPageModel(state: SettingsPageState, services: Setti
         }
     }
     val saved = state.saved?.let { SavedBackendsState(it, adding) { next -> adding = next } }
-    val node = rememberNodeHandshake(services.pairing?.rpc)
+    val invoker = services.pairing?.rpc
+    val node = rememberNodeHandshake(remember(invoker) { invoker?.let { call -> NodeInfoRpc { method, params -> call.invoke(method, params) } } })
     val backend = BackendFormState(editing, form, state.connection.takeUnless { adding }, saved, node.takeUnless { adding }) { form = it }
     val search = PageSearch(query, onQuery = { query = it }, onOpen = { group ->
         query = ""

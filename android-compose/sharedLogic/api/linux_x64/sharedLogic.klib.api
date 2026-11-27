@@ -5392,6 +5392,10 @@ abstract fun interface com.letta.mobile.data.node.carrier/NodePeerAcceptor { // 
     abstract suspend fun serve(com.letta.mobile.data.node.carrier/NodePeerLink) // com.letta.mobile.data.node.carrier/NodePeerAcceptor.serve|serve(com.letta.mobile.data.node.carrier.NodePeerLink){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.node.info/NodeInfoRpc { // com.letta.mobile.data.node.info/NodeInfoRpc|null[0]
+    abstract suspend fun invoke(kotlin/String, kotlinx.serialization.json/JsonObject): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.node.info/NodeInfoRpc.invoke|invoke(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.node.info/RuntimePatchSetSource { // com.letta.mobile.data.node.info/RuntimePatchSetSource|null[0]
     abstract fun current(): com.letta.mobile.data.node.info/RuntimePatchSet // com.letta.mobile.data.node.info/RuntimePatchSetSource.current|current(){}[0]
 
@@ -55455,7 +55459,7 @@ final class com.letta.mobile.data.node.info/NodeFacts { // com.letta.mobile.data
 }
 
 final class com.letta.mobile.data.node.info/NodeHandshake { // com.letta.mobile.data.node.info/NodeHandshake|null[0]
-    constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker, kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.node.info/NodeInfo?> = ...) // com.letta.mobile.data.node.info/NodeHandshake.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.node.info.NodeInfo?>){}[0]
+    constructor <init>(com.letta.mobile.data.node.info/NodeInfoRpc, kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.node.info/NodeInfo?> = ...) // com.letta.mobile.data.node.info/NodeHandshake.<init>|<init>(com.letta.mobile.data.node.info.NodeInfoRpc;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.node.info.NodeInfo?>){}[0]
 
     final suspend fun run(): com.letta.mobile.data.node.info/NodeHandshakeResult // com.letta.mobile.data.node.info/NodeHandshake.run|run(){}[0]
 }

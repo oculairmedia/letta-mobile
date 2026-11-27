@@ -1,10 +1,16 @@
 package com.letta.mobile.data.node.info
 
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.rpcwire.AdminRpcErrors
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+
+/** One `node.info` call: the method and its params in, the result element out; failures throw with the host's text. */
+fun interface NodeInfoRpc {
+    /** Calls [method] with [params] and returns its result, or null when it has none. */
+    suspend fun invoke(method: String, params: JsonObject): JsonElement?
+}
 
 /** The outcome of asking a connected node what it is. */
 sealed interface NodeHandshakeResult {
@@ -23,7 +29,7 @@ sealed interface NodeHandshakeResult {
  * [NodeCompatibilityRule] against this build and the optional [reference] node.
  */
 class NodeHandshake(
-    private val rpc: AdminRpcInvoker,
+    private val rpc: NodeInfoRpc,
     private val reference: suspend () -> NodeInfo? = { null },
 ) {
     /** Asks the node and judges it. Never throws except for cancellation. */
