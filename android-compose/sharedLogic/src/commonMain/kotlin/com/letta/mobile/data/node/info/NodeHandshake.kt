@@ -1,8 +1,8 @@
 package com.letta.mobile.data.node.info
 
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.rpcwire.AdminRpcErrors
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -45,7 +45,7 @@ class NodeHandshake(
     }
 
     private companion object {
-        val WIRE = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+        val WIRE = LettaJson.adminRpc
 
         fun classify(message: String): NodeHandshakeResult =
             if (AdminRpcErrors.isUnknownMethod(message) || message.startsWith("forbidden")) {

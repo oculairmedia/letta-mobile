@@ -1,7 +1,7 @@
 package com.letta.mobile.data.node.info
 
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -99,7 +99,8 @@ class NodeInfoService(
     }
 
     private companion object {
-        val WIRE = Json { encodeDefaults = true; explicitNulls = true }
+        /** Every field is written, defaults and nulls included, so the reply's shape never depends on a Kotlin default. */
+        val WIRE = LettaJson.persisted
         val TOKEN = Regex("""[A-Za-z0-9][A-Za-z0-9._+-]{0,63}""")
         val HEX = Regex("""[0-9a-f]{64}""")
         val MODEL_HANDLE = Regex("""[A-Za-z0-9][A-Za-z0-9._:@+/-]{0,199}""")
