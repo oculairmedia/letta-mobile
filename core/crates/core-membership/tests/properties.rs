@@ -68,6 +68,40 @@ fn one_cap(choice: u8) -> CapSet {
 /// Builds a DAG from `steps`. Ops may be unauthorized; that is the point. Returns the
 /// constellation and the ops in creation order (parents before children).
 fn build(steps: &[Step]) -> (OpId, Vec<SignedOp>) {
+    let genesis = genesis_op();
+    let constellation = genesis.id();
+    let mut ops = vec![genesis];
+    let mut generator = Generator {
+        constellation,
+        keys: POOL.collect(),
+        next_key: 27,
+        roots: vec![CatalogRoot([0; 16])],
+    };
+    for (index, step) in steps.iter().enumerate() {
+        let ts_ms = u64::try_from(index).expect("small") + 1;
+        let actor = generator.keys[usize::from(step.actor) % generator.keys.len()];
+        let target = generator.keys[usize::from(step.target) % generator.keys.len()];
+        let mut parents = BTreeSet::from([ops[usize::from(step.parent) % ops.len()].id()]);
+        if let Some(second) = step.second_parent {
+            parents.insert(ops[usize::from(second) % ops.len()].id());
+        }
+        let op = Op {
+            header: OpHeader {
+                constellation: Some(constellation),
+                issuer: key(actor).node_id(),
+                parents,
+                ts_ms,
+            },
+            payload: generator.payload(step, actor, target),
+            extensions: BTreeMap::new(),
+        };
+        ops.push(SignedOp::sign(&op, &key(actor)).expect("signs"));
+    }
+    (constellation, ops)
+}
+
+/// The genesis of the first pool key, with every capability.
+fn genesis_op() -> SignedOp {
     let first = key(*POOL.start());
     let genesis = Op {
         header: OpHeader {
@@ -84,27 +118,21 @@ fn build(steps: &[Step]) -> (OpId, Vec<SignedOp>) {
         },
         extensions: BTreeMap::new(),
     };
-    let genesis = SignedOp::sign(&genesis, &first).expect("signs");
-    let constellation = genesis.id();
-    let mut ops = vec![genesis];
-    let mut keys: Vec<u8> = POOL.collect();
-    let mut next_key = 27_u8;
-    let mut roots = vec![CatalogRoot([0; 16])];
-    for (index, step) in steps.iter().enumerate() {
-        let ts_ms = u64::try_from(index).expect("small") + 1;
-        let actor = keys[usize::from(step.actor) % keys.len()];
-        let target = keys[usize::from(step.target) % keys.len()];
-        let mut parents = BTreeSet::from([ops[usize::from(step.parent) % ops.len()].id()]);
-        if let Some(second) = step.second_parent {
-            parents.insert(ops[usize::from(second) % ops.len()].id());
-        }
-        let header = OpHeader {
-            constellation: Some(constellation),
-            issuer: key(actor).node_id(),
-            parents,
-            ts_ms,
-        };
-        let payload = match step.kind {
+    SignedOp::sign(&genesis, &first).expect("signs")
+}
+
+/// What the generator has handed out so far: the keys in play and the catalog roots.
+struct Generator {
+    constellation: OpId,
+    keys: Vec<u8>,
+    next_key: u8,
+    roots: Vec<CatalogRoot>,
+}
+
+impl Generator {
+    /// The payload `step` asks for, issued by `actor` about `target`.
+    fn payload(&mut self, step: &Step, actor: u8, target: u8) -> OpPayload {
+        match step.kind {
             0..=2 => OpPayload::Add {
                 subject: key(target).node_id(),
                 caps: add_caps(step.choice),
@@ -124,39 +152,36 @@ fn build(steps: &[Step]) -> (OpId, Vec<SignedOp>) {
                 caps_add: CapSet::new(),
                 caps_remove: one_cap(step.choice),
             },
-            7 => {
-                let new_key = key(next_key);
-                keys.push(next_key);
-                next_key += 1;
-                OpPayload::Rotate {
-                    new_key: new_key.node_id(),
-                    new_key_sig: rotate_proof(&new_key, &key(actor).node_id(), &constellation),
-                }
-            }
+            7 => self.rotate(actor),
             8 => OpPayload::PolicySet {
                 policy: Value::Map(BTreeMap::from([(
                     0,
                     Value::Uint(u64::from(step.choice % 2)),
                 )])),
             },
-            _ => {
-                let prev_root = roots[usize::from(step.choice) % roots.len()];
-                let new_root = CatalogRoot([u8::try_from(roots.len()).unwrap_or(255); 16]);
-                roots.push(new_root);
-                OpPayload::CatalogRootMove {
-                    new_root,
-                    prev_root,
-                }
-            }
-        };
-        let op = Op {
-            header,
-            payload,
-            extensions: BTreeMap::new(),
-        };
-        ops.push(SignedOp::sign(&op, &key(actor)).expect("signs"));
+            _ => self.root_move(step.choice),
+        }
     }
-    (constellation, ops)
+
+    fn rotate(&mut self, actor: u8) -> OpPayload {
+        let new_key = key(self.next_key);
+        self.keys.push(self.next_key);
+        self.next_key += 1;
+        OpPayload::Rotate {
+            new_key: new_key.node_id(),
+            new_key_sig: rotate_proof(&new_key, &key(actor).node_id(), &self.constellation),
+        }
+    }
+
+    fn root_move(&mut self, choice: u8) -> OpPayload {
+        let prev_root = self.roots[usize::from(choice) % self.roots.len()];
+        let new_root = CatalogRoot([u8::try_from(self.roots.len()).unwrap_or(255); 16]);
+        self.roots.push(new_root);
+        OpPayload::CatalogRootMove {
+            new_root,
+            prev_root,
+        }
+    }
 }
 
 fn log_of(constellation: OpId, ops: &[SignedOp]) -> MembershipLog {
