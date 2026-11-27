@@ -354,7 +354,10 @@ pub async fn run_scenario(harness: &dyn ContractHarness, name: &str) -> Outcome 
     };
     (endpoints.stop)().await;
     match (node_outcome, shell_outcome) {
-        (Err(failure), _) => Err(format!("{name}: node: {failure}")),
+        (Err(node_failure), Err(shell_failure)) => Err(format!(
+            "{name}: node: {node_failure}; shell: {shell_failure}"
+        )),
+        (Err(failure), Ok(())) => Err(format!("{name}: node: {failure}")),
         (Ok(()), Err(failure)) => Err(format!("{name}: shell: {failure}")),
         (Ok(()), Ok(())) => Ok(()),
     }
