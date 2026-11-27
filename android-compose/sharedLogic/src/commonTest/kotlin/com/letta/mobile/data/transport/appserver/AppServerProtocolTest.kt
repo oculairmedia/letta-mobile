@@ -10,6 +10,7 @@ import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -267,6 +268,55 @@ class AppServerProtocolTest {
         assertEquals("external-tool-1", toolResponse["request_id"]?.jsonPrimitive?.content)
         assertNull(toolResponse["tool_call_id"])
         assertEquals("done", toolResponse["result"]?.jsonObject?.get("content")?.jsonArray?.first()?.jsonObject?.get("text")?.jsonPrimitive?.content)
+    }
+
+    /**
+     * Pins the `resume_interrupted_turn` wire contract against the App Server's sync
+     * command validation (`isSyncCommand`: `resume_interrupted_turn === undefined | boolean`,
+     * read as `parsed.resume_interrupted_turn === true`): the host wrapper's reconnect sync
+     * sends the field as `true`, every client sync omits it entirely, and a frame carrying it
+     * round-trips through the typed command.
+     */
+    @Test
+    fun encodesResumeInterruptedTurnOnlyForTheHostReconnectSync() {
+        // The host wrapper's reconnect sync: the field is on the wire, spelled exactly so.
+        val hostReconnect = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(
+                AppServerCommand.Sync(
+                    runtime = runtime,
+                    requestId = "reconnect-sync",
+                    recoverApprovals = true,
+                    forceDeviceStatus = true,
+                    resumeInterruptedTurn = true,
+                ),
+            ),
+        ).jsonObject
+        assertEquals(true, hostReconnect["resume_interrupted_turn"]?.jsonPrimitive?.booleanOrNull)
+
+        // A client sync (cadence/gap/probe/relay): the field is omitted, not sent as false —
+        // the server applies its own default, which does not resume anything.
+        val clientSync = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(
+                AppServerCommand.Sync(runtime = runtime, requestId = "client-sync"),
+            ),
+        ).jsonObject
+        assertFalse(clientSync.containsKey("resume_interrupted_turn"))
+
+        // Round-trip: a frame carrying the field decodes onto the typed command.
+        val frame = buildJsonObject {
+            put("type", "sync")
+            put("runtime", buildJsonObject {
+                put("agent_id", "agent-1")
+                put("conversation_id", "conv-1")
+            })
+            put("request_id", "rt")
+            put("resume_interrupted_turn", true)
+        }
+        val decoded = AppServerProtocol.json.decodeFromJsonElement(
+            AppServerCommand.serializer(),
+            frame,
+        ) as AppServerCommand.Sync
+        assertTrue(decoded.resumeInterruptedTurn)
     }
 
     @Test

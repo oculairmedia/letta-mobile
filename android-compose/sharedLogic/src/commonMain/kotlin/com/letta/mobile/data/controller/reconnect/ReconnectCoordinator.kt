@@ -28,8 +28,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * 1. On a connection drop signal (from the controller's connection-state Flow),
  *    execute reconnect: re-establish the controller connection; for each active
  *    RuntimeRecord, runtime_start (if App Server restarted) and sync(recoverApprovals=true,
- *    forceDeviceStatus=true); rebuild in-memory runtime state from the replayed events
- *    + the durable registry records.
+ *    forceDeviceStatus=true, resumeInterruptedTurn=true); rebuild in-memory runtime state
+ *    from the replayed events + the durable registry records.
  *
  * 2. Call the ExternalToolRegistrar hook after each runtime_start on reconnect
  *    (since external tools are startup-bound).
@@ -82,8 +82,8 @@ class ReconnectCoordinator(
      *    if the App Server restarted)
      * 3. Calls externalToolRegistrar.reRegisterAll for each runtime (to restore
      *    external tools after App Server restart)
-     * 4. Calls controller.sync with recoverApprovals=true and forceDeviceStatus=true
-     *    to replay events and rebuild state
+     * 4. Calls controller.sync with recoverApprovals=true, forceDeviceStatus=true and
+     *    resumeInterruptedTurn=true to replay events and rebuild state
      *
      * This method is idempotent: calling it multiple times is safe (cached
      * runtimes in the controller will prevent duplicate runtime_start calls).
@@ -320,7 +320,8 @@ class ReconnectCoordinator(
      * This method:
      * 1. Calls controller.startRuntime (which may issue runtime_start if App Server restarted)
      * 2. Calls externalToolRegistrar.reRegisterAll (to restore external tools)
-     * 3. Calls controller.sync with recoverApprovals=true and forceDeviceStatus=true
+     * 3. Calls controller.sync with recoverApprovals=true, forceDeviceStatus=true and
+     *    resumeInterruptedTurn=true
      *
      * @param record The runtime record to reconnect
      */
@@ -349,12 +350,17 @@ class ReconnectCoordinator(
         // re-register them after each runtime_start on reconnect
         externalToolRegistrar.reRegisterAll(canonical.scope)
 
-        // Step 3: Sync with recover_approvals=true and force_device_status=true
-        // This replays events and rebuilds in-memory runtime state
+        // Step 3: Sync with recover_approvals=true, force_device_status=true and
+        // resume_interrupted_turn=true. This replays events and rebuilds in-memory runtime
+        // state, and — because the wrapper is the conversation's execution owner and this is
+        // the wrapper's own reconnect — asks the server to resume a turn an App Server
+        // restart interrupted, instead of denying its pending approvals as stale and
+        // leaving the turn hanging until the next user input. Client syncs never set it.
         controller.sync(
             runtime = canonical.scope,
             recoverApprovals = true,
             forceDeviceStatus = true,
+            resumeInterruptedTurn = true,
         )
     }
 

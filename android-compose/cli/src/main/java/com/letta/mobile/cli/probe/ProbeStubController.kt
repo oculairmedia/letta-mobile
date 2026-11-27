@@ -215,6 +215,7 @@ class ProbeStubController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
+        resumeInterruptedTurn: Boolean,
     ): AppServerInboundFrame.SyncResponse = AppServerInboundFrame.SyncResponse(
         requestId = "stub-sync-${UUID.randomUUID()}",
         runtime = runtime,

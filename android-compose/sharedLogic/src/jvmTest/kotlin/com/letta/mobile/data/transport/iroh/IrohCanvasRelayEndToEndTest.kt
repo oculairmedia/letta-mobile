@@ -188,6 +188,7 @@ class IrohCanvasRelayEndToEndTest {
             runtime: AppServerRuntimeScope,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
+            resumeInterruptedTurn: Boolean,
         ): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
 
         override suspend fun abort(

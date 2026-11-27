@@ -98,6 +98,7 @@ class ControlCapabilityHandlersTest {
             runtime: AppServerRuntimeScope,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
+            resumeInterruptedTurn: Boolean,
         ) = error("unused")
 
         override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?) = error("unused")

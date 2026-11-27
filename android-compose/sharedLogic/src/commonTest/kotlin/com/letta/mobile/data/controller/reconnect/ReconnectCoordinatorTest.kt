@@ -293,6 +293,9 @@ class ReconnectCoordinatorTest {
         assertEquals("conv-1", syncCall.runtime.conversationId)
         assertTrue(syncCall.recoverApprovals)
         assertTrue(syncCall.forceDeviceStatus)
+        // The wrapper's own reconnect sync is the one peer allowed to resume a turn an
+        // App Server restart interrupted: the wrapper is the conversation's execution owner.
+        assertTrue(syncCall.resumeInterruptedTurn)
     }
 }
 
@@ -345,11 +348,13 @@ private class FakeAppServerController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
+        resumeInterruptedTurn: Boolean,
     ): AppServerInboundFrame.SyncResponse {
         syncCalls += SyncCall(
             runtime = runtime,
             recoverApprovals = recoverApprovals,
             forceDeviceStatus = forceDeviceStatus,
+            resumeInterruptedTurn = resumeInterruptedTurn,
         )
 
         return AppServerInboundFrame.SyncResponse(
@@ -375,6 +380,7 @@ private class FakeAppServerController(
         val runtime: AppServerRuntimeScope,
         val recoverApprovals: Boolean,
         val forceDeviceStatus: Boolean,
+        val resumeInterruptedTurn: Boolean,
     )
 }
 

@@ -541,6 +541,9 @@ class IrohNodeConnection internal constructor(
                 )
                 val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
                 val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
+                // Host authority: a viewer's relayed sync never resumes an interrupted turn —
+                // only this wrapper's own reconnect sync does — so `resume_interrupted_turn`
+                // is deliberately not read from the viewer's frame and stays false here.
                 val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
                 AppServerProtocol.json.encodeToString(
                     AppServerInboundFrame.serializer(), response.copy(requestId = requestId),

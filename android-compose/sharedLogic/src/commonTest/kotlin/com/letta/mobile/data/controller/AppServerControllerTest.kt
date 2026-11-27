@@ -12,6 +12,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCreatedRuntimeEntities
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -24,6 +25,7 @@ import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -33,7 +35,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 class AppServerControllerTest {
@@ -510,6 +515,33 @@ class AppServerControllerTest {
         assertEquals("sync-req-1", command.requestId)
         assertEquals(true, command.recoverApprovals)
         assertEquals(false, command.forceDeviceStatus)
+    }
+
+    @Test
+    fun syncPutsResumeInterruptedTurnOnTheWireOnlyWhenAsked() = runTest {
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "sync-req-1" },
+        )
+        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+
+        // The host wrapper's reconnect sync asks the server to resume an interrupted turn.
+        controller.sync(runtime, recoverApprovals = true, forceDeviceStatus = true, resumeInterruptedTurn = true)
+        val resumeCommand = client.syncCommands.single()
+        val resumeWire = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(resumeCommand),
+        ).jsonObject
+        assertEquals(true, resumeWire["resume_interrupted_turn"]?.jsonPrimitive?.booleanOrNull)
+
+        // A client sync (default arguments) must not carry the field at all.
+        controller.sync(runtime)
+        val clientCommand = client.syncCommands.last()
+        assertEquals(false, clientCommand.resumeInterruptedTurn)
+        val clientWire = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(clientCommand),
+        ).jsonObject
+        assertFalse(clientWire.containsKey("resume_interrupted_turn"))
     }
 
     @Test
