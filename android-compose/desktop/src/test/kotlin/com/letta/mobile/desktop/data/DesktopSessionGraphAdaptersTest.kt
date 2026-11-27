@@ -34,7 +34,11 @@ import kotlinx.coroutines.test.runTest
  */
 class DesktopSessionGraphAdaptersTest {
     private fun graphFor(config: LettaConfig?): SharedSessionRepositoryGraph =
-        desktopSessionGraphFactory(configProvider = { config }, channelTransportFactory = ::NoOpChannelTransport).create()
+        desktopSessionGraphFactory(
+            configProvider = { config },
+            channelTransportFactory = ::NoOpChannelTransport,
+            appServerOverride = { null },
+        ).create()
 
     @Test
     fun factoryCreatesDesktopGraphWithoutAndroidImplementations() {
@@ -97,6 +101,27 @@ class DesktopSessionGraphAdaptersTest {
             assertIs<CachedBlockRepository>(graph.blockRepository, "serverUrl=$serverUrl")
             graph.close()
         }
+    }
+
+    /**
+     * Under the developer App Server override the desktop dials that App Server directly and binds no node transport,
+     * so a LOCAL config is read as the directly dialled session it is: agents and memory over that client. Before, the
+     * graph still treated it as a node session and left agents and memory with neither a node nor a client.
+     */
+    @Test
+    fun theDeveloperOverrideMakesALocalConfigADirectlyDialledSession() = runTest {
+        val config = LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = "")
+        val graph = desktopSessionGraphFactory(
+            configProvider = { config },
+            channelTransportFactory = ::NoOpChannelTransport,
+            appServerOverride = { "ws://127.0.0.1:4500" },
+        ).create()
+
+        assertIs<AppServerAgentRepository>(graph.agentRepository)
+        assertIs<AppServerAgentBlockRepository>(graph.blockRepository)
+        assertTrue(graph.capabilities.supports(SessionRoute.AGENTS))
+        assertFalse(graph.capabilities.supports(SessionRoute.TOOLS), "no node serves the admin set under the override")
+        graph.close()
     }
 
     @Test

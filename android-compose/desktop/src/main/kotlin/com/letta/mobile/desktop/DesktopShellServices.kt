@@ -170,6 +170,11 @@ private fun rememberDesktopIrohLink(
         bootstrap.irohAgentDirectorySlot.value = agentDirectory
         // letta-mobile-bzvro.37: MemFS, secrets and workspace files go through the host's relay.
         com.letta.mobile.desktop.workspace.DesktopIrohWorkspaceRelay.transport = transport
+        // Local-only controls follow the active backend, not whether the bundled runtime happens to be running.
+        com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute.publish(
+            bootstrap.activeConfig,
+            com.letta.mobile.desktop.chat.DesktopAppServerRuntimeConfig.fromProcess().serverUrl,
+        )
         desktopHostAppearance.attach(transport)
     }
     LaunchedEffect(Unit) { desktopHostAppearance.run() }

@@ -23,6 +23,7 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
+import com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
@@ -88,9 +89,11 @@ private fun rememberHostNotes(agentId: String, store: SecureSettingsStore): Drea
 @Composable
 private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes {
     val health by DesktopLocalRuntimeHost.appServer.health.collectAsState()
+    val onLocalNode by DesktopLocalNodeRoute.attached.collectAsState()
     var allowed by remember(store) { mutableStateOf(DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store)) }
-    // The bundled runtime runs on this computer whenever it is active: the desktop's own node supervises it.
-    val bundledOnWindows = health.active && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
+    // Only while the agent is the bundled runtime's: the desktop's own node is the active backend and its child runs.
+    // A remote node's agents dream on another machine, even while the bundled child runs here in the background.
+    val bundledOnWindows = health.active && onLocalNode && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
     return DreamingHostNotes(
         windowsAutoBlocked = bundledOnWindows,
         windowsAutoAllowed = allowed || DesktopRuntimeLaunchPreference.allowWindowsAutoReflection,

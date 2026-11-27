@@ -16,6 +16,7 @@ import com.letta.mobile.data.node.embedded.embeddedNodeTransport
 import com.letta.mobile.desktop.chat.DesktopAppServerRuntimeConfig
 import com.letta.mobile.desktop.chat.desktopCanvasToolRegistry
 import com.letta.mobile.desktop.runtime.DesktopBundledRuntimeNode
+import com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute
 import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
@@ -57,7 +58,7 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
 
 /** The bundled runtime is served by the desktop's own node unless a developer App Server override is set. */
 internal fun shouldAttachLocalNode(config: LettaConfig): Boolean =
-    config.mode == LettaConfig.Mode.LOCAL && DesktopAppServerRuntimeConfig.fromProcess().serverUrl == null
+    DesktopLocalNodeRoute.attaches(config, DesktopAppServerRuntimeConfig.fromProcess().serverUrl)
 
 private fun localNodeTransport(sessionScope: CoroutineScope, canvasSessions: CanvasSessionRegistry): IrohChannelTransport {
     DesktopBundledRuntimeNode.tools = { desktopCanvasToolRegistry(isIroh = false, canvasSessions) }
