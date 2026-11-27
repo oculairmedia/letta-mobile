@@ -316,6 +316,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/node-carrier
 
 - [Node carrier v1: one client stack over any transport](reference/contracts/node-carrier/node-carrier-v1.md)
+- [Node carrier v1: Rust core notes](reference/contracts/node-carrier/rust-carrier-notes-v1.md)
 
 ### reference/contracts/node-protocol
 

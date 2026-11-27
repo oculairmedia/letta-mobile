@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement", "crates/core-carrier", "crates/core-carrier-iroh"]
 
 [workspace.package]
 edition = "2024"
@@ -36,6 +36,8 @@ bytes = "1"
 tokio = { version = "1", default-features = false }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 uuid = { version = "1.19.0", default-features = false, features = ["std", "v8"] }
+core-carrier = { path = "crates/core-carrier" }
+async-trait = "0.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
