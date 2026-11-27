@@ -40,7 +40,7 @@ class NodeHandshake(
         NodeHandshakeResult.Checked(NodeCompatibilityRule.evaluate(info, reference()))
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (error: Exception) {
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
         classify(error.message.orEmpty())
     }
 

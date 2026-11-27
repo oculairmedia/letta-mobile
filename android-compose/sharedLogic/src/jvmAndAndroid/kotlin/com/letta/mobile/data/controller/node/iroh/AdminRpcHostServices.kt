@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.node.info.NodeFacts
 
 /** Host integration services used by admin routes; missing optional services keep their routes unavailable. */
+@Suppress("LongParameterList") // One optional slot per host service; each defaults to unavailable.
 class AdminRpcHostServices(
     /** Existing controller for runtime operations; null keeps controller-backed routes unavailable. */
     val controller: AppServerController? = null,

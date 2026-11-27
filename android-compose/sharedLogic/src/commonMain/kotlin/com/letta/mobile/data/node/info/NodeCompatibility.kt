@@ -102,7 +102,13 @@ object NodeCompatibilityRule {
         }
         val reasons = buildList {
             if (candidate.storeFormat.major != localStoreFormat.major) {
-                add(NodeIncompatibility(NodeIncompatibilityKind.STORE_FORMAT, localStoreFormat.toString(), candidate.storeFormat.toString()))
+                add(
+                    NodeIncompatibility(
+                        NodeIncompatibilityKind.STORE_FORMAT,
+                        localStoreFormat.toString(),
+                        candidate.storeFormat.toString(),
+                    ),
+                )
             }
             if (reference != null) addAll(runtimeParity(reference, candidate))
         }
