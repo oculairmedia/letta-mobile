@@ -24,6 +24,7 @@ SDK_DIR="${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}"
 NDK_DIR="${ANDROID_NDK_ROOT:-$(ls -d "$SDK_DIR"/ndk/* | sort -V | tail -1)}"
 TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_ROOT/scripts/lib/download-with-retry.sh"
 OUT_DIR="$REPO_ROOT/android-compose/app/libs/embedded-bash/arm64-v8a"
 WORK_DIR="${WORK_DIR:-/tmp/android-bash-build}"
 
@@ -36,13 +37,14 @@ export STRIP="$TOOLCHAIN/bin/llvm-strip"
 mkdir -p "$WORK_DIR" "$OUT_DIR"
 cd "$WORK_DIR"
 TARBALL="bash-$BASH_VERSION_TARGET.tar.gz"
-if [[ ! -f "$TARBALL" ]]; then
-  curl -fsSLO "https://ftp.gnu.org/gnu/bash/$TARBALL"
-fi
-echo "$BASH_SHA256  $TARBALL" | sha256sum -c - || {
-  echo "Checksum mismatch for $TARBALL — refusing to build from it." >&2
-  exit 1
-}
+# ftp.gnu.org has answered a signed release build's tarball request with an
+# empty reply, so the fetch goes through the shared helper: transient errors
+# are retried, the kernel.org and GNU mirror networks are the fallbacks, and
+# the pinned sha256 gate only ever sees a complete file.
+download_with_retry "$WORK_DIR/$TARBALL" "$BASH_SHA256" \
+  "https://ftp.gnu.org/gnu/bash/$TARBALL" \
+  "https://mirrors.kernel.org/gnu/bash/$TARBALL" \
+  "https://ftpmirror.gnu.org/gnu/bash/$TARBALL"
 rm -rf "bash-$BASH_VERSION_TARGET"
 tar xf "$TARBALL"
 cd "bash-$BASH_VERSION_TARGET"
