@@ -13,16 +13,21 @@ import com.letta.mobile.data.shellstate.shared.SharedShellState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -35,9 +40,13 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class HostAppearanceSettingsTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val edits = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @AfterTest
-    fun stop() = scope.cancel()
+    fun stop() {
+        scope.cancel()
+        edits.cancel()
+    }
 
     @Test
     fun changingTheThemeHereChangesWhatTheHostHoldsAndWhatAnotherClientShows() = runBlocking<Unit> {
@@ -105,18 +114,36 @@ class HostAppearanceSettingsTest {
         val host = RouterShellStateHost()
         val link = host.transport(Endpoint("desktop"))
         val here = client(link, dynamicColorSupported = true)
+        val persistentJobs = edits.coroutineContext[Job]!!.children.toSet()
         here.section.dynamicColor!!.set(true)
         within { here.shell.state.first { it.entries[AppearanceKeys.DYNAMIC_COLOR]?.value == JsonPrimitive(true) } }
 
+        awaitEdits(persistentJobs)
         link.cut()
         within { here.shell.state.first { !it.live } }
         here.section.themePreset!!.set(ThemePreset.OCEAN)
-        within { here.section.notice!!.first { it != null } }
+        awaitEdits(persistentJobs)
+        assertTrue(here.section.notice!!.value != null)
         link.restore()
         within { here.shell.state.first { it.live } }
 
         assertEquals(setOf(AppearanceKeys.DYNAMIC_COLOR), host.entries().keys)
         assertEquals(JsonPrimitive(true), host.entries().getValue(AppearanceKeys.DYNAMIC_COLOR))
+    }
+
+    @Test
+    fun awaitingEditsWaitsForTheEditCoroutineToFinish() = runBlocking<Unit> {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        edits.launch {
+            started.complete(Unit)
+            release.await()
+        }
+        started.await()
+        val waiting = async(start = CoroutineStart.UNDISPATCHED) { awaitEdits() }
+        assertFalse(waiting.isCompleted)
+        release.complete(Unit)
+        within { waiting.await() }
     }
 
     @Test
@@ -165,7 +192,11 @@ class HostAppearanceSettingsTest {
         val appearance = SharedShellAppearance(shell)
         scope.launch { appearance.run() }
         runBlocking { within { shell.state.first { it.editable } } }
-        return Client(appearance, hostAppearanceSettings(appearance, scope, dynamicColorSupported), shell)
+        return Client(appearance, hostAppearanceSettings(appearance, edits, dynamicColorSupported), shell)
+    }
+
+    private suspend fun awaitEdits(persistentJobs: Set<Job> = emptySet()) {
+        within { edits.coroutineContext[Job]!!.children.filterNot { it in persistentJobs }.toList().joinAll() }
     }
 
     private suspend fun <T> within(block: suspend () -> T): T = withTimeout(TIMEOUT_MS) { block() }
