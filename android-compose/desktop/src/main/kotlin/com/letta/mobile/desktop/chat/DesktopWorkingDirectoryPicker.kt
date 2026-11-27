@@ -17,6 +17,7 @@ import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerControlle
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.runtime.LocalAgentDefaults
@@ -35,9 +36,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * letta-mobile-zxk2n.6 (G32): the desktop's binding of the shared working-directory picker. It
- * browses through the desktop's workspace route (`list_in_directory` on the direct App Server
- * session) and hands the choice to the conversation's `change_device_state` cwd.
+ * The desktop's binding of the shared working-directory picker. It browses through the desktop's
+ * workspace route (`list_in_directory` over the node's workspace relay) and hands the choice to the
+ * conversation's `change_device_state` cwd.
  *
  * With the bundled local runtime the App Server's files are this computer's, so the picker also
  * gets folder creation, "show in file manager" and the OS folder dialog. With a remote App Server
@@ -62,11 +63,13 @@ internal fun rememberDesktopWorkingDirectoryPicker(port: DesktopChatSessionPort)
 internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): DesktopWorkingDirectoryPicker {
     val latestOnChosen by rememberUpdatedState(onChosen)
     val scope = rememberCoroutineScope()
-    // The LOCAL registry holds a client only while the bundled child runs on this computer.
-    val localClient by DesktopLocalAppServerClientRegistry.shared.clients.collectAsState(
+    // The files listed are this computer's only while the bundled child runs and no directly dialled App Server (which
+    // the workspace route prefers) is installed.
+    val runtimeHealth by DesktopLocalRuntimeHost.appServer.health.collectAsState()
+    val directClient by DesktopLocalAppServerClientRegistry.shared.clients.collectAsState(
         DesktopLocalAppServerClientRegistry.shared.currentOrNull(),
     )
-    val isLocal = localClient != null
+    val isLocal = runtimeHealth.active && directClient == null
     val recents = remember { RecentFolders(DesktopFileSecureSettingsStore(defaultDesktopStateDirectory().resolve(RECENT_FOLDERS_FILE))) }
     val agentDefaults = LocalAgentDefaults.current
     val controller = remember(scope, isLocal, agentDefaults) {

@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 
 /**
- * The Iroh connection the desktop is on, or null; the shell publishes it alongside the chat's
- * transport. Read per request by [DesktopWorkspaceSources].
+ * The node connection the desktop is on (an Iroh node, or its own node), or null; the shell publishes
+ * it alongside the chat's transport. Read per request by [DesktopWorkspaceSources].
  */
 internal object DesktopIrohWorkspaceRelay {
     @Volatile
@@ -22,13 +22,12 @@ internal object DesktopIrohWorkspaceRelay {
 }
 
 /**
- * Binds the shared agent-workspace sources (letta-mobile-bzvro.24–.26) to the desktop's App Server:
- * the direct session when there is one, otherwise the Iroh host's workspace relay
- * (letta-mobile-bzvro.37). With neither, every request fails with [NO_DIRECT_SESSION], which the
- * pages show in place of their content.
+ * Binds the shared agent-workspace sources to the desktop's App Server: a directly dialled session when
+ * a developer set one up, otherwise the node's workspace relay. With neither, every request fails with
+ * [NO_DIRECT_SESSION], which the pages show in place of their content.
  */
 internal class DesktopWorkspaceSources(
-    private val registry: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry.direct,
+    private val registry: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry.shared,
     private val irohTransport: () -> IChannelTransport? = { DesktopIrohWorkspaceRelay.transport },
 ) {
     private val route = WorkspaceClientRoute(

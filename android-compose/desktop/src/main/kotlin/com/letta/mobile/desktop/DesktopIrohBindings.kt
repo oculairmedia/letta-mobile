@@ -1,16 +1,21 @@
 package com.letta.mobile.desktop
 
-
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.chat.runtime.ArchivedConversations
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.node.embedded.embeddedNodeConnectConfig
+import com.letta.mobile.data.node.embedded.embeddedNodeTransport
+import com.letta.mobile.desktop.chat.DesktopAppServerRuntimeConfig
+import com.letta.mobile.desktop.chat.desktopCanvasToolRegistry
+import com.letta.mobile.desktop.runtime.DesktopBundledRuntimeNode
 import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
@@ -37,21 +42,29 @@ import kotlinx.coroutines.launch
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
 private const val DESKTOP_DEVICE_ID = "letta-desktop"
 
+/** The connect config for [config]'s node: its `iroh://` address, or the desktop's own node (no token). */
 private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
-    IrohConnectConfig(
-        baseShimUrl = config.serverUrl,
-        token = config.accessToken.orEmpty(),
-        deviceId = DESKTOP_DEVICE_ID,
-        clientVersion = "letta-desktop-iroh",
-    )
+    if (shouldAttachLocalNode(config)) {
+        embeddedNodeConnectConfig(DESKTOP_DEVICE_ID)
+    } else {
+        IrohConnectConfig(
+            baseShimUrl = config.serverUrl,
+            token = config.accessToken.orEmpty(),
+            deviceId = DESKTOP_DEVICE_ID,
+            clientVersion = "letta-desktop-iroh",
+        )
+    }
 
-/**
- * iroh:// backend: one QUIC channel transport shared by the chat gateway,
- * admin_rpc reads, and (once implemented server-side) registries. Selected
- * purely by URL scheme, same as Android's DefaultSessionRepositoryGraphFactory; null for HTTP
- * backends. Connects on entering composition and closes (disconnect + cancel its
- * owned coroutine job) on dispose.
- */
+/** The bundled runtime is served by the desktop's own node unless a developer App Server override is set. */
+internal fun shouldAttachLocalNode(config: LettaConfig): Boolean =
+    config.mode == LettaConfig.Mode.LOCAL && DesktopAppServerRuntimeConfig.fromProcess().serverUrl == null
+
+private fun localNodeTransport(sessionScope: CoroutineScope, canvasSessions: CanvasSessionRegistry): IrohChannelTransport {
+    DesktopBundledRuntimeNode.tools = { desktopCanvasToolRegistry(isIroh = false, canvasSessions) }
+    return embeddedNodeTransport(DesktopBundledRuntimeNode.host, DESKTOP_DEVICE_ID, sessionScope)
+}
+
+/** iroh:// backend: one QUIC channel transport shared by the chat gateway and admin_rpc reads; closed on dispose. */
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
     IrohChannelTransport(
         activeConfigProvider = { desktopIrohConnectConfig(config) },
@@ -145,27 +158,24 @@ private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecyc
     }
 }
 
-/**
- * letta-mobile-9v9nu: mode-authoritative Iroh transport gate.
- *
- * `Mode.LOCAL` always wins over `serverUrl`'s scheme. A persisted config can
- * carry an `iroh://` ticket (save-time `BackendConfigPolicy.normalize`
- * blanks it, but this gate is the last line of defense so an in-memory LOCAL
- * config never binds the remote transport regardless of what its `serverUrl`
- * still says).
- */
+/** Mode-authoritative Iroh transport gate: `Mode.LOCAL` wins over a leftover `iroh://` serverUrl. */
 internal fun shouldBindIrohTransport(config: LettaConfig): Boolean =
     config.mode != LettaConfig.Mode.LOCAL && IrohChannelTransport.isIrohUrl(config.serverUrl)
 
+/** The window's node transport for [activeConfig]: an Iroh node, the desktop's own node, or null for a direct ws:// host. */
 @Composable
 internal fun rememberIrohTransport(
     activeConfig: LettaConfig,
     chatScope: CoroutineScope,
+    canvasSessions: CanvasSessionRegistry,
 ): IrohChannelTransport? {
     val irohTransport = remember(activeConfig) {
-        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport).also { transport ->
+        if (shouldBindIrohTransport(activeConfig)) {
+            createIrohTransport(activeConfig)
+        } else {
             // No Iroh host behind this backend: canvases stay on this device, and say so.
-            if (transport == null) com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.detach()
+            com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.detach()
+            if (shouldAttachLocalNode(activeConfig)) localNodeTransport(chatScope, canvasSessions) else null
         }
     }
     DesktopTransportLifecycleEffect(
@@ -184,14 +194,7 @@ internal fun rememberIrohTransport(
     return irohTransport
 }
 
-/**
- * Publishes the live channel transport into the session graph slot.
- *
- * Only Iroh mode has a channel transport (the main QUIC transport). HTTP
- * backends publish null, so the graph falls back to NoOpChannelTransport and
- * its Cron/SelfTodo/Subagent repositories degrade to empty (the legacy shim
- * WebSocket side-channel that used to feed them was removed in g70jb.1).
- */
+/** Publishes the live channel transport into the session graph slot; a backend with none publishes null. */
 @Composable
 internal fun rememberAndPublishGraphChannelTransport(
     irohTransport: IrohChannelTransport?,

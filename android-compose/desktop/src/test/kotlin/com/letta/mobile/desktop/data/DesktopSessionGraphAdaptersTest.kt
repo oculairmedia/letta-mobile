@@ -12,7 +12,6 @@ import com.letta.mobile.data.repository.CachedBlockRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.appserver.AppServerAgentBlockRepository
 import com.letta.mobile.data.repository.appserver.AppServerAgentRepository
-import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -60,26 +59,20 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     /**
-     * letta-mobile-ckmub.4: no backend binds a Letta REST repository any more. The bundled runtime
-     * and a remote host reached directly (ws://) are both App Servers: agents and memory are read
-     * over that session; schedules and tools have no direct App Server route yet, so they are their
-     * absent-route form rather than a REST fallback.
+     * No backend binds a Letta REST repository. A remote host reached directly (ws://, a developer-only
+     * setting) is an App Server: agents and memory are read over that session; schedules and tools have
+     * no direct App Server route yet, so they are their absent-route form rather than a REST fallback.
      */
     @Test
-    fun appServerBackendsReadAgentsAndMemoryOverTheAppServer() = runTest {
-        val backends = listOf(
-            LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = ""),
-            LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500"),
-        )
-        for (config in backends) {
-            val graph = graphFor(config)
+    fun directAppServerReadsAgentsAndMemoryOverTheAppServer() = runTest {
+        val config = LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500")
+        val graph = graphFor(config)
 
-            assertIs<AppServerAgentRepository>(graph.agentRepository, config.id)
-            assertIs<AppServerAgentBlockRepository>(graph.blockRepository, config.id)
-            assertIs<ScheduleRepository>(graph.scheduleRepository, config.id)
-            assertUnserved(SessionRoute.TOOLS) { graph.toolRepository.refreshTools() }
-            graph.close()
-        }
+        assertIs<AppServerAgentRepository>(graph.agentRepository, config.id)
+        assertIs<AppServerAgentBlockRepository>(graph.blockRepository, config.id)
+        assertIs<ScheduleRepository>(graph.scheduleRepository, config.id)
+        assertUnserved(SessionRoute.TOOLS) { graph.toolRepository.refreshTools() }
+        graph.close()
     }
 
     @Test
@@ -91,17 +84,19 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     /**
-     * letta-mobile-9v9nu regression: a LOCAL config with a leftover `iroh://` serverUrl must not
-     * route tools or schedules through the Iroh-backed implementations.
+     * The bundled runtime is the desktop's own node: it is attached to like an Iroh node and serves the
+     * admin set over its channel transport, whether or not the config still carries a stale `iroh://`
+     * serverUrl.
      */
     @Test
-    fun localModeWithStaleIrohServerUrlNeverUsesIrohRepositories() = runTest {
-        val graph = graphFor(LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = IROH_URL))
+    fun localModeAttachesToTheDesktopNodeLikeAnIrohNode() = runTest {
+        for (serverUrl in listOf("", IROH_URL)) {
+            val graph = graphFor(LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = serverUrl))
 
-        assertFalse(graph.capabilities.supports(SessionRoute.TOOLS))
-        assertUnserved(SessionRoute.TOOLS) { graph.toolRepository.refreshTools() }
-        assertFalse(graph.scheduleRepository is IrohScheduleRepository)
-        graph.close()
+            assertTrue(graph.capabilities.supports(SessionRoute.TOOLS), "serverUrl=$serverUrl")
+            assertIs<CachedBlockRepository>(graph.blockRepository, "serverUrl=$serverUrl")
+            graph.close()
+        }
     }
 
     @Test

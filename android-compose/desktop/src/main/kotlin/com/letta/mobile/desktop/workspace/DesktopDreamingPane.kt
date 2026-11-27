@@ -89,8 +89,8 @@ private fun rememberHostNotes(agentId: String, store: SecureSettingsStore): Drea
 private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes {
     val health by DesktopLocalRuntimeHost.appServer.health.collectAsState()
     var allowed by remember(store) { mutableStateOf(DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store)) }
-    val bundledOnWindows = health.active && DesktopIrohWorkspaceRelay.transport == null &&
-        windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
+    // The bundled runtime runs on this computer whenever it is active: the desktop's own node supervises it.
+    val bundledOnWindows = health.active && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
     return DreamingHostNotes(
         windowsAutoBlocked = bundledOnWindows,
         windowsAutoAllowed = allowed || DesktopRuntimeLaunchPreference.allowWindowsAutoReflection,
@@ -103,11 +103,11 @@ private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes 
 }
 
 /**
- * letta-code's settings and `/dream` through the Iroh relay, else the direct App Server. The relay
- * is read per request, so a session that connects or drops Iroh later is followed; without one
+ * letta-code's settings and `/dream` through the node's relay, else a developer's direct App Server.
+ * The relay is read per request, so a session that connects or drops later is followed; without one
  * the relay answers "not connected" and the direct client serves.
  */
 private fun desktopDreamingRepository(): DreamingRepository {
-    val direct = AppServerDreamingRepository(client = { DesktopLocalAppServerClientRegistry.direct.currentOrNull() })
+    val direct = AppServerDreamingRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
     return AdminRpcDreamingRepository(AdminRpcInvoker.overTransport { DesktopIrohWorkspaceRelay.transport }).orElse(direct)
 }

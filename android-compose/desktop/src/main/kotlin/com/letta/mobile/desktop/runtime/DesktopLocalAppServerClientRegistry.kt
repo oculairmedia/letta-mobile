@@ -11,10 +11,12 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Shares the single child-owned App Server session with LOCAL repository adapters.
+ * Shares the App Server session the desktop dials directly (a ws:// address, a developer-only setting) with the
+ * repository adapters and workspace pages that read over it. The bundled runtime is never dialled directly: the shell
+ * reaches it through the desktop's own node.
  *
  * Instance-based (not a process-global `object`) so tests can isolate generations
- * and desktop bootstrap can inject a shared singleton (letta-mobile-l2ew9.4).
+ * and desktop bootstrap can inject a shared singleton.
  */
 class DesktopLocalAppServerClientRegistry {
     private data class Entry(val generation: Long, val token: String?, val client: AppServerClient?)
@@ -56,15 +58,10 @@ class DesktopLocalAppServerClientRegistry {
     }
 
     companion object {
-        /** Process-wide registry used by desktop bootstrap wiring. */
-        val shared: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry()
-
         /**
-         * letta-mobile-bzvro.24–.26: the session whenever the desktop speaks the App Server
-         * protocol directly (bundled runtime or an App Server URL), for workspace commands
-         * (MemFS, secrets, device files). Empty over Iroh, whose host relays them instead
-         * (letta-mobile-bzvro.37, see `DesktopWorkspaceSources`).
+         * Process-wide registry used by desktop bootstrap wiring: empty unless a developer points the desktop at an
+         * App Server directly, since every node (Iroh, or the desktop's own) relays its workspace commands instead.
          */
-        val direct: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry()
+        val shared: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry()
     }
 }

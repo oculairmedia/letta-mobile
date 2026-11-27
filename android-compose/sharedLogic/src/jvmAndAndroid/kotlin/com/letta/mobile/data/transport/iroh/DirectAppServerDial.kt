@@ -21,6 +21,7 @@ import io.ktor.client.plugins.websocket.WebSockets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 import kotlin.time.Duration
 import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
@@ -44,6 +45,11 @@ class DirectAppServerDial(
     val adminRpc: suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse,
     /** Ends the socket, then whatever the dial holds for it (the on-device runtime's lease). */
     val close: suspend (reason: String) -> Unit,
+    /**
+     * A streamed `admin_rpc` (see [com.letta.mobile.data.transport.api.IChannelTransport.adminRpcStream]) when the
+     * dial serves one, as a node session does on a call lane; null when it does not.
+     */
+    val adminRpcStream: ((method: String, params: JsonObject) -> Flow<JsonObject>)? = null,
 )
 
 /** Where [IrohChannelTransport] gets each direct dial; a fresh one per (re)dial. */

@@ -156,6 +156,9 @@ class WindowsNodeToolsEndpointContractTest : NodeToolsEndpointContract() {
 
         assertEquals(1, entries.size, entries.toString())
         assertEquals(AclEntryType.ALLOW, entries.single().type())
-        assertEquals(user, entries.single().principal())
+        // An elevated account (a CI runner) owns its files as the Administrators group, and the file's ACL names its owner.
+        val owner = Files.getOwner(endpointFile)
+        val named = entries.single().principal()
+        assertTrue(named in setOf(user, owner), "the ACL names $named, not $user or its owner $owner")
     }
 }

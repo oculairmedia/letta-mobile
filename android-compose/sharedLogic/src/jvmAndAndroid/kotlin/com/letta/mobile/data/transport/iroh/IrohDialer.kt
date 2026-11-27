@@ -191,6 +191,7 @@ internal class IrohDialer(
             adminRpcCall = dial.adminRpc,
             observerStreamFrames = dial.streamFrames,
             connectionAlive = { dial.connectionState.value.isReady },
+            adminRpcStreamCall = dial.adminRpcStream,
         )
         lossWatch = scope.launch {
             val ended = dial.connectionState.first { it is AppServerConnectionState.Failed } as AppServerConnectionState.Failed

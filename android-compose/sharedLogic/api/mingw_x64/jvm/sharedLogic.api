@@ -1594,6 +1594,7 @@ public final class com/letta/mobile/data/backend/SessionRouteKt {
 
 public final class com/letta/mobile/data/backend/SessionRouteMatrix {
 	public static final field INSTANCE Lcom/letta/mobile/data/backend/SessionRouteMatrix;
+	public final fun attachesThroughNode (Lcom/letta/mobile/data/backend/SessionPlatform;Lcom/letta/mobile/data/model/BackendKind;)Z
 	public final fun bound (Lcom/letta/mobile/data/backend/SessionPlatform;Lcom/letta/mobile/data/model/BackendKind;)Ljava/util/Set;
 	public final fun disagreements ()Ljava/util/Set;
 	public final fun getDIVERGENCES ()Ljava/util/Map;
@@ -38100,6 +38101,7 @@ public final class com/letta/mobile/data/node/NodeComposition {
 	public final fun getTurnIdentity ()Lcom/letta/mobile/data/runtime/TurnIdentityLedger;
 	public final fun installAdminRpc (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lcom/letta/mobile/data/node/NodeAdminExtras;)V
 	public final fun start (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun startLocal (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;Lcom/letta/mobile/data/node/NodeAppServerConnection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/node/NodeComposition$Companion {
@@ -38193,6 +38195,27 @@ public abstract interface class com/letta/mobile/data/node/NodeToolsSocket {
 
 public final class com/letta/mobile/data/node/NodeToolsSocket$Companion {
 	public final fun getNone ()Lcom/letta/mobile/data/node/NodeToolsSocket;
+}
+
+public final class com/letta/mobile/data/node/attach/NodeSessionAppServerTransport : com/letta/mobile/data/transport/appserver/AppServerTransport {
+	public fun <init> (Lcom/letta/mobile/data/node/carrier/NodeSession;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/carrier/NodeSession;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun adminRpcStream (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lkotlinx/coroutines/flow/Flow;
+	public final fun getConnectionState ()Lkotlinx/coroutines/flow/StateFlow;
+	public synthetic fun getControlFrames ()Lkotlinx/coroutines/flow/Flow;
+	public fun getControlFrames ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun getInboundFrames ()Lkotlinx/coroutines/flow/Flow;
+	public synthetic fun getStreamFrames ()Lkotlinx/coroutines/flow/Flow;
+	public fun getStreamFrames ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun isConnected ()Lkotlinx/coroutines/flow/Flow;
+	public fun sendControl (Lcom/letta/mobile/data/transport/appserver/AppServerCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/attach/NodeSessionDialer : com/letta/mobile/data/transport/iroh/DirectAppServerDialer {
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun dial (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getReadyTimeout-UwyO8pc ()J
 }
 
 public final class com/letta/mobile/data/node/carrier/InProcessNodeCarrier : com/letta/mobile/data/node/carrier/NodeCarrier {
@@ -38489,6 +38512,7 @@ public final class com/letta/mobile/data/node/carrier/NodeSession {
 	public static final field Companion Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;
 	public static final field MAX_RESUME_PAGES I
 	public final fun adminRpc-kXg03rg (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun adminRpcStream (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lkotlinx/coroutines/flow/Flow;
 	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getCapabilities ()Lcom/letta/mobile/data/node/carrier/NodeCapabilities;
 	public final fun getClosure ()Lkotlinx/coroutines/flow/StateFlow;
@@ -38518,6 +38542,44 @@ public final class com/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier$Compa
 
 public final class com/letta/mobile/data/node/carrier/iroh/IrohNodePeerLinkKt {
 	public static final fun serveIrohNodePeer (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public class com/letta/mobile/data/node/embedded/BundledRuntimeNode {
+	public fun <init> (Lcom/letta/mobile/data/node/host/AppServerProcessSource$Owned;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Ljava/io/File;Ljava/io/File;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/host/AppServerProcessSource$Owned;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Ljava/io/File;Ljava/io/File;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHost ()Lcom/letta/mobile/data/node/embedded/EmbeddedNodeHost;
+	public final fun getStateDirectory ()Ljava/io/File;
+	public final fun getTools ()Lkotlin/jvm/functions/Function0;
+	public final fun restart (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setTools (Lkotlin/jvm/functions/Function0;)V
+	public final fun spec ()Lcom/letta/mobile/data/node/embedded/EmbeddedNodeSpec;
+}
+
+public final class com/letta/mobile/data/node/embedded/EmbeddedNodeHost : com/letta/mobile/data/node/carrier/NodeCarrier, java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/data/node/embedded/EmbeddedNodeHost$Companion;
+	public fun <init> (Lcom/letta/mobile/data/node/embedded/EmbeddedNodeSpec;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun close ()V
+	public fun dial-VM31NQ8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getRunning ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun restart (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/embedded/EmbeddedNodeHost$Companion {
+	public final fun getADDRESS-HN4vsaY ()Ljava/lang/String;
+	public final fun getNODE_IDENTITY--sylO0U ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/embedded/EmbeddedNodeSpec {
+	public fun <init> (Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/node/NodePorts;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public final fun getAppServer ()Lkotlin/jvm/functions/Function1;
+	public final fun getConfig ()Lkotlin/jvm/functions/Function0;
+	public final fun getPorts ()Lcom/letta/mobile/data/node/NodePorts;
+	public final fun getTools ()Lkotlin/jvm/functions/Function0;
+}
+
+public final class com/letta/mobile/data/node/embedded/EmbeddedNodeTransportKt {
+	public static final fun embeddedNodeConnectConfig (Ljava/lang/String;)Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;
+	public static final fun embeddedNodeTransport (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/transport/iroh/IrohChannelTransport;
 }
 
 public final class com/letta/mobile/data/node/host/AgentMessageDelivery {
@@ -73764,8 +73826,10 @@ public final class com/letta/mobile/data/transport/iroh/DeliveryOutcome {
 }
 
 public final class com/letta/mobile/data/transport/iroh/DirectAppServerDial {
-	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/Flow;Ljava/util/Set;Lkotlin/jvm/functions/Function4;Lkotlin/jvm/functions/Function2;)V
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/Flow;Ljava/util/Set;Lkotlin/jvm/functions/Function4;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/Flow;Ljava/util/Set;Lkotlin/jvm/functions/Function4;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAdminRpc ()Lkotlin/jvm/functions/Function4;
+	public final fun getAdminRpcStream ()Lkotlin/jvm/functions/Function2;
 	public final fun getClient ()Lcom/letta/mobile/data/transport/appserver/AppServerClient;
 	public final fun getClose ()Lkotlin/jvm/functions/Function2;
 	public final fun getConnectionState ()Lkotlinx/coroutines/flow/StateFlow;
@@ -74181,12 +74245,13 @@ public final class com/letta/mobile/data/transport/iroh/IrohConnectConfig {
 }
 
 public final class com/letta/mobile/data/transport/iroh/IrohConnectionHandle {
-	public fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun component1 ()Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;
 	public final fun component10 ()Lkotlin/jvm/functions/Function2;
 	public final fun component11 ()Lkotlin/jvm/functions/Function2;
+	public final fun component12 ()Lkotlin/jvm/functions/Function2;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;
@@ -74195,10 +74260,11 @@ public final class com/letta/mobile/data/transport/iroh/IrohConnectionHandle {
 	public final fun component7 ()Ljava/util/Set;
 	public final fun component8 ()Lkotlinx/coroutines/flow/Flow;
 	public final fun component9 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;
+	public final fun copy (Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransport;Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Lkotlin/jvm/functions/Function4;Ljava/util/Set;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohConnectionHandle;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAdminRpcCall ()Lkotlin/jvm/functions/Function4;
+	public final fun getAdminRpcStreamCall ()Lkotlin/jvm/functions/Function2;
 	public final fun getClose ()Lkotlin/jvm/functions/Function2;
 	public final fun getConfig ()Lcom/letta/mobile/data/transport/iroh/IrohConnectConfig;
 	public final fun getConnectionAlive ()Lkotlin/jvm/functions/Function0;

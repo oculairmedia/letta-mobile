@@ -200,8 +200,8 @@ class DesktopAppServerChatGatewayBuilder(
                 ),
             )
             session = opened
-            if (spec.local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
-            if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
+            // A directly dialled App Server (developer-only) also serves the session's agents, memory and workspace pages.
+            if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
             startStreamIntegrity(router, opened.client, clientScope)
             // lgns8.22.3: one inbound collector per desktop gateway.
             val turnEngine = router.attachTurnStack(

@@ -13,10 +13,10 @@ import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 
 /**
- * letta-mobile-ckmub.17.1: desktop's binding of the shared [HostSessionGraphFactory]. The graph
- * itself is common code; desktop supplies only its JVM sessions: the bundled runtime's App Server
- * ([DesktopLocalAppServerClientRegistry.shared]), a directly dialled one
- * ([DesktopLocalAppServerClientRegistry.direct]) and the Iroh channel transport.
+ * Desktop's binding of the shared [HostSessionGraphFactory]. The graph itself is common code; desktop
+ * supplies only its JVM sessions: the node channel transport (an Iroh node, or the desktop's own node
+ * for the bundled runtime) and a directly dialled App Server ([DesktopLocalAppServerClientRegistry.shared],
+ * a developer-only setting).
  */
 fun desktopSessionGraphFactory(
     configProvider: () -> LettaConfig? = { null },
@@ -34,11 +34,10 @@ fun desktopSessionGraphFactory(
     )
 }
 
-/** The bundled runtime's session for a local backend, the directly dialled one for a ws:// host. */
+/** The directly dialled session for a ws:// host; every other backend is a node, read over its channel transport. */
 internal val DesktopAppServerClients = HostAppServerClients { kind ->
     when (kind) {
-        BackendKind.LOCAL_RUNTIME -> DesktopLocalAppServerClientRegistry.shared::currentClient
-        BackendKind.DIRECT_WS -> DesktopLocalAppServerClientRegistry.direct::currentClient
-        BackendKind.IROH -> null
+        BackendKind.DIRECT_WS -> DesktopLocalAppServerClientRegistry.shared::currentClient
+        BackendKind.LOCAL_RUNTIME, BackendKind.IROH -> null
     }
 }
