@@ -19652,13 +19652,14 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyTranspor
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcHostServices {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/node/info/NodeFacts;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/node/info/NodeFacts;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBeadsBaseUrl ()Ljava/lang/String;
 	public final fun getBeadsRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getBeadsTokenFile ()Ljava/lang/String;
 	public final fun getCanvasMountRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getController ()Lcom/letta/mobile/data/controller/AppServerController;
+	public final fun getNodeFacts ()Lcom/letta/mobile/data/node/info/NodeFacts;
 	public final fun getPluginRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getSecretRequestRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getSubagentRegistrySource ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;
@@ -20445,6 +20446,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabiliti
 	public static final field MEMORY_READ Ljava/lang/String;
 	public static final field MEMORY_WRITE Ljava/lang/String;
 	public static final field NOTEBOOK_AUTHENTICATED Ljava/lang/String;
+	public static final field PEER_AUTHENTICATED Ljava/lang/String;
 	public static final field PROJECTS_MANAGE Ljava/lang/String;
 	public static final field SCHEDULE_MANAGE Ljava/lang/String;
 	public static final field SECRET_REQUEST_AGENT Ljava/lang/String;
@@ -20458,6 +20460,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabiliti
 	public final fun forProtocolCommand (Ljava/lang/String;)Ljava/lang/String;
 	public final fun forWorkspaceMethod (Lcom/letta/mobile/data/transport/appserver/WorkspaceRelayMethod;)Ljava/lang/String;
 	public final fun getALL ()Ljava/util/Set;
+	public final fun getAUTHENTICATION_GATES ()Ljava/util/Set;
 	public final fun getCHAT_ROLE ()Ljava/util/Set;
 	public final fun getDEFAULT_DESKTOP_ROLE ()Ljava/util/Set;
 	public final fun getLEGACY_DESKTOP_ROLE ()Ljava/util/Set;
@@ -37884,8 +37887,8 @@ public final class com/letta/mobile/data/node/NodeAdminExtras {
 }
 
 public final class com/letta/mobile/data/node/NodeAdminRouterSpec {
-	public fun <init> (Lcom/letta/mobile/data/controller/DefaultAppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/DefaultAppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/DefaultAppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/node/info/NodeFacts;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/DefaultAppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/node/info/NodeFacts;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun build ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
 	public final fun getAgentChanges ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;
 	public final fun getAppServerProcessIdentity ()Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;
@@ -37899,6 +37902,7 @@ public final class com/letta/mobile/data/node/NodeAdminRouterSpec {
 	public final fun getLocalBackendDir ()Ljava/lang/String;
 	public final fun getModelExposureFile ()Ljava/lang/String;
 	public final fun getNativeClient ()Lcom/letta/mobile/data/transport/appserver/AppServerClient;
+	public final fun getNodeFacts ()Lcom/letta/mobile/data/node/info/NodeFacts;
 	public final fun getPairingQr ()Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;
 	public final fun getPairingService ()Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;
 	public final fun getPermissionModes ()Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;
@@ -37944,18 +37948,20 @@ public final class com/letta/mobile/data/node/NodeComposition$Companion {
 }
 
 public final class com/letta/mobile/data/node/NodeConfig {
-	public fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;)V
-	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;Lcom/letta/mobile/data/node/NodeIdentityConfig;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;Lcom/letta/mobile/data/node/NodeIdentityConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()Lcom/letta/mobile/data/node/NodeEndpointConfig;
 	public final fun component4 ()Lcom/letta/mobile/data/node/NodeAdminConfig;
-	public final fun copy (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;)Lcom/letta/mobile/data/node/NodeConfig;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/NodeConfig;Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/node/NodeConfig;
+	public final fun component5 ()Lcom/letta/mobile/data/node/NodeIdentityConfig;
+	public final fun copy (Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;Lcom/letta/mobile/data/node/NodeIdentityConfig;)Lcom/letta/mobile/data/node/NodeConfig;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/NodeConfig;Ljava/lang/String;JLcom/letta/mobile/data/node/NodeEndpointConfig;Lcom/letta/mobile/data/node/NodeAdminConfig;Lcom/letta/mobile/data/node/NodeIdentityConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/node/NodeConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAdmin ()Lcom/letta/mobile/data/node/NodeAdminConfig;
 	public final fun getEndpoint ()Lcom/letta/mobile/data/node/NodeEndpointConfig;
 	public final fun getHostStateDirectory ()Ljava/io/File;
+	public final fun getIdentity ()Lcom/letta/mobile/data/node/NodeIdentityConfig;
 	public final fun getModelExposureFile ()Ljava/lang/String;
 	public final fun getRequestTimeoutMs ()J
 	public fun hashCode ()I
@@ -37985,17 +37991,40 @@ public final class com/letta/mobile/data/node/NodeEndpointParts {
 	public final fun getProtocolHandlers ()Ljava/util/List;
 }
 
+public final class com/letta/mobile/data/node/NodeIdentityConfig {
+	public static final field Companion Lcom/letta/mobile/data/node/NodeIdentityConfig$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/node/NodeIdentityConfig;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/NodeIdentityConfig;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/NodeIdentityConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAppVersion ()Ljava/lang/String;
+	public final fun getCapabilities ()Ljava/util/Set;
+	public final fun getOs ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/NodeIdentityConfig$Companion {
+	public final fun getHEADLESS_CAPABILITIES ()Ljava/util/Set;
+}
+
 public abstract interface class com/letta/mobile/data/node/NodeLog {
 	public abstract fun error (Ljava/lang/String;)V
 	public abstract fun info (Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/data/node/NodePorts {
-	public fun <init> (Lcom/letta/mobile/data/node/AppServerHttpClients;Lcom/letta/mobile/data/node/NodeLog;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/node/NodeToolsSocket;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/node/AppServerHttpClients;Lcom/letta/mobile/data/node/NodeLog;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/node/NodeToolsSocket;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/node/AppServerHttpClients;Lcom/letta/mobile/data/node/NodeLog;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/node/NodeToolsSocket;Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/AppServerHttpClients;Lcom/letta/mobile/data/node/NodeLog;Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;Lcom/letta/mobile/data/node/NodeToolsSocket;Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getHttpClients ()Lcom/letta/mobile/data/node/AppServerHttpClients;
 	public final fun getLog ()Lcom/letta/mobile/data/node/NodeLog;
 	public final fun getProcessIdentity ()Lcom/letta/mobile/data/subagents/AppServerProcessIdentity;
+	public final fun getRuntimePatches ()Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;
 	public final fun getToolsSocket ()Lcom/letta/mobile/data/node/NodeToolsSocket;
 }
 
@@ -38331,6 +38360,309 @@ public final class com/letta/mobile/data/node/carrier/iroh/IrohNodeCarrier$Compa
 
 public final class com/letta/mobile/data/node/carrier/iroh/IrohNodePeerLinkKt {
 	public static final fun serveIrohNodePeer (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/node/carrier/NodePeerAcceptor;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/info/NodeAvailability : java/lang/Enum {
+	public static final field COMPATIBLE Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public static final field LIMITED Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public static final field UNAVAILABLE Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public static final field UNVERIFIED Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public static fun values ()[Lcom/letta/mobile/data/node/info/NodeAvailability;
+}
+
+public final class com/letta/mobile/data/node/info/NodeCapability : java/lang/Enum {
+	public static final field ALWAYS_ON Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static final field APPROVE Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static final field CATALOG Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static final field Companion Lcom/letta/mobile/data/node/info/NodeCapability$Companion;
+	public static final field EXECUTE Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static final field STORE Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static final field UI Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWireName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeCapability;
+	public static fun values ()[Lcom/letta/mobile/data/node/info/NodeCapability;
+}
+
+public final class com/letta/mobile/data/node/info/NodeCapability$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeCapability;
+}
+
+public final class com/letta/mobile/data/node/info/NodeCompatibility {
+	public static final field Companion Lcom/letta/mobile/data/node/info/NodeCompatibility$Companion;
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeInfo;Ljava/util/List;)V
+	public final fun allows (Lcom/letta/mobile/data/node/info/NodeCapability;)Z
+	public final fun component1 ()Lcom/letta/mobile/data/node/info/NodeInfo;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/letta/mobile/data/node/info/NodeInfo;Ljava/util/List;)Lcom/letta/mobile/data/node/info/NodeCompatibility;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/NodeCompatibility;Lcom/letta/mobile/data/node/info/NodeInfo;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeCompatibility;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailability ()Lcom/letta/mobile/data/node/info/NodeAvailability;
+	public final fun getBlocked ()Ljava/util/Set;
+	public final fun getInfo ()Lcom/letta/mobile/data/node/info/NodeInfo;
+	public final fun getReasons ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeCompatibility$Companion {
+	public final fun getLEGACY ()Lcom/letta/mobile/data/node/info/NodeCompatibility;
+}
+
+public final class com/letta/mobile/data/node/info/NodeCompatibilityRule {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/NodeCompatibilityRule;
+	public final fun evaluate (Lcom/letta/mobile/data/node/info/NodeInfo;Lcom/letta/mobile/data/node/info/NodeInfo;Lcom/letta/mobile/data/node/info/StoreFormatVersion;)Lcom/letta/mobile/data/node/info/NodeCompatibility;
+	public static synthetic fun evaluate$default (Lcom/letta/mobile/data/node/info/NodeCompatibilityRule;Lcom/letta/mobile/data/node/info/NodeInfo;Lcom/letta/mobile/data/node/info/NodeInfo;Lcom/letta/mobile/data/node/info/StoreFormatVersion;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeCompatibility;
+}
+
+public final class com/letta/mobile/data/node/info/NodeFacts {
+	public static final field Companion Lcom/letta/mobile/data/node/info/NodeFacts$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAppVersion ()Ljava/lang/String;
+	public final fun getCapabilities ()Ljava/util/Set;
+	public final fun getOs ()Ljava/lang/String;
+	public final fun getRuntimePatches ()Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;
+}
+
+public final class com/letta/mobile/data/node/info/NodeFacts$Companion {
+	public final fun getUNKNOWN ()Lcom/letta/mobile/data/node/info/NodeFacts;
+}
+
+public final class com/letta/mobile/data/node/info/NodeHandshake {
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/node/info/NodeHandshakeResult {
+}
+
+public final class com/letta/mobile/data/node/info/NodeHandshakeResult$Checked : com/letta/mobile/data/node/info/NodeHandshakeResult {
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeCompatibility;)V
+	public final fun component1 ()Lcom/letta/mobile/data/node/info/NodeCompatibility;
+	public final fun copy (Lcom/letta/mobile/data/node/info/NodeCompatibility;)Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Checked;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Checked;Lcom/letta/mobile/data/node/info/NodeCompatibility;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Checked;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompatibility ()Lcom/letta/mobile/data/node/info/NodeCompatibility;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeHandshakeResult$Failed : com/letta/mobile/data/node/info/NodeHandshakeResult {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Failed;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeHandshakeResult$Legacy : com/letta/mobile/data/node/info/NodeHandshakeResult {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/NodeHandshakeResult$Legacy;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeIncompatibility {
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeIncompatibility;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/NodeIncompatibility;Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeIncompatibility;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActual ()Ljava/lang/String;
+	public final fun getExpected ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeIncompatibilityKind : java/lang/Enum {
+	public static final field LETTA_CODE Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public static final field RUNTIME_PATCHES Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public static final field SCHEMA Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public static final field STORE_FORMAT Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public final fun getBlocks ()Ljava/util/Set;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+	public static fun values ()[Lcom/letta/mobile/data/node/info/NodeIncompatibilityKind;
+}
+
+public final class com/letta/mobile/data/node/info/NodeInfo {
+	public static final field Companion Lcom/letta/mobile/data/node/info/NodeInfo$Companion;
+	public fun <init> ()V
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/node/info/StoreFormatVersion;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/node/info/RuntimePatchSet;)V
+	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/node/info/StoreFormatVersion;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/node/info/RuntimePatchSet;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8 ()Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public final fun copy (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/node/info/StoreFormatVersion;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/node/info/RuntimePatchSet;)Lcom/letta/mobile/data/node/info/NodeInfo;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/NodeInfo;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/node/info/StoreFormatVersion;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/node/info/RuntimePatchSet;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/NodeInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAppVersion ()Ljava/lang/String;
+	public final fun getCapabilities ()Ljava/util/List;
+	public final fun getCapabilitySet ()Ljava/util/Set;
+	public final fun getKnowsLettaCodeVersion ()Z
+	public final fun getLettaCodeVersion ()Ljava/lang/String;
+	public final fun getModels ()Ljava/util/List;
+	public final fun getOs ()Ljava/lang/String;
+	public final fun getRuntimePatches ()Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public final fun getSchema ()I
+	public final fun getStoreFormat ()Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/node/info/NodeInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/NodeInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/node/info/NodeInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/node/info/NodeInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/node/info/NodeInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/node/info/NodeInfoRpc {
+	public abstract fun invoke (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/info/NodeInfoService {
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeFacts;Lcom/letta/mobile/data/node/info/NodeRuntimeFacts;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/info/NodeFacts;Lcom/letta/mobile/data/node/info/NodeRuntimeFacts;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun read (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun readJson (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/info/NodeInfoWire {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/NodeInfoWire;
+	public static final field METHOD Ljava/lang/String;
+	public static final field SCHEMA I
+	public static final field UNKNOWN Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/node/info/NodeOs {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/NodeOs;
+	public final fun family (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/node/info/NodeRuntimeFacts {
+	public static final field Companion Lcom/letta/mobile/data/node/info/NodeRuntimeFacts$Companion;
+	public abstract fun lettaCodeVersion ()Ljava/lang/String;
+	public abstract fun models (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/node/info/NodeRuntimeFacts$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/node/info/NodeRuntimeFacts;
+	public final fun of (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/node/info/NodeRuntimeFacts;
+}
+
+public final class com/letta/mobile/data/node/info/RuntimePatchBootLine {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/RuntimePatchBootLine;
+	public final fun parse (Ljava/lang/String;)Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+}
+
+public final class com/letta/mobile/data/node/info/RuntimePatchBootLineObserver : com/letta/mobile/data/node/info/RuntimePatchSetSource {
+	public fun <init> ()V
+	public fun current ()Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public final fun observe (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/node/info/RuntimePatchSet {
+	public static final field Companion Lcom/letta/mobile/data/node/info/RuntimePatchSet$Companion;
+	public static final field SOURCE_BOOT_LINE Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/String;)Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/RuntimePatchSet;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public final fun differsFrom (Lcom/letta/mobile/data/node/info/RuntimePatchSet;)Ljava/lang/Boolean;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplied ()Ljava/lang/Integer;
+	public final fun getDigest ()Ljava/lang/String;
+	public final fun getSkipped ()Ljava/lang/Integer;
+	public final fun getSource ()Ljava/lang/String;
+	public final fun getSummary ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isKnown ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/node/info/RuntimePatchSet$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/RuntimePatchSet$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/node/info/RuntimePatchSet;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/node/info/RuntimePatchSet$Companion {
+	public final fun getUNKNOWN ()Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/node/info/RuntimePatchSetSource {
+	public static final field Companion Lcom/letta/mobile/data/node/info/RuntimePatchSetSource$Companion;
+	public abstract fun current ()Lcom/letta/mobile/data/node/info/RuntimePatchSet;
+}
+
+public final class com/letta/mobile/data/node/info/RuntimePatchSetSource$Companion {
+	public final fun getUnknown ()Lcom/letta/mobile/data/node/info/RuntimePatchSetSource;
+}
+
+public final class com/letta/mobile/data/node/info/StoreFormatVersion {
+	public static final field Companion Lcom/letta/mobile/data/node/info/StoreFormatVersion$Companion;
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/node/info/StoreFormatVersion;IIILjava/lang/Object;)Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMajor ()I
+	public final fun getMinor ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/node/info/StoreFormatVersion$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/node/info/StoreFormatVersion$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/node/info/StoreFormatVersion;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/node/info/StoreFormatVersion$Companion {
+	public final fun getCURRENT ()Lcom/letta/mobile/data/node/info/StoreFormatVersion;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/notify/ApprovalAttentionMonitor {
