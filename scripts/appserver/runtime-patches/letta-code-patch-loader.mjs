@@ -3190,24 +3190,11 @@ function conversationTurnLock(state) {
 // 1), so the running total is their sum and the cumulative result envelope still wins at
 // completion. The total lives on state2 (per subagent, dropped when the child exits), only the
 // number is read, and the write never goes below the reported total (a retry reuses the id).
-const liveTokens = exactOncePatch(
-  "lcp-live-tokens",
-  [
-    {
-      token: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };",
-      replacement: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      usageTokens: 0, // lcp-live-tokens\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };",
-    },
-    {
-      token: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type !== "usage_statistics") {\n          flushPendingProgressText(state2, subagentId);\n        }',
-      replacement: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type === "usage_statistics") { // lcp-live-tokens\n          recordLiveUsageStatistics(event, state2, subagentId);\n        } else {\n          flushPendingProgressText(state2, subagentId);\n        }',
-    },
-    {
-      token: "function processStreamEvent(line, state2, subagentId) {",
-      replacement: "// lcp-live-tokens: sum the per-step usage_statistics chunks into the per-subagent state\n// and publish the running total the way the external coding-agent path does. The guard\n// keeps the store's reported total monotonic; the final result envelope overwrites it.\nfunction recordLiveUsageStatistics(event, state2, subagentId) {\n  const stepTokens = event.total_tokens;\n  if (typeof stepTokens !== \"number\" || !Number.isFinite(stepTokens) || stepTokens <= 0) {\n    return;\n  }\n  state2.usageTokens += stepTokens;\n  const agent = store2.agents.get(subagentId);\n  if (agent && state2.usageTokens >= agent.totalTokens) {\n    updateSubagent(subagentId, { totalTokens: state2.usageTokens });\n  }\n}\nfunction processStreamEvent(line, state2, subagentId) {",
-    },
-  ],
-  "running local subagents keep reporting no tokens until they finish",
-);
+const liveTokens = exactOncePatch("lcp-live-tokens", [
+  { token: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };", replacement: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      usageTokens: 0, // lcp-live-tokens\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };" },
+  { token: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type !== "usage_statistics") {\n          flushPendingProgressText(state2, subagentId);\n        }', replacement: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type === "usage_statistics") { // lcp-live-tokens\n          recordLiveUsageStatistics(event, state2, subagentId);\n        } else {\n          flushPendingProgressText(state2, subagentId);\n        }' },
+  { token: "function processStreamEvent(line, state2, subagentId) {", replacement: "// lcp-live-tokens: sum the per-step usage_statistics chunks into the per-subagent state\n// and publish the running total the way the external coding-agent path does. The guard\n// keeps the store's reported total monotonic; the final result envelope overwrites it.\nfunction recordLiveUsageStatistics(event, state2, subagentId) {\n  const stepTokens = event.total_tokens;\n  if (typeof stepTokens !== \"number\" || !Number.isFinite(stepTokens) || stepTokens <= 0) {\n    return;\n  }\n  state2.usageTokens += stepTokens;\n  const agent = store2.agents.get(subagentId);\n  if (agent && state2.usageTokens >= agent.totalTokens) {\n    updateSubagent(subagentId, { totalTokens: state2.usageTokens });\n  }\n}\nfunction processStreamEvent(line, state2, subagentId) {" },
+], "running local subagents keep reporting no tokens until they finish");
 
 // Patch order is significant: each step receives the previous step's output.
 const PATCH_STEPS = [
