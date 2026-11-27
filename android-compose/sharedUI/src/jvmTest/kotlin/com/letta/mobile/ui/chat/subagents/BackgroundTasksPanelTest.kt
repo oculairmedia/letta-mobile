@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -45,6 +46,20 @@ class BackgroundTasksPanelTest {
         onNodeWithText("Clear").performClick()
         onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertDoesNotExist()
         onNodeWithTag(SubagentRosterTag.RUNNING.of("toolu_run")).assertExists()
+    }
+
+    /** The panel shows what a run used — its tokens — on both running and finished cards. */
+    @Test
+    fun tokenUsageRendersOnRunningAndFinishedWork() = runComposeUiTest {
+        val running = entry("toolu_run", "running").copy(
+            toolCallCount = 116, totalTokens = 1_234_567L, model = "lmstudio/vibe-glm-5-3",
+        )
+        val finished = entry("toolu_done", "success").copy(totalTokens = 980L)
+        setContent { MaterialTheme { BackgroundTasksPanel(subagents = listOf(running, finished), now = { now }) } }
+        onNodeWithTag(SubagentRosterTag.SUBTITLE.of("toolu_run"), useUnmergedTree = true)
+            .assertTextContains("116 tools · 1.2M tok · lmstudio/vibe-glm-5-3", substring = true)
+        onNodeWithTag(SubagentRosterTag.SUBTITLE.of("toolu_done"), useUnmergedTree = true)
+            .assertTextContains("980 tok", substring = true)
     }
 
     @Test

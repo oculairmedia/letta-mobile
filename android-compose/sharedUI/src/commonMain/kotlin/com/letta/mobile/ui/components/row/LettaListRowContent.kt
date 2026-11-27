@@ -58,7 +58,11 @@ private fun RowTitle(spec: LettaListRowSpec, modifier: Modifier) {
         if (subtitle != null) {
             Text(
                 text = subtitle,
-                modifier = textModifier,
+                modifier = textModifier.then(if (spec.subtitleTag == null) {
+                    Modifier
+                } else {
+                    Modifier.testTag(spec.subtitleTag)
+                }),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = spec.subtitleLines,

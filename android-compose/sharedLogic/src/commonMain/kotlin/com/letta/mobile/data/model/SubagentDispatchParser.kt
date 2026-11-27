@@ -32,6 +32,7 @@ fun extractSubagentDispatch(
         prompt = args.stringField("prompt").orEmpty(),
         taskId = result?.taskIdField(),
         subagentAgentId = result?.subagentAgentIdField(),
+        subagentConversationId = result?.subagentConversationIdField(),
     )
 }
 
@@ -78,3 +79,8 @@ private fun JsonObject.subagentAgentIdField(): String? =
         ?: stringField("subagentAgentId")
         ?: stringField("agent_id")
         ?: stringField("agentId")
+
+private fun JsonObject.subagentConversationIdField(): String? =
+    stringField("conversation_id")
+        ?: stringField("conversationId")
+        ?: stringField("subagent_conversation_id")

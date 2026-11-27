@@ -120,17 +120,17 @@ internal fun showNavigation(shell: WorkspaceShell) {
 /** The open conversation's background tasks, beside the page while the person keeps them open. */
 @Composable
 internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
-    val workspace = shell.workspace
-    if (!workspace.showBackgroundTasks) return
-    val agent = workspace.focusedAgentId ?: return
-    val conversation = workspace.selectedConversationId ?: return
+    if (!shell.workspace.showBackgroundTasks) return
+    val agent = shell.workspace.focusedAgentId ?: return
+    val conversation = shell.workspace.selectedConversationId ?: return
     val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
     val subagents by remember(graph, agent, conversation) {
         graph.subagentRepository.subagentsWithHistoryFlow(SubagentParentScope(agent.value, conversation.value))
     }.collectAsStateWithLifecycle(emptyList())
     BackgroundTasksSidePane(
         subagents = subagents,
-        onClose = { workspace.showBackgroundTasks = false },
+        onClose = { shell.workspace.showBackgroundTasks = false },
+        onOpenConversation = { shell.port.openSubagentConversation(it) },
         dismissTask = graph.subagentRepository.dismissAction(SubagentParentScope(agent.value, conversation.value)),
     )
 }

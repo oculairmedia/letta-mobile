@@ -13,6 +13,8 @@ import com.letta.mobile.data.shell.CurrentFocusRequest
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.subagents.SubagentRosterItem
+import com.letta.mobile.data.subagents.toSubagentView
 
 /** Android effects carry the shared owner's request; an Opening never owns the current selection. */
 class AndroidShellChatPort(
@@ -110,6 +112,21 @@ class AndroidShellChatPort(
     fun open(agent: AgentId, conversation: ConversationId) {
         if (!isCurrentOwner() || !workspace.selectFocus(CurrentFocus("chat", agent, conversation, CurrentFocusChatMode.Exact))) return
         opening = Opening(agent, conversation, workspace.requestToken(), workspace).also(onOpening)
+    }
+
+    /**
+     * The Background tasks sheet's "View conversation" handler: close the sheet, then open the
+     * subagent's own chat (the registry's bare `default` resolved by the shared [toSubagentView],
+     * the same mapping the chat page's subagent rows use) and land on the chat page. A handler
+     * property, not another verb: the port's function budget is the interface plus its own
+     * navigation verbs, and this composition of them belongs to the sheet that hands it over.
+     */
+    val openSubagentConversation: (SubagentRosterItem) -> Unit = { item ->
+        item.toSubagentView()?.let { view ->
+            workspace.showBackgroundTasks = false
+            open(view.agentId, view.conversationId)
+            workspace.showChat()
+        }
     }
 
     /** Invalidate effects and target-bound drafts on a backend change. */

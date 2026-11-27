@@ -174,10 +174,13 @@ class ControllerSubagentRegistrySource(
                 .find(body)?.groupValues?.get(1)
             val childAgent = dispatch?.subagentAgentId ?: Regex("(?m)^Agent ID: (\\S+)\\s*$")
                 .find(body)?.groupValues?.get(1)
+            val childConversation = dispatch?.subagentConversationId
+                ?: Regex("(?m)^Conversation ID: (\\S+)\\s*$").find(body)?.groupValues?.get(1)
             return taskId?.let {
                 existing.copy(
                     taskId = existing.taskId ?: it,
                     subagentAgentId = existing.subagentAgentId ?: childAgent,
+                    subagentConversationId = existing.subagentConversationId ?: childConversation,
                 )
             }
         }

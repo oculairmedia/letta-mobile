@@ -1,5 +1,6 @@
 package com.letta.mobile.util
 
+import com.letta.mobile.util.time.CountLabels
 import kotlin.math.roundToInt
 
 /**
@@ -9,16 +10,10 @@ object FormatHelpers {
 
     /**
      * Formats integer count into compact representation (e.g., 987 -> "987", 12345 -> "12.3k", 999999 -> "1M").
+     * The one implementation lives in [CountLabels] (this package reaches the UI packages that use
+     * labels, so the leaf carries the math and every package can import it without a cycle).
      */
-    fun formatCompactCount(value: Int): String {
-        if (value < 9_950) return value.toString()
-        val inThousands = (value / 100.0).roundToInt() / 10.0
-        if (inThousands >= 1000.0) {
-            val inMillions = (value / 100_000.0).roundToInt() / 10.0
-            return "${inMillions}M"
-        }
-        return "${inThousands}k"
-    }
+    fun formatCompactCount(value: Int): String = CountLabels.compact(value.toLong())
 
     /**
      * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB, 3.0 GB).

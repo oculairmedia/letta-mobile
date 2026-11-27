@@ -319,6 +319,33 @@ class ControllerSubagentRegistrySourceTest {
     }
 
     @Test
+    fun backgroundReceiptNamesTheChildConversationWhileRunning() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(stream("parent", "local-conv-672", """{
+            "message_type":"tool_call_message",
+            "tool_call":{"name":"Agent","tool_call_id":"call-9",
+            "arguments":{"description":"Improve the roster","subagent_type":"general-purpose","run_in_background":true}}
+        }""".replace("\n", "")))
+        val receiptBody = "Task running in background with task ID: task_47\n" +
+            "Agent ID: agent-local-159eae27-cbed-4570-b9b6-1fcd08bbc720\n" +
+            "Conversation ID: default\nOutput file: /tmp/task_47.log\n\n" +
+            "You will be notified automatically when this task completes."
+        source.ingest(
+            stream("parent", "local-conv-672", buildJsonObject {
+                put("message_type", "tool_return_message")
+                put("tool_call_id", "call-9")
+                put("tool_return", receiptBody)
+            }.toString()),
+        )
+        val running = source.list("local-conv-672", true).single()
+        assertEquals(SubagentStatus.RUNNING, running.status)
+        assertEquals("agent-local-159eae27-cbed-4570-b9b6-1fcd08bbc720", running.subagentAgentId)
+        assertEquals("default", running.subagentConversationId)
+        val item = com.letta.mobile.data.subagents.projectSubagentRoster(listOf(running), now = 9_999_999L).running.single()
+        assertTrue(item.canOpenConversation)
+    }
+
+    @Test
     fun updateSubagentStateHydratesConversationScopedList() = runTest {
         val source = ControllerSubagentRegistrySource()
         source.ingest(

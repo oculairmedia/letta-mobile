@@ -23,6 +23,7 @@ import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.util.time.CountLabels
 import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 
@@ -125,13 +126,14 @@ private fun EmptyRoster(modifier: Modifier) {
 
 private val SUBAGENT_ROSTER_LIST = RosterListTag("subagent-roster")
 
-/** "General-purpose · 1m 28s · 12 tools · claude-sonnet-5-5 · quiet". */
+/** "General-purpose · 1m 28s · 12 tools · 1.2M tok · claude-sonnet-5-5 · quiet". */
 fun SubagentRosterItem.subtitle(): String {
     val parts = mutableListOf<String>()
     typeLabel.takeIf { it.isNotBlank() }?.let(parts::add)
     if (status.isTerminal) parts += statusWord(status)
     elapsedMs?.let { parts += TimeLabels.duration(it) }
     toolCallCount?.takeIf { it > 0 }?.let { parts += if (it == 1) "1 tool" else "$it tools" }
+    totalTokens?.takeIf { it > 0 }?.let { parts += "${CountLabels.compact(it)} tok" }
     model?.let(parts::add)
     if (status == SubagentRosterStatus.QUIET) parts += "quiet"
     return parts.joinToString(" · ")
