@@ -42,6 +42,13 @@ import { resolve as resolvePath } from "node:path";
 
 const TARGET_PATH = process.env["LETTA_CLI_PATH_REAL"] ?? "";
 
+// lcp-path-parity: children inherit this loader through NODE_OPTIONS but resolve `letta` from
+// PATH, so a PATH entry that is a different @letta-ai/letta-code install (a self-updated global)
+// loaded as a bundle that is not the pin, ran UNPATCHED with no boot summary at all. Such a load
+// is now reported loudly; with LETTA_PATCH_STRICT_PATH=1 the loader refuses to load it at all.
+const STRICT_PATH = process.env["LETTA_PATCH_STRICT_PATH"] === "1";
+const reportedBundleMismatches = new Set();
+
 // lcp-reflection-controls: Letta's persisted reflection settings are copied
 // field-by-field, so new per-agent keys need every read/write/command site to
 // land together. The launch wrapper leaves the stock launch body intact: this
@@ -3279,6 +3286,36 @@ function targetPath(url) {
   return samePath(path, TARGET_PATH) ? path : null;
 }
 
+// A `.../@letta-ai/letta-code/letta.js` file URL: the CLI bundle layout on every platform (URLs
+// always use forward slashes). The substring prefilter keeps the hot path — one scan per loaded
+// module — cheap; only a candidate that looks like a bundle pays for fileURLToPath.
+function lettaBundlePath(url) {
+  if (!url.includes("@letta-ai/letta-code/letta.js")) return null;
+  try { return resolvePath(fileURLToPath(url)); } catch { return null; }
+}
+
+/**
+ * Loud companion to the pin: a letta-code bundle other than `LETTA_CLI_PATH_REAL` is running
+ * unpatched (the lcp-* patches apply to the pin only), which is exactly the silent-unpatched
+ * subagent the pin exists to prevent. Logs once per stray bundle; throws (fail-closed) when
+ * `LETTA_PATCH_STRICT_PATH=1`.
+ *
+ * @param {string} url
+ * @returns {void}
+ */
+function reportBundleMismatch(url) {
+  if (!TARGET_PATH || !url.startsWith("file://")) return;
+  const path = lettaBundlePath(url);
+  if (path === null || samePath(path, TARGET_PATH) || reportedBundleMismatches.has(path)) return;
+  reportedBundleMismatches.add(path);
+  const message =
+    `[letta-code-patch] ERROR: bundle mismatch: this process loaded ${path} instead of the ` +
+    `pinned LETTA_CLI_PATH_REAL=${TARGET_PATH}; the bundle is running UNPATCHED. Point the ` +
+    `symlink/PATH letta at LETTA_CLI_PATH_REAL, or unset LETTA_CLI_PATH_REAL where no pin is intended.\n`;
+  if (STRICT_PATH) throw new Error(message);
+  process.stderr.write(message);
+}
+
 // LETTA_CLI_PATH_REAL may use forward slashes or another drive-letter case on Windows,
 // while fileURLToPath returns backslashes, so compare resolved paths (case-insensitive on win32).
 function samePath(a, b) {
@@ -3297,7 +3334,10 @@ function sourceText(source) {
 export async function load(url, context, nextLoad) {
   const result = await nextLoad(url, context);
   const path = targetPath(url);
-  if (path === null) return result;
+  if (path === null) {
+    reportBundleMismatch(url);
+    return result;
+  }
   const raw = sourceText(result.source);
   if (raw === null) return result;
 

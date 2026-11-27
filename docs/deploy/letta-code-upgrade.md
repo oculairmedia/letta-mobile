@@ -71,6 +71,11 @@ checks green on the exact head, with no open threads. Read the **newest run for 
 
 The App Server runs `/root/.bun/bin/letta` (a symlink to an install's `letta.js`) and finds `node`
 via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: never swap it.
+Subagent children resolve `letta` through the service PATH, so **every** `letta` on that PATH must
+resolve to the pinned install — a stray global (a self-updated one, or a direct symlink the cutover
+does not own, like `/usr/local/bin/letta`) leaves subagents running a different, unpatched bundle
+while the server runs the pin. `/etc/meridian/appserver.env` must set `DISABLE_AUTOUPDATER=1`
+(the cutover refuses to start without it: an enabled updater re-creates exactly that stray).
 
 1. **Stage the merged runtime-patch loader first** ([appserver-runtime-patches.md](appserver-runtime-patches.md))
    and confirm `lcp-patches applied=<N> skipped=0` on the old bundle. `<N>` is the loader's patch count
@@ -82,7 +87,12 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    `~/.nvm/versions/node/v24.18.0/bin/node <checkout>/scripts/appserver/letta-code-upgrade.mjs survey <new> --package-root /root/letta-code-<new>`
    must report READY; `<service node> <letta.js> --version`; and
    `LETTA_BIN=<letta.js> bash /usr/local/lib/meridian/check-image-support.sh` (sharp at the pinned version, a successful probe resize).
-5. **Check who else uses the symlink**: `grep -rl /root/.bun/bin/letta /etc/systemd`.
+5. **Check who else uses the symlink**: `grep -rl /root/.bun/bin/letta /etc/systemd`, and resolve
+   `letta` on the service PATH (`PATH` from `/etc/meridian/appserver.env`): every hit must point at
+   the pinned install, and must be moved with the cutover when it does not follow the managed
+   symlink. The runtime-patch loader also reports a wrong bundle itself, logging
+   `[letta-code-patch] ERROR: bundle mismatch ...` (and refusing to load it with
+   `LETTA_PATCH_STRICT_PATH=1`).
 6. **Wait for workers inside the App Server to finish, or back up their work.** The restart kills every
    turn and child, including the PM's own turn, and the Iroh wrapper restarts with it.
 7. **Run detached**, after writing the recovery plan to the PM checkpoint:
@@ -96,10 +106,15 @@ via PATH. `/usr/local/bin/node` is **shared with other services (steel-mcp)**: n
    loader line must show the same number; 41 for the 0.34.70 loader). Every node that shares agent state must run a
    loader with `lcp-system-prompt-tracking` (40 patches or more) before replicated prompt tracking is relied on: a node
    without it drops `system_prompt_tracking` from an agent record the next time it saves that agent.
-   It takes a lock, refuses to start unless the staged package reports `<new>`, changes the symlink,
-   `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts once, and requires a new
-   boot line `lcp-patches applied=<N> skipped=0`, the new node and env in the live process and the
-   `:4500` listener in the service's cgroup. On any failure it restores all three and restarts.
+   It takes a lock, refuses to start unless the staged package reports `<new>`, the env sets
+   `DISABLE_AUTOUPDATER=1` and the service PATH's `letta` is the old pin reporting the old version
+   and a clean `lcp-patches applied=<N> skipped=0` boot line under the service env, then changes
+   the symlink, `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line. Before restarting
+   it re-runs the same probe against the new pin (`applied=$EXPECTED_PATCHES skipped=0` required):
+   a PATH `letta` left at any other bundle rolls the whole cutover back. It then restarts once and
+   requires a new boot line `lcp-patches applied=<N> skipped=0`, the new node and env in the live
+   process and the `:4500` listener in the service's cgroup. On any failure it restores all three
+   and restarts.
 8. **Verify from the live process**: `/var/log/letta-code-cutover-<new>.log` says `RESULT: OK` (no log file means the script refused to start: read `journalctl -u letta-code-cutover`);
    `readlink /proc/<pid>/exe`, `/proc/<pid>/environ`. The bead closes on Emmanuel's live confirmation.
 

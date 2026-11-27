@@ -18,7 +18,11 @@
 #   2. LETTA_CLI_PATH_REAL in /etc/meridian/appserver.env     -> same letta.js (the lcp patch target)
 #   3. optional: a service-only PATH line putting <node-bin-dir> first. /usr/local/bin/node is
 #      shared with other services (steel-mcp) and is never swapped.
-# Success requires: the staged package reports <new-version>; a NEW boot line
+# Success requires: the staged package reports <new-version>; DISABLE_AUTOUPDATER=1 is in the env
+# (a self-updated global on the service PATH is how subagents end up unpatched); the `letta` the
+# service PATH resolves is the pinned bundle and, run under the service's NODE_OPTIONS +
+# LETTA_CLI_PATH_REAL, reports <version> and a clean patch boot line — checked against the old pin
+# before anything changes and against the new pin after the change; a NEW boot line
 # `lcp-patches applied=<N> skipped=0` with N = EXPECTED_PATCHES (required, no default); the live exe is the
 # expected node; the live env has the new LETTA_CLI_PATH_REAL; the symlink points at the new
 # letta.js; and the 127.0.0.1:4500 listener belongs to the service's cgroup.
@@ -45,6 +49,76 @@ PATH_MARKER='# letta-code-host-cutover: service-only Node'
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 BAK=$ENV.pre-letta-code-$NEW-$TS
 
+# ---- service env readers (the parity gate must see exactly what the service sees) ----
+# systemd EnvironmentFile semantics: the LAST assignment of a key wins.
+svc_env() { grep "^$1=" "$ENV" | tail -1 | cut -d= -f2-; }
+
+# The PATH a service child gets when the env file sets none: systemd's compiled default.
+SYSTEMD_DEFAULT_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# First executable $1 on $2, exactly as a subagent's shell would resolve it (empty PATH
+# elements would mean the current directory and are skipped: the service never runs one).
+resolve_on_path() {
+  local dir IFS=:
+  for dir in $2; do
+    [ -n "$dir" ] || continue
+    [ -x "$dir/$1" ] || continue
+    printf '%s\n' "$dir/$1"
+    return 0
+  done
+  return 1
+}
+
+# Resolves `letta` on the service PATH from $ENV and runs it under the service's own
+# NODE_OPTIONS + LETTA_CLI_PATH_REAL: the exact command a subagent child would end up running.
+# Fails loudly when the resolved letta is not the pinned bundle (that child would silently run
+# a different, possibly unpatched, install — the 2026-11-25 self-update incident), or when it
+# does not report $1 and a clean `lcp-patches applied=... skipped=0` boot line. $2 is the
+# expected applied count ("" = any count >= 1, for the pre-change bundle).
+letta_parity_gate() {
+  local expect_version=$1 expect_applied=${2:-}
+  local svc_path svc_node svc_real svc_home resolved real pin out version boot
+  svc_path=$(svc_env PATH); [ -n "$svc_path" ] || svc_path=$SYSTEMD_DEFAULT_PATH
+  svc_node=$(svc_env NODE_OPTIONS)
+  svc_real=$(svc_env LETTA_CLI_PATH_REAL)
+  svc_home=$(svc_env HOME); [ -n "$svc_home" ] || svc_home=/root
+  [ -n "$svc_real" ] || { echo "ABORT: $ENV sets no LETTA_CLI_PATH_REAL: the patch loader has no pin and every child runs unpatched"; return 1; }
+  resolved=$(resolve_on_path letta "$svc_path") || { echo "ABORT: no executable letta on the service PATH '$svc_path': a subagent could not spawn the pinned CLI"; return 1; }
+  real=$(readlink -f "$resolved") || { echo "ABORT: cannot resolve the service PATH letta $resolved"; return 1; }
+  pin=$(readlink -f "$svc_real") || { echo "ABORT: cannot resolve LETTA_CLI_PATH_REAL=$svc_real"; return 1; }
+  [ "$real" = "$pin" ] || {
+    echo "ABORT: the service PATH resolves letta to $real, not the pinned $svc_real ($pin)."
+    echo "  A subagent child would run that different (possibly unpatched) bundle while the server runs the pin."
+    echo "  Move every PATH letta symlink with the cutover (or remove the stray install), then retry."
+    return 1
+  }
+  # The version goes to the CLI's stdout and the patch boot line to the loader's stderr; capture
+  # the streams separately so their interleave through a pipe cannot swap the two.
+  local err_file out_rc probe_err
+  err_file=$(mktemp) || { echo "ABORT: cannot create a temp file for the parity probe"; return 1; }
+  out_rc=0
+  out=$(env -i PATH="$svc_path" HOME="$svc_home" NODE_OPTIONS="$svc_node" LETTA_CLI_PATH_REAL="$svc_real" "$resolved" --version 2>"$err_file") || out_rc=$?
+  probe_err=$(cat "$err_file")
+  boot=$(grep -m1 'lcp-patches applied=' "$err_file" || true)
+  rm -f "$err_file"
+  [ "$out_rc" -eq 0 ] || { echo "ABORT: '$resolved --version' under the service env failed (rc=$out_rc): $out$probe_err"; return 1; }
+  version=$(printf '%s\n' "$out" | awk 'NF {last=$0} END {print last}')
+  case "$version" in "$expect_version "*|"$expect_version") ;; *)
+    echo "ABORT: the service PATH letta reports '$version', expected $expect_version"; return 1;; esac
+  if [ -n "$expect_applied" ]; then
+    case "$boot" in *"applied=$expect_applied skipped=0"*) ;; *)
+      echo "ABORT: the service PATH letta printed no 'lcp-patches applied=$expect_applied skipped=0' boot line under the service env (got: ${boot:-none})."
+      echo "  Check NODE_OPTIONS in $ENV points at the staged loader and that the loader is current for this bundle."
+      return 1;; esac
+  else
+    case "$boot" in *"applied="[1-9]*" skipped=0"*) ;; *)
+      echo "ABORT: the service PATH letta printed no clean 'lcp-patches applied=<N> skipped=0' boot line under the service env (got: ${boot:-none})."
+      echo "  Without it the bundle runs unpatched; check NODE_OPTIONS in $ENV points at the staged loader."
+      return 1;; esac
+  fi
+  echo "PATH parity: letta=$resolved -> $real (pin $pin) version='$version' boot='$boot'"
+}
+
 echo "=== $(date -u +%FT%TZ) cutover $OLD -> $NEW node=${NODE_DIR:-unchanged}"
 
 # One cutover at a time, even when run directly rather than through the fixed systemd unit.
@@ -66,6 +140,17 @@ VERSION_NODE=${NODE_BIN:-node}
 STAGED_OUT=$("$VERSION_NODE" "$NEW_JS" --version 2>&1) || { echo "ABORT: $NEW_JS --version failed: $STAGED_OUT"; exit 1; }
 STAGED=$(printf '%s\n' "$STAGED_OUT" | tail -1)
 case "$STAGED" in "$NEW "*|"$NEW") ;; *) echo "ABORT: staged package reports '$STAGED', expected $NEW"; exit 1;; esac
+# With the updater enabled, letta-code self-updates the global install onto the service PATH and
+# subagents resolve that unpatched bundle while the server runs the patched pin (2026-11-25
+# incident). The env must already carry the disable; the cutover never writes policy for you.
+grep -qx 'DISABLE_AUTOUPDATER=1' "$ENV" || {
+  echo "ABORT: $ENV does not set DISABLE_AUTOUPDATER=1."
+  echo "  letta-code would self-update the global install onto the service PATH and subagents would silently run it unpatched."
+  echo "  Add DISABLE_AUTOUPDATER=1 to $ENV (see scripts/deploy/appserver.env.example), then retry."
+  exit 1
+}
+# What a subagent child gets TODAY must already be the old pin, fully patched under the service env.
+letta_parity_gate "$OLD" "" || { echo "ABORT: the preflight PATH-parity gate failed; nothing was changed"; exit 1; }
 cp -a "$ENV" "$BAK" && cmp -s "$ENV" "$BAK" || { echo "ABORT: env backup to $BAK failed; nothing changed"; exit 1; }
 echo "env backup: $BAK"
 
@@ -98,6 +183,9 @@ fi
 ln -sfn "$NEW_JS" "$LINK" || rollback "symlink update failed"
 [ "$(readlink "$LINK")" = "$NEW_JS" ] || rollback "symlink does not point at $NEW_JS"
 grep -nE '^(PATH|LETTA_CLI_PATH_REAL|NODE_OPTIONS)=' "$ENV"; echo "link -> $(readlink "$LINK")"
+# The env file is now the post-cutover state, so this is exactly what a subagent child will
+# resolve and run after the restart: the new pin, fully patched, reporting the expected count.
+letta_parity_gate "$NEW" "$EXPECTED_PATCHES" || rollback "the post-cutover PATH-parity gate failed"
 
 # Only a boot line written after this point counts. Remember the log's inode and size: if the log is
 # rotated (new inode) or truncated (smaller), read the new file from the start instead of the offset.
