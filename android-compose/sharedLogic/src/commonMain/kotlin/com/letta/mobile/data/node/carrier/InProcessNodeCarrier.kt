@@ -55,6 +55,7 @@ class InProcessNodeCarrier(
     }
 
     /** Serves [link] once; a node that returns closes it normally, one that fails or is stopped loses it. */
+    @Suppress("TooGenericExceptionCaught") // Whatever the node's serve throws loses this link; it must not escape the carrier.
     private suspend fun serve(link: InProcessLink) {
         var closure = NodeLinkClosure.NORMAL
         try {
