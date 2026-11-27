@@ -18,6 +18,7 @@ SDK_DIR="${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}"
 NDK_DIR="${ANDROID_NDK_ROOT:-$(ls -d "$SDK_DIR"/ndk/* | sort -V | tail -1)}"
 TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_ROOT/scripts/lib/download-with-retry.sh"
 OUT_DIR="$REPO_ROOT/android-compose/app/libs/embedded-git/arm64-v8a"
 WORK_DIR="${WORK_DIR:-/tmp/android-git-build}"
 
@@ -29,13 +30,14 @@ export STRIP="$TOOLCHAIN/bin/llvm-strip"
 mkdir -p "$WORK_DIR" "$OUT_DIR"
 cd "$WORK_DIR"
 TARBALL="git-$GIT_VERSION.tar.xz"
-if [[ ! -f "$TARBALL" ]]; then
-  curl -fsSLO "https://www.kernel.org/pub/software/scm/git/$TARBALL"
-fi
-echo "$GIT_SHA256  $TARBALL" | sha256sum -c - || {
-  echo "Checksum mismatch for $TARBALL — refusing to build from it." >&2
-  exit 1
-}
+# kernel.org can flake like any other upstream, so the fetch goes through
+# the shared helper: transient errors are retried, kernel.org's own edge and
+# mirror networks are the fallbacks, and the pinned sha256 gate only ever
+# sees a complete file.
+download_with_retry "$WORK_DIR/$TARBALL" "$GIT_SHA256" \
+  "https://www.kernel.org/pub/software/scm/git/$TARBALL" \
+  "https://mirrors.edge.kernel.org/pub/software/scm/git/$TARBALL" \
+  "https://mirrors.kernel.org/pub/software/scm/git/$TARBALL"
 rm -rf "git-$GIT_VERSION"
 tar xf "$TARBALL"
 cd "git-$GIT_VERSION"

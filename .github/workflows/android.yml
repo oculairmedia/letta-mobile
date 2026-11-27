@@ -238,6 +238,8 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_clean_arch.py -v
           bash scripts/tests/platform-ui-gate-test.sh
           bash scripts/tests/apt-install-retry-test.sh
+          # A flaky upstream mirror must not fail an Android build script's tarball fetch.
+          bash scripts/tests/download-with-retry-test.sh
           # A stale mingw_x64 API dump is otherwise seen only by the Windows runner.
           bash scripts/ci/api-dump-mirror-check.sh
 
