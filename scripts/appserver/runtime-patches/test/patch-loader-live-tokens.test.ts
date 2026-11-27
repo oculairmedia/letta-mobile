@@ -130,6 +130,53 @@ function assertSizes(sizes: unknown, expected: Partial<Sizes>, stage: string): v
   }
 }
 
+/** The leak child: `iterations` full lifecycles with a 64 KiB payload on every usage event. */
+function leakChildBody(markerHead: string, iterations: number): string {
+  return `
+    const markerHead = ${JSON.stringify(markerHead)};
+    const payload = markerHead + "-".repeat(65536);
+    const iterations = ${iterations};
+    const sizes = () => ({
+      agents: bundle.store2.agents.size,
+      cleanupTimers: bundle.completedSubagentCleanupTimers.size,
+      eventStores: bundle.stores4.size,
+      listeners: bundle.store2.listeners.size,
+      streamListeners: bundle.streamEventListeners.size,
+    });
+    let notified = 0;
+    let streamed = 0;
+    bundle.store2.listeners.add(() => { notified += 1; });
+    bundle.streamEventListeners.add(() => { streamed += 1; });
+    out.before = sizes();
+    const states = [];
+    for (let i = 0; i < iterations; i++) {
+      const id = \`subagent-leak-\${i}\`;
+      bundle.registerSubagent(id, "task", "leak", \`toolu-leak-\${i}\`, false, false, undefined, "", false);
+      const state = makeState(null, null);
+      states.push(state);
+      bundle.processStreamEvent(usageLine(11, payload), state, id);
+      bundle.processStreamEvent(usageLine(22, payload), state, id);
+      bundle.processStreamEvent(resultLine(33), state, id);
+      bundle.completeSubagent(id, { success: true });
+    }
+    out.retained = sizes();
+    // Nothing outside the per-subagent state and the stock store may hold the events' content.
+    out.markerInStore = JSON.stringify([...bundle.store2.agents.values()]).includes(markerHead)
+      || JSON.stringify(bundle.cachedSnapshot).includes(markerHead)
+      || JSON.stringify(bundle.cachedLifecycleItems).includes(markerHead)
+      || [...bundle.completedSubagentCleanupTimers.keys()].some((key) => String(key).includes(markerHead))
+      || [...bundle.stores4.keys()].some((key) => String(key).includes(markerHead));
+    out.statesHavePayload = states.some((state) => JSON.stringify(state).includes(markerHead));
+    out.stateBytes = states.map((state) => JSON.stringify(state).length);
+    out.lastLiveTotal = states[states.length - 1].usageTokens;
+    out.notified = notified;
+    out.streamed = streamed;
+    bundle.clearCompletedSubagents();
+    out.afterCleanup = sizes();
+    out.snapshotAgentsAfterCleanup = bundle.cachedSnapshot.agents.length;
+  `;
+}
+
 test("live tokens: usage_statistics steps report a running total that the final result still wins", (t) => {
   const bundlePath = deployedBundleOrSkip(t);
   if (!bundlePath) return;
@@ -204,49 +251,7 @@ test("live tokens: one thousand lifecycles retain nothing and copy no message co
   const out = childResult({
     bundlePath,
     patchedSource: patched.source,
-    body: `
-    const markerHead = ${JSON.stringify(markerHead)};
-    const payload = markerHead + "-".repeat(65536);
-    const iterations = ${iterations};
-    const sizes = () => ({
-      agents: bundle.store2.agents.size,
-      cleanupTimers: bundle.completedSubagentCleanupTimers.size,
-      eventStores: bundle.stores4.size,
-      listeners: bundle.store2.listeners.size,
-      streamListeners: bundle.streamEventListeners.size,
-    });
-    let notified = 0;
-    let streamed = 0;
-    bundle.store2.listeners.add(() => { notified += 1; });
-    bundle.streamEventListeners.add(() => { streamed += 1; });
-    out.before = sizes();
-    const states = [];
-    for (let i = 0; i < iterations; i++) {
-      const id = \`subagent-leak-\${i}\`;
-      bundle.registerSubagent(id, "task", "leak", \`toolu-leak-\${i}\`, false, false, undefined, "", false);
-      const state = makeState(null, null);
-      states.push(state);
-      bundle.processStreamEvent(usageLine(11, payload), state, id);
-      bundle.processStreamEvent(usageLine(22, payload), state, id);
-      bundle.processStreamEvent(resultLine(33), state, id);
-      bundle.completeSubagent(id, { success: true });
-    }
-    out.retained = sizes();
-    // Nothing outside the per-subagent state and the stock store may hold the events' content.
-    out.markerInStore = JSON.stringify([...bundle.store2.agents.values()]).includes(markerHead)
-      || JSON.stringify(bundle.cachedSnapshot).includes(markerHead)
-      || JSON.stringify(bundle.cachedLifecycleItems).includes(markerHead)
-      || [...bundle.completedSubagentCleanupTimers.keys()].some((key) => String(key).includes(markerHead))
-      || [...bundle.stores4.keys()].some((key) => String(key).includes(markerHead));
-    out.statesHavePayload = states.some((state) => JSON.stringify(state).includes(markerHead));
-    out.stateBytes = states.map((state) => JSON.stringify(state).length);
-    out.lastLiveTotal = states[states.length - 1].usageTokens;
-    out.notified = notified;
-    out.streamed = streamed;
-    bundle.clearCompletedSubagents();
-    out.afterCleanup = sizes();
-    out.snapshotAgentsAfterCleanup = bundle.cachedSnapshot.agents.length;
-  `,
+    body: leakChildBody(markerHead, iterations),
   });
 
   assert.equal(out.markerInStore, false, "no module-level collection retains the usage events' content");
