@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.controller.node.link.NodeCallExchange
-import com.letta.mobile.data.controller.node.link.NodeCallFraming
 import com.letta.mobile.data.controller.node.link.NodeConnectionWire
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.runtime.ConversationId
@@ -56,24 +55,28 @@ class IrohNodeConnectionDrainingTest {
     private val peerId = "d".repeat(64)
     private val runtime = AppServerRuntimeScope("agent-drain-conn", "conv-drain-conn")
 
-    /** The node's wire as an in-process fake: control frames in on a channel, out into a list. */
+    /**
+     * The node's wire as an in-process fake: control frames in on a channel, out into a list. Frames
+     * arrive whole, so the carrier-side bounds ([maxReassembledBytes], [peerFrameParts]) have nothing
+     * to reassemble, and no call lane is ever opened.
+     */
     private class FakeWire(override val peerId: String) : NodeConnectionWire {
         override val localShell: Boolean = false
         val inbound = Channel<String>(Channel.UNLIMITED)
         val outbound = CopyOnWriteArrayList<String>()
 
-        override suspend fun openLanes() = Unit
-        override suspend fun readControl(maxReassembledBytes: () -> Int, onFrame: suspend (String) -> Unit) {
+        override suspend fun readControl(
+            maxReassembledBytes: () -> Int,
+            peerFrameParts: () -> Boolean,
+            onFrame: suspend (String) -> Unit,
+        ) {
             for (frame in inbound) onFrame(frame)
         }
-        override suspend fun writeControl(frame: String, frameParts: Boolean) {
+        override suspend fun writeControl(frame: String) {
             outbound += frame
         }
-        override suspend fun writePush(frame: String, frameParts: Boolean, maxFrameBytes: Int) = Unit
-        override suspend fun awaitPushReadiness() = Unit
-        override suspend fun finishControl() = Unit
-        override suspend fun finishPush() = Unit
-        override suspend fun nextCall(framing: NodeCallFraming): NodeCallExchange? = null
+        override suspend fun writePush(frame: String) = Unit
+        override suspend fun nextCall(): NodeCallExchange? = null
         override fun onPeerCapabilities(capabilities: Set<String>) = Unit
         override fun close(code: Long, reason: String) = Unit
         override fun recordClosed() = Unit

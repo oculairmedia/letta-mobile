@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.node.serveIrohCarrierLink
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecordingTest
@@ -38,6 +39,9 @@ class IrohNodeEndpointShutdownDrainTest : TelemetryRecordingTest() {
     private fun endpoint(scope: CoroutineScope) = IrohNodeEndpoint(
         scope = scope,
         authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        // The production carrier link, as every endpoint construction passes it; nothing binds a
+        // QUIC endpoint here, so it is never invoked.
+        appServerLinks = ::serveIrohCarrierLink,
     )
 
     @Test
