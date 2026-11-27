@@ -14,6 +14,7 @@ import com.letta.mobile.data.workspace.directory.FolderCreator
 import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.RecentFolders
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerController
+import com.letta.mobile.data.backend.OwnNodeRoute
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
@@ -64,15 +65,13 @@ internal fun rememberDesktopWorkingDirectoryPicker(port: DesktopChatSessionPort)
 internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): DesktopWorkingDirectoryPicker {
     val latestOnChosen by rememberUpdatedState(onChosen)
     val scope = rememberCoroutineScope()
-    // The files listed are this computer's only while the active backend is the desktop's own node, its bundled child
-    // runs, and no directly dialled App Server (which the workspace route prefers) is installed. A remote node's paths
-    // are another machine's even while the bundled child runs in the background.
+    // This computer's files only on the desktop's own node with its child up and no direct App Server installed.
     val runtimeHealth by DesktopLocalRuntimeHost.appServer.health.collectAsState()
     val onLocalNode by DesktopLocalNodeRoute.attached.collectAsState()
     val directClient by DesktopLocalAppServerClientRegistry.shared.clients.collectAsState(
         DesktopLocalAppServerClientRegistry.shared.currentOrNull(),
     )
-    val isLocal = DesktopLocalNodeRoute.filesAreLocal(runtimeHealth.active, onLocalNode, hasDirectClient = directClient != null)
+    val isLocal = OwnNodeRoute.filesAreLocal(runtimeHealth.active, onLocalNode, hasDirectClient = directClient != null)
     val recents = remember { RecentFolders(DesktopFileSecureSettingsStore(defaultDesktopStateDirectory().resolve(RECENT_FOLDERS_FILE))) }
     val agentDefaults = LocalAgentDefaults.current
     val controller = remember(scope, isLocal, agentDefaults) {

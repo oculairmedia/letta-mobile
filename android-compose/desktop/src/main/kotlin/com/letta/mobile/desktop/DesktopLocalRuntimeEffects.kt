@@ -6,10 +6,10 @@ import androidx.compose.runtime.remember
 import com.letta.mobile.data.controller.reconnect.SuspendEvent
 import com.letta.mobile.data.controller.reconnect.SystemSuspendSignal
 import com.letta.mobile.data.controller.reconnect.WallClockJumpSuspendSignal
+import com.letta.mobile.data.runtime.host.RuntimeRestartResponder
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.runtime.DesktopBundledRuntimeNode
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
-import com.letta.mobile.desktop.runtime.DesktopRuntimeRestartResponder
 import kotlinx.coroutines.launch
 
 /** Who reacts to sleep and wake on desktop (letta-mobile-bzvro.4, F04). */
@@ -36,7 +36,7 @@ internal class DesktopSuspendResponder(
  * - When the supervisor restarts a crashed child (F03), the desktop's node is restarted over its new
  *   URL through a bridge lease, so the fresh child is not stopped and spawned again by the handoff;
  *   the chat's node session redials the new node by itself. This happens on every backend, not only
- *   while the window shows LOCAL ([DesktopRuntimeRestartResponder]).
+ *   while the window shows LOCAL ([RuntimeRestartResponder]).
  * - On wake (F04), crash counters reset, a dead child restarts, and a dropped chat connection
  *   retries at once.
  */
@@ -47,7 +47,7 @@ internal fun DesktopLocalRuntimeLifecycleEffect(
 ) {
     LaunchedEffect(chatController) {
         val effectScope = this
-        val responder = DesktopRuntimeRestartResponder(
+        val responder = RuntimeRestartResponder(
             nodeRunning = { DesktopBundledRuntimeNode.host.running.value },
             handOff = DesktopLocalRuntimeHost::handOffAfterRestart,
             restartNode = { effectScope.launch { DesktopBundledRuntimeNode.restart() } },

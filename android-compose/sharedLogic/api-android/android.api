@@ -1496,6 +1496,19 @@ public abstract interface class com/letta/mobile/data/backend/ConversationListin
 	public abstract fun create (Lkotlin/jvm/functions/Function4;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/backend/ConversationListing;
 }
 
+public class com/letta/mobile/data/backend/OwnNodeRoute {
+	public static final field Companion Lcom/letta/mobile/data/backend/OwnNodeRoute$Companion;
+	public fun <init> ()V
+	public final fun attaches (Lcom/letta/mobile/data/model/LettaConfig;Ljava/lang/String;)Z
+	public final fun getAttached ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun graphConfig (Lcom/letta/mobile/data/model/LettaConfig;Ljava/lang/String;)Lcom/letta/mobile/data/model/LettaConfig;
+	public final fun publish (Lcom/letta/mobile/data/model/LettaConfig;Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/backend/OwnNodeRoute$Companion {
+	public final fun filesAreLocal (ZZZ)Z
+}
+
 public abstract interface class com/letta/mobile/data/backend/RemoteRoute {
 	public fun isBound ()Z
 	public fun orNull ()Ljava/lang/Object;
@@ -49298,6 +49311,11 @@ public final class com/letta/mobile/data/runtime/host/LocalAppServerStoppedExcep
 public final class com/letta/mobile/data/runtime/host/LocalAppServerTerminatedException : java/lang/IllegalStateException, com/letta/mobile/data/transport/TerminalConnectionFailure {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getReason ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/runtime/host/RuntimeRestartResponder {
+	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)V
+	public final fun onRuntimeRestarted (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/runtime/supervisor/RuntimeCrashDecision {

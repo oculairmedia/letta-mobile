@@ -18,8 +18,7 @@ import com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute
  * Desktop's binding of the shared [HostSessionGraphFactory]. The graph itself is common code; desktop
  * supplies only its JVM sessions: the node channel transport (an Iroh node, or the desktop's own node
  * for the bundled runtime) and a directly dialled App Server ([DesktopLocalAppServerClientRegistry.shared],
- * a developer-only setting). [appServerOverride] is the developer App Server override, which turns a LOCAL config into
- * a directly dialled session ([DesktopLocalNodeRoute.graphConfig]).
+ * a developer-only setting). Under the developer [appServerOverride] a LOCAL config is a directly dialled session.
  */
 fun desktopSessionGraphFactory(
     configProvider: () -> LettaConfig? = { null },

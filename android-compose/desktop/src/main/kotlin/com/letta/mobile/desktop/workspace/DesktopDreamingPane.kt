@@ -35,10 +35,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.emptyFlow
 
 /**
- * letta-mobile-iczm7: the agent editor's Dreaming view. Desktop only binds: dreaming through the
- * Iroh host's relay when connected over iroh://, else the direct App Server (the bundled runtime
- * or an App Server URL); the dream log from the same MemFS route as the memory browser; live runs
- * from the subagent registry; and the Windows automatic-dream switch of the bundled runtime.
+ * The agent editor's Dreaming view. Desktop only binds: dreaming through the node's relay, else a direct App Server;
+ * the dream log from the memory browser's MemFS route; live runs from the subagent registry; and the Windows
+ * automatic-dream switch of the bundled runtime.
  */
 /** The desktop session pieces the Dreaming view reads: settings, subagents and the model catalog. */
 internal class DesktopDreamingDeps(
@@ -85,15 +84,13 @@ private fun rememberHostNotes(agentId: String, store: SecureSettingsStore): Drea
     )
 }
 
-/** The bundled runtime on Windows starts no automatic dream unless the user allowed it here. */
+/** The bundled runtime on Windows (only on the desktop's own node) starts no automatic dream unless allowed here. */
 @Composable
 private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes {
     val health by DesktopLocalRuntimeHost.appServer.health.collectAsState()
-    val onLocalNode by DesktopLocalNodeRoute.attached.collectAsState()
     var allowed by remember(store) { mutableStateOf(DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store)) }
-    // Only while the agent is the bundled runtime's: the desktop's own node is the active backend and its child runs.
-    // A remote node's agents dream on another machine, even while the bundled child runs here in the background.
-    val bundledOnWindows = health.active && onLocalNode && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
+    val onOwnNode = DesktopLocalNodeRoute.attached.collectAsState().value
+    val bundledOnWindows = health.active && onOwnNode && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
     return DreamingHostNotes(
         windowsAutoBlocked = bundledOnWindows,
         windowsAutoAllowed = allowed || DesktopRuntimeLaunchPreference.allowWindowsAutoReflection,

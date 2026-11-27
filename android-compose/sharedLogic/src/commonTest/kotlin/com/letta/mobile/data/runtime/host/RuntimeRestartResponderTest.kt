@@ -1,17 +1,17 @@
-package com.letta.mobile.desktop.runtime
+package com.letta.mobile.data.runtime.host
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.test.runTest
 
 /**
- * A restarted bundled child restarts the desktop's running node whichever backend the window shows: a generation left
- * running over the old child's port and token would be reused on the next return to LOCAL.
+ * A restarted bundled runtime restarts the host's running node whichever backend the window shows: a generation left
+ * running over the old runtime's port and token would be reused on the next return to LOCAL.
  */
-class DesktopRuntimeRestartResponderTest {
+class RuntimeRestartResponderTest {
     private val events = mutableListOf<String>()
 
-    private fun responder(nodeRunning: Boolean) = DesktopRuntimeRestartResponder(
+    private fun responder(nodeRunning: Boolean) = RuntimeRestartResponder(
         nodeRunning = { nodeRunning },
         handOff = { reconnect ->
             events += "bridge"

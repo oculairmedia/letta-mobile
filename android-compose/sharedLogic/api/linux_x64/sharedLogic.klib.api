@@ -61006,6 +61006,12 @@ final class com.letta.mobile.data.runtime.host/LocalAppServerTerminatedException
         final fun <get-reason>(): kotlin/String // com.letta.mobile.data.runtime.host/LocalAppServerTerminatedException.reason.<get-reason>|<get-reason>(){}[0]
 }
 
+final class com.letta.mobile.data.runtime.host/RuntimeRestartResponder { // com.letta.mobile.data.runtime.host/RuntimeRestartResponder|null[0]
+    constructor <init>(kotlin/Function0<kotlin/Boolean>, kotlin.coroutines/SuspendFunction1<kotlin/Function0<kotlin/Unit>, kotlin/Unit>, kotlin/Function0<kotlin/Unit>) // com.letta.mobile.data.runtime.host/RuntimeRestartResponder.<init>|<init>(kotlin.Function0<kotlin.Boolean>;kotlin.coroutines.SuspendFunction1<kotlin.Function0<kotlin.Unit>,kotlin.Unit>;kotlin.Function0<kotlin.Unit>){}[0]
+
+    final suspend fun onRuntimeRestarted() // com.letta.mobile.data.runtime.host/RuntimeRestartResponder.onRuntimeRestarted|onRuntimeRestarted(){}[0]
+}
+
 final class com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicy { // com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicy|null[0]
     constructor <init>(com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicyConfig = ...) // com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicy.<init>|<init>(com.letta.mobile.data.runtime.supervisor.RuntimeCrashPolicyConfig){}[0]
 
@@ -78511,6 +78517,21 @@ open class com.letta.mobile.data.api/ApiException : kotlin/Exception { // com.le
 
     final val code // com.letta.mobile.data.api/ApiException.code|{}code[0]
         final fun <get-code>(): kotlin/Int // com.letta.mobile.data.api/ApiException.code.<get-code>|<get-code>(){}[0]
+}
+
+open class com.letta.mobile.data.backend/OwnNodeRoute { // com.letta.mobile.data.backend/OwnNodeRoute|null[0]
+    constructor <init>() // com.letta.mobile.data.backend/OwnNodeRoute.<init>|<init>(){}[0]
+
+    final val attached // com.letta.mobile.data.backend/OwnNodeRoute.attached|{}attached[0]
+        final fun <get-attached>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.backend/OwnNodeRoute.attached.<get-attached>|<get-attached>(){}[0]
+
+    final fun attaches(com.letta.mobile.data.model/LettaConfig?, kotlin/String?): kotlin/Boolean // com.letta.mobile.data.backend/OwnNodeRoute.attaches|attaches(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+    final fun graphConfig(com.letta.mobile.data.model/LettaConfig?, kotlin/String?): com.letta.mobile.data.model/LettaConfig? // com.letta.mobile.data.backend/OwnNodeRoute.graphConfig|graphConfig(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+    final fun publish(com.letta.mobile.data.model/LettaConfig?, kotlin/String?) // com.letta.mobile.data.backend/OwnNodeRoute.publish|publish(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+
+    final object Companion { // com.letta.mobile.data.backend/OwnNodeRoute.Companion|null[0]
+        final fun filesAreLocal(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.backend/OwnNodeRoute.Companion.filesAreLocal|filesAreLocal(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    }
 }
 
 open class com.letta.mobile.data.canvas.library/CanvasBoardOwner { // com.letta.mobile.data.canvas.library/CanvasBoardOwner|null[0]
