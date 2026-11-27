@@ -132,7 +132,7 @@ class VoiceCardEndUiTest {
         showComposer(width, input) { handle = it }
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitUntil(timeoutMillis = 5_000) { handle?.controller?.state?.value == VoiceModeState.Listening }
-        waitForIdle()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasTestTag(VoiceModeTags.CARD_END)).fetchSemanticsNodes().isNotEmpty() }
         return { handle!! }
     }
 
@@ -147,7 +147,7 @@ class VoiceCardEndUiTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         endWord().press()
         waitUntil(timeoutMillis = 5_000) { handle().controller.state.value == VoiceModeState.Off }
-        waitForIdle()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasTestTag(VoiceModeTags.CARD)).fetchSemanticsNodes().isEmpty() }
         onNodeWithTag(VoiceModeTags.CARD).assertDoesNotExist()
     }
 
