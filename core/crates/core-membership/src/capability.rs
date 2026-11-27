@@ -42,12 +42,7 @@ impl Capability {
     ///
     /// [`CapabilityError`] when the text does not match the capability pattern.
     pub fn new(text: &str) -> Result<Self, CapabilityError> {
-        let bytes = text.as_bytes();
-        let first_ok = bytes.first().is_some_and(u8::is_ascii_lowercase);
-        let rest_ok = bytes.iter().skip(1).all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._*-".contains(byte)
-        });
-        if first_ok && rest_ok && bytes.len() <= 64 {
+        if is_capability_text(text.as_bytes()) {
             Ok(Self(text.to_owned()))
         } else {
             Err(CapabilityError)
@@ -63,6 +58,17 @@ impl Capability {
     fn known(text: &'static str) -> Self {
         Self(text.to_owned())
     }
+}
+
+/// `^[a-z][a-z0-9._*-]{0,63}$`.
+fn is_capability_text(bytes: &[u8]) -> bool {
+    let Some((first, rest)) = bytes.split_first() else {
+        return false;
+    };
+    let rest_ok = rest
+        .iter()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._*-".contains(byte));
+    first.is_ascii_lowercase() && rest.len() < 64 && rest_ok
 }
 
 impl fmt::Display for Capability {
@@ -104,10 +110,21 @@ pub const DEVICE_CEILING: [&str; 6] = [
     Capability::NODE_REPLICATE,
 ];
 
-/// Builds a [`CapSet`] from known capability strings.
+/// Builds a [`CapSet`] from capability strings written in code, such as the constants on
+/// [`Capability`]. Parse untrusted text with [`Capability::new`] instead.
+///
+/// # Panics
+///
+/// When a name is not a valid capability string, so a set this returns never makes
+/// [`crate::SignedOp::sign`] fail on its capabilities.
 #[must_use]
 pub fn cap_set(names: &[&'static str]) -> CapSet {
-    names.iter().map(|name| Capability::known(name)).collect()
+    names
+        .iter()
+        .map(|name| {
+            Capability::new(name).unwrap_or_else(|_| panic!("{name:?} is not a capability string"))
+        })
+        .collect()
 }
 
 /// Whether every capability in `caps` is inside [`DEVICE_CEILING`].
@@ -252,5 +269,18 @@ mod tests {
         let opted = Preset::Phone { execution: true }.capabilities();
         assert!(opted.contains(&Capability::known(Capability::NODE_EXECUTE)));
         assert_eq!(Preset::FirstDevice.capabilities().len(), 10);
+    }
+
+    #[test]
+    fn cap_set_keeps_valid_names() {
+        let caps = cap_set(&[Capability::UI, "app.custom-1"]);
+        assert_eq!(caps.len(), 2);
+        assert!(caps.iter().all(|cap| Capability::new(cap.as_str()).is_ok()));
+    }
+
+    #[test]
+    #[should_panic(expected = "is not a capability string")]
+    fn cap_set_refuses_invalid_names() {
+        let _ = cap_set(&["Admin"]);
     }
 }

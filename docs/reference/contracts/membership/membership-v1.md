@@ -118,7 +118,11 @@ it is unauthorized (section 5, `bad_proof_of_possession`).
   additionally bound it per peer). When its parents arrive it joins the DAG, parents before children. A full buffer
   refuses new pending ops [`pending_full`].
 - The held set is therefore always down-closed and descends from the one genesis. Its **heads** (held ops that no held
-  op names as a parent) are the parents of the next op the node writes.
+  op names as a parent) are the parents of the next op the node writes. A node never writes a subset of its heads: that
+  would change the op's causal past. Each parent costs 34 bytes of the 8,192-byte body, so a node holding more than about
+  230 concurrent heads cannot write until v2 defines a merge op; signing then fails with [`too_large`]. Heads are ops
+  written concurrently by members that have not synced, and every op a node writes merges all of its heads into one, so a
+  constellation of one user's devices stays far below that bound.
 - `past(X)`, the causal past of X, is the transitive closure of its parents. X and Y are **concurrent** when neither is
   in the other's past.
 

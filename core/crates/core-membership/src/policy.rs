@@ -209,7 +209,8 @@ fn quorum(item: &Value) -> Result<Option<Quorum>, PolicyError> {
         None => majority,
         Some(value) => uint(value, 5)?,
     };
-    if count < 3 || required < majority || required > count {
+    let required_in_range = (majority..=count).contains(&required);
+    if count < 3 || !required_in_range {
         return Err(PolicyError::BadQuorum);
     }
     Ok(Some(Quorum { voters, required }))
@@ -276,6 +277,30 @@ mod tests {
         assert_eq!(policy.self_fence_ms, 40_000);
         assert!(!policy.resume_alone);
         assert_eq!(policy.quorum.expect("quorum").required, 2);
+    }
+
+    #[test]
+    fn explicit_values_override_derived_defaults() {
+        let voters: Vec<Value> = (1..=3_u8).map(|b| Value::Bytes(vec![b; 32])).collect();
+        let policy = FailoverPolicy::from_value(&map(vec![
+            (1, Value::Uint(100_000)),
+            (5, map(vec![(0, Value::Array(voters))])),
+            (7, Value::Uint(12_345)),
+            (9, Value::Bool(true)),
+        ]))
+        .expect("valid");
+        // Key 7 wins over after_ms - 60000, and key 9 wins over "resume alone only without a quorum".
+        assert_eq!(policy.self_fence_ms, 12_345);
+        assert!(policy.resume_alone);
+    }
+
+    #[test]
+    fn the_derived_self_fence_floors_at_zero() {
+        for after_ms in [0, 59_999, 60_000] {
+            let policy =
+                FailoverPolicy::from_value(&map(vec![(1, Value::Uint(after_ms))])).expect("valid");
+            assert_eq!(policy.self_fence_ms, 0, "after_ms {after_ms}");
+        }
     }
 
     #[test]

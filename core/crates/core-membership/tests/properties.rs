@@ -5,7 +5,7 @@ mod common;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use common::{key, shuffled};
+use common::{DagBuilder, key, shuffled};
 use core_membership::capability::{self, CapSet, Capability, Preset};
 use core_membership::op::{CatalogRoot, Op, OpHeader, OpKind, OpPayload, rotate_proof};
 use core_membership::{
@@ -220,6 +220,11 @@ fn valid_revokes<'a>(log: &'a MembershipLog, evaluation: &Evaluation) -> Vec<&'a
         .collect()
 }
 
+/// Whether neither op is in the other's causal past.
+fn concurrent(log: &MembershipLog, a: &OpId, b: &OpId) -> bool {
+    a != b && !log.causal_past(a).contains(b) && !log.causal_past(b).contains(a)
+}
+
 fn value() -> impl Strategy<Value = Value> {
     let leaf = prop_oneof![
         any::<u64>().prop_map(Value::Uint),
@@ -327,6 +332,10 @@ proptest! {
     /// M6: no single op leaves zero admins. Every valid op had an admin in its past's state, and a
     /// locked constellation needs two concurrent valid ops that each take an admin away: a revoke,
     /// a rotate (which retires the old key) or a grant removing `admin.full`.
+    ///
+    /// A valid op X is authorized in `S_E(past(X))`, which uses the whole set's revokes. Evaluating
+    /// `past(X)` on its own gives the same state exactly when it finds the same ops of `past(X)`
+    /// valid; otherwise a valid revoke concurrent with X excluded one of them.
     #[test]
     fn no_single_op_removes_the_last_admin(steps in vec(step(), 1..14)) {
         let (constellation, ops) = build(&steps);
@@ -336,20 +345,28 @@ proptest! {
             if *id == constellation {
                 continue;
             }
-            let past = log.restricted_to(&log.causal_past(id)).evaluate();
-            prop_assert!(!past.view.admins().is_empty());
+            let past_ids = log.causal_past(id);
+            let past = log.restricted_to(&past_ids).evaluate();
+            let valid_in_whole: BTreeSet<OpId> =
+                evaluation.valid.intersection(&past_ids).copied().collect();
+            if past.valid == valid_in_whole {
+                prop_assert!(!past.view.admins().is_empty());
+            } else {
+                prop_assert!(
+                    valid_revokes(&log, &evaluation).iter().any(|revoke| concurrent(&log, &revoke.id(), id)),
+                    "the past's state differs only under a concurrent revoke"
+                );
+            }
         }
         if evaluation.view.is_locked() {
             let removers: Vec<&SignedOp> = log
                 .ops()
                 .filter(|op| evaluation.valid.contains(&op.id()) && takes_admin_away(op.op()))
                 .collect();
-            let concurrent = removers.iter().any(|a| removers.iter().any(|b| {
-                a.id() != b.id()
-                    && !log.causal_past(&a.id()).contains(&b.id())
-                    && !log.causal_past(&b.id()).contains(&a.id())
-            }));
-            prop_assert!(concurrent);
+            let any_concurrent = removers
+                .iter()
+                .any(|a| removers.iter().any(|b| concurrent(&log, &a.id(), &b.id())));
+            prop_assert!(any_concurrent);
         }
     }
 
@@ -419,4 +436,44 @@ fn the_generator_produces_interesting_dags() {
     let evaluation = log_of(constellation, &ops).evaluate();
     assert!(!evaluation.rejections.is_empty());
     assert!(evaluation.valid.len() > 3);
+}
+
+#[test]
+fn a_concurrent_revoke_can_restore_the_admin_a_valid_op_relies_on() {
+    // N21 and N22 each drop their own admin.full concurrently; N21 then adds N23 with its
+    // devices.approve. Concurrently N21 revokes N22, which excludes N22's grant, so in the whole
+    // set N22 is still an admin in the add's past and the add is valid. The past alone has no
+    // admin left: only the whole set's revokes give the add's authorizing state.
+    let mut b = DagBuilder::default();
+    for desc in [
+        serde_json::json!({"op": "g", "kind": "genesis", "issuer": "N21", "caps_add": "preset:first_device", "catalog_root": "00000000000000000000000000000000"}),
+        serde_json::json!({"op": "a22", "kind": "add", "issuer": "N21", "parents": ["g"], "subject": "N22", "caps_add": "preset:first_device"}),
+        serde_json::json!({"op": "drop21", "kind": "grant", "issuer": "N21", "parents": ["a22"], "subject": "N21", "caps_add": [], "caps_remove": ["admin.full"]}),
+        serde_json::json!({"op": "drop22", "kind": "grant", "issuer": "N22", "parents": ["a22"], "subject": "N22", "caps_add": [], "caps_remove": ["admin.full"]}),
+        serde_json::json!({"op": "x", "kind": "add", "issuer": "N21", "parents": ["drop21", "drop22"], "subject": "N23", "caps_add": "preset:phone"}),
+        serde_json::json!({"op": "r22", "kind": "revoke", "issuer": "N21", "parents": ["a22"], "subject": "N22"}),
+    ] {
+        b.add(&desc);
+    }
+    let constellation = b.constellation.expect("genesis");
+    let log = log_of(constellation, &b.ops());
+    let evaluation = log.evaluate();
+    let x = b.id("x");
+    assert!(evaluation.valid.contains(&x), "{:?}", evaluation.rejections);
+    assert!(!evaluation.valid.contains(&b.id("drop22")));
+    let past_ids = log.causal_past(&x);
+    let past = log.restricted_to(&past_ids).evaluate();
+    assert!(
+        past.view.admins().is_empty(),
+        "the past alone lost both admins"
+    );
+    assert_ne!(
+        past.valid,
+        evaluation
+            .valid
+            .intersection(&past_ids)
+            .copied()
+            .collect::<BTreeSet<_>>()
+    );
+    assert!(concurrent(&log, &b.id("r22"), &x));
 }

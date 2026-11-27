@@ -372,6 +372,13 @@ impl Op {
         if let Some(subject) = self.subject() {
             map.insert(key::SUBJECT, bytes(subject.as_bytes()));
         }
+        self.put_texts(&mut map);
+        self.put_payload(&mut map);
+        Value::Map(map)
+    }
+
+    /// The optional display texts: genesis name and label, add name, revoke reason.
+    fn put_texts(&self, map: &mut BTreeMap<u64, Value>) {
         let mut put_text = |field: u64, text: &Option<String>| {
             if let Some(text) = text {
                 map.insert(field, Value::Text(text.clone()));
@@ -386,6 +393,10 @@ impl Op {
             OpPayload::Revoke { reason, .. } => put_text(key::REASON, reason),
             _ => {}
         }
+    }
+
+    /// The kind-specific required fields (the subject is a header-level field).
+    fn put_payload(&self, map: &mut BTreeMap<u64, Value>) {
         match &self.payload {
             OpPayload::Genesis {
                 caps, catalog_root, ..
@@ -423,13 +434,37 @@ impl Op {
             }
             OpPayload::Revoke { .. } => {}
         }
-        Value::Map(map)
     }
 
-    /// The op's canonical body bytes.
+    /// The op's body bytes, unchecked: they are canonical BCBOR, but nothing checks that they
+    /// meet the body profile (field types and sizes, nesting depth, the size limit, reserved
+    /// extension keys), so [`Op::decode`] may refuse them. Use [`Op::try_encode`], or
+    /// [`SignedOp::sign`], for bytes that are known to decode.
     #[must_use]
     pub fn encode(&self) -> Vec<u8> {
         bcbor::encode(&self.to_value())
+    }
+
+    /// The op's canonical body bytes, checked: every extension key is 64 or above and the bytes
+    /// decode as an op.
+    ///
+    /// # Errors
+    ///
+    /// [`OpError::UnexpectedField`] for an extension under a reserved key (one below 64, which
+    /// would otherwise be read back as a spec field), or the [`Op::decode`] error for bytes outside
+    /// the body profile.
+    pub fn try_encode(&self) -> Result<Vec<u8>, OpError> {
+        self.check_extension_keys()?;
+        let body = self.encode();
+        Self::decode(&body)?;
+        Ok(body)
+    }
+
+    fn check_extension_keys(&self) -> Result<(), OpError> {
+        match self.extensions.range(..key::FIRST_EXTENSION).next() {
+            Some((reserved, _)) => Err(OpError::UnexpectedField(*reserved)),
+            None => Ok(()),
+        }
     }
 
     /// Decodes a body. The body must be canonical and well-formed for its kind.
@@ -448,33 +483,8 @@ impl Op {
     }
 
     fn from_map(mut map: BTreeMap<u64, Value>) -> Result<Self, OpError> {
-        if map.get(&key::V) != Some(&Value::Uint(OP_VERSION)) {
-            return Err(if map.contains_key(&key::V) {
-                OpError::Version
-            } else {
-                OpError::MissingField(key::V)
-            });
-        }
-        let kind = match map.get(&key::KIND) {
-            Some(Value::Uint(code)) => OpKind::from_code(*code).ok_or(OpError::UnknownKind)?,
-            Some(_) => return Err(OpError::BadField(key::KIND)),
-            None => return Err(OpError::MissingField(key::KIND)),
-        };
-        let (required, optional) = kind.fields();
-        let common = [key::V, key::KIND, key::ISSUER, key::PARENTS, key::TS_MS];
-        for field in common.iter().chain(required) {
-            if !map.contains_key(field) {
-                return Err(OpError::MissingField(*field));
-            }
-        }
-        if let Some(extra) = map.keys().copied().find(|field| {
-            *field < key::FIRST_EXTENSION
-                && !common.contains(field)
-                && !required.contains(field)
-                && !optional.contains(field)
-        }) {
-            return Err(OpError::UnexpectedField(extra));
-        }
+        let kind = version_and_kind(&map)?;
+        check_field_set(kind, &map)?;
         let extensions = map.split_off(&key::FIRST_EXTENSION);
         let mut fields = Fields(map);
         let header = OpHeader {
@@ -496,6 +506,44 @@ impl Op {
             payload,
             extensions,
         })
+    }
+}
+
+/// Checks `v` and reads `kind`.
+fn version_and_kind(map: &BTreeMap<u64, Value>) -> Result<OpKind, OpError> {
+    match map.get(&key::V) {
+        Some(Value::Uint(OP_VERSION)) => {}
+        Some(_) => return Err(OpError::Version),
+        None => return Err(OpError::MissingField(key::V)),
+    }
+    match map.get(&key::KIND) {
+        Some(Value::Uint(code)) => OpKind::from_code(*code).ok_or(OpError::UnknownKind),
+        Some(_) => Err(OpError::BadField(key::KIND)),
+        None => Err(OpError::MissingField(key::KIND)),
+    }
+}
+
+/// Every field `kind` requires is present, and no reserved field it does not allow is.
+fn check_field_set(kind: OpKind, map: &BTreeMap<u64, Value>) -> Result<(), OpError> {
+    const COMMON: [u64; 5] = [key::V, key::KIND, key::ISSUER, key::PARENTS, key::TS_MS];
+    let (required, optional) = kind.fields();
+    if let Some(missing) = COMMON
+        .iter()
+        .chain(required)
+        .find(|field| !map.contains_key(field))
+    {
+        return Err(OpError::MissingField(*missing));
+    }
+    let allowed = |field: &u64| {
+        COMMON.contains(field) || required.contains(field) || optional.contains(field)
+    };
+    match map
+        .range(..key::FIRST_EXTENSION)
+        .map(|(field, _)| *field)
+        .find(|field| !allowed(field))
+    {
+        Some(extra) => Err(OpError::UnexpectedField(extra)),
+        None => Ok(()),
     }
 }
 
@@ -652,13 +700,16 @@ impl SignedOp {
     ///
     /// # Errors
     ///
-    /// [`OpError::WrongKey`] when `key` is not the issuer's, [`OpError::TooLarge`] when the body
-    /// exceeds [`MAX_OP_BYTES`], or the decode error when `op` is not well-formed (for example a
-    /// genesis with parents).
+    /// [`OpError::WrongKey`] when `key` is not the issuer's, [`OpError::UnexpectedField`] for an
+    /// extension under a reserved key, [`OpError::TooLarge`] when the body exceeds
+    /// [`MAX_OP_BYTES`], or the decode error when `op` is not well-formed (for example a genesis
+    /// with parents).
     pub fn sign(op: &Op, key: &NodeKey) -> Result<Self, OpError> {
         if key.node_id() != op.header.issuer {
             return Err(OpError::WrongKey);
         }
+        op.check_extension_keys()?;
+        // `from_parts` decodes the body, so the signed bytes are always inside the body profile.
         let body = op.encode();
         let id = OpId::of_body(&body);
         let sig = key.sign(id.as_bytes());
@@ -760,4 +811,64 @@ pub fn rotate_proof_valid(
         &crypto::rotate_pop_message(subject, new_key, constellation),
         proof,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add_op(key: &NodeKey, extensions: BTreeMap<u64, Value>) -> Op {
+        Op {
+            header: OpHeader {
+                constellation: Some(OpId::from_bytes([7; 32])),
+                issuer: key.node_id(),
+                parents: BTreeSet::from([OpId::from_bytes([8; 32])]),
+                ts_ms: 0,
+            },
+            payload: OpPayload::Add {
+                subject: NodeKey::from_seed(&[2; 32]).node_id(),
+                caps: crate::capability::cap_set(&[Capability::UI]),
+                name: None,
+            },
+            extensions,
+        }
+    }
+
+    #[test]
+    fn an_extension_under_a_reserved_key_is_refused_before_signing() {
+        let key = NodeKey::from_seed(&[1; 32]);
+        // Without the check, key 9 would be read back as the add's name.
+        let op = add_op(
+            &key,
+            BTreeMap::from([(key::NAME, Value::Text("desk".into()))]),
+        );
+        assert_eq!(op.try_encode(), Err(OpError::UnexpectedField(key::NAME)));
+        assert_eq!(
+            SignedOp::sign(&op, &key),
+            Err(OpError::UnexpectedField(key::NAME))
+        );
+        let ok = add_op(
+            &key,
+            BTreeMap::from([(key::FIRST_EXTENSION, Value::Text("desk".into()))]),
+        );
+        let signed = SignedOp::sign(&ok, &key).expect("extension keys from 64 sign");
+        assert_eq!(signed.op(), &ok);
+        assert_eq!(ok.try_encode().as_deref(), Ok(signed.body()));
+    }
+
+    #[test]
+    fn try_encode_refuses_bodies_outside_the_profile() {
+        let key = NodeKey::from_seed(&[1; 32]);
+        let mut deep = Value::Array(vec![]);
+        for _ in 1..bcbor::MAX_DEPTH {
+            deep = Value::Array(vec![deep]);
+        }
+        // The extension alone is at the depth limit; inside the body map it is one level deeper.
+        let op = add_op(&key, BTreeMap::from([(key::FIRST_EXTENSION, deep)]));
+        assert!(matches!(op.try_encode(), Err(OpError::Encoding(_))));
+        assert!(matches!(
+            SignedOp::sign(&op, &key),
+            Err(OpError::Encoding(_))
+        ));
+    }
 }

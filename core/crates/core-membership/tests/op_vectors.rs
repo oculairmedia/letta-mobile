@@ -63,40 +63,33 @@ fn negative(name: &str, envelope: &[u8], stage: &str, error: &str) -> Json {
     json!({"name": name, "envelope": hex(envelope), "stage": stage, "error": error})
 }
 
+/// The envelopes that must be rejected, in the fixture's order: encoding, body fields, envelope
+/// shape, insertion, then authorization.
 fn negatives(b: &DagBuilder) -> Vec<Json> {
-    let n1 = key(1);
-    let genesis = b.by_label["genesis"].op().clone();
-    let add = b.by_label["add"].op().clone();
-    let grant = b.by_label["grant"].op().clone();
-    let constellation = b.constellation.expect("genesis");
-    let add_entries = body_entries(&add);
-    let mut out = Vec::new();
+    let mut out = encoding_negatives(b);
+    out.extend(body_negatives(b));
+    out.extend(envelope_negatives(b));
+    out.extend(insert_negatives(b));
+    out.push(bad_pop_negative(b));
+    out
+}
 
+/// A bad signature, a non-canonical body and an unsorted parent set.
+fn encoding_negatives(b: &DagBuilder) -> Vec<Json> {
+    let n1 = key(1);
     let mut bad_sig = bcbor::decode(&b.by_label["genesis"].envelope()).expect("envelope");
     if let Value::Array(parts) = &mut bad_sig
         && let Value::Bytes(sig) = &mut parts[1]
     {
         sig[63] ^= 0x01;
     }
-    out.push(negative(
-        "bad_signature",
-        &bcbor::encode(&bad_sig),
-        "decode",
-        "bad_signature",
-    ));
 
-    let mut non_canonical = body_entries(&genesis);
+    let mut non_canonical = body_entries(b.by_label["genesis"].op());
     for entry in &mut non_canonical {
         if entry.0 == field::TS_MS {
             entry.1 = vec![0x18, 0x05];
         }
     }
-    out.push(negative(
-        "non_canonical_body",
-        &sign_raw(&raw_map(&non_canonical), &n1),
-        "decode",
-        "bad_encoding",
-    ));
 
     let (low, high) = {
         let a = b.id("genesis");
@@ -106,144 +99,167 @@ fn negatives(b: &DagBuilder) -> Vec<Json> {
     let mut unsorted_parents = vec![0x82];
     unsorted_parents.extend(bcbor::encode(&Value::Bytes(high.as_bytes().to_vec())));
     unsorted_parents.extend(bcbor::encode(&Value::Bytes(low.as_bytes().to_vec())));
-    let mut entries = add_entries.clone();
-    for entry in &mut entries {
+    let mut unsorted = body_entries(b.by_label["add"].op());
+    for entry in &mut unsorted {
         if entry.0 == field::PARENTS {
             entry.1.clone_from(&unsorted_parents);
         }
     }
-    out.push(negative(
-        "unsorted_parents",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "bad_field",
-    ));
 
-    let entries = with_entry(add_entries.clone(), field::LABEL, &Value::Text("x".into()));
-    out.push(negative(
-        "unexpected_field",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "unexpected_field",
-    ));
+    vec![
+        negative(
+            "bad_signature",
+            &bcbor::encode(&bad_sig),
+            "decode",
+            "bad_signature",
+        ),
+        negative(
+            "non_canonical_body",
+            &sign_raw(&raw_map(&non_canonical), &n1),
+            "decode",
+            "bad_encoding",
+        ),
+        negative(
+            "unsorted_parents",
+            &sign_raw(&raw_map(&unsorted), &n1),
+            "decode",
+            "bad_field",
+        ),
+    ]
+}
 
-    let entries = without(body_entries(&grant), field::CAPS_REMOVE);
-    out.push(negative(
-        "missing_field",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "missing_field",
-    ));
+/// Canonical bodies with one field wrong, each signed by its issuer.
+fn body_negatives(b: &DagBuilder) -> Vec<Json> {
+    let add = body_entries(b.by_label["add"].op());
+    let genesis = body_entries(b.by_label["genesis"].op());
+    let grant = body_entries(b.by_label["grant"].op());
+    let rotate = body_entries(b.by_label["rotate"].op());
+    let cases = [
+        (
+            "unexpected_field",
+            with_entry(add.clone(), field::LABEL, &Value::Text("x".into())),
+            1,
+            "unexpected_field",
+        ),
+        (
+            "missing_field",
+            without(grant, field::CAPS_REMOVE),
+            1,
+            "missing_field",
+        ),
+        (
+            "oversize",
+            with_entry(add.clone(), 64, &Value::Bytes(vec![0; 8_200])),
+            1,
+            "too_large",
+        ),
+        (
+            "genesis_with_constellation",
+            with_entry(genesis, field::CONSTELLATION, &Value::Bytes(vec![0xee; 32])),
+            1,
+            "unexpected_field",
+        ),
+        (
+            "unknown_kind",
+            with_entry(add.clone(), field::KIND, &Value::Uint(7)),
+            1,
+            "unknown_kind",
+        ),
+        (
+            "bad_version",
+            with_entry(add.clone(), field::V, &Value::Uint(2)),
+            1,
+            "bad_version",
+        ),
+        (
+            "name_too_long",
+            with_entry(add.clone(), field::NAME, &Value::Text("n".repeat(65))),
+            1,
+            "bad_field",
+        ),
+        (
+            "bad_capability_string",
+            with_entry(
+                add,
+                field::CAPS_ADD,
+                &Value::Array(vec![Value::Text("Admin".into())]),
+            ),
+            1,
+            "bad_field",
+        ),
+        (
+            "rotate_subject_not_issuer",
+            with_entry(
+                rotate,
+                field::SUBJECT,
+                &Value::Bytes(key(5).node_id().as_bytes().to_vec()),
+            ),
+            2,
+            "subject_not_issuer",
+        ),
+    ];
+    cases
+        .into_iter()
+        .map(|(name, entries, signer, error)| {
+            negative(
+                name,
+                &sign_raw(&raw_map(&entries), &key(signer)),
+                "decode",
+                error,
+            )
+        })
+        .collect()
+}
 
-    let entries = with_entry(add_entries.clone(), 64, &Value::Bytes(vec![0; 8_200]));
-    out.push(negative(
-        "oversize",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "too_large",
-    ));
+/// Envelopes that are not `[body bstr, sig bstr64]`.
+fn envelope_negatives(b: &DagBuilder) -> Vec<Json> {
+    vec![
+        negative(
+            "envelope_not_array",
+            &bcbor::encode(&Value::Map(std::collections::BTreeMap::new())),
+            "decode",
+            "bad_shape",
+        ),
+        negative(
+            "short_signature",
+            &bcbor::encode(&Value::Array(vec![
+                Value::Bytes(b.by_label["add"].body().to_vec()),
+                Value::Bytes(vec![0; 63]),
+            ])),
+            "decode",
+            "bad_shape",
+        ),
+    ]
+}
 
-    let entries = with_entry(
-        body_entries(&genesis),
-        field::CONSTELLATION,
-        &Value::Bytes(vec![0xee; 32]),
-    );
-    out.push(negative(
-        "genesis_with_constellation",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "unexpected_field",
-    ));
-
-    let entries = with_entry(add_entries.clone(), field::KIND, &Value::Uint(7));
-    out.push(negative(
-        "unknown_kind",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "unknown_kind",
-    ));
-
-    let entries = with_entry(add_entries.clone(), field::V, &Value::Uint(2));
-    out.push(negative(
-        "bad_version",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "bad_version",
-    ));
-
-    let entries = with_entry(
-        add_entries.clone(),
-        field::NAME,
-        &Value::Text("n".repeat(65)),
-    );
-    out.push(negative(
-        "name_too_long",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "bad_field",
-    ));
-
-    let entries = with_entry(
-        add_entries.clone(),
-        field::CAPS_ADD,
-        &Value::Array(vec![Value::Text("Admin".into())]),
-    );
-    out.push(negative(
-        "bad_capability_string",
-        &sign_raw(&raw_map(&entries), &n1),
-        "decode",
-        "bad_field",
-    ));
-
-    let rotate = b.by_label["rotate"].op().clone();
-    let entries = with_entry(
-        body_entries(&rotate),
-        field::SUBJECT,
-        &Value::Bytes(key(5).node_id().as_bytes().to_vec()),
-    );
-    out.push(negative(
-        "rotate_subject_not_issuer",
-        &sign_raw(&raw_map(&entries), &key(2)),
-        "decode",
-        "subject_not_issuer",
-    ));
-
-    out.push(negative(
-        "envelope_not_array",
-        &bcbor::encode(&Value::Map(std::collections::BTreeMap::new())),
-        "decode",
-        "bad_shape",
-    ));
-    out.push(negative(
-        "short_signature",
-        &bcbor::encode(&Value::Array(vec![
-            Value::Bytes(b.by_label["add"].body().to_vec()),
-            Value::Bytes(vec![0; 63]),
-        ])),
-        "decode",
-        "bad_shape",
-    ));
-
-    let mut foreign = add.clone();
+/// Well-formed ops the log refuses: another constellation's add and a foreign genesis.
+fn insert_negatives(b: &DagBuilder) -> Vec<Json> {
+    let mut foreign = b.by_label["add"].op().clone();
     foreign.header.constellation = Some(OpId::from_bytes([0xee; 32]));
-    out.push(negative(
-        "wrong_constellation",
-        &SignedOp::sign(&foreign, &n1).expect("signs").envelope(),
-        "insert",
-        "constellation_mismatch",
-    ));
-
-    let mut other_genesis = genesis.clone();
+    let mut other_genesis = b.by_label["genesis"].op().clone();
     other_genesis.header.issuer = key(2).node_id();
-    out.push(negative(
-        "foreign_genesis",
-        &SignedOp::sign(&other_genesis, &key(2))
-            .expect("signs")
-            .envelope(),
-        "insert",
-        "foreign_genesis",
-    ));
+    vec![
+        negative(
+            "wrong_constellation",
+            &SignedOp::sign(&foreign, &key(1)).expect("signs").envelope(),
+            "insert",
+            "constellation_mismatch",
+        ),
+        negative(
+            "foreign_genesis",
+            &SignedOp::sign(&other_genesis, &key(2))
+                .expect("signs")
+                .envelope(),
+            "insert",
+            "foreign_genesis",
+        ),
+    ]
+}
 
+/// A rotate whose proof of possession is signed by the wrong key: it decodes and inserts, and
+/// authorization rejects it.
+fn bad_pop_negative(b: &DagBuilder) -> Json {
+    let constellation = b.constellation.expect("genesis");
     let mut bad_pop = b.by_label["rotate"].op().clone();
     bad_pop.header.issuer = key(1).node_id();
     bad_pop.header.parents = [b.id("catalog_root_move")].into();
@@ -255,13 +271,12 @@ fn negatives(b: &DagBuilder) -> Vec<Json> {
             &constellation,
         )),
     };
-    out.push(negative(
+    negative(
         "bad_pop",
-        &SignedOp::sign(&bad_pop, &n1).expect("signs").envelope(),
+        &SignedOp::sign(&bad_pop, &key(1)).expect("signs").envelope(),
         "authorize",
         "bad_proof_of_possession",
-    ));
-    out
+    )
 }
 
 fn generate() -> Json {
@@ -311,7 +326,12 @@ fn fixture_is_current() {
     let generated = generate();
     if std::env::var_os("BAKEN_REGEN_FIXTURES").is_some() {
         let text = serde_json::to_string_pretty(&generated).expect("serializes") + "\n";
-        std::fs::write(contract_path(FIXTURE), text).expect("writes fixture");
+        // Write beside the fixture and rename over it, so `vectors_verify`, which runs in
+        // parallel, never reads a half-written file.
+        let path = contract_path(FIXTURE);
+        let staged = path.with_extension("json.tmp");
+        std::fs::write(&staged, text).expect("writes staged fixture");
+        std::fs::rename(&staged, &path).expect("replaces fixture");
     }
     let on_disk = load_value(FIXTURE).expect("fixture loads");
     assert!(
@@ -323,6 +343,21 @@ fn fixture_is_current() {
 #[test]
 fn vectors_verify() {
     let fixture = load_value(FIXTURE).expect("fixture loads");
+    verify_keys(&fixture);
+    let constellation = OpId::from_bytes(
+        unhex(fixture["constellation"].as_str().expect("id"))
+            .try_into()
+            .expect("32"),
+    );
+    let log = verify_vectors(&fixture, constellation);
+    verify_hash_contexts(&fixture, constellation);
+    for vector in fixture["invalid"].as_array().expect("invalid") {
+        verify_invalid(vector, &log);
+    }
+}
+
+/// Every test key's public key follows from its seed.
+fn verify_keys(fixture: &Json) {
     for k in fixture["keys"].as_array().expect("keys") {
         let name = k["name"].as_str().expect("name");
         let seed: [u8; 32] = unhex(k["seed"].as_str().expect("seed"))
@@ -336,36 +371,16 @@ fn vectors_verify() {
             "{name}"
         );
     }
-    let constellation = OpId::from_bytes(
-        unhex(fixture["constellation"].as_str().expect("id"))
-            .try_into()
-            .expect("32"),
-    );
+}
+
+/// Every vector decodes, re-encodes byte for byte and inserts; together they cover every kind and
+/// all evaluate as valid. Returns the log holding them.
+fn verify_vectors(fixture: &Json, constellation: OpId) -> MembershipLog {
     let mut log = MembershipLog::new(constellation);
     let mut kinds = Vec::new();
     for vector in fixture["vectors"].as_array().expect("vectors") {
         let name = vector["name"].as_str().expect("name");
-        let envelope = unhex(vector["envelope"].as_str().expect("envelope"));
-        let signed = SignedOp::decode_envelope(&envelope).expect(name);
-        assert_eq!(hex(signed.body()), vector["body"], "{name} body");
-        assert_eq!(signed.id().to_string(), vector["op_id"], "{name} op id");
-        assert_eq!(
-            hex(signed.signature().as_bytes()),
-            vector["sig"],
-            "{name} sig"
-        );
-        assert_eq!(signed.envelope(), envelope, "{name} envelope re-encodes");
-        assert_eq!(
-            signed.op().encode(),
-            signed.body(),
-            "{name} body re-encodes"
-        );
-        assert_eq!(Op::decode(signed.body()).as_ref(), Ok(signed.op()));
-        assert_eq!(signed.op().kind().name(), vector["kind"]);
-        assert_eq!(
-            signed.op().header.issuer,
-            key_named(vector["issuer"].as_str().expect("issuer")).node_id()
-        );
+        let signed = verify_vector(vector);
         kinds.push(signed.op().kind());
         log.insert(signed).expect(name);
     }
@@ -386,7 +401,36 @@ fn vectors_verify() {
         "{:?}",
         evaluation.rejections
     );
+    log
+}
 
+fn verify_vector(vector: &Json) -> SignedOp {
+    let name = vector["name"].as_str().expect("name");
+    let envelope = unhex(vector["envelope"].as_str().expect("envelope"));
+    let signed = SignedOp::decode_envelope(&envelope).expect(name);
+    assert_eq!(hex(signed.body()), vector["body"], "{name} body");
+    assert_eq!(signed.id().to_string(), vector["op_id"], "{name} op id");
+    assert_eq!(
+        hex(signed.signature().as_bytes()),
+        vector["sig"],
+        "{name} sig"
+    );
+    assert_eq!(signed.envelope(), envelope, "{name} envelope re-encodes");
+    assert_eq!(
+        signed.op().encode(),
+        signed.body(),
+        "{name} body re-encodes"
+    );
+    assert_eq!(Op::decode(signed.body()).as_ref(), Ok(signed.op()));
+    assert_eq!(signed.op().kind().name(), vector["kind"]);
+    assert_eq!(
+        signed.op().header.issuer,
+        key_named(vector["issuer"].as_str().expect("issuer")).node_id()
+    );
+    signed
+}
+
+fn verify_hash_contexts(fixture: &Json, constellation: OpId) {
     for context in fixture["hash_contexts"].as_array().expect("contexts") {
         if context["context"] == OP_ID_CONTEXT {
             let input = unhex(context["input"].as_str().expect("input"));
@@ -400,33 +444,35 @@ fn vectors_verify() {
             assert_eq!(hex(&message), context["output"]);
         }
     }
+}
 
-    for vector in fixture["invalid"].as_array().expect("invalid") {
-        let name = vector["name"].as_str().expect("name");
-        let envelope = unhex(vector["envelope"].as_str().expect("envelope"));
-        let expected = vector["error"].as_str().expect("error");
-        let decoded = SignedOp::decode_envelope(&envelope);
-        match vector["stage"].as_str().expect("stage") {
-            "decode" => assert_eq!(decoded.expect_err(name).code(), expected, "{name}"),
-            "insert" => {
-                let error = log.clone().insert(decoded.expect(name)).expect_err(name);
-                assert_eq!(error.code(), expected, "{name}");
-            }
-            "authorize" => {
-                let signed = decoded.expect(name);
-                let mut extended = log.clone();
-                extended.insert(signed.clone()).expect(name);
-                let evaluation = extended.evaluate();
-                assert_eq!(
-                    evaluation
-                        .rejections
-                        .get(&signed.id())
-                        .map(core_membership::Rejection::code),
-                    Some(expected),
-                    "{name}"
-                );
-            }
-            other => panic!("unknown stage {other}"),
+/// An invalid envelope fails at its stage with its code: decoding, inserting into `log`, or
+/// authorization in the evaluation of `log` plus the op.
+fn verify_invalid(vector: &Json, log: &MembershipLog) {
+    let name = vector["name"].as_str().expect("name");
+    let envelope = unhex(vector["envelope"].as_str().expect("envelope"));
+    let expected = vector["error"].as_str().expect("error");
+    let decoded = SignedOp::decode_envelope(&envelope);
+    match vector["stage"].as_str().expect("stage") {
+        "decode" => assert_eq!(decoded.expect_err(name).code(), expected, "{name}"),
+        "insert" => {
+            let error = log.clone().insert(decoded.expect(name)).expect_err(name);
+            assert_eq!(error.code(), expected, "{name}");
         }
+        "authorize" => {
+            let signed = decoded.expect(name);
+            let mut extended = log.clone();
+            extended.insert(signed.clone()).expect(name);
+            let evaluation = extended.evaluate();
+            assert_eq!(
+                evaluation
+                    .rejections
+                    .get(&signed.id())
+                    .map(core_membership::Rejection::code),
+                Some(expected),
+                "{name}"
+            );
+        }
+        other => panic!("unknown stage {other}"),
     }
 }

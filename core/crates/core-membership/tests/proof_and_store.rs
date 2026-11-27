@@ -3,6 +3,7 @@
 mod common;
 
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::{DagBuilder, node_named};
 use core_membership::proof::ProofError;
@@ -10,7 +11,7 @@ use core_membership::{
     Inserted, MembershipLog, OpId, PersistError, PersistentLog, PushBudget, PushError, PushLimits,
     proof_bundle,
 };
-use core_store::{MemoryStore, Store, StoredOp};
+use core_store::{BindingsStore, MemoryStore, Store, StoreError, StoredOp, Txn};
 use serde_json::json;
 
 const R0: &str = "00000000000000000000000000000000";
@@ -203,4 +204,92 @@ fn ops_are_stored_under_their_own_id() {
         PersistentLog::open(b.constellation.expect("genesis"), store),
         Err(PersistError::IdMismatch { .. })
     ));
+}
+
+/// A [`MemoryStore`] whose writes fail while `failing` is set.
+#[derive(Default)]
+struct FlakyStore {
+    inner: MemoryStore,
+    failing: AtomicBool,
+}
+
+impl Store for FlakyStore {
+    fn read<T, E: From<StoreError>>(
+        &self,
+        f: impl FnOnce(&dyn Txn) -> Result<T, E>,
+    ) -> Result<T, E> {
+        self.inner.read(f)
+    }
+
+    fn write<T, E: From<StoreError>>(
+        &self,
+        f: impl FnOnce(&mut dyn Txn) -> Result<T, E>,
+    ) -> Result<T, E> {
+        if self.failing.load(Ordering::SeqCst) {
+            return Err(StoreError::Invalid("injected write failure".into()).into());
+        }
+        self.inner.write(f)
+    }
+
+    fn bindings(&self) -> &dyn BindingsStore {
+        self.inner.bindings()
+    }
+
+    fn schema_version(&self) -> u32 {
+        self.inner.schema_version()
+    }
+}
+
+#[test]
+fn a_failed_write_leaves_the_log_unchanged_so_a_retry_stores_the_op() {
+    let b = constellation();
+    let constellation = b.constellation.expect("genesis");
+    let mut log = PersistentLog::open(constellation, FlakyStore::default()).expect("opens");
+    log.insert(b.by_label["g"].clone(), 1_000).expect("genesis");
+    // a3 waits for a2; a2's write fails, so neither joins and a3 waits again.
+    assert!(matches!(
+        log.insert(b.by_label["a3"].clone(), 1_000),
+        Ok(Inserted::Pending { .. })
+    ));
+    log.store().failing.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        log.insert(b.by_label["a2"].clone(), 1_000),
+        Err(PersistError::Store(_))
+    ));
+    assert!(!log.log().contains(&b.id("a2")));
+    assert!(!log.log().contains(&b.id("a3")));
+    assert_eq!(log.log().pending().count(), 1, "a3 waits again");
+
+    log.store().failing.store(false, Ordering::SeqCst);
+    assert_eq!(
+        log.insert(b.by_label["a2"].clone(), 1_000).expect("retry"),
+        Inserted::Stored(vec![b.id("a2"), b.id("a3")]),
+        "the retry is not a duplicate and completes a3 again"
+    );
+    let reopened = PersistentLog::open(constellation, log.into_store()).expect("reopens");
+    assert_eq!(reopened.log().len(), 3);
+    assert_eq!(reopened.log().pending().count(), 0);
+}
+
+#[test]
+fn a_dag_larger_than_the_pending_bound_reopens_whatever_the_row_order() {
+    // A chain longer than twice the pending bound: rows come back in op-id order, so most of the
+    // chain loads before its ancestors and waits at once.
+    let links = 2 * core_membership::log::DEFAULT_PENDING_LIMIT + 100;
+    let mut b = DagBuilder::default();
+    b.add(&json!({"op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": R0}));
+    let mut parent = "g".to_owned();
+    for n in 0..links {
+        let label = format!("p{n}");
+        b.add(&json!({"op": label, "kind": "policy_set", "issuer": "N1", "parents": [parent], "ts_ms": n, "policy": {"map": []}}));
+        parent = label;
+    }
+    let constellation = b.constellation.expect("genesis");
+    let mut log = PersistentLog::open(constellation, MemoryStore::default()).expect("opens");
+    for op in b.ops() {
+        assert!(matches!(log.insert(op, 1_000), Ok(Inserted::Stored(_))));
+    }
+    let reopened = PersistentLog::open(constellation, log.into_store()).expect("reopens");
+    assert_eq!(reopened.log().len(), links + 1);
+    assert_eq!(reopened.log().heads(), BTreeSet::from([b.id(&parent)]));
 }

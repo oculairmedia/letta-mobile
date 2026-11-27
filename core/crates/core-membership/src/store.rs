@@ -8,7 +8,7 @@ use core_store::{Store, StoreError, StoredOp};
 use thiserror::Error;
 
 use crate::crypto::OpId;
-use crate::log::{InsertError, Inserted, MembershipLog};
+use crate::log::{DEFAULT_PENDING_LIMIT, InsertError, Inserted, MembershipLog};
 use crate::op::{OpError, SignedOp};
 
 impl From<OpId> for core_store::OpId {
@@ -56,11 +56,15 @@ pub struct PersistentLog<S> {
 impl<S: Store> PersistentLog<S> {
     /// Opens the log of `constellation` from `store`, re-verifying every stored op.
     ///
+    /// The store returns rows in op-id order, which is not parent order, so a stored op can load
+    /// before its parents. Loading therefore lifts the pending bound: every stored op was complete
+    /// when it was written, so the load always completes. The bound applies again afterwards.
+    ///
     /// # Errors
     ///
     /// [`PersistError`] when the store fails, a stored op is invalid, or one belongs elsewhere.
     pub fn open(constellation: OpId, store: S) -> Result<Self, PersistError> {
-        let mut log = MembershipLog::new(constellation);
+        let mut log = MembershipLog::new(constellation).with_pending_limit(usize::MAX);
         let rows = store.read(|txn| txn.ops())?;
         for row in rows {
             let signed = SignedOp::decode_envelope(&row.envelope).map_err(PersistError::Corrupt)?;
@@ -73,6 +77,7 @@ impl<S: Store> PersistentLog<S> {
             }
             log.insert(signed)?;
         }
+        let log = log.with_pending_limit(DEFAULT_PENDING_LIMIT);
         Ok(Self { log, store })
     }
 
@@ -82,7 +87,8 @@ impl<S: Store> PersistentLog<S> {
     /// # Errors
     ///
     /// [`PersistError`] when the log refuses the op or the store fails. When the store fails the
-    /// ops stay in the in-memory log; a reopen drops them and a peer sends them again.
+    /// in-memory log is put back as it was (the ops the insert completed wait again), so inserting
+    /// the same op again retries the write.
     pub fn insert(&mut self, op: SignedOp, received_at_ms: u64) -> Result<Inserted, PersistError> {
         let inserted = self.log.insert(op)?;
         if let Inserted::Stored(ids) = &inserted {
@@ -91,12 +97,16 @@ impl<S: Store> PersistentLog<S> {
                 .filter_map(|id| self.log.get(id))
                 .map(|signed| stored_op(signed, received_at_ms))
                 .collect();
-            self.store.write(|txn| {
+            let written = self.store.write(|txn| {
                 for row in &rows {
                     txn.put_op(row)?;
                 }
                 Ok::<_, StoreError>(())
-            })?;
+            });
+            if let Err(error) = written {
+                self.log.undo_stored(ids);
+                return Err(error.into());
+            }
         }
         Ok(inserted)
     }

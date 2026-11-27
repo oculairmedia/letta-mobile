@@ -145,13 +145,38 @@ impl DagBuilder {
     }
 
     /// Adds the op described by `desc` and returns it.
+    ///
+    /// # Panics
+    ///
+    /// When the label is already taken: a second op with the same label would hide the first one
+    /// from [`DagBuilder::ops`] while its children still name it.
     pub fn add(&mut self, desc: &Json) -> SignedOp {
-        let field = |name: &str| desc.get(name);
-        let text = |name: &str| field(name).and_then(Json::as_str).map(str::to_owned);
-        let label = text("op").expect("op label");
-        let kind = text("kind").expect("kind");
-        let issuer_key = key_named(&text("issuer").expect("issuer"));
-        let parents: BTreeSet<OpId> = field("parents")
+        let label = json_text(desc, "op").expect("op label");
+        assert!(
+            !self.by_label.contains_key(&label),
+            "duplicate op label {label}: each fixture op needs its own label"
+        );
+        let kind = json_text(desc, "kind").expect("kind");
+        let issuer_key = key_named(&json_text(desc, "issuer").expect("issuer"));
+        let header = self.header(desc, &kind, &issuer_key);
+        let payload = self.payload(desc, &kind, &issuer_key);
+        let op = Op {
+            header,
+            payload,
+            extensions: BTreeMap::new(),
+        };
+        let signed = SignedOp::sign(&op, &issuer_key).expect("signs");
+        if kind == "genesis" {
+            self.constellation = Some(signed.id());
+        }
+        self.by_label.insert(label.clone(), signed.clone());
+        self.order.push(label);
+        signed
+    }
+
+    fn header(&self, desc: &Json, kind: &str, issuer_key: &NodeKey) -> OpHeader {
+        let parents: BTreeSet<OpId> = desc
+            .get("parents")
             .and_then(Json::as_array)
             .map(|labels| {
                 labels
@@ -160,7 +185,7 @@ impl DagBuilder {
                     .collect()
             })
             .unwrap_or_default();
-        let header = OpHeader {
+        OpHeader {
             constellation: if kind == "genesis" {
                 None
             } else {
@@ -168,11 +193,15 @@ impl DagBuilder {
             },
             issuer: issuer_key.node_id(),
             parents,
-            ts_ms: field("ts_ms").and_then(Json::as_u64).unwrap_or(0),
-        };
+            ts_ms: desc.get("ts_ms").and_then(Json::as_u64).unwrap_or(0),
+        }
+    }
+
+    fn payload(&self, desc: &Json, kind: &str, issuer_key: &NodeKey) -> OpPayload {
+        let text = |name: &str| json_text(desc, name);
         let subject = || node_named(&text("subject").expect("subject"));
-        let caps = |name: &str| field(name).map(caps_from_json).unwrap_or_default();
-        let payload = match kind.as_str() {
+        let caps = |name: &str| desc.get(name).map(caps_from_json).unwrap_or_default();
+        match kind {
             "genesis" => OpPayload::Genesis {
                 caps: caps("caps_add"),
                 name: text("name"),
@@ -193,46 +222,38 @@ impl DagBuilder {
                 caps_add: caps("caps_add"),
                 caps_remove: caps("caps_remove"),
             },
-            "rotate" => {
-                let new_key = key_named(&text("new_key").expect("new_key"));
-                let pop_signer = text("pop_signer").map_or_else(
-                    || key_named(&text("new_key").expect("new_key")),
-                    |name| key_named(&name),
-                );
-                let constellation = self.constellation.expect("genesis first");
-                // A proof signed by another key is the "bad PoP" case.
-                let sig = pop_signer.sign(&core_membership::crypto::rotate_pop_message(
-                    &issuer_key.node_id(),
-                    &new_key.node_id(),
-                    &constellation,
-                ));
-                OpPayload::Rotate {
-                    new_key: new_key.node_id(),
-                    new_key_sig: sig,
-                }
-            }
+            "rotate" => self.rotate_payload(desc, issuer_key),
             "policy_set" => OpPayload::PolicySet {
-                policy: value_from_json(field("policy").expect("policy")),
+                policy: value_from_json(desc.get("policy").expect("policy")),
             },
             "catalog_root_move" => OpPayload::CatalogRootMove {
                 new_root: root(&text("new_root").expect("new_root")),
                 prev_root: root(&text("prev_root").expect("prev_root")),
             },
             other => panic!("unknown kind {other}"),
-        };
-        let op = Op {
-            header,
-            payload,
-            extensions: BTreeMap::new(),
-        };
-        let signed = SignedOp::sign(&op, &issuer_key).expect("signs");
-        if kind == "genesis" {
-            self.constellation = Some(signed.id());
         }
-        self.by_label.insert(label.clone(), signed.clone());
-        self.order.push(label);
-        signed
     }
+
+    fn rotate_payload(&self, desc: &Json, issuer_key: &NodeKey) -> OpPayload {
+        let new_key_name = json_text(desc, "new_key").expect("new_key");
+        let new_key = key_named(&new_key_name);
+        let pop_signer = key_named(&json_text(desc, "pop_signer").unwrap_or(new_key_name));
+        let constellation = self.constellation.expect("genesis first");
+        // A proof signed by another key is the "bad PoP" case.
+        let sig = pop_signer.sign(&core_membership::crypto::rotate_pop_message(
+            &issuer_key.node_id(),
+            &new_key.node_id(),
+            &constellation,
+        ));
+        OpPayload::Rotate {
+            new_key: new_key.node_id(),
+            new_key_sig: sig,
+        }
+    }
+}
+
+fn json_text(desc: &Json, name: &str) -> Option<String> {
+    desc.get(name).and_then(Json::as_str).map(str::to_owned)
 }
 
 /// A deterministic shuffle (xorshift), so fixture runs are reproducible.

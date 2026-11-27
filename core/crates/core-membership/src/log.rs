@@ -110,15 +110,10 @@ impl MembershipLog {
         if self.ops.contains_key(&id) || self.pending.contains_key(&id) {
             return Ok(Inserted::Duplicate);
         }
-        let header = &op.op().header;
-        if op.op().kind() == OpKind::Genesis {
-            if id != self.constellation {
-                return Err(InsertError::ForeignGenesis);
-            }
-        } else if header.constellation != Some(self.constellation) {
-            return Err(InsertError::ConstellationMismatch);
-        }
-        let missing: BTreeSet<OpId> = header
+        self.check_constellation(&op)?;
+        let missing: BTreeSet<OpId> = op
+            .op()
+            .header
             .parents
             .iter()
             .filter(|parent| !self.ops.contains_key(parent))
@@ -135,6 +130,21 @@ impl MembershipLog {
         let mut stored = vec![id];
         self.promote_pending(&mut stored);
         Ok(Inserted::Stored(stored))
+    }
+
+    /// A genesis must be the trust anchor; any other op must name it.
+    fn check_constellation(&self, op: &SignedOp) -> Result<(), InsertError> {
+        if op.op().kind() == OpKind::Genesis {
+            if op.id() == self.constellation {
+                Ok(())
+            } else {
+                Err(InsertError::ForeignGenesis)
+            }
+        } else if op.op().header.constellation == Some(self.constellation) {
+            Ok(())
+        } else {
+            Err(InsertError::ConstellationMismatch)
+        }
     }
 
     fn promote_pending(&mut self, stored: &mut Vec<OpId>) {
@@ -159,6 +169,21 @@ impl MembershipLog {
                     self.ops.insert(id, op);
                     stored.push(id);
                 }
+            }
+        }
+    }
+
+    /// Undoes the insert that returned [`Inserted::Stored`] with `stored`: the inserted op (the
+    /// first id) leaves the log and the pending ops it completed wait for it again. Call it right
+    /// after that insert, before any other change.
+    pub(crate) fn undo_stored(&mut self, stored: &[OpId]) {
+        let Some((inserted, completed)) = stored.split_first() else {
+            return;
+        };
+        self.ops.remove(inserted);
+        for id in completed {
+            if let Some(op) = self.ops.remove(id) {
+                self.pending.insert(*id, op);
             }
         }
     }
