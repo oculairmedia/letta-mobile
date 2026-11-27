@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import { patchLettaCodeSourceResultForTest } from "../letta-code-patch-loader.mjs";
 
@@ -65,14 +65,18 @@ function patchedBundle(bundle: string): { source: string; appliedPatches: number
 }
 let patchedBundleCached: { bundle: string; result: ReturnType<typeof patchedBundle> } | null = null;
 
-/** Whether a parent environment variable may reach the child: not the loader hook and no LETTA_/LCP_ settings. */
+/** Whether a parent environment variable may reach the child: not the loader hook, no LETTA_/LCP_ settings. */
 function inherited(name: string): boolean {
   return name !== "NODE_OPTIONS" && !name.startsWith("LETTA_") && !name.startsWith("LCP_");
 }
 
-type Child = { status: number | null; stdout: string; stderr: string };
+type Harness = { bundlePath: string; patchedSource: string; body: string };
+type Sizes = { agents: number; cleanupTimers: number; eventStores: number; listeners: number; streamListeners: number };
 
-function runChild(bundlePath: string, stateLiteral: string, body: string): Child {
+/** Runs `body` against the real patched bundle in a child process and returns its RESULT object. */
+function childResult({ bundlePath, patchedSource, body }: Harness): Record<string, unknown> {
+  const literal = STATE_LITERAL_PATTERN.exec(patchedSource);
+  assert.ok(literal, "the per-subagent state literal is not in the patched bundle");
   const register = `import { register } from "node:module";\n` +
     `register(${JSON.stringify(LOADER_URL)});\n` +
     `register(${JSON.stringify(EXPORT_HOOK_URL)});\n`;
@@ -97,33 +101,43 @@ function runChild(bundlePath: string, stateLiteral: string, body: string): Child
   for (const [name, value] of Object.entries(process.env)) {
     if (value !== undefined && inherited(name)) env[name] = value;
   }
-  return spawnSync(process.execPath, [
+  const child = spawnSync(process.execPath, [
     "--import", `data:text/javascript,${encodeURIComponent(register)}`,
     "--input-type=module", "--eval", script,
   ], {
     encoding: "utf8",
-    env: { ...env, LETTA_CLI_PATH_REAL: resolve(bundlePath), LCP_STATE_LITERAL: stateLiteral },
+    // The loader compares fileURLToPath(url) with LETTA_CLI_PATH_REAL verbatim, so hand it the
+    // platform form of the path.
+    env: {
+      ...env,
+      LETTA_CLI_PATH_REAL: resolve(bundlePath),
+      LCP_STATE_LITERAL: literal[0].slice("const state2 = ".length),
+    },
     timeout: 120_000,
   });
-}
-
-/** Drives the child and returns its RESULT object; fails the test on any child error. */
-function childResult(t: { skip: (reason: string) => void }, bundlePath: string, patchedSource: string, body: string): Record<string, unknown> {
-  const literal = STATE_LITERAL_PATTERN.exec(patchedSource);
-  assert.ok(literal, "the per-subagent state literal is not in the patched bundle");
-  const child = runChild(bundlePath, literal[0].slice("const state2 = ".length), body);
   assert.equal(child.status, 0, `child failed: ${child.stderr}\n${child.stdout}`);
   const line = child.stdout.split("\n").find((entry) => entry.startsWith("RESULT "));
   assert.ok(line, `child printed no RESULT line: ${child.stdout}\n${child.stderr}`);
   return JSON.parse(line.slice("RESULT ".length)) as Record<string, unknown>;
 }
 
+/** Asserts a sizes snapshot the child reported, field by field, with the reason in the message. */
+function assertSizes(sizes: unknown, expected: Partial<Sizes>, stage: string): void {
+  assert.ok(typeof sizes === "object" && sizes !== null, `${stage}: no sizes reported`);
+  for (const [name, want] of Object.entries(expected)) {
+    const got = (sizes as Record<string, unknown>)[name];
+    assert.equal(got, want, `${stage}: ${name} must be ${want} (got ${String(got)})`);
+  }
+}
+
 test("live tokens: usage_statistics steps report a running total that the final result still wins", (t) => {
   const bundlePath = deployedBundleOrSkip(t);
   if (!bundlePath) return;
-  const bundle = readFileSync(bundlePath, "utf8");
-  const patched = patchedBundle(bundle);
-  const out = childResult(t, bundlePath, patched.source, `
+  const patched = patchedBundle(readFileSync(bundlePath, "utf8"));
+  const out = childResult({
+    bundlePath,
+    patchedSource: patched.source,
+    body: `
     const tokens = (id) => bundle.store2.agents.get(id)?.totalTokens;
     const register = (id, toolCallId, description) =>
       bundle.registerSubagent(id, "task", description, toolCallId, false, false, undefined, "", false);
@@ -166,7 +180,8 @@ test("live tokens: usage_statistics steps report a running total that the final 
     bundle.processStreamEvent(usageLine(100), s3, id3);
     out.junkThenValid = tokens(id3);
     out.stateFields = Object.keys(s3);
-  `);
+  `,
+  });
 
   assert.equal(out.afterRegister, 0, "a fresh subagent reports no tokens");
   assert.equal(out.liveAfterFirstStep, 1200, "the first step's tokens are visible while the subagent runs");
@@ -183,11 +198,13 @@ test("live tokens: usage_statistics steps report a running total that the final 
 test("live tokens: one thousand lifecycles retain nothing and copy no message content", (t) => {
   const bundlePath = deployedBundleOrSkip(t);
   if (!bundlePath) return;
-  const bundle = readFileSync(bundlePath, "utf8");
-  const patched = patchedBundle(bundle);
+  const patched = patchedBundle(readFileSync(bundlePath, "utf8"));
   const markerHead = "LCP-LIVE-TOKENS-PAYLOAD";
   const iterations = 1000;
-  const out = childResult(t, bundlePath, patched.source, `
+  const out = childResult({
+    bundlePath,
+    patchedSource: patched.source,
+    body: `
     const markerHead = ${JSON.stringify(markerHead)};
     const payload = markerHead + "-".repeat(65536);
     const iterations = ${iterations};
@@ -229,11 +246,8 @@ test("live tokens: one thousand lifecycles retain nothing and copy no message co
     bundle.clearCompletedSubagents();
     out.afterCleanup = sizes();
     out.snapshotAgentsAfterCleanup = bundle.cachedSnapshot.agents.length;
-  `);
-
-  const before = out.before as Record<string, number>;
-  const retained = out.retained as Record<string, number>;
-  const after = out.afterCleanup as Record<string, number>;
+  `,
+  });
 
   assert.equal(out.markerInStore, false, "no module-level collection retains the usage events' content");
   assert.equal(out.statesHavePayload, false, "the per-subagent state retains no message content");
@@ -246,20 +260,22 @@ test("live tokens: one thousand lifecycles retain nothing and copy no message co
 
   // Growth is exactly the stock completed-subagent retention: one agent and one cleanup timer
   // per lifecycle, nothing per usage event, and both listener sets stay at their test sizes.
-  assert.equal(before.agents, 0, "the store starts empty");
-  assert.equal(before.cleanupTimers, 0, "no cleanup timers before the run");
-  assert.equal(retained.agents, iterations, "one store entry per subagent, none extra");
-  assert.equal(retained.cleanupTimers, iterations, "one stock cleanup timer per subagent, none extra");
-  assert.equal(retained.eventStores, 0, "no task-event stores (no progress text was produced)");
-  assert.equal(retained.listeners, 1, "no store listener was added by the run");
-  assert.equal(retained.streamListeners, 1, "no stream listener was added by the run");
-
+  assertSizes(out.before, { agents: 0, cleanupTimers: 0, listeners: 1, streamListeners: 1 }, "before the run");
+  assertSizes(out.retained, {
+    agents: iterations,
+    cleanupTimers: iterations,
+    eventStores: 0,
+    listeners: 1,
+    streamListeners: 1,
+  }, "after one thousand lifecycles");
   // After the stock cleanup, nothing per-subagent survives anywhere.
-  assert.equal(after.agents, 0, "no subagent state survives the cleanup");
-  assert.equal(after.cleanupTimers, 0, "no cleanup timer survives the cleanup");
-  assert.equal(after.eventStores, 0, "no event store survives the cleanup");
-  assert.equal(after.listeners, 1, "listener count is unchanged by the cleanup");
-  assert.equal(after.streamListeners, 1, "stream listener count is unchanged by the cleanup");
+  assertSizes(out.afterCleanup, {
+    agents: 0,
+    cleanupTimers: 0,
+    eventStores: 0,
+    listeners: 1,
+    streamListeners: 1,
+  }, "after the cleanup");
   assert.equal(out.snapshotAgentsAfterCleanup, 0, "the snapshot cache holds no subagent after the cleanup");
 });
 
