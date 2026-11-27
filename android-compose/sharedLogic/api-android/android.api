@@ -40342,6 +40342,7 @@ public final class com/letta/mobile/data/node/carrier/NodeSession {
 public final class com/letta/mobile/data/node/carrier/NodeSession$Companion {
 	public final fun open (Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun open$default (Lcom/letta/mobile/data/node/carrier/NodeSession$Companion;Lcom/letta/mobile/data/node/carrier/NodeCarrier;Lcom/letta/mobile/data/node/carrier/NodeOpenRequest;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
 
 public abstract interface class com/letta/mobile/data/node/core/CoreNodeHandle : java/lang/AutoCloseable {
 	public abstract fun address (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
