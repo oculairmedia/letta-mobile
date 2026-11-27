@@ -22,8 +22,6 @@ import com.letta.mobile.data.model.RunId
 import com.letta.mobile.data.runtime.LoopPhase
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.node.serveIrohCarrierLink
-import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.coroutines.CompletableDeferred
