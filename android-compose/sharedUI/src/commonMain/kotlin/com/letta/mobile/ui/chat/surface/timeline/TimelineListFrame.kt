@@ -373,13 +373,16 @@ private fun ownLeadingSpace(item: ChatRenderItem, older: ChatRenderItem?): Dp = 
     // A notice (a report, a Monitor event, a task's state) is a run header's sibling on the header
     // rail: it opens a block, so it takes the section break a run takes, wherever it falls in a group.
     item is ChatRenderItem.Single && item.message.subagentNotification != null -> ChatRowSpacing.ungrouped
+    item is ChatRenderItem.RunBlock && older != null -> ChatRowSpacing.ungrouped
     else -> blockLeadingSpace(item)
 }
 
 private fun blockLeadingSpace(item: ChatRenderItem): Dp = when (item) {
-    // A run is a new turn: the section break above it, the same one the next speaker takes
-    // below it, so its summary line sits evenly between the two.
-    is ChatRenderItem.RunBlock -> ChatRowSpacing.ungrouped
+    is ChatRenderItem.RunBlock -> if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) {
+        ChatRowSpacing.grouped
+    } else {
+        ChatRowSpacing.ungrouped
+    }
     is ChatRenderItem.Single -> when {
         item.stableRunKey != null -> ChatRowSpacing.ungrouped
         item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped
