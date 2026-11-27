@@ -38555,6 +38555,7 @@ public final class com/letta/mobile/data/node/host/NodeHostOs : java/lang/Enum {
 public final class com/letta/mobile/data/node/host/NodeHostOs$Companion {
 	public final fun current ()Lcom/letta/mobile/data/node/host/NodeHostOs;
 	public final fun of (Ljava/lang/String;)Lcom/letta/mobile/data/node/host/NodeHostOs;
+}
 
 public final class com/letta/mobile/data/notify/ApprovalAttentionMonitor {
 	public fun <init> (Lcom/letta/mobile/data/notify/AttentionGate;)V
