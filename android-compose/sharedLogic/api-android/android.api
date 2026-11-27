@@ -20292,6 +20292,9 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun attachPermissionModePublisher (Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;)V
 	public final fun attachSubagentPublisher (Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher;)V
 	public final fun attachToolsetStatuses (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)Lkotlinx/coroutines/Job;
+	public final fun awaitShutdownDrain (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun beginShutdownDrain-VtjQ1oo (JLkotlin/jvm/functions/Function0;)Z
+	public static synthetic fun beginShutdownDrain-VtjQ1oo$default (Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint;JLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Z
 	public final fun broadcastPinsUpdated (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun broadcastShellStateUpdated (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun connect (Lcomputer/iroh/EndpointAddr;[BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -20299,6 +20302,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun conversationChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeTarget;
 	public final fun conversationViewers ()Lkotlin/jvm/functions/Function2;
 	public final fun create (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun cutShutdownDrainWait ()V
 	public final fun getAdminRpcRouter ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
 	public final fun isConversationViewed-LfPRSJk (Ljava/lang/String;)Z
 	public final fun nodeIdHex ()Ljava/lang/String;

@@ -37,6 +37,7 @@ import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.link.NodeConnectionWire
 
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -138,6 +139,10 @@ class IrohNodeEndpoint(
     /** The controller this endpoint generation serves, set with its [turnHost]; links served before that are refused. */
     @Volatile
     private var servingController: AppServerController? = null
+
+    /** The cut of the shutdown drain [beginShutdownDrain] began; null before it or after the generation ended. */
+    @Volatile
+    private var shutdownDrainCut: (() -> Unit)? = null
 
     init {
         // letta-mobile-6vf4r (S3): a connection that starts viewing a conversation mid-turn learns
@@ -660,6 +665,7 @@ class IrohNodeEndpoint(
         acceptJob?.cancel()
         acceptJob = null
         servingController = null
+        shutdownDrainCut = null
         turnHost?.shutdown()
         turnHost = null
 
@@ -668,6 +674,29 @@ class IrohNodeEndpoint(
             runCatching { it.close() }
         }
         endpoint = null
+    }
+
+    /**
+     * Begins this endpoint generation's shutdown drain: its [NodeTurnHost] refuses new turn inputs
+     * while its live turns keep running and relaying, so the shutdown path can then wait for them
+     * with [awaitShutdownDrain] before [shutdown] closes the App Server connection — instead of
+     * cancelling every in-flight turn with cause "transport". Returns false when no generation
+     * started or a drain already began (in both cases there is nothing to wait for).
+     */
+    fun beginShutdownDrain(bound: Duration, nowMs: () -> Long = System::currentTimeMillis): Boolean {
+        val host = turnHost ?: return false
+        shutdownDrainCut = host.beginDrain(bound, nowMs) ?: return false
+        return true
+    }
+
+    /** Cuts an in-flight [awaitShutdownDrain] at once: a second shutdown signal, or an explicit skip. */
+    fun cutShutdownDrainWait() {
+        shutdownDrainCut?.invoke()
+    }
+
+    /** Waits for the drain begun by [beginShutdownDrain]: every live turn ended, its bound elapsed, or [cutShutdownDrainWait] cut it. */
+    suspend fun awaitShutdownDrain() {
+        turnHost?.awaitDrained()
     }
 
     companion object {

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,8 +15,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The node-owned home of every live Iroh turn.
@@ -40,10 +45,113 @@ class NodeTurnHost internal constructor(
     /** Serialized writes to observer viewers; node-owned so a detached turn still reaches them. */
     internal val observerWrites = ObserverWriteQueue(scope)
 
+    internal val clientMessageDedupe = ProcessScopedClientMessageDedupe()
     private val live = AtomicInteger(0)
+    private val admissionLock = Any()
+    private val admittedInputs = mutableSetOf<Triple<String, String, String>>()
 
     /** Turns currently running on this host, attached or detached (telemetry/tests). */
     val liveTurnCount: Int get() = live.get()
+
+    /**
+     * The shutdown drain in progress. Set once by [beginDrain] and never cleared: a draining host
+     * is going away. While it drains the host refuses new turn inputs ([isDraining]) and
+     * [awaitDrained] waits for the live ones, so closing the App Server connection afterwards
+     * cancels no in-flight turn with cause "transport" (the App Server's reaction to its listener
+     * connection dropping mid-turn).
+     */
+    private val draining = AtomicBoolean(false)
+
+    /** Completed by the drain's cut (what [beginDrain] returned): [awaitDrained] then stops waiting at once. */
+    private val drainCut = CompletableDeferred<Unit>()
+
+    /** Guards [awaitDrained] against a second caller: the drain's wait runs once. */
+    private val drainAwaited = AtomicBoolean(false)
+
+    /** The drain's bound, start and initial turn count, recorded by [beginDrain] for its telemetry. */
+    @Volatile
+    private var drainBoundMs: Long = 0
+
+    @Volatile
+    private var drainStartedAtMs: Long = 0
+
+    @Volatile
+    private var drainWaitedTurns: Int = 0
+
+    /**
+     * Begins this host's shutdown drain: [isDraining] turns true, so new turn inputs are refused
+     * while the already-active turns keep running and relaying, and the drain's [bound] is
+     * recorded for [awaitDrained]. Returns the drain's cut — invoking it once makes
+     * [awaitDrained] stop waiting at once (a second shutdown signal) — or null when a drain
+     * already began.
+     */
+    internal fun beginDrain(bound: Duration, nowMs: () -> Long = System::currentTimeMillis): (() -> Unit)? {
+        synchronized(admissionLock) {
+            if (!draining.compareAndSet(false, true)) return null
+            drainBoundMs = bound.inWholeMilliseconds
+            drainStartedAtMs = nowMs()
+            drainWaitedTurns = live.get()
+        }
+        Telemetry.event(
+            "IrohNode", "shutdown.drain.start",
+            "active_turns" attr drainWaitedTurns,
+            "bound_ms" attr drainBoundMs,
+        )
+        return { drainCut.complete(Unit) }
+    }
+
+    /** Whether this host is draining for shutdown: no new turn inputs are accepted. */
+    internal val isDraining: Boolean get() = draining.get()
+
+    /**
+     * Waits for the drain begun by [beginDrain] until every live turn ended, the drain's bound
+     * elapsed or the drain's cut was invoked, then emits `shutdown.drain.done` with
+     * `waited_turns` (the turns the drain began with), `cut_turns` (the turns still live when it
+     * ended) and `elapsed_ms`. Runs at most once per host.
+     */
+    internal suspend fun awaitDrained(nowMs: () -> Long = System::currentTimeMillis) {
+        if (!drainAwaited.compareAndSet(false, true)) return
+        val drained = withTimeoutOrNull(drainBoundMs.milliseconds) {
+            while (live.get() > 0) {
+                // Either the cut arrives or a short poll tick passes, so a finishing turn is
+                // noticed within DRAIN_POLL_MS and a cut ends the wait at once.
+                if (withTimeoutOrNull(DRAIN_POLL_MS.milliseconds) { drainCut.await() } != null) {
+                    return@withTimeoutOrNull false
+                }
+            }
+            true
+        }
+        Telemetry.event(
+            "IrohNode", "shutdown.drain.done",
+            "waited_turns" attr drainWaitedTurns,
+            "cut_turns" attr live.get(),
+            "elapsed_ms" attr (nowMs() - drainStartedAtMs),
+            "reason" attr when (drained) {
+                true -> "drained"
+                false -> "cut"
+                null -> "bound"
+            },
+        )
+    }
+
+    /** Atomically recognize a resend or reserve a new turn before shutdown can begin. */
+    internal fun admitInput(key: Triple<String, String, String>?, isDuplicate: (Boolean) -> Boolean): Int =
+        synchronized(admissionLock) {
+            when {
+                key != null && key in admittedInputs -> 2
+                isDuplicate(draining.get()) -> 2
+                draining.get() -> 0
+                else -> 1.also {
+                    if (key != null) admittedInputs.add(key)
+                    live.incrementAndGet()
+                }
+            }
+        }
+
+    internal fun finishAdmission(key: Triple<String, String, String>?, releaseLive: Boolean = false) {
+        if (key != null) synchronized(admissionLock) { admittedInputs.remove(key) }
+        if (releaseLive) live.decrementAndGet()
+    }
 
     /** Frames already claimed (by `idempotency_key`), the most recent ones; guarded by itself, with [serverRuns]. */
     private val claimedFrames = LinkedHashSet<String>()
@@ -96,24 +204,6 @@ class NodeTurnHost internal constructor(
     internal fun clientSent(conversation: ConversationId, clientMessageIds: Collection<String>): Boolean =
         clientTurns[conversation]?.any { it.clientMessageId in clientMessageIds } == true
 
-    private fun noteClientTurnStarted(turn: NodeTurn) {
-        // Lists are immutable and replaced inside compute, so a reader never sees one being changed.
-        clientTurns.compute(ConversationId(turn.conversationId)) { _, running -> running.orEmpty() + turn }
-    }
-
-    /** Remembers the turn's runs BEFORE it stops counting as running, so its late frames never look unowned. */
-    private fun noteClientTurnEnded(turn: NodeTurn) {
-        val conversation = ConversationId(turn.conversationId)
-        val relayed = turn.fanout.relayedRunIds.filter { it.isNotBlank() }.map(::RunId)
-        if (relayed.isNotEmpty()) {
-            synchronized(clientRuns) {
-                val runs = clientRuns.getOrPut(conversation) { LinkedHashSet() }
-                relayed.forEach { runs.rememberRecent(it, REMEMBERED_CLIENT_RUNS) }
-            }
-        }
-        clientTurns.computeIfPresent(conversation) { _, running -> (running - turn).takeIf { it.isNotEmpty() } }
-    }
-
     /** Each conversation's relayed turn whose run is bound and not finished. */
     private val runningTurns = ConcurrentHashMap<String, IrohRelayedTurnProtocol>()
 
@@ -137,14 +227,15 @@ class NodeTurnHost internal constructor(
      * Runs [turn] on the node scope and waits for it. If the caller (the initiator's connection)
      * is cancelled first, the turn keeps running detached and this rethrows the cancellation.
      */
-    internal suspend fun run(turn: NodeTurn) {
-        live.incrementAndGet()
-        noteClientTurnStarted(turn)
+    internal suspend fun run(turn: NodeTurn, admitted: Boolean = false) {
+        if (!admitted) synchronized(admissionLock) { live.incrementAndGet() }
+        // Lists are immutable and replaced inside compute, so a reader never sees one being changed.
+        clientTurns.compute(ConversationId(turn.conversationId)) { _, running -> running.orEmpty() + turn }
         val job = scope.launch {
             try {
                 turn.body()
             } finally {
-                noteClientTurnEnded(turn)
+                noteClientTurnEnded(turn, clientRuns, clientTurns)
                 turn.journal.close(terminalObserved = turn.fanout.anyTerminalWritten)
             }
         }
@@ -152,7 +243,7 @@ class NodeTurnHost internal constructor(
         try {
             job.join()
         } catch (cancelled: CancellationException) {
-            detach(turn, job)
+            detachTurn(turn, job, live.get())
             throw cancelled
         }
     }
@@ -172,36 +263,14 @@ class NodeTurnHost internal constructor(
         scope.cancel(CancellationException("Iroh node turn host shut down"))
     }
 
-    private fun detach(turn: NodeTurn, job: Job) {
-        if (job.isCompleted) return
-        turn.fanout.detachInitiator()
-        // The initiator never saw this turn's tail: record that now, so a wrapper restart before the turn ends still owes it.
-        turn.journal.noteInitiatorMissedTail()
-        Telemetry.event(
-            "IrohNode", "turn.detached",
-            "conversationId" attr turn.conversationId,
-            "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
-            "liveTurns" attr live.get(),
-        )
-        job.invokeOnCompletion { cause ->
-            Telemetry.event(
-                "IrohNode", "turn.detached_journaled",
-                "conversationId" attr turn.conversationId,
-                "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
-                "serverTerminal" attr turn.fanout.anyTerminalWritten,
-                "cause" attr (cause?.let { it::class.simpleName } ?: ""),
-            )
-        }
-    }
-
     companion object {
-        /** Runs remembered per conversation for [clientOwns]; a turn rarely binds more than a few. */
-        private const val REMEMBERED_CLIENT_RUNS = 64
-
         /** Conversations whose finished client runs are remembered; the least recently used is forgotten first. */
         private const val REMEMBERED_CLIENT_CONVERSATIONS = 256
         private const val INITIAL_CAPACITY = 16
         private const val LOAD_FACTOR = 0.75f
+
+        /** How often [awaitDrained] re-reads the live turn count between cut signals. */
+        private const val DRAIN_POLL_MS = 100L
 
         private val handler = CoroutineExceptionHandler { _, throwable ->
             Telemetry.event(
@@ -234,6 +303,47 @@ private fun <T> LinkedHashSet<T>.rememberRecent(value: T, cap: Int) {
     remove(value)
     add(value)
     while (size > cap) remove(first())
+}
+
+/** Remembers the turn's runs BEFORE it stops counting as running, so its late frames never look unowned. */
+private fun noteClientTurnEnded(
+    turn: NodeTurn,
+    clientRuns: MutableMap<ConversationId, LinkedHashSet<RunId>>,
+    clientTurns: ConcurrentHashMap<ConversationId, List<NodeTurn>>,
+) {
+    val conversation = ConversationId(turn.conversationId)
+    val relayed = turn.fanout.relayedRunIds.filter { it.isNotBlank() }.map(::RunId)
+    if (relayed.isNotEmpty()) {
+        synchronized(clientRuns) {
+            val runs = clientRuns.getOrPut(conversation) { LinkedHashSet() }
+            relayed.forEach { runs.rememberRecent(it, REMEMBERED_CLIENT_RUNS_CAP) }
+        }
+    }
+    clientTurns.computeIfPresent(conversation) { _, running -> (running - turn).takeIf { it.isNotEmpty() } }
+}
+
+private const val REMEMBERED_CLIENT_RUNS_CAP = 64
+
+private fun detachTurn(turn: NodeTurn, job: Job, liveTurns: Int) {
+    if (job.isCompleted) return
+    turn.fanout.detachInitiator()
+    // The initiator never saw this turn's tail: record that now, so a wrapper restart before the turn ends still owes it.
+    turn.journal.noteInitiatorMissedTail()
+    Telemetry.event(
+        "IrohNode", "turn.detached",
+        "conversationId" attr turn.conversationId,
+        "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
+        "liveTurns" attr liveTurns,
+    )
+    job.invokeOnCompletion { cause ->
+        Telemetry.event(
+            "IrohNode", "turn.detached_journaled",
+            "conversationId" attr turn.conversationId,
+            "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
+            "serverTerminal" attr turn.fanout.anyTerminalWritten,
+            "cause" attr (cause?.let { it::class.simpleName } ?: ""),
+        )
+    }
 }
 
 /** Frames remembered for [NodeTurnHost.claimFrame]; both sides see a frame within milliseconds of each other. */
