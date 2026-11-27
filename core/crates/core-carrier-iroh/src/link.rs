@@ -63,6 +63,14 @@ impl State {
         state
     }
 
+    /// Records the connection's closure if it has already closed (no wait; the watcher task records it
+    /// too, and the first record wins).
+    fn record_if_closed(&self) {
+        if let Some(error) = self.connection.close_reason() {
+            self.record(closure_of(&error).unwrap_or(LinkClosure::Lost));
+        }
+    }
+
     /// Sets the closure once.
     fn record(&self, closure: LinkClosure) {
         self.closure.send_if_modified(|current| {
@@ -209,6 +217,7 @@ impl FrameSink for StreamSink {
 /// The reading half of one stream. A protocol error in the stream ends it (the source completes).
 struct StreamSource {
     recv: RecvStream,
+    state: Arc<State>,
     decoder: Option<FrameDecoder>,
     pending: VecDeque<Frame>,
     encoding: Encoding,
@@ -216,9 +225,10 @@ struct StreamSource {
 }
 
 impl StreamSource {
-    fn new(recv: RecvStream, encoding: &Encoding) -> Self {
+    fn new(recv: RecvStream, state: &Arc<State>, encoding: &Encoding) -> Self {
         Self {
             recv,
+            state: Arc::clone(state),
             decoder: Some(FrameDecoder::new(encoding.limits())),
             pending: VecDeque::new(),
             encoding: encoding.clone(),
@@ -239,18 +249,18 @@ impl FrameSource for StreamSource {
                 decoder.set_limits(Limits::DEFAULT);
                 self.widened = true;
             }
-            match self.recv.read_chunk(READ_CHUNK).await {
-                Ok(Some(chunk)) => {
-                    if let Ok(frames) = decoder.push(&chunk) {
-                        self.pending.extend(frames.into_iter().map(Frame::from));
-                    } else {
-                        self.decoder = None;
-                        let _ = self.recv.stop(VarInt::from_u32(0));
-                    }
-                }
-                Ok(None) | Err(_) => {
+            if let Ok(Some(chunk)) = self.recv.read_chunk(READ_CHUNK).await {
+                if let Ok(frames) = decoder.push(&chunk) {
+                    self.pending.extend(frames.into_iter().map(Frame::from));
+                } else {
                     self.decoder = None;
+                    let _ = self.recv.stop(VarInt::from_u32(0));
                 }
+            } else {
+                self.decoder = None;
+                // The lane ended: if the connection is already closed, its closure is recorded
+                // before this source reports the end, so a reader that sees the end sees why.
+                self.state.record_if_closed();
             }
         }
     }
@@ -287,7 +297,7 @@ pub(crate) async fn dial_lanes(
     let encoding = Encoding::new(true);
     let (inbound_tx, inbound_rx) = mpsc::unbounded_channel();
     for (lane, recv) in [(Lane::Control, control_recv), (Lane::Push, push_recv)] {
-        let mut source = StreamSource::new(recv, &encoding);
+        let mut source = StreamSource::new(recv, &state, &encoding);
         let tx = inbound_tx.clone();
         tokio::spawn(async move {
             while let Some(frame) = source.recv().await {
@@ -379,7 +389,7 @@ impl Link for DialEnd {
         sink.write(&request).await?;
         Ok(CallLane {
             sink: Box::new(sink),
-            source: Box::new(StreamSource::new(recv, &self.encoding)),
+            source: Box::new(StreamSource::new(recv, &self.state, &self.encoding)),
         })
     }
 }
@@ -435,7 +445,7 @@ impl ProtocolHandler for RouterAdapter {
         });
         let accepted = AcceptedLink {
             link,
-            control: Box::new(StreamSource::new(control_recv, &encoding)),
+            control: Box::new(StreamSource::new(control_recv, &state, &encoding)),
             calls: Box::new(Calls { state, encoding }),
         };
         self.protocols.serve(accepted).await;
@@ -455,7 +465,7 @@ impl CallSource for Calls {
         let (send, recv) = self.state.connection.accept_bi().await.ok()?;
         Some(CallLane {
             sink: Box::new(StreamSink::new(send, &self.state, &self.encoding)),
-            source: Box::new(StreamSource::new(recv, &self.encoding)),
+            source: Box::new(StreamSource::new(recv, &self.state, &self.encoding)),
         })
     }
 }
