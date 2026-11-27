@@ -84,6 +84,7 @@ internal class AdminRpcStreamLimits(
  * happens on the control channel; this server only observes the shared
  * [authenticated] flag.
  */
+@Suppress("TooManyFunctions") // One request/response stream lifecycle: accept, read, dispatch, answer and close share one state.
 internal class AdminRpcStreamServer(
     private val router: AdminRpcRouter,
     private val authenticated: AtomicBoolean,
