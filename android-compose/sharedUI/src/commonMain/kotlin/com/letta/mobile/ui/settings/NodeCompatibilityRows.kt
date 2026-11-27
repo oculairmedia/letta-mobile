@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.node.info.NodeAvailability
 import com.letta.mobile.data.node.info.NodeCompatibility
 import com.letta.mobile.data.node.info.NodeHandshake
@@ -25,7 +26,7 @@ const val NODE_COMPATIBILITY_KEY: String = "backend-node"
  * to a newly connected host ([rpc]) or the [connection] changes, and is null while there is none or before it answers.
  */
 @Composable
-fun rememberNodeHandshake(rpc: NodeInfoRpc?, connection: Any? = null): NodeHandshakeResult? {
+fun rememberNodeHandshake(rpc: NodeInfoRpc?, connection: BackendConnectionStatus? = null): NodeHandshakeResult? {
     var result by remember(rpc, connection) { mutableStateOf<NodeHandshakeResult?>(null) }
     LaunchedEffect(rpc, connection) {
         result = rpc?.let { NodeHandshake(it).run() }

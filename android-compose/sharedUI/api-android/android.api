@@ -7952,7 +7952,7 @@ public final class com/letta/mobile/ui/settings/HostAppearanceBinding_androidKt 
 
 public final class com/letta/mobile/ui/settings/NodeCompatibilityRowsKt {
 	public static final field NODE_COMPATIBILITY_KEY Ljava/lang/String;
-	public static final fun rememberNodeHandshake (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Ljava/lang/Object;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/data/node/info/NodeHandshakeResult;
+	public static final fun rememberNodeHandshake (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Lcom/letta/mobile/data/model/BackendConnectionStatus;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/data/node/info/NodeHandshakeResult;
 	public static final fun sentence (Lcom/letta/mobile/data/node/info/NodeIncompatibility;)Ljava/lang/String;
 	public static final fun settingsHelper (Lcom/letta/mobile/data/node/info/NodeHandshakeResult;)Ljava/lang/String;
 	public static final fun settingsRow (Lcom/letta/mobile/data/node/info/NodeHandshakeResult;)Lcom/letta/mobile/data/settings/SettingsRow$Status;
