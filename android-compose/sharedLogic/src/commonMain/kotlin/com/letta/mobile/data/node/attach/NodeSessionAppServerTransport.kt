@@ -17,6 +17,7 @@ import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.appServerAdminRpcParams
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -38,6 +39,12 @@ import kotlinx.serialization.json.JsonObject
  * The session is already authenticated, so this transport never sends an `auth` frame. It collects the session's
  * inbound frames for the session's whole life, in [scope], and answers the tool calls the node relays to this app with
  * [appToolRelay] when the node negotiated [AppToolRelay.CAPABILITY] (null answers none).
+ *
+ * The two lanes are delivered independently, as over Iroh, where each has a stream of its own: push frames are handed
+ * to a queue of their own and drained into [streamFrames] by a second collector, so a slow push subscriber holds back
+ * only later pushes and never a control answer (`runtime_start_response`, `input_accepted`, `sync_response`). The push
+ * queue is unbounded, as the session's own inbound buffer is: dropping a turn frame would corrupt the turn, and a
+ * bound that suspended would stall the control lane again.
  */
 class NodeSessionAppServerTransport(
     private val session: NodeSession,
@@ -46,6 +53,7 @@ class NodeSessionAppServerTransport(
 ) : AppServerTransport {
     private val control = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
     private val stream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
+    private val pushQueue = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
 
     override val controlFrames: SharedFlow<AppServerReceivedFrame> = control.asSharedFlow()
     override val streamFrames: SharedFlow<AppServerReceivedFrame> = stream.asSharedFlow()
@@ -57,7 +65,14 @@ class NodeSessionAppServerTransport(
         session.closure.map(::stateOf).stateIn(scope, SharingStarted.Eagerly, stateOf(session.closure.value))
 
     init {
-        scope.launch { session.inbound.collect(::route) }
+        scope.launch {
+            try {
+                session.inbound.collect(::route)
+            } finally {
+                pushQueue.close()
+            }
+        }
+        scope.launch { for (received in pushQueue) stream.emit(received) }
     }
 
     override suspend fun sendControl(command: AppServerCommand) {
@@ -82,7 +97,8 @@ class NodeSessionAppServerTransport(
         val channel = if (inbound.lane == NodeLane.PUSH) AppServerChannel.Stream else AppServerChannel.Control
         val received = AppServerProtocol.decodeFrame(inbound.frame.encode(), channel)
         when {
-            channel == AppServerChannel.Stream -> stream.emit(received)
+            // Never suspends: the push collector drains the queue at the push subscribers' pace.
+            channel == AppServerChannel.Stream -> pushQueue.trySend(received)
             !answerAppToolCall(received.raw) -> control.emit(received)
         }
     }
