@@ -30,7 +30,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -88,18 +87,23 @@ class EmbeddedNodeHostTest {
         val session = open()
         val transport = NodeSessionAppServerTransport(session, scope)
         node.restart()
+        // restart() returns only once the old generation has wound down, and its lease goes with it.
+        assertEquals(1, released.get(), "the old generation's lease is released before restart() returns")
         assertEquals(NodeLinkClosure.LOST, session.closure.first { it != null })
         assertIs<AppServerConnectionState.Failed>(transport.connectionState.first { it !is AppServerConnectionState.Ready })
-        while (released.get() == 0) delay(10) // the old generation's lease is released once its scope has wound down
-        assertEquals(1, released.get())
         open()
         assertEquals(2, leases.get(), "the next dial starts a new generation")
     }
 
+    /**
+     * The node's router answers a one-shot method called through the streamed call with its one response, and the
+     * stream ends there. Multi-frame streams and early cancellation are covered against a streaming node in
+     * `NodeSessionAdminRpcStreamTest`.
+     */
     @Test
-    fun aStreamedAdminRpcEndsAfterItsResponse() = scenario {
+    fun aOneShotMethodThroughTheStreamedCallEndsAfterItsResponse() = scenario {
         val frames = open().adminRpcStream("health.check", null).toList()
-        assertEquals("admin_rpc_response", frames.last().type)
+        assertEquals(listOf("admin_rpc_response"), frames.map { it.type })
     }
 
     @Test
