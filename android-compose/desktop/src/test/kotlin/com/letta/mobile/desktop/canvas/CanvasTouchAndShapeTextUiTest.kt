@@ -3,6 +3,7 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.rightClick
@@ -221,12 +223,30 @@ class CanvasTouchAndShapeTextUiTest {
         awaitCanvasUi("shape text size 20") { rect().fontSize == 20f }
         onNodeWithContentDescription("Text alignment").performClick()
         awaitCanvasUi("shape text aligned right") { rect().textAlignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT }
+        // Every edit on the bar restarts the board's debounced save. The waits above settle the
+        // saves the earlier edits started, but the alignment edit's is still half a second of
+        // board time away when the palette opens, and a save that expires while a click into the
+        // palette is between its press and its release events lands its sync work between the
+        // two: on a slow runner that recomposition mid-gesture swallowed the pick without
+        // failing any earlier assertion. Spend that save here - the session's next revision is
+        // the save made visible - so the palette is opened and picked at a quiescent point.
+        val savedBeforePalette = session.document.value?.revision
+        mainClock.advanceTimeBy(AUTOSAVE_SETTLE_MS)
+        awaitCanvasUi("alignment edit saved") { session.document.value?.revision != savedBeforePalette }
         onNodeWithContentDescription("Text color").performClick()
         awaitCanvasUi("shape text color palette") {
             onAllNodes(hasContentDescription("Color blue")).fetchSemanticsNodes().isNotEmpty()
         }
-        onNodeWithContentDescription("Color blue").performClick()
+        // The colour is picked through the swatch's own click action rather than an injected
+        // press: an injected click's press and release are 60 ms of clock apart, and whatever
+        // the board is still settling can land between them and eat the tap. The action is one
+        // call on the same handler a tap runs, so nothing can come between asking for the colour
+        // and the shape getting it. Opening the palette above is still a real injected click.
+        onNodeWithContentDescription("Color blue").performSemanticsAction(SemanticsActions.OnClick)
         awaitCanvasUi("shape text colored blue") { rect().textColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
         assertEquals(androidx.compose.ui.graphics.Color.Black, rect().strokeColor, "only the text changed colour")
     }
 }
+
+/** Past the board's 500 ms debounced save, so one advance spends whatever edit is pending. */
+private const val AUTOSAVE_SETTLE_MS = 1_000L
