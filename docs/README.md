@@ -333,6 +333,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [pins.set: pins v1](reference/contracts/pins.set/pins-v1.md)
 
+### reference/contracts/placement
+
+- [Placement v1: placement, handoff and failover \(X1/X6\)](reference/contracts/placement/placement-v1.md)
+
 ### reference/contracts/reflection.get
 
 - [reflection.get: Reflection Settings v2](reference/contracts/reflection.get/settings-v2.md)

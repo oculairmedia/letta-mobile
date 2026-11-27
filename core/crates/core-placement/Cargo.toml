@@ -1,0 +1,26 @@
+[package]
+name = "core-placement"
+version = "0.1.0"
+description = "Placement (X1/X6): the membership-aware claim judge, quorum votes with persisted promises, the placement record, the move pipeline, the failover policy evaluator, the fenced-holder report and the feed v1 placement amendment. Pure state machines; wasm-safe."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+core-log.workspace = true
+core-membership.workspace = true
+core-proto.workspace = true
+core-store.workspace = true
+hex.workspace = true
+backon.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+core-testkit.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

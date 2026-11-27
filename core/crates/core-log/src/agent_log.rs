@@ -298,10 +298,20 @@ impl<'j, J: ClaimJudge + ?Sized> AgentLog<'j, J> {
             .entry(&parent.hash)?
             .filter(|e| e.seq == parent.seq && e.log_id == self.log_id)
             .ok_or_else(|| LogError::ClaimRejected("unknown parent".into()))?;
+        let parent_payload = load_payload(store, &parent_entry)?;
+        // A claim over a seal (other than the move the seal names) goes above the sealed-to epoch,
+        // so a late open by the seal's target is a divergent tail rather than a tie on `n`.
+        let sealed_to = match &parent_payload {
+            Some(Payload::EpochSeal(seal)) if open.reason != Reason::Move => {
+                seal.next_epoch.map_or(0, |next| next.n)
+            }
+            _ => 0,
+        };
         let max_n = store
             .max_n_seen(&self.log_id)?
             .unwrap_or(0)
-            .max(parent_entry.epoch.n);
+            .max(parent_entry.epoch.n)
+            .max(sealed_to);
         let epoch = Epoch {
             n: max_n + 1,
             claimant: key.node_id(),
@@ -312,7 +322,6 @@ impl<'j, J: ClaimJudge + ?Sized> AgentLog<'j, J> {
         let payload = Payload::EpochOpen(open.clone());
         let bytes = payload.encode();
         let entry = self.sign(key, epoch, parent, kind::EPOCH_OPEN, 0, &bytes, ts_ms)?;
-        let parent_payload = load_payload(store, &parent_entry)?;
         let context = ClaimContext {
             log_id: self.log_id,
             open: &entry,
