@@ -39,6 +39,14 @@ on:
       - ".serena/**"
   workflow_dispatch:
 
+concurrency:
+  # letta-mobile-2frn5: this advisory graph export runs on nearly every Kotlin
+  # PR, and a rebase or follow-up push used to leave the previous head's run
+  # holding its runner for the full export. A newer PR head now supersedes the
+  # stale one; a main run is never cancelled mid-flight.
+  group: architecture-graph-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
   # the prefix this advisory workflow restored AND wrote a parallel default-prefix

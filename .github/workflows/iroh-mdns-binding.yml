@@ -11,6 +11,13 @@ on:
       - 'scripts/iroh-mdns-binding/**'
       - '.github/workflows/iroh-mdns-binding.yml'
 
+concurrency:
+  # letta-mobile-2frn5: each new PR head supersedes the stale one's 90-minute
+  # three-OS binding matrix instead of leaving both sets of runners booked;
+  # a dispatch run on main is never cancelled.
+  group: iroh-mdns-binding-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   # Same Gradle User Home cache family as android.yml (ci-speedup-pr2): without
   # the prefix this optional workflow wrote a parallel default-prefix gradle-home

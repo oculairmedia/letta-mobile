@@ -241,6 +241,17 @@ jobs:
           # A stale mingw_x64 API dump is otherwise seen only by the Windows runner.
           bash scripts/ci/api-dump-mirror-check.sh
 
+      # letta-mobile-2frn5: the desktop packaging script contracts self-test on
+      # every PR. They used to ride desktop.yml's pull_request runs, which no
+      # longer exist (packaging is main + dispatch); the required test job keeps
+      # them blocking before merge. Pure Python, ~25s, no Gradle.
+      - name: Self-test desktop packaging scripts
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_desktop_packaging*.py' -v
+          python3 scripts/tests/test_linux_startup_diagnostic.py
+          python3 scripts/tests/test_nucleus_hotkey.py
+
       - name: Enforce platform parity guardrails
         working-directory: ${{ github.workspace }}
         run: |
@@ -1431,29 +1442,58 @@ jobs:
         working-directory: android-compose
 
     steps:
+      # letta-mobile-2frn5: on a PR this job duplicated the wrapper build the
+      # required shared-multiplatform job already performs
+      # (:iroh-wrapper-cli:test and :iroh-wrapper-cli:installDist run there on
+      # every PR and every main push), while its own artifact upload is
+      # main-only. PRs now skip the Gradle build with a green step summary —
+      # the required check keeps proving the wrapper assembles before merge,
+      # and main pushes still build and upload the distribution for the
+      # deployment runbook. Green-skip steps like api-contract-windows, never
+      # a skipped job: build-iroh-wrapper-pass rejects `skipped`.
+      - name: Resolve whether the wrapper distribution must build
+        id: wrapper_scope
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "build-iroh-wrapper: full run (this is not a pull request)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "run=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "build-iroh-wrapper: skipped on this PR."
+            echo "The required \`shared-multiplatform\` job runs \`:iroh-wrapper-cli:test\` and \`:iroh-wrapper-cli:installDist\` on every PR; the wrapper artifact builds and uploads on main pushes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: steps.wrapper_scope.outputs.run == 'true'
         with:
           fetch-depth: 0
 
       - name: Setup Java 26
         # Same JDK as test-workload / api-docs / web-wasm / build-apk (ci-speedup-pr1)
         # so Gradle build-cache entries are produced and consumed under one JVM.
+        if: steps.wrapper_scope.outputs.run == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
+        if: steps.wrapper_scope.outputs.run == 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
           cache-cleanup: on-success
 
       - name: Build wrapper distribution
+        if: steps.wrapper_scope.outputs.run == 'true'
         run: ./gradlew :iroh-wrapper-cli:installDist
 
       - name: Upload iroh-wrapper distribution
-        if: github.event_name != 'pull_request'
+        if: steps.wrapper_scope.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: meridian-iroh-wrapper-${{ github.run_number }}

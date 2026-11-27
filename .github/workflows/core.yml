@@ -21,7 +21,10 @@ permissions:
 
 concurrency:
   group: core-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # letta-mobile-2frn5: match the repo convention (android.yml): a newer PR
+  # head supersedes the stale one's run, but a main run is never cancelled
+  # mid-flight — a burst of merges must not drop a pending main verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always

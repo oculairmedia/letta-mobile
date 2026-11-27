@@ -21,6 +21,13 @@ on:
       - "android-compose/avatar/renderer-rive/**"
   workflow_dispatch:
 
+concurrency:
+  # letta-mobile-2frn5: a newer PR head supersedes the stale one's rig check
+  # instead of booking a second runner for the old head; a main run is never
+  # cancelled mid-flight.
+  group: mascot-rig-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 
