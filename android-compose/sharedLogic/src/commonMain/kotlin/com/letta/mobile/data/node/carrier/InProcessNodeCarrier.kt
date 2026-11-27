@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -45,10 +46,18 @@ class InProcessNodeCarrier(
     /** The one address this carrier dials. */
     val address: NodeAddress = NodeAddress(SCHEME + name)
 
+    private val liveCallLanes = MutableStateFlow(0)
+
+    /**
+     * How many call lanes are open across this carrier's links: a lane counts from its open until both of its ends
+     * finished sending, or its link closed. A long-lived link that only makes calls keeps this bounded.
+     */
+    internal val openCallLanes: StateFlow<Int> = liveCallLanes.asStateFlow()
+
     override suspend fun dial(address: NodeAddress): NodeLink {
         if (address != this.address) throw unreachable("no in-process node at ${address.value}")
         if (!scope.isActive) throw unreachable("the in-process node has stopped")
-        val link = InProcessLink(node)
+        val link = InProcessLink(node, liveCallLanes)
         // A node stopped before the serve even started still ends the link: the serve's own close never runs then.
         scope.launch { serve(link) }.invokeOnCompletion { link.close(NodeLinkClosure.LOST) }
         return link.shellEnd
@@ -84,13 +93,13 @@ class InProcessNodeCarrier(
 }
 
 /** One in-process link: the shared closure, the control and push channels, and the call lanes opened on it. */
-private class InProcessLink(private val node: NodePeerIdentity) {
+private class InProcessLink(private val node: NodePeerIdentity, private val liveCallLanes: MutableStateFlow<Int>) {
     private val closureState = MutableStateFlow<NodeLinkClosure?>(null)
     private val toNodeControl = Channel<NodeFrame>(Channel.UNLIMITED)
     private val toShellControl = Channel<NodeFrame>(Channel.UNLIMITED)
     private val toShellPush = Channel<NodeFrame>(Channel.UNLIMITED)
     private val toNodeCalls = Channel<NodeCallLane>(Channel.UNLIMITED)
-    private val lanes = MutableStateFlow<List<InProcessCall>>(emptyList())
+    private val lanes = MutableStateFlow<Set<InProcessCall>>(emptySet())
 
     /** Ends the link once; frames already written are still delivered, then every lane completes. */
     fun close(closure: NodeLinkClosure) {
@@ -100,6 +109,21 @@ private class InProcessLink(private val node: NodePeerIdentity) {
         toShellPush.close()
         toNodeCalls.close()
         lanes.value.forEach(InProcessCall::close)
+    }
+
+    private fun register(call: InProcessCall) {
+        lanes.update { it + call }
+        liveCallLanes.update { it + 1 }
+    }
+
+    /** Forgets [call] once it ended, so a link that only makes calls never accumulates them. Idempotent. */
+    fun unregister(call: InProcessCall) {
+        var removed = false
+        lanes.update { current ->
+            removed = call in current
+            current - call
+        }
+        if (removed) liveCallLanes.update { it - 1 }
     }
 
     /**
@@ -125,13 +149,13 @@ private class InProcessLink(private val node: NodePeerIdentity) {
         override suspend fun openCall(request: NodeFrame): NodeCallLane {
             if (closureState.value != null) throw closed()
             val call = InProcessCall(this@InProcessLink)
-            // Registered first so a close that races the open still ends the lane; unregistered if the open fails.
-            lanes.update { it + call }
+            // Registered first so a close that races the open still ends the lane; it unregisters itself when it ends,
+            // which a failed open does at once.
+            register(call)
             try {
                 call.shellEnd.send(request)
                 if (toNodeCalls.trySend(call.nodeEnd).isFailure) throw closed()
             } catch (failure: NodeCarrierException) {
-                lanes.update { it - call }
                 call.close()
                 throw failure
             }
@@ -157,10 +181,14 @@ private class InProcessLink(private val node: NodePeerIdentity) {
     }
 }
 
-/** One call lane: a channel each way, each closed by its writer's finish or by the link's close. */
+/**
+ * One call lane: a channel each way, each closed by its writer's finish or by the link's close. The lane has ended once
+ * both writers finished (or the link closed it), and then leaves its link's lanes.
+ */
 private class InProcessCall(private val link: InProcessLink) {
     private val toNode = Channel<NodeFrame>(Channel.UNLIMITED)
     private val toShell = Channel<NodeFrame>(Channel.UNLIMITED)
+    private val finishedWriters = MutableStateFlow(0)
 
     val shellEnd: NodeCallLane = end(reads = toShell, writes = toNode)
     val nodeEnd: NodeCallLane = end(reads = toNode, writes = toShell)
@@ -168,6 +196,12 @@ private class InProcessCall(private val link: InProcessLink) {
     fun close() {
         toNode.close()
         toShell.close()
+        link.unregister(this)
+    }
+
+    /** Counts a writer's first finish only; the lane ends with the second. */
+    private fun finished(writes: Channel<NodeFrame>) {
+        if (writes.close() && finishedWriters.updateAndGet { it + 1 } == WRITERS) link.unregister(this)
     }
 
     private fun end(reads: Channel<NodeFrame>, writes: Channel<NodeFrame>): NodeCallLane = object : NodeCallLane {
@@ -175,9 +209,7 @@ private class InProcessCall(private val link: InProcessLink) {
 
         override suspend fun send(frame: NodeFrame) = link.write(writes, frame)
 
-        override suspend fun finishSending() {
-            writes.close()
-        }
+        override suspend fun finishSending() = finished(writes)
     }
 }
 
@@ -189,3 +221,6 @@ private fun JsonElement.snapshot(): JsonElement = when (this) {
 }
 
 private fun JsonObject.snapshot(): JsonObject = JsonObject(entries.associate { (key, value) -> key to value.snapshot() })
+
+/** A call lane's two writers: the shell's end and the node's. */
+private const val WRITERS = 2
