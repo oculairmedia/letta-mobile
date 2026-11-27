@@ -18,6 +18,8 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         maven {
+            // Patched automerge-java (0.0.9-letta1): network sends dispatched in order per connection.
+            // Regenerate the jar with: android-compose/third_party/automerge/build-patched.sh
             url = uri("third_party/maven")
             content { includeVersion("org.automerge", "automerge", "0.0.9-letta1") }
         }
