@@ -1,8 +1,11 @@
 package com.letta.mobile.ui.settings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.letta.mobile.data.node.info.NodeAvailability
 import com.letta.mobile.data.node.info.NodeCompatibility
 import com.letta.mobile.data.node.info.NodeHandshake
@@ -19,14 +22,15 @@ const val NODE_COMPATIBILITY_KEY: String = "backend-node"
 
 /**
  * The connected node's version handshake: runs once each time the host hands the page an admin_rpc
- * to a newly connected host ([rpc]), and is null while there is none or before it answers.
+ * to a newly connected host ([rpc]) or the [connection] changes, and is null while there is none or before it answers.
  */
 @Composable
-fun rememberNodeHandshake(rpc: NodeInfoRpc?): NodeHandshakeResult? {
-    val result: State<NodeHandshakeResult?> = produceState<NodeHandshakeResult?>(initialValue = null, rpc) {
-        value = rpc?.let { NodeHandshake(it).run() }
+fun rememberNodeHandshake(rpc: NodeInfoRpc?, connection: Any? = null): NodeHandshakeResult? {
+    var result by remember(rpc, connection) { mutableStateOf<NodeHandshakeResult?>(null) }
+    LaunchedEffect(rpc, connection) {
+        result = rpc?.let { NodeHandshake(it).run() }
     }
-    return result.value
+    return result
 }
 
 /** The handshake as the Backend section's Node row: a status in words and tone, and why. */

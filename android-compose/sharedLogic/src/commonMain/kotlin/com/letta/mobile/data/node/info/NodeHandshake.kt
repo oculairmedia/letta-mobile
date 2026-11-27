@@ -33,19 +33,34 @@ class NodeHandshake(
     private val reference: suspend () -> NodeInfo? = { null },
 ) {
     /** Asks the node and judges it. Never throws except for cancellation. */
-    suspend fun run(): NodeHandshakeResult = try {
-        val result = rpc.invoke(NodeInfoWire.METHOD, JsonObject(emptyMap()))
-            ?: return NodeHandshakeResult.Failed("${NodeInfoWire.METHOD} returned no result")
-        val info = WIRE.decodeFromJsonElement(NodeInfo.serializer(), result)
-        NodeHandshakeResult.Checked(NodeCompatibilityRule.evaluate(info, reference()))
+    suspend fun run(): NodeHandshakeResult {
+        val info = try {
+            val result = rpc.invoke(NodeInfoWire.METHOD, JsonObject(emptyMap()))
+                ?: return NodeHandshakeResult.Failed("${NodeInfoWire.METHOD} returned no result")
+            if (result !is JsonObject || STORE_FORMAT_FIELD !in result) {
+                return NodeHandshakeResult.Failed("${NodeInfoWire.METHOD} did not report $STORE_FORMAT_FIELD")
+            }
+            WIRE.decodeFromJsonElement(NodeInfo.serializer(), result)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            return classify(error.message.orEmpty())
+        }
+        return NodeHandshakeResult.Checked(NodeCompatibilityRule.evaluate(info, referenceOrNull()))
+    }
+
+    /** The reference is optional: a failure to read it leaves the target judged on its own. */
+    private suspend fun referenceOrNull(): NodeInfo? = try {
+        reference()
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        classify(error.message.orEmpty())
+    } catch (@Suppress("TooGenericExceptionCaught", "SwallowedException") error: Exception) {
+        null
     }
 
     private companion object {
         val WIRE = LettaJson.adminRpc
+        const val STORE_FORMAT_FIELD = "store_format"
 
         fun classify(message: String): NodeHandshakeResult =
             if (AdminRpcErrors.isUnknownMethod(message) || message.startsWith("forbidden")) {

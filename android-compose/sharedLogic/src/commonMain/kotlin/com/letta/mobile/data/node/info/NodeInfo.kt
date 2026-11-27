@@ -99,12 +99,16 @@ data class RuntimePatchSet(
 
     /**
      * Whether this set and [other] are known to differ: by digest when both carry one, else by the
-     * applied and skipped counts when both carry them. Null when the two cannot be compared.
+     * applied count when both carry it, and the skipped count only when both carry that too. Null when the two cannot be compared.
      */
     fun differsFrom(other: RuntimePatchSet): Boolean? = when {
         !isKnown || !other.isKnown -> null
         digest != null && other.digest != null -> digest != other.digest
-        applied != null && other.applied != null -> applied != other.applied || (skipped ?: 0) != (other.skipped ?: 0)
+        applied != null && other.applied != null -> when {
+            applied != other.applied -> true
+            skipped != null && other.skipped != null -> skipped != other.skipped
+            else -> null
+        }
         else -> null
     }
 
