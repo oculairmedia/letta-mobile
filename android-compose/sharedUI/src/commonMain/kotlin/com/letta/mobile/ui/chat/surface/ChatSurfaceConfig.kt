@@ -95,6 +95,15 @@ data class ChatSurfacePlatform(
      */
     val topChromeInset: Dp = 0.dp,
     /**
+     * Extra rest space above the timeline's first row while the page's floating top-end overlay
+     * (the phone's Background-tasks launcher) shows. The overlay itself still hangs from
+     * [topChromeInset]; this reserve lifts only the timeline's content — its rows, goal card,
+     * welcome and status phases and sticky prompt rest below the two together, so the floating orb
+     * never covers the prompt bubble resting at the top of the list. Zero (the default) adds
+     * nothing (desktop).
+     */
+    val timelineOverlayReserve: Dp = 0.dp,
+    /**
      * Save and share for the full-screen image viewer (Android: MediaStore and the share sheet).
      * Null hides both actions (desktop).
      */

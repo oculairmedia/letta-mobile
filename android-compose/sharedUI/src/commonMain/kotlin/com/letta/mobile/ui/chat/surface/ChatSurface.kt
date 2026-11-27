@@ -763,7 +763,10 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
             listState = frame.session.listState,
-            topInset = frame.platform.topChromeInset,
+            // The overlay still hangs from the chrome inset; the reserve only lifts the rows (and
+            // every other top phase) below the overlay's own band, so a floating top-end launcher
+            // never covers the prompt bubble resting at the list's top.
+            topInset = frame.platform.topChromeInset + frame.platform.timelineOverlayReserve,
             canSendStarterPrompts = frame.session.canSendStarterPrompts,
         )
         frame.platform.timelineOverlay?.let { overlay ->

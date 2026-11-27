@@ -53,6 +53,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
+import com.letta.mobile.ui.chat.subagents.backgroundTasksLauncherReserve
 import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
@@ -167,6 +168,11 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         // The rings show on the canvas too: subagent activity stays in sight in canvas mode.
         subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.dualNavigation(dualView)) },
         topChromeInset = params.topChromeInset,
+        // While the floating tasks launcher shows, the timeline rests below its band: the orb
+        // hangs from the chrome inset and must not cover the prompt bubble at the list's top.
+        timelineOverlayReserve = backgroundTasksLauncherReserve(
+            showing = params.navigation.onOpenBackgroundTasks != null && currentSubagents.barState.runningCount > 0,
+        ),
     )
     // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
     // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
@@ -319,6 +325,7 @@ private fun rememberAndroidChatSurfacePlatform(
     onComposerHeightChange: ((Dp) -> Unit)?,
     subagentRings: @Composable () -> Unit,
     topChromeInset: Dp,
+    timelineOverlayReserve: Dp,
 ): ChatSurfacePlatform {
     val currentOnComposerHeight by rememberUpdatedState(onComposerHeightChange)
     val reportsComposerHeight = onComposerHeightChange != null
@@ -330,7 +337,7 @@ private fun rememberAndroidChatSurfacePlatform(
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val hasBackground = pageBackground != null
     val imageActions = rememberAndroidImageActions(context)
-    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset, imageActions) {
+    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset, timelineOverlayReserve, imageActions) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = if (hasBackground) {
@@ -341,6 +348,7 @@ private fun rememberAndroidChatSurfacePlatform(
             // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
             showKeyboardHints = false,
             topChromeInset = topChromeInset,
+            timelineOverlayReserve = timelineOverlayReserve,
             timelineOverlay = { currentOverlay() },
             canvasOverlay = { currentOverlay() },
             onComposerHeightChange = if (reportsComposerHeight) {
