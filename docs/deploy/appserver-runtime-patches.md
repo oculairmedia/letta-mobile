@@ -5,6 +5,23 @@
 `letta-code-patch-loader.mjs`, which rewrites the deployed `letta.js` bundle at load time
 (the `lcp-*` patches; the boot log reports `lcp-patches applied=N skipped=M`).
 
+## Bundle parity
+
+The patches apply to exactly one file: `LETTA_CLI_PATH_REAL`. Any child process that loads a
+different `@letta-ai/letta-code/letta.js` (a `letta` resolved from PATH to a self-updated global
+install, a stray symlink) runs UNPATCHED, which used to happen with no boot summary at all. The
+loader now logs, once per stray bundle per process:
+
+```
+[letta-code-patch] ERROR: bundle mismatch: this process loaded <path> instead of the pinned LETTA_CLI_PATH_REAL=<pin>; …
+```
+
+Setting `LETTA_PATCH_STRICT_PATH=1` in the service env makes the loader refuse to load the wrong
+bundle at all (the child dies at module load instead of running unpatched).
+`scripts/deploy/letta-code-host-cutover.sh` checks the same parity during a cutover: the `letta`
+the service PATH resolves must be the pin, and under the service's `NODE_OPTIONS` +
+`LETTA_CLI_PATH_REAL` its `--version` output must carry `lcp-patches applied=<expected> skipped=0`.
+
 Moved on 2026-11-04 from the deprecated `letta-code-parallel` repo
 (`oculairmedia/letta-code-admin-shim`, `admin-shim/scripts/`), byte-identical to its deployed
 commit `6354a12`. The deployed host still loads the old path until `/etc/meridian/appserver.env`
