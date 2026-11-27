@@ -59,6 +59,13 @@ fn without(mut entries: Vec<(u64, Vec<u8>)>, key: u64) -> Vec<(u64, Vec<u8>)> {
     entries
 }
 
+/// Replaces the encoded value under `key` with `raw`, which need not be canonical.
+fn replace_raw(entries: &mut [(u64, Vec<u8>)], key: u64, raw: Vec<u8>) {
+    if let Some(entry) = entries.iter_mut().find(|(k, _)| *k == key) {
+        entry.1 = raw;
+    }
+}
+
 fn negative(name: &str, envelope: &[u8], stage: &str, error: &str) -> Json {
     json!({"name": name, "envelope": hex(envelope), "stage": stage, "error": error})
 }
@@ -85,11 +92,7 @@ fn encoding_negatives(b: &DagBuilder) -> Vec<Json> {
     }
 
     let mut non_canonical = body_entries(b.by_label["genesis"].op());
-    for entry in &mut non_canonical {
-        if entry.0 == field::TS_MS {
-            entry.1 = vec![0x18, 0x05];
-        }
-    }
+    replace_raw(&mut non_canonical, field::TS_MS, vec![0x18, 0x05]);
 
     let (low, high) = {
         let a = b.id("genesis");
@@ -100,11 +103,7 @@ fn encoding_negatives(b: &DagBuilder) -> Vec<Json> {
     unsorted_parents.extend(bcbor::encode(&Value::Bytes(high.as_bytes().to_vec())));
     unsorted_parents.extend(bcbor::encode(&Value::Bytes(low.as_bytes().to_vec())));
     let mut unsorted = body_entries(b.by_label["add"].op());
-    for entry in &mut unsorted {
-        if entry.0 == field::PARENTS {
-            entry.1.clone_from(&unsorted_parents);
-        }
-    }
+    replace_raw(&mut unsorted, field::PARENTS, unsorted_parents);
 
     vec![
         negative(
@@ -128,82 +127,89 @@ fn encoding_negatives(b: &DagBuilder) -> Vec<Json> {
     ]
 }
 
-/// Canonical bodies with one field wrong, each signed by its issuer.
-fn body_negatives(b: &DagBuilder) -> Vec<Json> {
-    let add = body_entries(b.by_label["add"].op());
-    let genesis = body_entries(b.by_label["genesis"].op());
-    let grant = body_entries(b.by_label["grant"].op());
-    let rotate = body_entries(b.by_label["rotate"].op());
-    let cases = [
+/// One field changed in a canonical body.
+enum Edit {
+    Set(u64, Value),
+    Drop(u64),
+}
+
+/// The body cases: (name, the chain op whose body is edited, the edit, the error).
+fn body_cases() -> Vec<(&'static str, &'static str, Edit, &'static str)> {
+    use Edit::{Drop, Set};
+    let other_subject = Value::Bytes(key(5).node_id().as_bytes().to_vec());
+    let bad_caps = Value::Array(vec![Value::Text("Admin".into())]);
+    vec![
         (
             "unexpected_field",
-            with_entry(add.clone(), field::LABEL, &Value::Text("x".into())),
-            1,
+            "add",
+            Set(field::LABEL, Value::Text("x".into())),
             "unexpected_field",
         ),
         (
             "missing_field",
-            without(grant, field::CAPS_REMOVE),
-            1,
+            "grant",
+            Drop(field::CAPS_REMOVE),
             "missing_field",
         ),
         (
             "oversize",
-            with_entry(add.clone(), 64, &Value::Bytes(vec![0; 8_200])),
-            1,
+            "add",
+            Set(64, Value::Bytes(vec![0; 8_200])),
             "too_large",
         ),
         (
             "genesis_with_constellation",
-            with_entry(genesis, field::CONSTELLATION, &Value::Bytes(vec![0xee; 32])),
-            1,
+            "genesis",
+            Set(field::CONSTELLATION, Value::Bytes(vec![0xee; 32])),
             "unexpected_field",
         ),
         (
             "unknown_kind",
-            with_entry(add.clone(), field::KIND, &Value::Uint(7)),
-            1,
+            "add",
+            Set(field::KIND, Value::Uint(7)),
             "unknown_kind",
         ),
         (
             "bad_version",
-            with_entry(add.clone(), field::V, &Value::Uint(2)),
-            1,
+            "add",
+            Set(field::V, Value::Uint(2)),
             "bad_version",
         ),
         (
             "name_too_long",
-            with_entry(add.clone(), field::NAME, &Value::Text("n".repeat(65))),
-            1,
+            "add",
+            Set(field::NAME, Value::Text("n".repeat(65))),
             "bad_field",
         ),
         (
             "bad_capability_string",
-            with_entry(
-                add,
-                field::CAPS_ADD,
-                &Value::Array(vec![Value::Text("Admin".into())]),
-            ),
-            1,
+            "add",
+            Set(field::CAPS_ADD, bad_caps),
             "bad_field",
         ),
         (
             "rotate_subject_not_issuer",
-            with_entry(
-                rotate,
-                field::SUBJECT,
-                &Value::Bytes(key(5).node_id().as_bytes().to_vec()),
-            ),
-            2,
+            "rotate",
+            Set(field::SUBJECT, other_subject),
             "subject_not_issuer",
         ),
-    ];
-    cases
+    ]
+}
+
+/// Canonical bodies with one field wrong, each signed by its issuer.
+fn body_negatives(b: &DagBuilder) -> Vec<Json> {
+    body_cases()
         .into_iter()
-        .map(|(name, entries, signer, error)| {
+        .map(|(name, label, edit, error)| {
+            let op = b.by_label[label].op();
+            let entries = match edit {
+                Edit::Set(key, value) => with_entry(body_entries(op), key, &value),
+                Edit::Drop(key) => without(body_entries(op), key),
+            };
+            let signer = key_named(&common::name_of_node(&op.header.issuer));
             negative(
                 name,
-                &sign_raw(&raw_map(&entries), &key(signer)),
+                &sign_raw(&raw_map(&entries), &signer),
                 "decode",
                 error,
             )
