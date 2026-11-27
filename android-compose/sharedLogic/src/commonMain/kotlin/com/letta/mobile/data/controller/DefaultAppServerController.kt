@@ -693,6 +693,7 @@ class DefaultAppServerController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
+        resumeInterruptedTurn: Boolean,
     ): AppServerInboundFrame.SyncResponse = runtime.controllerCall("sync") {
         client.sync(
             AppServerCommand.Sync(
@@ -700,6 +701,7 @@ class DefaultAppServerController(
                 requestId = requestIdFactory(),
                 recoverApprovals = recoverApprovals,
                 forceDeviceStatus = forceDeviceStatus,
+                resumeInterruptedTurn = resumeInterruptedTurn,
             ),
         )
     }

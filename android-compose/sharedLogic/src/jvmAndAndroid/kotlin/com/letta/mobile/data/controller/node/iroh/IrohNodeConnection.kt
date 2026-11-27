@@ -541,6 +541,9 @@ class IrohNodeConnection internal constructor(
                 )
                 val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
                 val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
+                // Host authority: a viewer's relayed sync never resumes an interrupted turn —
+                // only this wrapper's own reconnect sync does — so `resume_interrupted_turn`
+                // is deliberately not read from the viewer's frame and stays false here.
                 val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
                 AppServerProtocol.json.encodeToString(
                     AppServerInboundFrame.serializer(), response.copy(requestId = requestId),
@@ -623,13 +626,7 @@ class IrohNodeConnection internal constructor(
                 }
                 "input" -> ifAuthorized(requestId) {
                     ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("input")) {
-                    launchInputJob(
-                        frameJson = frameJson,
-                        push = push,
-                        activeTurnJobs = activeTurnJobs,
-                        activeTurnJobsMutex = activeTurnJobsMutex,
-                    )
-                    null
+                        handleControlInput(frameJson, push, activeTurnJobs, activeTurnJobsMutex)
                     }
                 }
                 "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
@@ -661,18 +658,60 @@ class IrohNodeConnection internal constructor(
         }
     }
 
-    private suspend fun CoroutineScope.launchInputJob(
+    private suspend fun CoroutineScope.handleControlInput(
         frameJson: String,
         push: ViewerFrameSink,
         activeTurnJobs: LinkedHashSet<Job>,
         activeTurnJobsMutex: Mutex,
-    ) {
-        val job = launch(start = CoroutineStart.LAZY) {
-            val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson)
-            handleInput(input as AppServerCommand.Input, push)
+    ): String? {
+        val input = AppServerProtocol.json.decodeFromString(
+            AppServerCommand.serializer(), frameJson,
+        ) as AppServerCommand.Input
+        val message = firstUserMessage(input)
+        val key = message?.clientMessageId?.let {
+            Triple(input.runtime.agentId, input.runtime.conversationId, it)
         }
-        activeTurnJobsMutex.withLock { activeTurnJobs += job }
+        return when (turnHost.admitInput(key) { draining ->
+            message != null && if (draining) {
+                message.clientMessageId?.let {
+                    turnHost.clientSent(input.conversation(), listOf(it)) ||
+                        turnHost.journal.knowsTurn(input.owner(), input.conversation(), it)
+                } == true
+            } else {
+                isResentInput(input, message)
+            }
+        }) {
+            0 -> {
+                Telemetry.event(
+                    "IrohNode", "input.draining_rejected",
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "conversationId" attr input.runtime.conversationId,
+                )
+                input.requestId?.let {
+                    inputAcceptedFrame(it, input.runtime, TurnInputAcknowledgement.rejected(SHUTDOWN_DRAIN_INPUT_REJECTION))
+                }
+            }
+            2 -> { serveResentInput(input, requireNotNull(message), push); null }
+            else -> {
+                launchInputJob(input, push, activeTurnJobs, activeTurnJobsMutex, key)
+                null
+            }
+        }
+    }
+
+    private suspend fun CoroutineScope.launchInputJob(
+        input: AppServerCommand.Input,
+        push: ViewerFrameSink,
+        activeTurnJobs: LinkedHashSet<Job>,
+        activeTurnJobsMutex: Mutex,
+        key: Triple<String, String, String>?,
+    ) {
+        val transferred = java.util.concurrent.atomic.AtomicBoolean(false)
+        val job = launch(start = CoroutineStart.LAZY) {
+            handleInput(input, push) { transferred.set(true) }
+        }
         job.invokeOnCompletion { cause ->
+            turnHost.finishAdmission(key, releaseLive = !transferred.get())
             launch {
                 activeTurnJobsMutex.withLock { activeTurnJobs.remove(job) }
                 Telemetry.event(
@@ -684,6 +723,7 @@ class IrohNodeConnection internal constructor(
                 )
             }
         }
+        activeTurnJobsMutex.withLock { activeTurnJobs += job }
         Telemetry.event(
             "IrohNode", "stream.job.started",
             "remoteEndpointId" attr remoteEndpointId,
@@ -934,7 +974,8 @@ class IrohNodeConnection internal constructor(
     /** A re-sent input is a duplicate in this process (the dedupe set) or in an earlier one (the journal). */
     private fun isResentInput(input: AppServerCommand.Input, message: AppServerInputMessage): Boolean {
         val clientMsgId = message.clientMessageId ?: return false
-        return !clientMessageDedupe.markHandled(input.owner(), input.conversation(), clientMsgId) ||
+        val dedupe = if (clientMessageDedupe === SHARED_CLIENT_MESSAGE_DEDUPE) turnHost.clientMessageDedupe else clientMessageDedupe
+        return !dedupe.markHandled(input.owner(), input.conversation(), clientMsgId) ||
             turnHost.journal.knowsTurn(input.owner(), input.conversation(), clientMsgId)
     }
 
@@ -965,6 +1006,7 @@ class IrohNodeConnection internal constructor(
     private suspend fun handleInput(
         input: AppServerCommand.Input,
         push: ViewerFrameSink,
+        transferAdmission: () -> Unit,
     ) {
         val userMsg = firstUserMessage(input)
         val contentParts = userMsg?.content as? JsonArray
@@ -972,10 +1014,6 @@ class IrohNodeConnection internal constructor(
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
             ?: ""
         val clientMsgId = userMsg?.clientMessageId
-        if (userMsg != null && isResentInput(input, userMsg)) {
-            serveResentInput(input, userMsg, push)
-            return
-        }
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:${input.runtime.agentId}:${input.runtime.conversationId}"),
@@ -995,6 +1033,7 @@ class IrohNodeConnection internal constructor(
         // The collector runs on the node-owned host. If this connection closes first, the turn is
         // detached, not cancelled: the server turn keeps its approvals, external tools and other
         // viewers, and its tail stays in the journal for this initiator's redial.
+        transferAdmission()
         turnHost.run(
             NodeTurn(
                 conversationId = input.runtime.conversationId,
@@ -1004,6 +1043,7 @@ class IrohNodeConnection internal constructor(
             ) {
                 relayAndSettle(command, turn)
             },
+            admitted = true,
         )
     }
 
@@ -1107,6 +1147,14 @@ class IrohNodeConnection internal constructor(
             addAll(SubagentAdminHandlers.advertisedCapabilities(router.registeredMethods))
         }
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
+
+        /**
+         * Why an input is refused while the host drains for shutdown: retryable wording for the
+         * client's failed send, so the user retries once the wrapper is back (its systemd unit
+         * restarts it) instead of seeing a turn cancelled mid-flight.
+         */
+        internal const val SHUTDOWN_DRAIN_INPUT_REJECTION =
+            "wrapper is shutting down; no new turns accepted — retry once it reconnects"
         // Raised 5s -> 60s (P3): a heavy final turn (large tool_return, long
         // stop_reason flush) can legitimately still be draining when the control
         // channel closes; the old 5s cap cancelled those turns before their

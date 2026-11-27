@@ -43,6 +43,9 @@ class IrohDialerStreamIntegrityTest {
         val sync = wire.client.syncs.single()
         assertEquals(runtime, sync.runtime)
         assertEquals(true, sync.recoverApprovals)
+        // A client's gap resync is not the wrapper's reconnect: it must never ask the
+        // server to resume an interrupted turn, only the wrapper's reconnect sync may.
+        assertEquals(false, sync.resumeInterruptedTurn)
         assertTrue(sync.requestId.orEmpty().startsWith("iroh-sync-"))
         job.cancel()
     }

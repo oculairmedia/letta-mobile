@@ -31,6 +31,8 @@ data class LettaListRowSpec(
     val titleLines: Int = 1,
     /** Maximum subtitle lines; additional text is ellipsized. */
     val subtitleLines: Int = 1,
+    /** Test tag on the subtitle line (the roster's ended rows tag their subtitle like its running cards). */
+    val subtitleTag: String? = null,
 )
 
 /** Test hooks for [LettaListRow]. */

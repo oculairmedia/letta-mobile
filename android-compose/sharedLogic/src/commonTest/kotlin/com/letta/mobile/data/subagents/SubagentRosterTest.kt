@@ -168,6 +168,19 @@ class SubagentRosterTest {
     }
 
     @Test
+    fun tokenUsageSurvivesTheProjectionForRunningAndFinishedWork() {
+        val roster = projectSubagentRoster(
+            listOf(
+                entry("toolu_run").copy(toolCallCount = 116, totalTokens = 1_234_567L),
+                entry("toolu_done", status = SubagentStatus.COMPLETED).copy(totalTokens = 980L),
+            ),
+            now = now,
+        )
+        assertEquals(1_234_567L, roster.running.single().totalTokens)
+        assertEquals(980L, roster.finished.single().totalTokens)
+    }
+
+    @Test
     fun rosterKeyPrefersToolCallThenTaskThenAComposite() {
         val base = SubagentEntry(toolCallId = "call_123", taskId = "task_456", description = "d", subagentType = "R", status = "running", startedAt = "t0")
         assertEquals("call_123", base.rosterKey())

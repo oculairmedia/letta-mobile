@@ -315,6 +315,7 @@ class ShimOffParityGateTest {
             runtime: AppServerRuntimeScope,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
+            resumeInterruptedTurn: Boolean,
         ): AppServerInboundFrame.SyncResponse = error("unused")
 
         override suspend fun abort(

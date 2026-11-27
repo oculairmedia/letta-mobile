@@ -51,11 +51,13 @@ internal fun RunningCard(
     }
     val orbActivity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working
     val visibleLines = if (expanded) item.activity else item.activity.takeLast(1)
+    // No outline: the tonal surface step (surfaceContainer over surfaceContainerLow) separates the cards.
     LettaPanel(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = LettaDimens.Space.lg * item.depth)
             .testTag(SubagentRosterTag.RUNNING.of(item.key)),
+        border = false,
     ) {
         LettaHangingRow(
             leading = { AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity) },
@@ -65,8 +67,23 @@ internal fun RunningCard(
         ) {
             TitleBlock(item)
             visibleLines.forEach { line -> ActivityLine(line) }
-            ConversationAction(item, onOpenConversation)
-            if (onDismiss != null) LettaHangingRowAction(label = "Dismiss", onClick = { onDismiss(item) })
+            CardActions(item, onOpenConversation, onDismiss)
+        }
+    }
+}
+
+/** The card's actions share one row: the conversation first (primary ink), dismiss after it (destructive). */
+@Composable
+private fun CardActions(
+    item: SubagentRosterItem,
+    onOpenConversation: OpenSubagentConversation?,
+    onDismiss: ((SubagentRosterItem) -> Unit)?,
+) {
+    if (onOpenConversation == null && onDismiss == null) return
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
+        ConversationAction(item, onOpenConversation)
+        if (onDismiss != null) {
+            LettaHangingRowAction(label = "Dismiss", onClick = { onDismiss(item) }, destructive = true)
         }
     }
 }
@@ -80,7 +97,13 @@ internal fun EndedRow(
     onDismiss: ((SubagentRosterItem) -> Unit)?,
 ) {
     RosterListRow(
-        spec = LettaListRowSpec(title = item.title, subtitle = item.subtitle(), trailing = item.identity.label),
+        spec = LettaListRowSpec(
+            title = item.title,
+            subtitle = item.subtitle(),
+            subtitleLines = 2,
+            subtitleTag = SubagentRosterTag.SUBTITLE.of(item.key),
+            trailing = item.identity.label,
+        ),
         row = row,
         slots = RosterRowSlots(
             leading = { RosterStatusGlyph(item.status) },
@@ -130,7 +153,9 @@ private fun TitleBlock(item: SubagentRosterItem) {
             text = item.subtitle(),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            // Two lines, so a phone's narrow card keeps its elapsed time, tool count and tokens
+            // visible; the model sits last and is the one segment that may wrap.
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.testTag(SubagentRosterTag.SUBTITLE.of(item.key)),
         )

@@ -3184,6 +3184,45 @@ function conversationTurnLock(state) {
   state.appliedPatches += 1;
 }
 
+// lcp-live-tokens: a LOCAL subagent reported total_tokens only when it finished (handleResultEvent,
+// on the final result envelope, was the sole writer), so the Background tasks card showed no tokens
+// while it ran. Each usage_statistics stream message carries one model call's tokens (step_count:
+// 1), so the running total is their sum and the cumulative result envelope still wins at
+// completion. The total lives on state2 (per subagent, dropped when the child exits), only the
+// number is read, and the write never goes below the reported total (a retry reuses the id).
+const liveTokens = exactOncePatch("lcp-live-tokens", [
+  { token: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };", replacement: "    const state2 = {\n      agentId: existingAgentId || null,\n      conversationId: existingConversationId || null,\n      finalResult: null,\n      finalError: null,\n      enqueueReceipt: null,\n      resultStats: null,\n      usageTokens: 0, // lcp-live-tokens\n      displayedToolCalls: new Set,\n      toolCallStatuses: new Map\n    };" },
+  { token: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type !== "usage_statistics") {\n          flushPendingProgressText(state2, subagentId);\n        }', replacement: '        if (event.message_type === "assistant_message" || event.message_type === "reasoning_message") {\n          handleTextChunk(event, state2, subagentId);\n        } else if (event.message_type === "usage_statistics") { // lcp-live-tokens\n          recordLiveUsageStatistics(event, state2, subagentId);\n        } else {\n          flushPendingProgressText(state2, subagentId);\n        }' },
+  { token: "function processStreamEvent(line, state2, subagentId) {", replacement: "// lcp-live-tokens: sum the per-step usage_statistics chunks into the per-subagent state\n// and publish the running total the way the external coding-agent path does. The guard\n// keeps the store's reported total monotonic; the final result envelope overwrites it.\nfunction recordLiveUsageStatistics(event, state2, subagentId) {\n  const stepTokens = event.total_tokens;\n  if (typeof stepTokens !== \"number\" || !Number.isFinite(stepTokens) || stepTokens <= 0) {\n    return;\n  }\n  state2.usageTokens += stepTokens;\n  const agent = store2.agents.get(subagentId);\n  if (agent && state2.usageTokens >= agent.totalTokens) {\n    updateSubagent(subagentId, { totalTokens: state2.usageTokens });\n  }\n}\nfunction processStreamEvent(line, state2, subagentId) {" },
+], "running local subagents keep reporting no tokens until they finish");
+
+// Recover backend runs left behind when the listener loses its turn lifecycle.
+const abortOrphanedRun = exactOncePatch("lcp-abort-orphaned-run", [{
+  token: `  if (params.command.run_id && (!hasCurrentTurn || params.command.run_id !== lifecycleSnapshot.runId)) {
+    return false;
+  }
+  if (!hasCurrentTurn && !hasPendingApprovals) {
+    return false;
+  }`,
+  replacement: `  if (hasCurrentTurn && params.command.run_id && params.command.run_id !== lifecycleSnapshot.runId) {
+    return false;
+  }
+  if (!hasCurrentTurn && (params.command.run_id || !hasPendingApprovals)) {
+    // lcp-abort-orphaned-run: require backend confirmation; scope "default" by agent_id so
+    // another agent's default conversation can never be cancelled.
+    try {
+      const named = scope.conversation_id && scope.conversation_id !== "default";
+      if (named) await resolvedDeps.cancelConversationRun(scope.conversation_id, params.command.run_id);
+      else if (scope.agent_id && params.command.run_id) await resolvedDeps.cancelRun(scope.agent_id, params.command.run_id);
+      else if (scope.agent_id) await resolvedDeps.cancelConversation(scope.agent_id, scope.conversation_id);
+      else return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }`,
+}], "orphaned backend runs cannot be aborted after the listener loses its turn");
+
 // Patch order is significant: each step receives the previous step's output.
 const PATCH_STEPS = [
   agentTaskStatus,
@@ -3223,6 +3262,8 @@ const PATCH_STEPS = [
   skillDir,
   systemPromptTracking,
   conversationTurnLock,
+  liveTokens,
+  abortOrphanedRun,
 ];
 
 /**

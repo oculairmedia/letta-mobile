@@ -50,7 +50,16 @@ ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
   --pairing-store-file /etc/meridian/paired-peers.json \
   --subagent-registry-file /var/lib/meridian/subagent-registry.json \
   --local-backend-dir /root/.letta/lc-local-backend \
-  --skills-dir /root/.letta/skills
+  --skills-dir /root/.letta/skills \
+  --shutdown-drain-seconds 300
+
+# Shutdown drain: on SIGTERM the wrapper refuses new turn inputs and waits up
+# to --shutdown-drain-seconds (300s) for in-flight turns before closing the
+# App Server connection, so that close cancels no running turn with cause
+# "transport". A second SIGTERM cuts the wait. TimeoutStopSec must cover the
+# drain bound (300s) plus the final close, hence 360s; systemd would otherwise
+# SIGKILL at its 90s default — mid-drain, killing the turns the drain protects.
+TimeoutStopSec=360s
 
 # Durable state outside the immutable release tree (subagent registry — chips
 # must survive wrapper restarts, letta-mobile-lgns8.22.8). systemd creates and

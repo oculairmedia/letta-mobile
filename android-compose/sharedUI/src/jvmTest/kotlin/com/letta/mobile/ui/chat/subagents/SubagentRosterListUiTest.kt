@@ -18,8 +18,10 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.subagents.QUIET_AFTER_MS
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.projectSubagentRoster
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-ulcg6 (PR4): the shared subagent roster both clients render.
@@ -111,6 +113,65 @@ class SubagentRosterListUiTest {
         onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertDoesNotExist()
     }
 
+    /** Token usage reads beside the tool count, before the model, so it never falls off the card. */
+    @Test
+    fun theSubtitleCarriesTokenUsageOnRunningAndFinishedWork() = runComposeUiTest {
+        val withTokens = listOf(
+            entry("toolu_run").copy(
+                toolCallCount = 116,
+                totalTokens = 1_234_567L,
+                model = "lmstudio/vibe-glm-5-3",
+                subagentAgentId = "agent-local-child",
+                subagentConversationId = "default",
+            ),
+            entry("toolu_spent", status = "success").copy(totalTokens = 980L),
+        )
+        setContent {
+            MaterialTheme {
+                SubagentRosterList(roster = projectSubagentRoster(withTokens, now), onOpenConversation = {}, onClearFinished = {})
+            }
+        }
+        onNodeWithTag(SubagentRosterTag.SUBTITLE.of("toolu_run"), useUnmergedTree = true)
+            .assertTextContains("116 tools", substring = true)
+            .assertTextContains("116 tools · 1.2M tok · lmstudio/vibe-glm-5-3", substring = true)
+        onNodeWithTag(SubagentRosterTag.SUBTITLE.of("toolu_spent"), useUnmergedTree = true)
+            .assertTextContains("980 tok", substring = true)
+    }
+
+    /** A running card's "View conversation" and "Dismiss" sit on one row, not stacked. */
+    @Test
+    fun theRunningCardsActionsShareOneRow() = runComposeUiTest {
+        val running = entry("toolu_run").copy(
+            subagentAgentId = "agent-local-child",
+            subagentConversationId = "default",
+            parentAgentId = "agent-parent",
+            parentConversationId = "local-conv-517",
+        )
+        var opened: SubagentRosterItem? = null
+        var dismissed: SubagentRosterItem? = null
+        setContent {
+            MaterialTheme {
+                SubagentRosterList(
+                    roster = projectSubagentRoster(listOf(running), now),
+                    onOpenConversation = { opened = it },
+                    onClearFinished = {},
+                    onDismiss = { dismissed = it },
+                    dismissableToolCallIds = setOf(running.toolCallId),
+                )
+            }
+        }
+        val openAction = onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_run")).fetchSemanticsNode().boundsInRoot
+        val dismissAction = onNodeWithText("Dismiss").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            abs(openAction.center.y - dismissAction.center.y) <= 1f,
+            "the actions' centers differ in y by ${abs(openAction.center.y - dismissAction.center.y)}px; they are not on one row",
+        )
+        onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_run")).performClick()
+        runOnIdle { assertEquals("toolu_run", opened?.key) }
+        onNodeWithText("Dismiss").performClick()
+        runOnIdle { assertEquals("toolu_run", dismissed?.key) }
+    }
+
     @Test
     fun clearHidesFinishedRows() = runComposeUiTest {
         setContent {
@@ -128,4 +189,5 @@ class SubagentRosterListUiTest {
         onNodeWithText("Clear").performClick()
         onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertDoesNotExist()
     }
+
 }

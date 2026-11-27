@@ -112,6 +112,20 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String? = null,
         @SerialName("recover_approvals") val recoverApprovals: Boolean? = null,
         @SerialName("force_device_status") val forceDeviceStatus: Boolean? = null,
+        /**
+         * Asks the server to resume a turn the App Server interrupted (a restart mid-turn),
+         * recovering its approval state instead of denying the pending approvals as stale and
+         * leaving the turn hanging until the next user input. Upstream reads it as
+         * `resume_interrupted_turn === true` and only inside `recover_approvals` recovery.
+         *
+         * Host-authority contract: only the host wrapper's own reconnect sync sets this.
+         * The wrapper is the conversation's execution owner, so it is the only peer that may
+         * take an interrupted turn back over. Client syncs (mobile/desktop/web viewers,
+         * cadence/gap syncs, liveness probes) keep it `false`, and the wire omits it then —
+         * unlike [recoverApprovals] there is no server-side state where an explicit `false`
+         * means something else, so a plain `Boolean` default models the contract exactly.
+         */
+        @SerialName("resume_interrupted_turn") val resumeInterruptedTurn: Boolean = false,
     ) : AppServerCommand
 
     @Serializable

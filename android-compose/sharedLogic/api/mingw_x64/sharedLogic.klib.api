@@ -6291,7 +6291,7 @@ abstract interface com.letta.mobile.data.controller/AppServerController { // com
     abstract fun runTurn(com.letta.mobile.runtime/TurnCommand): kotlinx.coroutines.flow/Flow<com.letta.mobile.runtime/RuntimeEventDraft> // com.letta.mobile.data.controller/AppServerController.runTurn|runTurn(com.letta.mobile.runtime.TurnCommand){}[0]
     abstract suspend fun abort(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/String? = ...): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AbortMessageResponse // com.letta.mobile.data.controller/AppServerController.abort|abort(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.String?){}[0]
     abstract suspend fun startRuntime(com.letta.mobile.data.model/AgentId, com.letta.mobile.runtime/ConversationId, kotlin/String? = ..., com.letta.mobile.data.transport.appserver/AppServerPermissionMode? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.controller/CanonicalRuntime // com.letta.mobile.data.controller/AppServerController.startRuntime|startRuntime(com.letta.mobile.data.model.AgentId;com.letta.mobile.runtime.ConversationId;kotlin.String?;com.letta.mobile.data.transport.appserver.AppServerPermissionMode?;kotlin.Boolean;kotlin.Boolean){}[0]
-    abstract suspend fun sync(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.SyncResponse // com.letta.mobile.data.controller/AppServerController.sync|sync(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.Boolean;kotlin.Boolean){}[0]
+    abstract suspend fun sync(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.SyncResponse // com.letta.mobile.data.controller/AppServerController.sync|sync(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
     open fun close() // com.letta.mobile.data.controller/AppServerController.close|close(){}[0]
     open fun markConnected() // com.letta.mobile.data.controller/AppServerController.markConnected|markConnected(){}[0]
     open fun observeRuntimeFrames(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame>? // com.letta.mobile.data.controller/AppServerController.observeRuntimeFrames|observeRuntimeFrames(){}[0]
@@ -21360,7 +21360,7 @@ sealed interface com.letta.mobile.data.transport.appserver/AppServerCommand { //
     }
 
     final class Sync : com.letta.mobile.data.transport.appserver/AppServerCommand { // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync|null[0]
-        constructor <init>(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?){}[0]
+        constructor <init>(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.Boolean){}[0]
 
         final val forceDeviceStatus // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.forceDeviceStatus|{}forceDeviceStatus[0]
             final fun <get-forceDeviceStatus>(): kotlin/Boolean? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.forceDeviceStatus.<get-forceDeviceStatus>|<get-forceDeviceStatus>(){}[0]
@@ -21368,6 +21368,8 @@ sealed interface com.letta.mobile.data.transport.appserver/AppServerCommand { //
             final fun <get-recoverApprovals>(): kotlin/Boolean? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.recoverApprovals.<get-recoverApprovals>|<get-recoverApprovals>(){}[0]
         final val requestId // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.requestId|{}requestId[0]
             final fun <get-requestId>(): kotlin/String? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.requestId.<get-requestId>|<get-requestId>(){}[0]
+        final val resumeInterruptedTurn // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.resumeInterruptedTurn|{}resumeInterruptedTurn[0]
+            final fun <get-resumeInterruptedTurn>(): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.resumeInterruptedTurn.<get-resumeInterruptedTurn>|<get-resumeInterruptedTurn>(){}[0]
         final val runtime // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.runtime|{}runtime[0]
             final fun <get-runtime>(): com.letta.mobile.data.transport.appserver/AppServerRuntimeScope // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.runtime.<get-runtime>|<get-runtime>(){}[0]
 
@@ -21375,7 +21377,8 @@ sealed interface com.letta.mobile.data.transport.appserver/AppServerCommand { //
         final fun component2(): kotlin/String? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.component2|component2(){}[0]
         final fun component3(): kotlin/Boolean? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.component3|component3(){}[0]
         final fun component4(): kotlin/Boolean? // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.component4|component4(){}[0]
-        final fun copy(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.transport.appserver/AppServerCommand.Sync // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.copy|copy(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?){}[0]
+        final fun component5(): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.component5|component5(){}[0]
+        final fun copy(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport.appserver/AppServerCommand.Sync // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.copy|copy(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.Boolean){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.transport.appserver/AppServerCommand.Sync.toString|toString(){}[0]
@@ -41853,7 +41856,7 @@ final class com.letta.mobile.data.controller/DefaultAppServerController : com.le
     final suspend fun stopRuntime(com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.controller/DefaultAppServerController.stopRuntime|stopRuntime(com.letta.mobile.data.model.AgentId){}[0]
     final suspend fun submitApproval(com.letta.mobile.data.controller/ControllerApprovalAnswer): com.letta.mobile.data.controller/ApprovalSubmitResult // com.letta.mobile.data.controller/DefaultAppServerController.submitApproval|submitApproval(com.letta.mobile.data.controller.ControllerApprovalAnswer){}[0]
     final suspend fun submitApproval(com.letta.mobile.data.model/AgentId, com.letta.mobile.runtime/ConversationId?, kotlin/String, kotlin/Boolean, kotlin/String?, kotlin/String?, kotlinx.serialization.json/JsonObject?): com.letta.mobile.data.controller/ApprovalSubmitResult // com.letta.mobile.data.controller/DefaultAppServerController.submitApproval|submitApproval(com.letta.mobile.data.model.AgentId;com.letta.mobile.runtime.ConversationId?;kotlin.String;kotlin.Boolean;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonObject?){}[0]
-    final suspend fun sync(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/Boolean, kotlin/Boolean): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.SyncResponse // com.letta.mobile.data.controller/DefaultAppServerController.sync|sync(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.Boolean;kotlin.Boolean){}[0]
+    final suspend fun sync(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.SyncResponse // com.letta.mobile.data.controller/DefaultAppServerController.sync|sync(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final object Companion // com.letta.mobile.data.controller/DefaultAppServerController.Companion|null[0]
 }
@@ -54790,7 +54793,7 @@ final class com.letta.mobile.data.model/UiMessage { // com.letta.mobile.data.mod
 }
 
 final class com.letta.mobile.data.model/UiSubagentDispatch { // com.letta.mobile.data.model/UiSubagentDispatch|null[0]
-    constructor <init>(kotlin/String?, kotlin/String, kotlin/String, kotlin/Boolean, kotlin/String, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiSubagentDispatch.<init>|<init>(kotlin.String?;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String?, kotlin/String, kotlin/String, kotlin/Boolean, kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/UiSubagentDispatch.<init>|<init>(kotlin.String?;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
 
     final val description // com.letta.mobile.data.model/UiSubagentDispatch.description|{}description[0]
         final fun <get-description>(): kotlin/String // com.letta.mobile.data.model/UiSubagentDispatch.description.<get-description>|<get-description>(){}[0]
@@ -54800,6 +54803,8 @@ final class com.letta.mobile.data.model/UiSubagentDispatch { // com.letta.mobile
         final fun <get-runInBackground>(): kotlin/Boolean // com.letta.mobile.data.model/UiSubagentDispatch.runInBackground.<get-runInBackground>|<get-runInBackground>(){}[0]
     final val subagentAgentId // com.letta.mobile.data.model/UiSubagentDispatch.subagentAgentId|{}subagentAgentId[0]
         final fun <get-subagentAgentId>(): kotlin/String? // com.letta.mobile.data.model/UiSubagentDispatch.subagentAgentId.<get-subagentAgentId>|<get-subagentAgentId>(){}[0]
+    final val subagentConversationId // com.letta.mobile.data.model/UiSubagentDispatch.subagentConversationId|{}subagentConversationId[0]
+        final fun <get-subagentConversationId>(): kotlin/String? // com.letta.mobile.data.model/UiSubagentDispatch.subagentConversationId.<get-subagentConversationId>|<get-subagentConversationId>(){}[0]
     final val subagentType // com.letta.mobile.data.model/UiSubagentDispatch.subagentType|{}subagentType[0]
         final fun <get-subagentType>(): kotlin/String // com.letta.mobile.data.model/UiSubagentDispatch.subagentType.<get-subagentType>|<get-subagentType>(){}[0]
     final val taskId // com.letta.mobile.data.model/UiSubagentDispatch.taskId|{}taskId[0]
@@ -54814,7 +54819,8 @@ final class com.letta.mobile.data.model/UiSubagentDispatch { // com.letta.mobile
     final fun component5(): kotlin/String // com.letta.mobile.data.model/UiSubagentDispatch.component5|component5(){}[0]
     final fun component6(): kotlin/String? // com.letta.mobile.data.model/UiSubagentDispatch.component6|component6(){}[0]
     final fun component7(): kotlin/String? // com.letta.mobile.data.model/UiSubagentDispatch.component7|component7(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiSubagentDispatch // com.letta.mobile.data.model/UiSubagentDispatch.copy|copy(kotlin.String?;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun component8(): kotlin/String? // com.letta.mobile.data.model/UiSubagentDispatch.component8|component8(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.model/UiSubagentDispatch // com.letta.mobile.data.model/UiSubagentDispatch.copy|copy(kotlin.String?;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/UiSubagentDispatch.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/UiSubagentDispatch.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/UiSubagentDispatch.toString|toString(){}[0]
@@ -66096,7 +66102,7 @@ final class com.letta.mobile.data.subagents/SubagentRoster { // com.letta.mobile
 }
 
 final class com.letta.mobile.data.subagents/SubagentRosterItem { // com.letta.mobile.data.subagents/SubagentRosterItem|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, com.letta.mobile.data.subagents/SubagentRosterStatus, com.letta.mobile.data.subagents/SubagentIdentity, kotlin/Int?, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/Int, kotlin/String?, kotlin/Boolean, kotlin/String) // com.letta.mobile.data.subagents/SubagentRosterItem.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.subagents.SubagentRosterStatus;com.letta.mobile.data.subagents.SubagentIdentity;kotlin.Int?;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.String){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, com.letta.mobile.data.subagents/SubagentRosterStatus, com.letta.mobile.data.subagents/SubagentIdentity, kotlin/Int?, kotlin/Long? = ..., kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/Int, kotlin/String?, kotlin/Boolean, kotlin/String) // com.letta.mobile.data.subagents/SubagentRosterItem.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.subagents.SubagentRosterStatus;com.letta.mobile.data.subagents.SubagentIdentity;kotlin.Int?;kotlin.Long?;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.String){}[0]
 
     final val activity // com.letta.mobile.data.subagents/SubagentRosterItem.activity|{}activity[0]
         final fun <get-activity>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.subagents/SubagentRosterItem.activity.<get-activity>|<get-activity>(){}[0]
@@ -66128,25 +66134,28 @@ final class com.letta.mobile.data.subagents/SubagentRosterItem { // com.letta.mo
         final fun <get-toolCallCount>(): kotlin/Int? // com.letta.mobile.data.subagents/SubagentRosterItem.toolCallCount.<get-toolCallCount>|<get-toolCallCount>(){}[0]
     final val toolCallId // com.letta.mobile.data.subagents/SubagentRosterItem.toolCallId|{}toolCallId[0]
         final fun <get-toolCallId>(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+    final val totalTokens // com.letta.mobile.data.subagents/SubagentRosterItem.totalTokens|{}totalTokens[0]
+        final fun <get-totalTokens>(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentRosterItem.totalTokens.<get-totalTokens>|<get-totalTokens>(){}[0]
     final val typeLabel // com.letta.mobile.data.subagents/SubagentRosterItem.typeLabel|{}typeLabel[0]
         final fun <get-typeLabel>(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.typeLabel.<get-typeLabel>|<get-typeLabel>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.component1|component1(){}[0]
     final fun component10(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component10|component10(){}[0]
     final fun component11(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component11|component11(){}[0]
-    final fun component12(): kotlin/Int // com.letta.mobile.data.subagents/SubagentRosterItem.component12|component12(){}[0]
-    final fun component13(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component13|component13(){}[0]
-    final fun component14(): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentRosterItem.component14|component14(){}[0]
-    final fun component15(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.component15|component15(){}[0]
+    final fun component12(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component12|component12(){}[0]
+    final fun component13(): kotlin/Int // com.letta.mobile.data.subagents/SubagentRosterItem.component13|component13(){}[0]
+    final fun component14(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component14|component14(){}[0]
+    final fun component15(): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentRosterItem.component15|component15(){}[0]
+    final fun component16(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.component16|component16(){}[0]
     final fun component2(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.component2|component2(){}[0]
     final fun component3(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.subagents/SubagentRosterStatus // com.letta.mobile.data.subagents/SubagentRosterItem.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.subagents/SubagentIdentity // com.letta.mobile.data.subagents/SubagentRosterItem.component5|component5(){}[0]
     final fun component6(): kotlin/Int? // com.letta.mobile.data.subagents/SubagentRosterItem.component6|component6(){}[0]
-    final fun component7(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.subagents/SubagentRosterItem.component7|component7(){}[0]
-    final fun component8(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentRosterItem.component8|component8(){}[0]
-    final fun component9(): kotlin/String? // com.letta.mobile.data.subagents/SubagentRosterItem.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.subagents/SubagentRosterStatus = ..., com.letta.mobile.data.subagents/SubagentIdentity = ..., kotlin/Int? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String = ...): com.letta.mobile.data.subagents/SubagentRosterItem // com.letta.mobile.data.subagents/SubagentRosterItem.copy|copy(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.subagents.SubagentRosterStatus;com.letta.mobile.data.subagents.SubagentIdentity;kotlin.Int?;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.String){}[0]
+    final fun component7(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentRosterItem.component7|component7(){}[0]
+    final fun component8(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.subagents/SubagentRosterItem.component8|component8(){}[0]
+    final fun component9(): kotlin/Long? // com.letta.mobile.data.subagents/SubagentRosterItem.component9|component9(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.subagents/SubagentRosterStatus = ..., com.letta.mobile.data.subagents/SubagentIdentity = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String = ...): com.letta.mobile.data.subagents/SubagentRosterItem // com.letta.mobile.data.subagents/SubagentRosterItem.copy|copy(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.subagents.SubagentRosterStatus;com.letta.mobile.data.subagents.SubagentIdentity;kotlin.Int?;kotlin.Long?;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentRosterItem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.subagents/SubagentRosterItem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.subagents/SubagentRosterItem.toString|toString(){}[0]
@@ -84517,6 +84526,10 @@ final object com.letta.mobile.ui.theme/LettaThemeTokens { // com.letta.mobile.ui
         final fun <get-spring>(): com.letta.mobile.ui.theme/LettaThemePresetTokens // com.letta.mobile.ui.theme/LettaThemeTokens.spring.<get-spring>|<get-spring>(){}[0]
 
     final fun preset(com.letta.mobile.data.model/ThemePreset): com.letta.mobile.ui.theme/LettaThemePresetTokens // com.letta.mobile.ui.theme/LettaThemeTokens.preset|preset(com.letta.mobile.data.model.ThemePreset){}[0]
+}
+
+final object com.letta.mobile.util.time/CountLabels { // com.letta.mobile.util.time/CountLabels|null[0]
+    final fun compact(kotlin/Long): kotlin/String // com.letta.mobile.util.time/CountLabels.compact|compact(kotlin.Long){}[0]
 }
 
 final object com.letta.mobile.util.time/TimeLabels { // com.letta.mobile.util.time/TimeLabels|null[0]

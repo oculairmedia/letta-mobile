@@ -112,6 +112,10 @@ interface AppServerController {
      * @param runtime The runtime scope to sync
      * @param recoverApprovals Whether to recover pending approvals
      * @param forceDeviceStatus Whether to force device status update
+     * @param resumeInterruptedTurn Whether the server should resume a turn it interrupted
+     * (a restart mid-turn) instead of denying its pending approvals as stale. Host-authority
+     * contract: only the host wrapper's own reconnect sync passes `true` — it is the
+     * conversation's execution owner. Every client sync keeps the default `false`.
      * @return The sync response from the App Server
      * @throws AppServerControllerException if sync fails
      */
@@ -119,6 +123,7 @@ interface AppServerController {
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean = false,
         forceDeviceStatus: Boolean = false,
+        resumeInterruptedTurn: Boolean = false,
     ): AppServerInboundFrame.SyncResponse
 
     /**

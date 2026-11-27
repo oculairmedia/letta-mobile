@@ -50,6 +50,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
 import kotlin.system.exitProcess
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,6 +97,21 @@ class AppServerServeIrohCommand : CliktCommand(
         "--request-timeout-ms",
         help = "Request timeout in milliseconds",
     ).default("120000")
+
+    /**
+     * The shutdown drain bound: a SIGTERM shutdown first refuses new turn inputs and waits for the
+     * live ones (up to this many seconds) before it closes the App Server connection, so closing
+     * that connection cancels no in-flight turn with cause "transport". A second SIGTERM (or
+     * Ctrl+C) cuts the wait. The systemd unit's `TimeoutStopSec` must cover this bound plus the
+     * final close; 0 refuses new turns but closes at once.
+     */
+    private val shutdownDrainSeconds by option(
+        "--shutdown-drain-seconds",
+        envvar = "LETTA_SHUTDOWN_DRAIN_SECONDS",
+        help = "Seconds a SIGTERM shutdown waits for active turns before closing the App Server " +
+            "connection (0 = refuse new turns but close at once). The unit's TimeoutStopSec must " +
+            "cover this bound plus the final close.",
+    ).int().default(DEFAULT_SHUTDOWN_DRAIN_SECONDS)
 
     private val irohPort by option(
         "--iroh-port",
@@ -362,13 +378,21 @@ class AppServerServeIrohCommand : CliktCommand(
         runWithLifecycleCleanup(
             scope = scope,
             cleanup = {
-                println("\n[iroh-app-server] Shutting down...")
-                runCatching { irohEndpoint?.shutdown() }
-                runCatching { notebookProtocol?.close() }
-                runCatching { notebookStore?.close() }
-                runCatching { ownedServer?.close() }
-                runCatching { pluginHost?.close() }
-                scope.cancel()
+                // FIRST, before anything closes: drain the live turns while the endpoint still
+                // relays their frames, so the App Server connection close that follows cancels
+                // no in-flight turn with cause "transport".
+                cleanupAfterDrain(
+                    drain = { drainActiveTurnsBeforeShutdown(irohEndpoint, shutdownDrainBound(shutdownDrainSeconds)) },
+                    cleanup = {
+                        println("\n[iroh-app-server] Shutting down...")
+                        runCatching { irohEndpoint?.shutdown() }
+                        runCatching { notebookProtocol?.close() }
+                        runCatching { notebookStore?.close() }
+                        runCatching { pluginHost?.close() }
+                        scope.cancel()
+                    },
+                    closeOwned = { ownedServer?.close() },
+                )
             },
         ) {
             val authPolicy = resolveAuthPolicy()
@@ -667,7 +691,6 @@ class AppServerServeIrohCommand : CliktCommand(
      */
     private suspend fun startOwnedAppServer(host: LocalAppServerHost, scope: CoroutineScope): LocalAppServerLease {
         println("[iroh-app-server] Starting owned App Server ($lettaCommand server)...")
-        Runtime.getRuntime().addShutdownHook(Thread(host::close))
         val lease = host.acquire()
         println("[iroh-app-server] Owned App Server ready at ${lease.serverUrl}")
         scope.launch {
@@ -808,6 +831,55 @@ class AppServerServeIrohCommand : CliktCommand(
         sortDirectAddresses(addrs)
     } catch (_: Exception) {
         emptyList()
+    }
+}
+
+/** The shutdown drain bound from the CLI option: a negative value clamps to zero (close at once). */
+internal fun shutdownDrainBound(seconds: Int): Duration = seconds.coerceAtLeast(0).seconds
+
+/**
+ * The shutdown drain bound the wrapper runs with when the option is absent: five minutes (the
+ * scale of a turn's 300s idle watchdog), matched by the systemd unit's `TimeoutStopSec=360s`
+ * (bound + a minute for the final close).
+ */
+internal const val DEFAULT_SHUTDOWN_DRAIN_SECONDS = 300
+
+/**
+ * Drains [endpoint]'s active turns before the shutdown that follows closes its App Server
+ * connection: the endpoint refuses new turn inputs ([IrohNodeEndpoint.beginShutdownDrain]) and
+ * waits for the live ones up to [bound], so the close cancels no in-flight turn with cause
+ * "transport". A second shutdown signal — delivered to [registerShutdownCutSignals]'s cut — or the
+ * bound ends the wait; either way the caller proceeds to the normal close. No endpoint (or none
+ * that started a turn host) drains nothing and returns at once.
+ */
+internal suspend fun drainActiveTurnsBeforeShutdown(
+    endpoint: IrohNodeEndpoint?,
+    bound: Duration,
+    registerCutSignal: (() -> Unit) -> AutoCloseable = ::registerShutdownCutSignals,
+) {
+    if (endpoint == null || !endpoint.beginShutdownDrain(bound)) return
+    registerCutSignal(endpoint::cutShutdownDrainWait).use { endpoint.awaitShutdownDrain() }
+}
+
+/**
+ * Cuts a shutdown drain at once when a second shutdown signal arrives: installs SIGTERM and
+ * SIGINT handlers over the JVM's own (the first signal already began the drain through its
+ * shutdown hook; empirically the handler can be installed and reached mid-shutdown on OpenJDK 21).
+ * Closing the returned handle restores the previous handlers, so anything after the drain sees
+ * the JVM's default signal behaviour again.
+ */
+internal fun registerShutdownCutSignals(cut: () -> Unit): AutoCloseable {
+    val installed = listOf("TERM", "INT").mapNotNull { name ->
+        runCatching {
+            val signal = sun.misc.Signal(name)
+            val previous = sun.misc.Signal.handle(signal) { cut() }
+            name to previous
+        }.getOrNull()
+    }
+    return AutoCloseable {
+        installed.forEach { (name, previous) ->
+            runCatching { sun.misc.Signal.handle(sun.misc.Signal(name), previous ?: sun.misc.SignalHandler.SIG_DFL) }
+        }
     }
 }
 
@@ -977,3 +1049,13 @@ internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?, environmentDir: 
 /** [voiceMemoryDir] with this process's `LETTA_LOCAL_BACKEND_DIR`. */
 internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?): java.io.File? =
     voiceMemoryDir(effectiveBackendDir, System.getenv("LETTA_LOCAL_BACKEND_DIR"))
+
+internal suspend fun cleanupAfterDrain(drain: suspend () -> Unit, cleanup: suspend () -> Unit, closeOwned: () -> Unit) {
+    try {
+        drain()
+        cleanup()
+    } finally {
+        // The owned child must outlive the drain, including on cleanup failure.
+        runCatching { closeOwned() }
+    }
+}

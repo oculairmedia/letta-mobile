@@ -52,6 +52,22 @@ LETTA_CLI_PATH_REAL=/root/letta-code-<version>/node_modules/@letta-ai/letta-code
   node --import tsx/esm --test --test-concurrency=1 test/*.test.ts
 ```
 
+## Live subagent tokens
+
+A LOCAL subagent reported `total_tokens` only when it finished: the sole writer was
+`handleResultEvent`, on the final result envelope, so the Background tasks card showed no
+tokens while a local subagent ran (external coding-agent workers already report live through
+`updateSubagent`).
+
+| Patch | Effect |
+| --- | --- |
+| `lcp-live-tokens` | The per-step `usage_statistics` messages in the subagent child's stream-json (one per model call, `step_count: 1`, that call's tokens) are summed into a `usageTokens` field on the per-subagent stream state and published through the same `updateSubagent(subagentId, { totalTokens })` call the result envelope uses, so the card shows a running total while the subagent runs. Only the number is read; the event object is never stored. The store write never goes below the reported total (a retried subagent reuses the id with fresh state), and the final result envelope still overwrites unconditionally at completion. |
+
+| `lcp-abort-orphaned-run` | Allows aborting a backend run when the listener has lost its turn lifecycle. Cancellation is scoped to the conversation and optional run ID; an unconfirmed cancellation returns false. |
+
+`lcp-live-tokens` adds one to the boot count. The tests, including a 1,000-lifecycle
+retention check, are in `test/patch-loader-live-tokens.test.ts`.
+
 ## Host-neutral agent store
 
 Agent state replicates between nodes in both directions, so these patches make the local store
