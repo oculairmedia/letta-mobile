@@ -15,6 +15,13 @@ on:
     - cron: "17 6 * * 1"
   workflow_dispatch:
 
+concurrency:
+  # letta-mobile-2frn5: a newer PR head supersedes the stale one's baseline
+  # verification instead of booking a second runner for the old head; the
+  # weekly main run is never cancelled.
+  group: appserver-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 

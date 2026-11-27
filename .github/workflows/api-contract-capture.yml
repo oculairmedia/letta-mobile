@@ -5,6 +5,13 @@ on:
   push:
     branches: ["codex/api-capture/**"]
 
+concurrency:
+  # letta-mobile-2frn5: rapid pushes to an api-capture branch supersede each
+  # other instead of stacking 45-minute two-OS capture runs; this workflow
+  # never runs on main, so the guard only ever cancels a stale branch run.
+  group: api-contract-capture-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 

@@ -2,32 +2,23 @@ name: Desktop Installer
 
 # Builds the shared :desktop Compose client on native hosts: Windows EXE/MSI
 # and a Linux x86-64 AppImage with bundled JBR/Node/AppServer and Linux JNI.
+#
+# letta-mobile-2frn5: no pull_request trigger. The 30+ min Windows/Linux
+# packaging used to run on nearly every PR (the shared-first rule means almost
+# every PR touches sharedLogic/sharedUI, which were pull_request path filters)
+# and held two runners while the required checks queued. PR coverage of the
+# desktop client is unchanged: android.yml's required shared-ui-desktop-tests
+# job runs :desktop:test on every PR, apiCheck guards the ABI in the required
+# shared-multiplatform job, and the fast packaging script self-tests
+# (test_desktop_packaging*, test_linux_startup_diagnostic, test_nucleus_hotkey)
+# run inside the required `test` job. The heavy packaging and installer smoke
+# runs stay on main pushes (paths below, never cancelled) and on demand for
+# any branch via workflow_dispatch. desktop-installer-pass is not a required
+# check (scripts/bootstrap-branch-protection.sh), so no PR is left waiting on
+# a status that never reports.
 
 on:
   push:
-    branches: [main]
-    paths:
-      - ".github/workflows/desktop.yml"
-      - ".github/workflows/release.yml"
-      - "scripts/desktop/**"
-      - "scripts/tests/test_desktop_packaging*.py"
-      - "scripts/tests/desktop_packaging_fixtures.py"
-      - "scripts/tests/desktop_smoke_fixtures.py"
-      - "scripts/tests/test_linux_startup_diagnostic.py"
-      - "scripts/tests/test_nucleus_hotkey.py"
-      - "android-compose/build-logic/**"
-      - "android-compose/letta-code-runtime/**"
-      - "android-compose/sharedUI/**"
-      - "android-compose/plugin-view/**"
-      - "android-compose/desktop/**"
-      - "android-compose/native/**"
-      - "android-compose/avatar/**"
-      - "android-compose/sharedLogic/**"
-      - "android-compose/gradle/**"
-      - "android-compose/settings.gradle.kts"
-      - "android-compose/build.gradle.kts"
-      - "android-compose/gradle.properties"
-  pull_request:
     branches: [main]
     paths:
       - ".github/workflows/desktop.yml"

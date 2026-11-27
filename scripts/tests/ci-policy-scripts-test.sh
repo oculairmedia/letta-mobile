@@ -477,6 +477,58 @@ if run_body_policy 'Shared implementation searched: android-compose/sharedUI/' 1
 assert_not_contains "$pr_triggers" 'edited'
 assert_contains "$pr_triggers" 'types: [opened, synchronize, reopened]'
 assert_contains "$android_workflow_text" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+# letta-mobile-2frn5: CI runner throughput. Every workflow that can run on a PR
+# or a pushed branch must cancel its stale runs: a rebase or follow-up push
+# otherwise leaves the previous head's advisory run holding a runner for its
+# full 10-90 min while the required checks queue behind it. Main runs are never
+# cancelled mid-flight (the android-perf queue rationale below: a burst of
+# merges must not drop a pending main run). architecture-graph, api-contract-
+# capture, appserver-contract, iroh-mdns-binding and mascot-rig had no
+# concurrency block at all; core.yml cancelled main runs too.
+for concurrency_workflow in \
+  architecture-graph \
+  api-contract-capture \
+  appserver-contract \
+  iroh-mdns-binding \
+  mascot-rig \
+  core; do
+  concurrency_text="$(<"$SOURCE_ROOT/.github/workflows/$concurrency_workflow.yml")"
+  assert_contains "$concurrency_text" 'concurrency:'
+  assert_contains "$concurrency_text" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+done
+# letta-mobile-2frn5: the 30+ min Windows/Linux installer packaging (two
+# runners per run) runs on path-filtered main pushes and dispatch only. Its old
+# pull_request trigger fired on nearly every PR, because the shared-first rule
+# means almost every PR touches sharedLogic/sharedUI, one of its path filters.
+# PR coverage of the desktop client is unchanged: the required
+# shared-ui-desktop-tests job runs :desktop:test on every PR, and the fast
+# packaging script self-tests run inside the required `test` job (below), so no
+# PR coverage was lost with the trigger. desktop-installer-pass is not a
+# required check (CHECKS below), so removing the PR trigger cannot leave a
+# "waiting for status" deadlock.
+desktop_workflow="$(<"$SOURCE_ROOT/.github/workflows/desktop.yml")"
+assert_not_contains "$desktop_workflow" $'\n  pull_request:'
+assert_contains "$desktop_workflow" "cancel-in-progress: \${{ github.ref != 'refs/heads/main' }}"
+wrapper_job="$(
+  awk '
+    /^  build-iroh-wrapper:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+# letta-mobile-2frn5: on a PR this job duplicated the wrapper build the required
+# shared-multiplatform job already performs (:iroh-wrapper-cli:test and
+# :iroh-wrapper-cli:installDist run there on every PR and every main push),
+# while its own artifact upload is main-only. PRs now skip the Gradle build
+# with a green step summary — green-skip steps, never a skipped job, because
+# build-iroh-wrapper-pass rejects `skipped` exactly like api-contract-windows.
+assert_contains "$wrapper_job" "if: steps.wrapper_scope.outputs.run == 'true'"
+assert_contains "$wrapper_job" ':iroh-wrapper-cli:installDist'
+# The desktop packaging script self-tests that used to ride desktop.yml's PR
+# runs stay blocking on every PR, inside the required `test` job.
+assert_contains "$test_job" "unittest discover -s scripts/tests -p 'test_desktop_packaging*.py'"
+assert_contains "$test_job" 'scripts/tests/test_linux_startup_diagnostic.py'
+assert_contains "$test_job" 'scripts/tests/test_nucleus_hotkey.py'
 # Every android.yml job carries its own timeout-minutes (the default is 360).
 while IFS= read -r job_name; do
   job_block="$(awk -v job="  ${job_name}:" '$0 == job { active=1; next }
