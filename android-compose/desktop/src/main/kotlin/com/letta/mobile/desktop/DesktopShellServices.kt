@@ -46,7 +46,7 @@ internal data class DesktopShellLayout(
     val sidebarToggleFocusRequester: FocusRequester,
 )
 
-/** The live Iroh transport and its admin-RPC agent directory; both null off Iroh. */
+/** The live node transport (an Iroh node, or the desktop's own node) and its admin-RPC agent directory; both null for a direct App Server. */
 internal data class DesktopIrohLink(
     val transport: IrohChannelTransport?,
     val agentDirectory: IrohAdminRpcAgentDirectory?,
@@ -104,7 +104,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     val agentDefaults = remember(bootstrap.secureSettingsStore) { StoredAgentDefaults(bootstrap.secureSettingsStore) }
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val nucleusController = rememberDesktopNucleusController(chatScope)
-    val iroh = rememberDesktopIrohLink(bootstrap, chatScope)
+    val iroh = rememberDesktopIrohLink(bootstrap, chatScope, canvasShell.sessions)
     val chatRuntime = DesktopChatRuntime(bootstrap.bootstrapState, chatScope, bootstrap.dataBindings, agentDefaults, canvasShell.sessions)
     val chatController = rememberShellChatController(bootstrap, iroh, chatRuntime)
     val localConfig = rememberDesktopLocalConfigState(
@@ -113,10 +113,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
         isLocalMode = bootstrap.activeConfig.mode == LettaConfig.Mode.LOCAL,
         onRestartRequested = chatController::retryConnection,
     )
-    DesktopLocalRuntimeLifecycleEffect(
-        chatController = chatController,
-        isLocalMode = bootstrap.activeConfig.mode == LettaConfig.Mode.LOCAL,
-    )
+    DesktopLocalRuntimeLifecycleEffect(chatController = chatController)
     return DesktopShellCore(
         bootstrap = bootstrap,
         sessionGraph = sessionGraph,
@@ -160,8 +157,12 @@ private fun rememberDesktopShellLayout(backend: LettaConfig): DesktopShellLayout
 }
 
 @Composable
-private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope: CoroutineScope): DesktopIrohLink {
-    val transport = rememberIrohTransport(bootstrap.activeConfig, chatScope)
+private fun rememberDesktopIrohLink(
+    bootstrap: DesktopConfigBootstrap,
+    chatScope: CoroutineScope,
+    canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
+): DesktopIrohLink {
+    val transport = rememberIrohTransport(bootstrap.activeConfig, chatScope, canvasSessions)
     val agentDirectory = remember(transport) {
         transport?.let { IrohAdminRpcAgentDirectory(it) }
     }
@@ -169,6 +170,11 @@ private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope
         bootstrap.irohAgentDirectorySlot.value = agentDirectory
         // letta-mobile-bzvro.37: MemFS, secrets and workspace files go through the host's relay.
         com.letta.mobile.desktop.workspace.DesktopIrohWorkspaceRelay.transport = transport
+        // Local-only controls follow the active backend, not whether the bundled runtime happens to be running.
+        com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute.publish(
+            bootstrap.activeConfig,
+            com.letta.mobile.desktop.chat.DesktopAppServerRuntimeConfig.fromProcess().serverUrl,
+        )
         desktopHostAppearance.attach(transport)
     }
     LaunchedEffect(Unit) { desktopHostAppearance.run() }
@@ -201,7 +207,7 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     val sessionGraph = core.sessionGraph.value
     val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory, sessionGraph.slashCommands)
     val settingsStore = core.bootstrap.secureSettingsStore
-    // The MemFS browser reads through the process-wide direct App Server session, not the session graph.
+    // The MemFS browser reads through the node's workspace relay (or a developer's direct App Server), not the session graph.
     val librarySources = remember(settingsStore) { ShellLibrarySources(settingsStore, DesktopWorkspaceSources().memfs()) }
     val agentSlashCommands = remember(httpApis.slashCommandApi) {
         mutableStateOf<List<AgentSlashCommand>>(emptyList())

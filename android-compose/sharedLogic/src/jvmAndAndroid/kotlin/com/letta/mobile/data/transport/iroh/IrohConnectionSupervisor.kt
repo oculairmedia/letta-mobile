@@ -61,6 +61,12 @@ data class IrohConnectionHandle(
      */
     val openConnection: (suspend (alpn: ByteArray) -> computer.iroh.Connection)? = null,
     val close: suspend (String) -> Unit,
+    /**
+     * A streamed `admin_rpc` on this dial's own call lane, for a dial with no Iroh [transport] (a node session over
+     * another carrier). Null falls back to [transport]'s streamed request.
+     */
+    val adminRpcStreamCall: ((method: String, params: kotlinx.serialization.json.JsonObject) ->
+        kotlinx.coroutines.flow.Flow<kotlinx.serialization.json.JsonObject>)? = null,
 ) {
     /** The flow the observer ingests: the test override if present, else the live transport's stream. */
     val effectiveObserverStreamFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>?

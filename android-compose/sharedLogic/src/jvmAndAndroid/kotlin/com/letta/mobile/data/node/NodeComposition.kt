@@ -129,6 +129,16 @@ class NodeComposition(
     }
 
     /**
+     * Starts a node only this process reaches: the host's tools socket and [endpoint]'s turn host over [connection],
+     * without binding or accepting on Iroh. The shell in this process then attaches through [inProcessCarrier]; the
+     * node serves it the same router, turns and feed an Iroh peer gets.
+     */
+    suspend fun startLocal(endpoint: IrohNodeEndpoint, connection: NodeAppServerConnection) {
+        ports.toolsSocket.start(scope, connection.client)
+        endpoint.startTurnHost(connection.controller)
+    }
+
+    /**
      * The node's end of a carrier link from anywhere but this process: each link is served as one node connection on
      * [endpoint], with the same router, auth, gates, viewers, turns and feed as an Iroh peer accepted there, and every
      * peer meets the endpoint's policy, whatever identity its link reports. Links are served once [start] has run; one

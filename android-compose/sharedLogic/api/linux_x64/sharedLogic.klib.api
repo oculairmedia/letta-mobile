@@ -55290,6 +55290,23 @@ final class com.letta.mobile.data.model/VibesyncStatsResponse { // com.letta.mob
     }
 }
 
+final class com.letta.mobile.data.node.attach/NodeSessionAppServerTransport : com.letta.mobile.data.transport.appserver/AppServerTransport { // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport|null[0]
+    constructor <init>(com.letta.mobile.data.node.carrier/NodeSession, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder? = ...) // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.<init>|<init>(com.letta.mobile.data.node.carrier.NodeSession;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.controller.extras.relay.AppToolRelayResponder?){}[0]
+
+    final val connectionState // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.connectionState|{}connectionState[0]
+        final fun <get-connectionState>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport.appserver/AppServerConnectionState> // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.connectionState.<get-connectionState>|<get-connectionState>(){}[0]
+    final val controlFrames // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.controlFrames|{}controlFrames[0]
+        final fun <get-controlFrames>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.controlFrames.<get-controlFrames>|<get-controlFrames>(){}[0]
+    final val isConnected // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.isConnected|{}isConnected[0]
+        final fun <get-isConnected>(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.isConnected.<get-isConnected>|<get-isConnected>(){}[0]
+    final val streamFrames // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.streamFrames|{}streamFrames[0]
+        final fun <get-streamFrames>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.transport.appserver/AppServerReceivedFrame> // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.streamFrames.<get-streamFrames>|<get-streamFrames>(){}[0]
+
+    final fun adminRpcStream(kotlin/String, kotlinx.serialization.json/JsonObject): kotlinx.coroutines.flow/Flow<kotlinx.serialization.json/JsonObject> // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.adminRpcStream|adminRpcStream(kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
+    final suspend fun adminRpc(kotlin/String, kotlin/String, kotlin/String?): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.adminRpc|adminRpc(kotlin.String;kotlin.String;kotlin.String?){}[0]
+    final suspend fun sendControl(com.letta.mobile.data.transport.appserver/AppServerCommand) // com.letta.mobile.data.node.attach/NodeSessionAppServerTransport.sendControl|sendControl(com.letta.mobile.data.transport.appserver.AppServerCommand){}[0]
+}
+
 final class com.letta.mobile.data.node.carrier/InProcessNodeCarrier : com.letta.mobile.data.node.carrier/NodeCarrier { // com.letta.mobile.data.node.carrier/InProcessNodeCarrier|null[0]
     constructor <init>(kotlin/String, com.letta.mobile.data.node.carrier/NodePeerIdentity, com.letta.mobile.data.node.carrier/NodePeerAcceptor, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.node.carrier/InProcessNodeCarrier.<init>|<init>(kotlin.String;com.letta.mobile.data.node.carrier.NodePeerIdentity;com.letta.mobile.data.node.carrier.NodePeerAcceptor;kotlinx.coroutines.CoroutineScope){}[0]
 
@@ -55405,6 +55422,7 @@ final class com.letta.mobile.data.node.carrier/NodeSession { // com.letta.mobile
     final val node // com.letta.mobile.data.node.carrier/NodeSession.node|{}node[0]
         final fun <get-node>(): com.letta.mobile.data.node.carrier/NodePeerIdentity // com.letta.mobile.data.node.carrier/NodeSession.node.<get-node>|<get-node>(){}[0]
 
+    final fun adminRpcStream(kotlin/String, kotlinx.serialization.json/JsonObject?): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.node.carrier/NodeFrame> // com.letta.mobile.data.node.carrier/NodeSession.adminRpcStream|adminRpcStream(kotlin.String;kotlinx.serialization.json.JsonObject?){}[0]
     final fun nextRequestId(): kotlin/String // com.letta.mobile.data.node.carrier/NodeSession.nextRequestId|nextRequestId(){}[0]
     final suspend fun adminRpc(kotlin/String, kotlinx.serialization.json/JsonObject?): com.letta.mobile.data.node.carrier/NodeFrame // com.letta.mobile.data.node.carrier/NodeSession.adminRpc|adminRpc(kotlin.String;kotlinx.serialization.json.JsonObject?){}[0]
     final suspend fun close() // com.letta.mobile.data.node.carrier/NodeSession.close|close(){}[0]
@@ -60986,6 +61004,12 @@ final class com.letta.mobile.data.runtime.host/LocalAppServerTerminatedException
 
     final val reason // com.letta.mobile.data.runtime.host/LocalAppServerTerminatedException.reason|{}reason[0]
         final fun <get-reason>(): kotlin/String // com.letta.mobile.data.runtime.host/LocalAppServerTerminatedException.reason.<get-reason>|<get-reason>(){}[0]
+}
+
+final class com.letta.mobile.data.runtime.host/RuntimeRestartResponder { // com.letta.mobile.data.runtime.host/RuntimeRestartResponder|null[0]
+    constructor <init>(kotlin/Function0<kotlin/Boolean>, kotlin.coroutines/SuspendFunction1<kotlin/Function0<kotlin/Unit>, kotlin/Unit>, kotlin/Function0<kotlin/Unit>) // com.letta.mobile.data.runtime.host/RuntimeRestartResponder.<init>|<init>(kotlin.Function0<kotlin.Boolean>;kotlin.coroutines.SuspendFunction1<kotlin.Function0<kotlin.Unit>,kotlin.Unit>;kotlin.Function0<kotlin.Unit>){}[0]
+
+    final suspend fun onRuntimeRestarted() // com.letta.mobile.data.runtime.host/RuntimeRestartResponder.onRuntimeRestarted|onRuntimeRestarted(){}[0]
 }
 
 final class com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicy { // com.letta.mobile.data.runtime.supervisor/RuntimeCrashPolicy|null[0]
@@ -78495,6 +78519,21 @@ open class com.letta.mobile.data.api/ApiException : kotlin/Exception { // com.le
         final fun <get-code>(): kotlin/Int // com.letta.mobile.data.api/ApiException.code.<get-code>|<get-code>(){}[0]
 }
 
+open class com.letta.mobile.data.backend/OwnNodeRoute { // com.letta.mobile.data.backend/OwnNodeRoute|null[0]
+    constructor <init>() // com.letta.mobile.data.backend/OwnNodeRoute.<init>|<init>(){}[0]
+
+    final val attached // com.letta.mobile.data.backend/OwnNodeRoute.attached|{}attached[0]
+        final fun <get-attached>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.backend/OwnNodeRoute.attached.<get-attached>|<get-attached>(){}[0]
+
+    final fun attaches(com.letta.mobile.data.model/LettaConfig?, kotlin/String?): kotlin/Boolean // com.letta.mobile.data.backend/OwnNodeRoute.attaches|attaches(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+    final fun graphConfig(com.letta.mobile.data.model/LettaConfig?, kotlin/String?): com.letta.mobile.data.model/LettaConfig? // com.letta.mobile.data.backend/OwnNodeRoute.graphConfig|graphConfig(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+    final fun publish(com.letta.mobile.data.model/LettaConfig?, kotlin/String?) // com.letta.mobile.data.backend/OwnNodeRoute.publish|publish(com.letta.mobile.data.model.LettaConfig?;kotlin.String?){}[0]
+
+    final object Companion { // com.letta.mobile.data.backend/OwnNodeRoute.Companion|null[0]
+        final fun filesAreLocal(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.backend/OwnNodeRoute.Companion.filesAreLocal|filesAreLocal(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    }
+}
+
 open class com.letta.mobile.data.canvas.library/CanvasBoardOwner { // com.letta.mobile.data.canvas.library/CanvasBoardOwner|null[0]
     constructor <init>(kotlin/Function0<com.letta.mobile.data.canvas.library/CanvasBoardSessions>) // com.letta.mobile.data.canvas.library/CanvasBoardOwner.<init>|<init>(kotlin.Function0<com.letta.mobile.data.canvas.library.CanvasBoardSessions>){}[0]
 
@@ -80034,6 +80073,7 @@ final object com.letta.mobile.data.backend/SessionRouteMatrix { // com.letta.mob
     final val DIVERGENCES // com.letta.mobile.data.backend/SessionRouteMatrix.DIVERGENCES|{}DIVERGENCES[0]
         final fun <get-DIVERGENCES>(): kotlin.collections/Map<kotlin/Pair<com.letta.mobile.data.model/BackendKind?, com.letta.mobile.data.backend/SessionRoute>, kotlin/String> // com.letta.mobile.data.backend/SessionRouteMatrix.DIVERGENCES.<get-DIVERGENCES>|<get-DIVERGENCES>(){}[0]
 
+    final fun attachesThroughNode(com.letta.mobile.data.backend/SessionPlatform, com.letta.mobile.data.model/BackendKind?): kotlin/Boolean // com.letta.mobile.data.backend/SessionRouteMatrix.attachesThroughNode|attachesThroughNode(com.letta.mobile.data.backend.SessionPlatform;com.letta.mobile.data.model.BackendKind?){}[0]
     final fun bound(com.letta.mobile.data.backend/SessionPlatform, com.letta.mobile.data.model/BackendKind?): kotlin.collections/Set<com.letta.mobile.data.backend/SessionRoute> // com.letta.mobile.data.backend/SessionRouteMatrix.bound|bound(com.letta.mobile.data.backend.SessionPlatform;com.letta.mobile.data.model.BackendKind?){}[0]
     final fun disagreements(): kotlin.collections/Set<kotlin/Pair<com.letta.mobile.data.model/BackendKind?, com.letta.mobile.data.backend/SessionRoute>> // com.letta.mobile.data.backend/SessionRouteMatrix.disagreements|disagreements(){}[0]
 }

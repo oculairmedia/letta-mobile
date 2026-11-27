@@ -158,6 +158,79 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  # The node's Windows bindings (process identity from PID plus creation time, the owner-only ACL
+  # token file, the TCP-only tools endpoint) and the embedded desktop node only run their real code
+  # on Windows; Linux CI skips those cases. Not part of required-test: it runs beside it.
+  node-windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve whether the Windows node tests must run
+        id: win_node
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            base="origin/${{ github.base_ref }}"
+          fi
+          changed="$(git diff --name-only --diff-filter=ACMRD "${base}...HEAD")"
+          if grep -Eq '^android-compose/(sharedLogic|gradle|build-logic)/|^\.github/workflows/android\.yml$' <<<"$changed"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Windows node tests: skipped (no sharedLogic, gradle or workflow path changed vs ${base})." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-java@v4
+        if: steps.win_node.outputs.run == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-java@v4
+        if: steps.win_node.outputs.run == 'true'
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Expose JDK 21 to Gradle's daemon resolver
+        if: steps.win_node.outputs.run == 'true'
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        if: steps.win_node.outputs.run == 'true'
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
+      - name: Run the node host, tools socket and embedded node tests on Windows
+        if: steps.win_node.outputs.run == 'true'
+        run: >-
+          ./gradlew.bat --no-daemon --max-workers=2 "-Pkotlin.compiler.execution.strategy=in-process"
+          :sharedLogic:jvmTest
+          --tests "com.letta.mobile.data.node.host.*"
+          --tests "com.letta.mobile.data.meridian.socket.*"
+          --tests "com.letta.mobile.data.node.embedded.*"
+      - name: Upload Windows node test reports
+        if: failure() && steps.win_node.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-windows-tests-${{ github.sha }}
+          path: android-compose/sharedLogic/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 7
+
   test:
     name: test-workload
     runs-on: ubuntu-latest

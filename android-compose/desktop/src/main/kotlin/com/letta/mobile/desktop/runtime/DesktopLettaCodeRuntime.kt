@@ -180,8 +180,13 @@ internal object DesktopLocalRuntimeHost {
         context = DesktopRuntimeLaunchPreference.currentContext(),
     )
 
+    @Volatile private var currentChild: Process? = null
+    /** The bundled App Server as the child this process owns: its PID while it runs. */
+    val ownedProcess = com.letta.mobile.data.node.host.AppServerProcessSource.Owned { currentChild?.takeIf { it.isAlive }?.pid() }
+
     private fun recordSpawn(process: Process) {
         val pid = process.pid()
+        currentChild = process
         spawnRegistry.onSpawned(pid)
         process.onExit().thenRun { spawnRegistry.onEnded(pid) }
     }

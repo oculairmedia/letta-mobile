@@ -86,11 +86,25 @@ object SessionRouteMatrix {
             IROH_ADMIN + SessionRoute.CONVERSATIONS + SessionRoute.CONVERSATION_RECOMPILE
     }
 
-    /** Desktop: an App Server it dials (bundled or ws://) serves agents and memory; Iroh the admin set. */
+    /**
+     * Desktop: a node serves the admin set, its own in-process node for the bundled runtime exactly as an Iroh node
+     * does; a ws:// App Server it dials directly (a developer-only setting) serves agents and memory.
+     */
     private fun desktop(kind: BackendKind?): Set<SessionRoute> = when (kind) {
         null -> emptySet()
-        BackendKind.LOCAL_RUNTIME, BackendKind.DIRECT_WS -> setOf(SessionRoute.AGENTS, SessionRoute.BLOCKS)
-        BackendKind.IROH -> IROH_ADMIN
+        BackendKind.LOCAL_RUNTIME, BackendKind.IROH -> IROH_ADMIN
+        BackendKind.DIRECT_WS -> setOf(SessionRoute.AGENTS, SessionRoute.BLOCKS)
+    }
+
+    /**
+     * Whether [platform]'s session for [kind] is a node session: the shell attaches to a node (over Iroh, or the
+     * desktop's own node in its process) and reads the admin set over `admin_rpc` on that session's channel transport.
+     * Android builds its own graph and is not asked.
+     */
+    fun attachesThroughNode(platform: SessionPlatform, kind: BackendKind?): Boolean = when (kind) {
+        BackendKind.IROH -> true
+        BackendKind.LOCAL_RUNTIME -> platform == SessionPlatform.DESKTOP
+        BackendKind.DIRECT_WS, null -> false
     }
 
     /**
@@ -108,21 +122,25 @@ object SessionRouteMatrix {
      */
     val DIVERGENCES: Map<Pair<BackendKind?, SessionRoute>, String> = buildMap {
         put(BackendKind.IROH to SessionRoute.CONVERSATIONS, DESKTOP_CONVERSATIONS)
-        put(BackendKind.IROH to SessionRoute.CONVERSATION_RECOMPILE, "only Android relays conversation.recompile (letta-mobile-by4vm.51)")
-        // letta-mobile-by4vm.110.6: Android reaches a ws:// or on-device App Server through the same
-        // channel and in-process admin router as an Iroh host; desktop and web bind fewer routes there.
-        for (kind in listOf(BackendKind.LOCAL_RUNTIME, BackendKind.DIRECT_WS)) {
-            for (route in android(kind) - desktop(kind)) put(kind to route, ANDROID_APP_SERVER_CHANNEL)
+        put(BackendKind.IROH to SessionRoute.CONVERSATION_RECOMPILE, ONLY_ANDROID_RECOMPILES)
+        // The desktop attaches to its own node exactly as to an Iroh node, so its local row diverges from Android's
+        // where the Iroh row does, and from the browser's, which has no runtime, everywhere it serves.
+        put(BackendKind.LOCAL_RUNTIME to SessionRoute.CONVERSATIONS, DESKTOP_CONVERSATIONS)
+        put(BackendKind.LOCAL_RUNTIME to SessionRoute.CONVERSATION_RECOMPILE, ONLY_ANDROID_RECOMPILES)
+        for (route in desktop(BackendKind.LOCAL_RUNTIME)) put(BackendKind.LOCAL_RUNTIME to route, NO_BROWSER_RUNTIME)
+        // Android reaches a ws:// App Server through the same channel and in-process admin router as an Iroh host;
+        // desktop (where it is a developer-only setting) and web bind fewer routes there.
+        for (route in android(BackendKind.DIRECT_WS) - desktop(BackendKind.DIRECT_WS)) {
+            put(BackendKind.DIRECT_WS to route, ANDROID_APP_SERVER_CHANNEL)
         }
-        put(BackendKind.LOCAL_RUNTIME to SessionRoute.AGENTS, NO_BROWSER_RUNTIME)
-        put(BackendKind.LOCAL_RUNTIME to SessionRoute.BLOCKS, NO_BROWSER_RUNTIME)
     }
 
     private const val DESKTOP_CONVERSATIONS =
         "desktop and web list conversations through their chat gateway, not the session's conversation repository"
+    private const val ONLY_ANDROID_RECOMPILES = "only Android relays conversation.recompile"
     private const val NO_BROWSER_RUNTIME = "a browser has no embedded runtime"
     private const val ANDROID_APP_SERVER_CHANNEL =
-        "Android serves every App Server through its channel and the Iroh host's admin router; desktop and web bind fewer routes"
+        "Android serves a ws:// App Server through its channel and the Iroh host's admin router; desktop and web bind fewer routes"
 
     /** The cells where [bound] differs between platforms, computed from the rows. */
     fun disagreements(): Set<Pair<BackendKind?, SessionRoute>> {

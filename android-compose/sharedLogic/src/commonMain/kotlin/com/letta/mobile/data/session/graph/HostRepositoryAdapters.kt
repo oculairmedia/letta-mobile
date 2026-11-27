@@ -4,6 +4,7 @@ import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.SessionRouteMatrix
 import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.BackendKind
@@ -52,18 +53,19 @@ class HostSessionBinding(
 
 /**
  * The repositories a desktop or browser session binds itself,
- * one copy for both (it was desktop's `DesktopRepositoryAdapters`). An App Server the host dials
- * directly (the bundled runtime or a ws:// host) serves agents and memory; an Iroh host serves the
- * admin set over `admin_rpc`. Everything else is its shared absent-route form.
+ * one copy for both (it was desktop's `DesktopRepositoryAdapters`). A node (an Iroh host, or the
+ * desktop's own node for the bundled runtime) serves the admin set over `admin_rpc`; a ws:// App
+ * Server the host dials directly serves agents and memory. Everything else is its shared
+ * absent-route form.
  */
 @Suppress("NoDetachedCoroutineLifecycle")
 class HostRepositoryAdapters(binding: HostSessionBinding) {
     private val channelTransport = binding.channelTransport
 
-    // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
-    // even if serverUrl still carries a leftover iroh:// ticket.
+    // Mode is authoritative: LOCAL never binds a remote Iroh host even if serverUrl still carries a leftover
+    // iroh:// ticket. A node session (an Iroh node, or the desktop's own node for LOCAL) serves the admin set.
     private val backendKind = binding.config.routedBackendKind()
-    private val irohMode = backendKind == BackendKind.IROH
+    private val irohMode = binding.config != null && SessionRouteMatrix.attachesThroughNode(binding.platform, backendKind)
     private val servedKind = hostServedKind(binding.config)
 
     /**

@@ -23,6 +23,7 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
+import com.letta.mobile.desktop.runtime.DesktopLocalNodeRoute
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
@@ -34,10 +35,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.emptyFlow
 
 /**
- * letta-mobile-iczm7: the agent editor's Dreaming view. Desktop only binds: dreaming through the
- * Iroh host's relay when connected over iroh://, else the direct App Server (the bundled runtime
- * or an App Server URL); the dream log from the same MemFS route as the memory browser; live runs
- * from the subagent registry; and the Windows automatic-dream switch of the bundled runtime.
+ * The agent editor's Dreaming view. Desktop only binds: dreaming through the node's relay, else a direct App Server;
+ * the dream log from the memory browser's MemFS route; live runs from the subagent registry; and the Windows
+ * automatic-dream switch of the bundled runtime.
  */
 /** The desktop session pieces the Dreaming view reads: settings, subagents and the model catalog. */
 internal class DesktopDreamingDeps(
@@ -84,13 +84,13 @@ private fun rememberHostNotes(agentId: String, store: SecureSettingsStore): Drea
     )
 }
 
-/** The bundled runtime on Windows starts no automatic dream unless the user allowed it here. */
+/** The bundled runtime on Windows (only on the desktop's own node) starts no automatic dream unless allowed here. */
 @Composable
 private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes {
     val health by DesktopLocalRuntimeHost.appServer.health.collectAsState()
     var allowed by remember(store) { mutableStateOf(DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store)) }
-    val bundledOnWindows = health.active && DesktopIrohWorkspaceRelay.transport == null &&
-        windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
+    val onOwnNode = DesktopLocalNodeRoute.attached.collectAsState().value
+    val bundledOnWindows = health.active && onOwnNode && windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
     return DreamingHostNotes(
         windowsAutoBlocked = bundledOnWindows,
         windowsAutoAllowed = allowed || DesktopRuntimeLaunchPreference.allowWindowsAutoReflection,
@@ -103,11 +103,11 @@ private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes 
 }
 
 /**
- * letta-code's settings and `/dream` through the Iroh relay, else the direct App Server. The relay
- * is read per request, so a session that connects or drops Iroh later is followed; without one
+ * letta-code's settings and `/dream` through the node's relay, else a developer's direct App Server.
+ * The relay is read per request, so a session that connects or drops later is followed; without one
  * the relay answers "not connected" and the direct client serves.
  */
 private fun desktopDreamingRepository(): DreamingRepository {
-    val direct = AppServerDreamingRepository(client = { DesktopLocalAppServerClientRegistry.direct.currentOrNull() })
+    val direct = AppServerDreamingRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
     return AdminRpcDreamingRepository(AdminRpcInvoker.overTransport { DesktopIrohWorkspaceRelay.transport }).orElse(direct)
 }

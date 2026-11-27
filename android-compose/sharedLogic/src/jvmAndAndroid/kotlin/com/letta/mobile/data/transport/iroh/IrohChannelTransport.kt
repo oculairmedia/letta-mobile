@@ -779,11 +779,14 @@ class IrohChannelTransport(
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         adminRpcExecutor.execute(AdminRpcRequest(method, path, body))
 
-    /** Streamed requests are never retried: they go on the ready connection's transport once. */
+    /** Streamed requests are never retried: they go on the ready connection (its dial's own call, else its Iroh transport) once. */
     override fun adminRpcStream(method: String, params: JsonObject): Flow<JsonObject> =
         kotlinx.coroutines.flow.flow {
-            val transport = supervisor.ready().transport ?: error("streamed admin_rpc requested without an active transport")
-            emitAll(transport.adminRpcStream(method, params))
+            val ready = supervisor.ready()
+            val streamed = ready.adminRpcStreamCall?.invoke(method, params)
+                ?: ready.transport?.adminRpcStream(method, params)
+                ?: error("streamed admin_rpc requested without an active transport")
+            emitAll(streamed)
         }
 
     override suspend fun disconnect() {

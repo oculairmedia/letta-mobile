@@ -14,6 +14,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -121,6 +123,33 @@ class NodeSession private constructor(
     }
 
     /**
+     * Calls the streamed `admin_rpc` [method] with [params] on a call lane of its own: every frame the node writes on
+     * it, in order (`admin_rpc_stream` frames, then the final `admin_rpc_response`), ending after the final response or
+     * when the lane ends without one. The send half stays open while collecting. A collection stopped before the final
+     * response cancels the call on the node: it writes `admin_rpc_cancel` with the call's `request_id`, then finishes
+     * the send half. Throws [NodeCarrierException] with [NodeCarrierFailure.Closed] if the link is already closed.
+     */
+    fun adminRpcStream(method: String, params: JsonObject?): Flow<NodeFrame> = flow {
+        val requestId = RequestId(requestIds())
+        val lane = link.openCall(adminRpcFrame(requestId, method, params))
+        var answered = false
+        try {
+            lane.incoming
+                .transformWhile { frame ->
+                    emit(frame)
+                    answered = frame.type == NodeCarrierWire.ADMIN_RPC_RESPONSE
+                    !answered
+                }
+                .collect { emit(it) }
+        } finally {
+            withContext(NonCancellable) {
+                if (!answered) runCatchingCancellable { lane.send(adminRpcCancelFrame(requestId)) }
+                runCatchingCancellable { lane.finishSending() }
+            }
+        }
+    }
+
+    /**
      * Reads [conversation]'s feed from [from] (null asks for a snapshot) with `feed.subscribe`, page after page while
      * the node says `has_more`, each read continuing from the previous page's cursor. Returns the pages in order; the
      * caller applies them by the feed contract (a `snapshot` page replaces, a `replay` page appends). Throws
@@ -198,6 +227,13 @@ private fun adminRpcFrame(requestId: RequestId, method: String, params: JsonObje
         put(NodeCarrierWire.REQUEST_ID, requestId.value)
         put(NodeCarrierWire.METHOD, method)
         params?.let { put(NodeCarrierWire.PARAMS, it) }
+    },
+)
+
+private fun adminRpcCancelFrame(requestId: RequestId): NodeFrame = NodeFrame(
+    buildJsonObject {
+        put(NodeCarrierWire.TYPE, NodeCarrierWire.ADMIN_RPC_CANCEL)
+        put(NodeCarrierWire.REQUEST_ID, requestId.value)
     },
 )
 

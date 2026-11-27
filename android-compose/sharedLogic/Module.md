@@ -485,6 +485,14 @@ The node carrier SPI and the one client stack on top of it. A carrier (`NodeCarr
 
 Per-OS bindings of a node's ports on JVM hosts: App Server process identity that survives PID reuse, the local tools endpoint's transport, and how `agent_message_send` is sent (a `meridian` subprocess on Linux, in-process on Windows). Hosts pick one set by OS and compose through [NodeHostBindings](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.node.host/-node-host-bindings/index.html), never naming a platform's implementation.
 
+# Package com.letta.mobile.data.node.attach
+
+How the shell's client stack attaches to a node over a carrier: `NodeSessionAppServerTransport` speaks the App Server protocol over an authenticated `NodeSession` (control lane, push lane, one call lane per admin_rpc), and `NodeSessionDialer` hands each session to the channel transport as one dial. A node in the shell's own process and a node over Iroh are therefore reached with the same transport, turn engine, relays, feed and pushes.
+
+# Package com.letta.mobile.data.node.embedded
+
+A node that runs inside its host's process and is reached only from it, as the desktop's node is. `EmbeddedNodeHost` is a carrier for one in-process address: it starts a node composition over a leased App Server on the first dial, in generations, and a restart loses every link so attached shells redial the next one. It binds no Iroh endpoint.
+
 # Package com.letta.mobile.data.node.carrier.iroh
 
 The Iroh node carrier. `IrohNodeCarrier` dials a node over QUIC with the stream layout and frame codec nodes already serve (first bi-stream control, second push, every later one an admin_rpc call lane; `frame_part` chunking stays inside the carrier), and `serveIrohNodePeer` serves one accepted Iroh connection to a `NodePeerAcceptor` as the node end of the link. Application close codes and reasons cross unchanged; a connection lost without one is `LOST`.

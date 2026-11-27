@@ -4,8 +4,7 @@ import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.runtime.host.LocalAppServerLease
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 
 /**
  * Builds the desktop's App Server chat gateway for a backend address.
@@ -25,9 +24,8 @@ fun interface DesktopAppServerChatGatewayFactory {
 
 /**
  * Where the App Server is. [serverUrl] is a developer override (`-Dletta.desktop.appServerChat.url`
- * or `LETTA_DESKTOP_APP_SERVER_URL`); without it the bundled runtime's address (LOCAL) or the
- * config's Remote host address is used. [bearerToken], when set, authenticates the dial in place of
- * the config's access token (the bundled runtime's capability token, letta-mobile-by4vm.110.4).
+ * or `LETTA_DESKTOP_APP_SERVER_URL`); without it the config's Remote host address is used. [bearerToken],
+ * when set, authenticates the dial in place of the config's access token.
  */
 data class DesktopAppServerRuntimeConfig(
     val serverUrl: String? = null,
@@ -37,8 +35,16 @@ data class DesktopAppServerRuntimeConfig(
         const val SERVER_URL_PROPERTY = "letta.desktop.appServerChat.url"
         const val SERVER_URL_ENV = "LETTA_DESKTOP_APP_SERVER_URL"
 
+        /** Developer setting that dials a ws:// host directly: `-Dletta.desktop.directAppServer=true` or its env twin. */
+        const val DIRECT_APP_SERVER_PROPERTY = "letta.desktop.directAppServer"
+        const val DIRECT_APP_SERVER_ENV = "LETTA_DESKTOP_DIRECT_APP_SERVER"
+
         fun fromProcess(): DesktopAppServerRuntimeConfig =
             DesktopAppServerRuntimeConfig(serverUrl = readServerUrl())
+
+        /** Whether the developer setting for a directly dialled ws:// App Server is on in this process. */
+        fun directAppServerAllowed(): Boolean =
+            (System.getProperty(DIRECT_APP_SERVER_PROPERTY) ?: System.getenv(DIRECT_APP_SERVER_ENV)).equals("true", ignoreCase = true)
 
         private fun readServerUrl(): String? {
             val raw = System.getProperty(SERVER_URL_PROPERTY) ?: System.getenv(SERVER_URL_ENV)
@@ -48,39 +54,34 @@ data class DesktopAppServerRuntimeConfig(
 }
 
 internal object DesktopAppServerChatGateways {
+    /** The gateway for an App Server dialled directly; the bundled runtime is reached through the desktop's node, never here. */
     suspend fun createDefault(
         config: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
         appServerGatewayFactory: DesktopAppServerChatGatewayFactory = defaultFactory(),
-        acquireLocalRuntime: suspend () -> LocalAppServerLease = DesktopLocalRuntimeHost.appServer::acquire,
-    ): DesktopChatGateway {
-        val (resolvedConfig, lease) = resolveRuntime(config, appServerConfig, acquireLocalRuntime)
-        return try {
-            val gateway = appServerGatewayFactory.create(config, resolvedConfig)
-            lease?.let(gateway::owningRuntime) ?: gateway
-        } catch (error: Throwable) {
-            lease?.close()
-            throw error
-        }
-    }
+        directAppServerAllowed: Boolean = DesktopAppServerRuntimeConfig.directAppServerAllowed(),
+    ): DesktopChatGateway =
+        appServerGatewayFactory.create(config, resolveRuntime(config, appServerConfig, directAppServerAllowed))
 
-    /**
-     * LOCAL (with no override) starts the bundled runtime and dials it; any other config dials its
-     * own address. Mode is authoritative: a LOCAL config's leftover remote address is never used
-     * (letta-mobile-9v9nu).
-     */
-    private suspend fun resolveRuntime(
+    /** The override, else the config's own address (a ws:// host needs the developer setting); never a LOCAL config's. */
+    private fun resolveRuntime(
         config: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig,
-        acquireLocalRuntime: suspend () -> LocalAppServerLease,
-    ): Pair<DesktopAppServerRuntimeConfig, LocalAppServerLease?> {
-        appServerConfig.serverUrl?.let { return appServerConfig to null }
-        if (config.mode == LettaConfig.Mode.LOCAL) {
-            val lease = acquireLocalRuntime()
-            return DesktopAppServerRuntimeConfig(serverUrl = lease.serverUrl, bearerToken = lease.bearerToken) to lease
-        }
-        return DesktopAppServerRuntimeConfig(serverUrl = config.serverUrl.trim().takeIf { it.isNotBlank() }) to null
+        directAppServerAllowed: Boolean,
+    ): DesktopAppServerRuntimeConfig {
+        appServerConfig.serverUrl?.let { return appServerConfig }
+        check(config.mode != LettaConfig.Mode.LOCAL) { LOCAL_RUNTIME_IS_A_NODE }
+        val address = config.serverUrl.trim().takeIf { it.isNotBlank() }
+        val allowed = address == null || directAppServerAllowed || IrohChannelTransport.isIrohUrl(address)
+        check(allowed) { DIRECT_IS_DEVELOPER_ONLY }
+        return DesktopAppServerRuntimeConfig(serverUrl = address)
     }
+
+    private const val LOCAL_RUNTIME_IS_A_NODE =
+        "The bundled runtime is reached through the desktop's own node, not dialled directly."
+    private const val DIRECT_IS_DEVELOPER_ONLY =
+        "A ws:// App Server address is a developer setting. Use an iroh:// node or the bundled runtime, or start the " +
+            "desktop with -D${DesktopAppServerRuntimeConfig.DIRECT_APP_SERVER_PROPERTY}=true."
 
     fun defaultFactory(
         permissionModeSettings: PermissionModeSettings? = null,
@@ -98,9 +99,9 @@ internal suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
     appServerGatewayFactory: DesktopAppServerChatGatewayFactory = defaultDesktopAppServerGatewayFactory(),
-    acquireLocalRuntime: suspend () -> LocalAppServerLease = DesktopLocalRuntimeHost.appServer::acquire,
+    directAppServerAllowed: Boolean = DesktopAppServerRuntimeConfig.directAppServerAllowed(),
 ): DesktopChatGateway =
-    DesktopAppServerChatGateways.createDefault(config, appServerConfig, appServerGatewayFactory, acquireLocalRuntime)
+    DesktopAppServerChatGateways.createDefault(config, appServerConfig, appServerGatewayFactory, directAppServerAllowed)
 
 internal fun defaultDesktopAppServerGatewayFactory(
     permissionModeSettings: PermissionModeSettings? = null,
