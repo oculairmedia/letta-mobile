@@ -36,9 +36,9 @@ class CorePlatformHooks(
         keys.loadOrCreate()
     } catch (e: CancellationException) {
         throw e
-    } catch (e: IOException) {
+    } catch (@Suppress("SwallowedException") e: IOException) {
         throw HostException.Failed("node key: ${e.message}")
-    } catch (e: IllegalArgumentException) {
+    } catch (@Suppress("SwallowedException") e: IllegalArgumentException) {
         throw HostException.Failed("node key: ${e.message}")
     }
 

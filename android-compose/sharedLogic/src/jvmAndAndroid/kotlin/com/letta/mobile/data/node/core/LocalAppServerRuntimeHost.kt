@@ -78,7 +78,7 @@ class LocalAppServerRuntimeHost(
         block()
     } catch (e: CancellationException) {
         throw e
-    } catch (e: IllegalStateException) {
+    } catch (@Suppress("SwallowedException") e: IllegalStateException) {
         throw HostException.Failed(e.message ?: e.toString())
     }
 }
