@@ -3304,9 +3304,12 @@ function lettaBundlePath(url) {
  * @returns {void}
  */
 function reportBundleMismatch(url) {
-  if (!TARGET_PATH || !url.startsWith("file://")) return;
+  if (!TARGET_PATH) return;
+  if (!url.startsWith("file://")) return;
   const path = lettaBundlePath(url);
-  if (path === null || samePath(path, TARGET_PATH) || reportedBundleMismatches.has(path)) return;
+  if (path === null) return;
+  if (samePath(path, TARGET_PATH)) return;
+  if (reportedBundleMismatches.has(path)) return;
   reportedBundleMismatches.add(path);
   const message =
     `[letta-code-patch] ERROR: bundle mismatch: this process loaded ${path} instead of the ` +
