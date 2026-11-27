@@ -52,6 +52,7 @@ class IrohNodeCarrier(
     /** How long a dial may take before the node counts as unreachable. */
     private val connectTimeout: Duration = DEFAULT_CONNECT_TIMEOUT,
 ) : NodeCarrier {
+    @Suppress("TooGenericExceptionCaught") // Any failure opening the streams means the node is unreachable.
     override suspend fun dial(address: NodeAddress): NodeLink {
         val remote = parse(address)
         val connection = connect(remote)
@@ -76,6 +77,7 @@ class IrohNodeCarrier(
         throw unreachable("not an Iroh address", error)
     }
 
+    @Suppress("TooGenericExceptionCaught") // The native endpoint throws untyped errors; all of them mean the dial failed.
     private suspend fun connect(remote: EndpointAddr): Connection = try {
         withTimeout(connectTimeout) { endpoint.connect(remote, alpn) }
     } catch (error: TimeoutCancellationException) {
