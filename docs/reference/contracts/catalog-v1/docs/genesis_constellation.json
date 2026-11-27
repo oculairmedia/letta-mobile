@@ -1,0 +1,23 @@
+{
+  "agents": {},
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "createdAtMs": 0,
+  "docs": {
+    "shell": "automerge:3miboxbaSup8H78s16NQKUi5G3XQ"
+  },
+  "ext": {},
+  "members": {},
+  "membershipOps": {},
+  "meta": {
+    "iconToken": null,
+    "name": "Home"
+  },
+  "nodes": {},
+  "schema": "baken.catalog.constellation/1",
+  "settings": {
+    "display": {},
+    "signed": {}
+  },
+  "supersededBy": null,
+  "v": 1
+}

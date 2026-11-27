@@ -1,0 +1,19 @@
+{
+  "case": "read_only_strip",
+  "about": "A read-only member that sends changes anyway: stripped, quarantined, closed 4403 write_not_permitted on the third violation.",
+  "members": [{ "n": 2, "preset": "read_only" }],
+  "steps": [
+    { "op": "node", "name": "a", "n": 1 },
+    { "op": "node", "name": "b", "n": 2, "believes": "desktop_node" },
+    { "op": "create", "name": "a", "class": "agent", "agent": "agent-a", "as": "doc" },
+    { "op": "register", "name": "b", "doc": "doc", "class": "agent" },
+    { "op": "connect", "from": "b", "to": "a" },
+    { "op": "find", "name": "b", "doc": "doc" },
+    { "op": "edit", "name": "b", "doc": "doc", "put_root": "conv-1" },
+    { "op": "edit", "name": "b", "doc": "doc", "put_root": "conv-2" },
+    { "op": "edit", "name": "b", "doc": "doc", "put_root": "conv-3" },
+    { "op": "expect_closed", "name": "a", "peer": "b", "code": 4403, "reason": "write_not_permitted" },
+    { "op": "expect_quarantine", "name": "a", "reason": "unauthorized_change", "at_least": 1 },
+    { "op": "expect_nodes", "name": "a", "doc": "doc", "ids": [] }
+  ]
+}

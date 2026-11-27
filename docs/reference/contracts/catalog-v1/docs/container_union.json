@@ -1,0 +1,61 @@
+{
+  "agentId": "agent-a",
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "conversations": {
+    "$conflict": [
+      {
+        "conv-b": {
+          "agentId": "agent-a",
+          "createdAtMs": 1000,
+          "createdBy": {
+            "agentId": null,
+            "clientId": null,
+            "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+            "t": "node"
+          },
+          "deletedAtMs": null,
+          "detail": {},
+          "ext": {},
+          "forkPoint": null,
+          "id": "conv-b",
+          "kind": "root",
+          "lastActivityAtMs": null,
+          "parentId": null,
+          "title": "Conversation conv-b",
+          "titleSource": "auto"
+        }
+      },
+      {
+        "conv-a": {
+          "agentId": "agent-a",
+          "createdAtMs": 1000,
+          "createdBy": {
+            "agentId": null,
+            "clientId": null,
+            "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+            "t": "node"
+          },
+          "deletedAtMs": null,
+          "detail": {},
+          "ext": {},
+          "forkPoint": null,
+          "id": "conv-a",
+          "kind": "root",
+          "lastActivityAtMs": null,
+          "parentId": null,
+          "title": "Conversation conv-a",
+          "titleSource": "auto"
+        }
+      }
+    ]
+  },
+  "createdAtMs": 0,
+  "deleted": {},
+  "ext": {},
+  "memoryDivergences": {},
+  "placement": null,
+  "schema": "baken.catalog.agent/1",
+  "subagentLinks": {},
+  "supersededBy": null,
+  "v": 1
+}

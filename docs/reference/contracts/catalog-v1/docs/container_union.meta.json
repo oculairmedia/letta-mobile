@@ -1,0 +1,88 @@
+{
+  "class": "agent",
+  "documentId": "4ZjjHmex3wNBGoS5udBTWpehDzqG",
+  "heads": [
+    "629f60b87dfc8b95dda26dffd870f39ee128074b1d5f30b2aface6d4cd39d8ce",
+    "db365500b2418dfde479a808985a9968314ba2d2c9fda69f5f68dd48f91b9c5f"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {
+      "conv-a": {
+        "id": "conv-a",
+        "agentId": "agent-a",
+        "parentId": null,
+        "kind": "root",
+        "forkPoint": null,
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-a",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      },
+      "conv-b": {
+        "id": "conv-b",
+        "agentId": "agent-a",
+        "parentId": null,
+        "kind": "root",
+        "forkPoint": null,
+        "createdBy": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        },
+        "createdAtMs": 1000,
+        "title": "Conversation conv-b",
+        "titleSource": "auto",
+        "lastActivityAtMs": null,
+        "deletedAtMs": null,
+        "orphan": false,
+        "status": null,
+        "resolution": null,
+        "detail": {}
+      }
+    },
+    "deleted": {},
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": [
+      {
+        "path": "/conversations",
+        "reason": "container_conflict_unioned"
+      }
+    ]
+  },
+  "expectedViolations": [
+    {
+      "path": "/conversations",
+      "reason": "container_conflict_unioned"
+    }
+  ]
+}

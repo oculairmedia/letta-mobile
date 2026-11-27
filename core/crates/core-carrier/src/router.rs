@@ -6,7 +6,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use core_proto::closure::Closure;
 
-use crate::{AcceptedLink, AccessDecision, AccessHook, AdmitAll, AppClose, VerifiedPeer};
+use crate::{
+    AcceptedLink, AccessDecision, AccessHook, AdmitAll, AppClose, StreamHandler, StreamLink,
+    VerifiedPeer,
+};
 
 /// Serves the links accepted for one ALPN.
 #[async_trait]
@@ -16,12 +19,22 @@ pub trait ProtocolHandler: Send + Sync + 'static {
     async fn serve(&self, link: AcceptedLink);
 }
 
+/// The handler registered for one ALPN.
+#[derive(Clone)]
+enum Handler {
+    /// Node-protocol lanes and frames.
+    Frames(Arc<dyn ProtocolHandler>),
+    /// One raw byte stream.
+    Stream(Arc<dyn StreamHandler>),
+}
+
 /// What a node serves: its access hook and a handler per ALPN. Carriers hand every accepted link to
-/// [`serve`](Self::serve) after [`check`](Self::check) admitted the peer.
+/// [`serve`](Self::serve) (or [`serve_stream`](Self::serve_stream) for a byte-stream ALPN) after
+/// [`check`](Self::check) admitted the peer.
 #[derive(Clone)]
 pub struct Protocols {
     access: Arc<dyn AccessHook>,
-    handlers: Vec<(Vec<u8>, Arc<dyn ProtocolHandler>)>,
+    handlers: Vec<(Vec<u8>, Handler)>,
 }
 
 impl Protocols {
@@ -52,6 +65,12 @@ impl Protocols {
         self.handler(alpn).is_some()
     }
 
+    /// Whether `alpn` is served as a byte-stream protocol ([`ProtocolsBuilder::accept_stream`]).
+    #[must_use]
+    pub fn is_stream(&self, alpn: &[u8]) -> bool {
+        matches!(self.handler(alpn), Some(Handler::Stream(_)))
+    }
+
     /// The access hook.
     #[must_use]
     pub fn access(&self) -> Arc<dyn AccessHook> {
@@ -67,7 +86,7 @@ impl Protocols {
     /// handler left it open. A link on an ALPN with no handler is closed `4404 unknown_alpn`.
     pub async fn serve(&self, accepted: AcceptedLink) {
         let link = Arc::clone(&accepted.link);
-        let Some(handler) = self.handler(link.alpn()) else {
+        let Some(Handler::Frames(handler)) = self.handler(link.alpn()) else {
             link.close(Closure::UNKNOWN_ALPN.into());
             return;
         };
@@ -77,7 +96,22 @@ impl Protocols {
         }
     }
 
-    fn handler(&self, alpn: &[u8]) -> Option<&Arc<dyn ProtocolHandler>> {
+    /// Serves an admitted byte-stream link with the stream handler for its ALPN, then closes it with
+    /// `0 closed` if the handler left it open. A link on an ALPN with no stream handler is closed
+    /// `4404 unknown_alpn`.
+    pub async fn serve_stream(&self, link: StreamLink) {
+        let control = Arc::clone(&link.control);
+        let Some(Handler::Stream(handler)) = self.handler(control.alpn()) else {
+            control.close(Closure::UNKNOWN_ALPN.into());
+            return;
+        };
+        handler.serve(link).await;
+        if control.closure().is_none() {
+            control.close(AppClose::closed());
+        }
+    }
+
+    fn handler(&self, alpn: &[u8]) -> Option<&Handler> {
         self.handlers
             .iter()
             .find(|(registered, _)| registered == alpn)
@@ -101,7 +135,7 @@ impl fmt::Debug for Protocols {
 /// Builds [`Protocols`].
 pub struct ProtocolsBuilder {
     access: Arc<dyn AccessHook>,
-    handlers: Vec<(Vec<u8>, Arc<dyn ProtocolHandler>)>,
+    handlers: Vec<(Vec<u8>, Handler)>,
 }
 
 impl ProtocolsBuilder {
@@ -120,6 +154,22 @@ impl ProtocolsBuilder {
     /// configuration error caught at startup.
     #[must_use]
     pub fn accept(mut self, alpn: &[u8], handler: impl ProtocolHandler) -> Self {
+        self.register(alpn, Handler::Frames(Arc::new(handler)));
+        self
+    }
+
+    /// Serves `alpn` as a byte-stream protocol with `handler`: each link is one raw stream.
+    ///
+    /// # Panics
+    ///
+    /// When `alpn` is already registered.
+    #[must_use]
+    pub fn accept_stream(mut self, alpn: &[u8], handler: impl StreamHandler) -> Self {
+        self.register(alpn, Handler::Stream(Arc::new(handler)));
+        self
+    }
+
+    fn register(&mut self, alpn: &[u8], handler: Handler) {
         assert!(
             self.handlers
                 .iter()
@@ -127,8 +177,7 @@ impl ProtocolsBuilder {
             "ALPN {} registered twice",
             String::from_utf8_lossy(alpn)
         );
-        self.handlers.push((alpn.to_vec(), Arc::new(handler)));
-        self
+        self.handlers.push((alpn.to_vec(), handler));
     }
 
     /// The finished set.

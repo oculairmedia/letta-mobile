@@ -1,0 +1,67 @@
+{
+  "archived": {
+    "conv-x": {
+      "agentId": "agent-a",
+      "atMs": 5,
+      "by": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "t": "node"
+      }
+    }
+  },
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "createdAtMs": 0,
+  "devices": {},
+  "docRev": {
+    "$counter": 2
+  },
+  "entries": {
+    "shell.layout": {
+      "$conflict": [
+        {
+          "rev": 1,
+          "updatedAtMs": 11,
+          "updatedBy": {
+            "agentId": null,
+            "clientId": null,
+            "nodeId": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+            "t": "node"
+          },
+          "valueJson": "{\"lanes\":2}"
+        },
+        {
+          "rev": 1,
+          "updatedAtMs": 10,
+          "updatedBy": {
+            "agentId": null,
+            "clientId": null,
+            "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+            "t": "node"
+          },
+          "valueJson": "{\"lanes\":1}"
+        }
+      ]
+    }
+  },
+  "ext": {},
+  "pins": {
+    "agent-a": {
+      "by": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "pinnedAtMs": 0,
+      "pos": "W"
+    }
+  },
+  "pinsRev": {
+    "$counter": 3
+  },
+  "schema": "baken.catalog.shell/1",
+  "supersededBy": null,
+  "v": 1
+}

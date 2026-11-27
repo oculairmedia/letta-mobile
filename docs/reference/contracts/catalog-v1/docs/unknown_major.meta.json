@@ -1,0 +1,17 @@
+{
+  "class": "agent",
+  "documentId": "27HbvBwgQkT9t23sr9KJM6PsVE8F",
+  "heads": [
+    "e3ea32649b3460ce8a6c4b5fe516bd4881adb2ae072b63aa84deebbef118d8eb"
+  ],
+  "schemaMajor": "baken.catalog.agent/2",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "unavailable",
+    "schema": "baken.catalog.agent/2"
+  },
+  "expectedViolations": []
+}

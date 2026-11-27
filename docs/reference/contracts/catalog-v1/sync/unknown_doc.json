@@ -1,0 +1,17 @@
+{
+  "case": "unknown_doc",
+  "about": "A document the receiver has not registered: its sync is dropped and no history is stored.",
+  "members": [{ "n": 2, "preset": "desktop_node" }],
+  "steps": [
+    { "op": "node", "name": "a", "n": 1 },
+    { "op": "node", "name": "b", "n": 2 },
+    { "op": "connect", "from": "b", "to": "a" },
+    { "op": "create", "name": "b", "class": "agent", "agent": "agent-b", "as": "doc" },
+    { "op": "edit", "name": "b", "doc": "doc", "put_root": "conv-1" },
+    { "op": "settle" },
+    { "op": "expect_no_copy", "name": "a", "doc": "doc" },
+    { "op": "register", "name": "a", "doc": "doc", "class": "agent" },
+    { "op": "find", "name": "a", "doc": "doc" },
+    { "op": "expect_nodes", "name": "a", "doc": "doc", "ids": ["conv-1"] }
+  ]
+}

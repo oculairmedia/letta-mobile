@@ -1,0 +1,61 @@
+{
+  "agents": {},
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "createdAtMs": 0,
+  "docs": {},
+  "ext": {},
+  "members": {
+    "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394": {
+      "addedAtMs": 0,
+      "addedBy": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "caps": [
+        "ui"
+      ],
+      "derivedFromHead": "stale",
+      "name": "node-2",
+      "revokedAtMs": null,
+      "state": "active"
+    }
+  },
+  "membershipOps": {
+    "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42": {
+      "body": {
+        "$bytes": "qgABAQADWCCKiOPddAnxlf1S2y08ul1yymcJvx2UEhvzdIgBtA9vXASABQAGWCCKiOPddAnxlf1S2y08ul1yymcJvx2UEhvzdIgBtA9vXAeKYnVpZXN0b3JlZ2FwcHJvdmVnY2F0YWxvZ2phZG1pbi5mdWxsbG5vZGUuZXhlY3V0ZW1jYXRhbG9nLndyaXRlbW5vZGUudGFrZW92ZXJubm9kZS5yZXBsaWNhdGVvZGV2aWNlcy5hcHByb3ZlCWZub2RlLTEOZ2ZpeHR1cmUPUOnrFCH162ZfoJvZVhtq4cU"
+      },
+      "issuer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "sig": {
+        "$bytes": "yfmO6TTKdTB5VQERdYiUh1k21tsCzWQD8Put2wwvTSSrKFQtUW2MjgyAgw-WGnnnzWAiYo_9wl3z9SqHMfoQAQ"
+      }
+    },
+    "dd259ad900a7467d0394d91afa6ff24989adfdb4117e4ec8487d006a1b760105": {
+      "body": {
+        "$bytes": "qQABAQECWCAOfquuN3Q_YyldVT1UeRHHVRLQmItSgTSKLQmN55O-QgNYIIqI4910CfGV_VLbLTy6XXLKZwm_HZQSG_N0iAG0D29cBIFYIA5-q643dD9jKV1VPVR5EcdVEtCYi1KBNIotCY3nk75CBQAGWCCBOXcOqH0XX1ajVGbDTH7My42KkbTuN6Jd9g9bj8mzlAeIYnVpZXN0b3JlZ2FwcHJvdmVnY2F0YWxvZ2xub2RlLmV4ZWN1dGVtY2F0YWxvZy53cml0ZW1ub2RlLnRha2VvdmVybm5vZGUucmVwbGljYXRlCWZub2RlLTI"
+      },
+      "issuer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "sig": {
+        "$bytes": "_cNxCDOUxh3wDLcvw097fdT_uUAEB2HIXYK6ObI63AAA-TbaYNa9wENC0i2IU8Gx6H0sQ0YLaXPGZETd91aSAA"
+      }
+    },
+    "dd259ad900a7467d0394d91afa6ff24989adfdb4117e4ec8487d006a1b76010500": {
+      "body": {
+        "$bytes": "qQABAQECWCAOfquuN3Q_YyldVT1UeRHHVRLQmItSgTSKLQmN55O-QgNYIIqI4910CfGV_VLbLTy6XXLKZwm_HZQSG_N0iAG0D29cBIFYIA5-q643dD9jKV1VPVR5EcdVEtCYi1KBNIotCY3nk75CBQAGWCCBOXcOqH0XX1ajVGbDTH7My42KkbTuN6Jd9g9bj8mzlAeIYnVpZXN0b3JlZ2FwcHJvdmVnY2F0YWxvZ2xub2RlLmV4ZWN1dGVtY2F0YWxvZy53cml0ZW1ub2RlLnRha2VvdmVybm5vZGUucmVwbGljYXRlCWZub2RlLTI"
+      },
+      "issuer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "sig": {
+        "$bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    }
+  },
+  "meta": {
+    "iconToken": null,
+    "name": "Home"
+  },
+  "nodes": {},
+  "schema": "baken.catalog.constellation/1",
+  "settings": {
+    "display": {},
+    "signed": {}
+  },
+  "supersededBy": null,
+  "v": 1
+}

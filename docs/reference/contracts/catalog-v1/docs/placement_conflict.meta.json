@@ -1,0 +1,41 @@
+{
+  "class": "agent",
+  "documentId": "3v8QBvbF1vZig2ccbiScEmRMTfkb",
+  "heads": [
+    "7bb8f2923206e8ff3aec96bab3aab44191029f940b441dabccb0cbea9a6f8c0c",
+    "d3369478135f7e1592234848ebbcd99076f6cbee34fb24d6ca5d4d73e9c9de1b"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": {
+      "holder": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "epochN": 2,
+      "epochClaimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "state": "active",
+      "verified": true,
+      "effectiveEpochN": 2,
+      "effectiveEpochClaimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    },
+    "conversations": {},
+    "deleted": {},
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

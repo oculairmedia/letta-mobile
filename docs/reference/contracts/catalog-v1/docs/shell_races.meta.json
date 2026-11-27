@@ -1,0 +1,68 @@
+{
+  "class": "shell",
+  "documentId": "LBnpWLPcGHehXD8KSQd9Pv1Vdm2",
+  "heads": [
+    "218f8a3a35f4c9b36bfd205370cedbf346cd7ea92a78c87644e33ba8b53d09a3",
+    "d598223fe86e4bc9d21ca701272e1af4b75bae2e6e07ec63133ae32bced8994c"
+  ],
+  "schemaMajor": "baken.catalog.shell/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "shell",
+    "header": {
+      "schema": "baken.catalog.shell/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "docRev": 2,
+    "entries": {
+      "shell.layout": {
+        "valueJson": "{\"lanes\":2}",
+        "rev": 1,
+        "updatedBy": {
+          "t": "node",
+          "nodeId": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+          "clientId": null,
+          "agentId": null
+        },
+        "updatedAtMs": 11
+      }
+    },
+    "pinsRev": 3,
+    "pins": [
+      {
+        "agentId": "agent-a",
+        "pos": "W",
+        "pinnedAtMs": 0,
+        "by": {
+          "t": "node",
+          "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "clientId": null,
+          "agentId": null
+        }
+      }
+    ],
+    "archived": {
+      "conv-x": {
+        "agentId": "agent-a",
+        "atMs": 5,
+        "by": {
+          "t": "node",
+          "nodeId": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+          "clientId": null,
+          "agentId": null
+        }
+      }
+    },
+    "devices": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

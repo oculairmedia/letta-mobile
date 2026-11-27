@@ -1,0 +1,32 @@
+{
+  "class": "agent",
+  "documentId": "2UAC5JooscqZK7fE3jdHJ8VoXzeq",
+  "heads": [
+    "8c524e0dd95072ea637201baad6f86d330e592464d8a0073c5471851b4c556b1"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {},
+    "deleted": {},
+    "subagentLinks": {},
+    "memoryDivergences": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

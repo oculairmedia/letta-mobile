@@ -1,0 +1,46 @@
+{
+  "class": "agent",
+  "documentId": "46YaM1LrrKcR7zr1VUWavdJ5zwPB",
+  "heads": [
+    "b568e0dbd6ee7a0d5276ce202c32e844680a27ca80e12e1275a9fcd8a3694353"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {},
+    "deleted": {},
+    "subagentLinks": {},
+    "memoryDivergences": {
+      "676439c7-2c19-81fe-83f0-4724d0caf31c": {
+        "id": "676439c7-2c19-81fe-83f0-4724d0caf31c",
+        "strandedEpochN": 2,
+        "strandedEpochClaimant": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "memfsBranch": "divergence/2-8139770e/main",
+        "detectedAtMs": 5000,
+        "detectedBy": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+        "resolution": {
+          "state": "open",
+          "atMs": null,
+          "by": null
+        }
+      }
+    },
+    "violations": []
+  },
+  "expectedViolations": []
+}

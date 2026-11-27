@@ -1,0 +1,32 @@
+{
+  "class": "constellation",
+  "documentId": "4G1ra4Gytpd3CsgyNofkic6bnV8y",
+  "heads": [
+    "165511fe36a82bb66704e3e70fc8ab2ccb9d27ebf2e90b8501e5ed5577830c42"
+  ],
+  "schemaMajor": "baken.catalog.constellation/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "constellation",
+    "header": {
+      "schema": "baken.catalog.constellation/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "name": "Home",
+    "shellDoc": "automerge:3miboxbaSup8H78s16NQKUi5G3XQ",
+    "membershipOps": {},
+    "members": {},
+    "nodes": {},
+    "agents": {},
+    "violations": []
+  },
+  "expectedViolations": []
+}

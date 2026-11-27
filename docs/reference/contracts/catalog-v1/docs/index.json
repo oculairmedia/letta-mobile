@@ -1,0 +1,85 @@
+{
+  "generator": "core/crates/core-catalog/tests/doc_fixtures.rs (BAKEN_REGEN_FIXTURES=1 cargo test -p core-catalog --test doc_fixtures)",
+  "cases": [
+    {
+      "case": "genesis_constellation",
+      "class": "constellation"
+    },
+    {
+      "case": "genesis_shell",
+      "class": "shell"
+    },
+    {
+      "case": "genesis_agent",
+      "class": "agent"
+    },
+    {
+      "case": "agent_tree",
+      "class": "agent"
+    },
+    {
+      "case": "memory_divergence",
+      "class": "agent"
+    },
+    {
+      "case": "placement_verified",
+      "class": "agent"
+    },
+    {
+      "case": "placement_forged",
+      "class": "agent"
+    },
+    {
+      "case": "placement_conflict",
+      "class": "agent"
+    },
+    {
+      "case": "shell_races",
+      "class": "shell"
+    },
+    {
+      "case": "shell_pin_cap",
+      "class": "shell"
+    },
+    {
+      "case": "constellation_docurl_conflict",
+      "class": "constellation"
+    },
+    {
+      "case": "constellation_members",
+      "class": "constellation"
+    },
+    {
+      "case": "forward_compat",
+      "class": "agent"
+    },
+    {
+      "case": "unknown_major",
+      "class": "agent"
+    },
+    {
+      "case": "container_union",
+      "class": "agent"
+    },
+    {
+      "case": "container_deleted",
+      "class": "agent"
+    },
+    {
+      "case": "container_repaired",
+      "class": "agent"
+    },
+    {
+      "case": "cycle_orphan",
+      "class": "agent"
+    },
+    {
+      "case": "rollover_old",
+      "class": "agent"
+    },
+    {
+      "case": "rollover_new",
+      "class": "agent"
+    }
+  ]
+}

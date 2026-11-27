@@ -1,0 +1,90 @@
+{
+  "agentId": "agent-a",
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "conversations": {
+    "conv-a": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {},
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-a",
+      "kind": "fork",
+      "lastActivityAtMs": null,
+      "parentId": "conv-b",
+      "title": "Conversation conv-a",
+      "titleSource": "auto"
+    },
+    "conv-b": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {},
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-b",
+      "kind": "fork",
+      "lastActivityAtMs": null,
+      "parentId": "conv-a",
+      "title": "Conversation conv-b",
+      "titleSource": "auto"
+    },
+    "conv-c": {
+      "agentId": "agent-a",
+      "createdAtMs": 1000,
+      "createdBy": {
+        "agentId": null,
+        "clientId": null,
+        "nodeId": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "t": "node"
+      },
+      "deletedAtMs": null,
+      "detail": {},
+      "ext": {},
+      "forkPoint": {
+        "lastSharedMessageId": "message-1",
+        "logEpochClaimant": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "logEpochN": 1,
+        "logSeq": 4
+      },
+      "id": "conv-c",
+      "kind": "fork",
+      "lastActivityAtMs": null,
+      "parentId": "conv-gone",
+      "title": "Conversation conv-c",
+      "titleSource": "auto"
+    }
+  },
+  "createdAtMs": 0,
+  "deleted": {},
+  "ext": {},
+  "memoryDivergences": {},
+  "placement": null,
+  "schema": "baken.catalog.agent/1",
+  "subagentLinks": {},
+  "supersededBy": null,
+  "v": 1
+}

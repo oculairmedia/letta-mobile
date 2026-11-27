@@ -1,0 +1,21 @@
+{
+  "case": "revoke_and_caps",
+  "about": "A revocation mid-sync closes 4403 peer_not_allowed; a capability change closes 4409 caps_changed.",
+  "members": [{ "n": 2, "preset": "desktop_node" }, { "n": 3, "preset": "desktop_node" }],
+  "steps": [
+    { "op": "node", "name": "a", "n": 1 },
+    { "op": "node", "name": "b", "n": 2 },
+    { "op": "node", "name": "c", "n": 3 },
+    { "op": "create", "name": "a", "class": "agent", "agent": "agent-a", "as": "doc" },
+    { "op": "register", "name": "b", "doc": "doc", "class": "agent" },
+    { "op": "register", "name": "c", "doc": "doc", "class": "agent" },
+    { "op": "connect", "from": "b", "to": "a" },
+    { "op": "connect", "from": "c", "to": "a" },
+    { "op": "find", "name": "b", "doc": "doc" },
+    { "op": "find", "name": "c", "doc": "doc" },
+    { "op": "membership", "revoke": 2 },
+    { "op": "expect_closed", "name": "a", "peer": "b", "code": 4403, "reason": "peer_not_allowed" },
+    { "op": "membership", "remove_caps": 3, "caps": ["catalog.write"] },
+    { "op": "expect_closed", "name": "a", "peer": "c", "code": 4409, "reason": "caps_changed" }
+  ]
+}

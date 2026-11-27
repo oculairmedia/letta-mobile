@@ -1,0 +1,44 @@
+{
+  "class": "agent",
+  "documentId": "fAJ6PnxwyqvxrqoonBVNxAMdKNo",
+  "heads": [
+    "4b1166cb9372ef6b76c3fdb97462cb99c729b21479e4cd02aefa2e39219511bf"
+  ],
+  "schemaMajor": "baken.catalog.agent/1",
+  "v": 1,
+  "context": {
+    "membershipFromDocOps": false
+  },
+  "expectedView": {
+    "status": "agent",
+    "header": {
+      "schema": "baken.catalog.agent/1",
+      "major": 1,
+      "v": 1,
+      "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+      "createdAtMs": 0,
+      "supersededBy": null,
+      "writable": true
+    },
+    "agentId": "agent-a",
+    "placement": null,
+    "conversations": {},
+    "deleted": {},
+    "subagentLinks": {
+      "agent-sub-1": "conv-root"
+    },
+    "memoryDivergences": {},
+    "violations": [
+      {
+        "path": "/conversations",
+        "reason": "missing_container"
+      }
+    ]
+  },
+  "expectedViolations": [
+    {
+      "path": "/conversations",
+      "reason": "missing_container"
+    }
+  ]
+}

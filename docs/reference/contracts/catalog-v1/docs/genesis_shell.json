@@ -1,0 +1,18 @@
+{
+  "archived": {},
+  "constellationId": "0e7eabae37743f63295d553d547911c75512d0988b5281348a2d098de793be42",
+  "createdAtMs": 0,
+  "devices": {},
+  "docRev": {
+    "$counter": 0
+  },
+  "entries": {},
+  "ext": {},
+  "pins": {},
+  "pinsRev": {
+    "$counter": 0
+  },
+  "schema": "baken.catalog.shell/1",
+  "supersededBy": null,
+  "v": 1
+}
