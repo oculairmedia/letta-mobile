@@ -626,13 +626,15 @@ class IrohNodeConnection internal constructor(
                 }
                 "input" -> ifAuthorized(requestId) {
                     ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("input")) {
-                    launchInputJob(
-                        frameJson = frameJson,
-                        push = push,
-                        activeTurnJobs = activeTurnJobs,
-                        activeTurnJobsMutex = activeTurnJobsMutex,
-                    )
-                    null
+                    shutdownDrainRejection(frameJson) ?: run {
+                        launchInputJob(
+                            frameJson = frameJson,
+                            push = push,
+                            activeTurnJobs = activeTurnJobs,
+                            activeTurnJobsMutex = activeTurnJobsMutex,
+                        )
+                        null
+                    }
                     }
                 }
                 "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
@@ -662,6 +664,33 @@ class IrohNodeConnection internal constructor(
             // (secret.request.submit), so nothing of the frame may come back.
             """{"type":"error","message":"Failed to parse frame (${e::class.simpleName})"}"""
         }
+    }
+
+    /**
+     * The host is draining for shutdown ([NodeTurnHost.isDraining]): the input is refused with a
+     * retryable rejection instead of starting a turn the imminent connection close would cancel
+     * with cause "transport". Returns the `input_accepted` rejection frame for an input that
+     * carries a `request_id` — the correlation the client's engine maps to a failed send whose
+     * text says to retry — or null when the host accepts new turns, the frame is not an input, or
+     * the peer sent no `request_id` to answer (that peer awaits no ack, so the refusal is silent,
+     * like a redial ack it cannot receive).
+     */
+    private fun shutdownDrainRejection(frameJson: String): String? {
+        if (!turnHost.isDraining) return null
+        val input = runCatching {
+            AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as? AppServerCommand.Input
+        }.getOrNull() ?: return null
+        val requestId = input.requestId ?: return null
+        Telemetry.event(
+            "IrohNode", "input.draining_rejected",
+            "remoteEndpointId" attr remoteEndpointId,
+            "conversationId" attr input.runtime.conversationId,
+        )
+        return inputAcceptedFrame(
+            requestId,
+            input.runtime,
+            TurnInputAcknowledgement.rejected(SHUTDOWN_DRAIN_INPUT_REJECTION),
+        )
     }
 
     private suspend fun CoroutineScope.launchInputJob(
@@ -1110,6 +1139,14 @@ class IrohNodeConnection internal constructor(
             addAll(SubagentAdminHandlers.advertisedCapabilities(router.registeredMethods))
         }
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
+
+        /**
+         * Why an input is refused while the host drains for shutdown: retryable wording for the
+         * client's failed send, so the user retries once the wrapper is back (its systemd unit
+         * restarts it) instead of seeing a turn cancelled mid-flight.
+         */
+        internal const val SHUTDOWN_DRAIN_INPUT_REJECTION =
+            "wrapper is shutting down; no new turns accepted — retry once it reconnects"
         // Raised 5s -> 60s (P3): a heavy final turn (large tool_return, long
         // stop_reason flush) can legitimately still be draining when the control
         // channel closes; the old 5s cap cancelled those turns before their

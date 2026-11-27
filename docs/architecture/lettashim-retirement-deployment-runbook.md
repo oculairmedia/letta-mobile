@@ -982,9 +982,11 @@ ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
   --iroh-port 4501 \
   --iroh-secret-key-file /etc/meridian/iroh-secret.key \
   --pairing-store-file /etc/meridian/paired-peers.json \
-  --vibesync-base-url http://127.0.0.1:3099
+  --vibesync-base-url http://127.0.0.1:3099 \
+  --shutdown-drain-seconds 300
 Restart=always
 RestartSec=10
+TimeoutStopSec=360s
 LimitNOFILE=65536
 NoNewPrivileges=true
 PrivateTmp=true
@@ -992,6 +994,21 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 ```
+
+#### Shutdown drain (`--shutdown-drain-seconds`, `TimeoutStopSec`)
+
+On SIGTERM the wrapper does not close its App Server connection at once: it
+refuses new turn inputs (the phone sees a retryable `input_accepted`
+rejection), keeps relaying frames/approvals/terminals for the turns already
+running, and waits up to `--shutdown-drain-seconds` (default 300s) for them to
+finish. Only then does it close the connection — so the App Server's
+`cleanupListenerConnection` never cancels an in-flight turn with cause
+`transport`. A second SIGTERM (or Ctrl+C) cuts the wait immediately and the
+close proceeds. `TimeoutStopSec` must cover the drain bound plus the final
+close (300s + 60s = 360s); without an explicit value systemd SIGKILLs at its
+90s default, mid-drain. Each drain logs `shutdown.drain.start` and
+`shutdown.drain.done` (`waited_turns`, `cut_turns`, `elapsed_ms`) to
+`/var/log/meridian-iroh-wrapper.log`.
 
 Do not add an App Server restart to `ExecStartPre`, `ExecStartPost`, or the
 deployment script. Do not include an admin/shim base URL.
