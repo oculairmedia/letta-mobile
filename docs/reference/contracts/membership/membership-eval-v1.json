@@ -1,0 +1,558 @@
+{
+  "contract": "membership/eval",
+  "version": 1,
+  "notes": "Evaluation cases (membership-v1.md section 6). Each op is described by fields; a runner signs it with the test key named by issuer (seed = the key number repeated 32 times) and resolves parents by op label. ts_ms defaults to 0. caps are a list or preset:<name>. A rotate's proof of possession is signed by new_key unless pop_signer names another key. Policies use the value notation of bcbor-v1.json. expect.status lists every node id with a status, exactly. expect.caps lists the capabilities of every active member (absent means none). rejections lists every op that has no effect, exactly, with its code. Every case must give the same result for every arrival order; cases with permutations = all are run in every order. Hand-written; the op ids named in expectations of the two order-sensitive cases were filled in from the reference implementation and are stable because keys and bodies are fixed.",
+  "roots": {
+    "R0": "00000000000000000000000000000000",
+    "R1": "11111111111111111111111111111111",
+    "R2": "22222222222222222222222222222222",
+    "R3": "33333333333333333333333333333333"
+  },
+  "cases": [
+    {
+      "name": "linear_chain",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0", "name": "first", "label": "home" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:desktop_node", "name": "desk2" },
+        { "op": "a3", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" },
+        { "op": "gr3", "kind": "grant", "issuer": "N1", "parents": ["a3"], "subject": "N3", "caps_add": ["node.execute"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active", "N3": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:desktop_node", "N3": "preset:phone_execution" },
+        "admins": ["N1"],
+        "locked": false,
+        "catalog_root": "R0",
+        "superseded_roots": [],
+        "names": { "N1": "first", "N2": "desk2" },
+        "label": "home"
+      },
+      "rejections": {}
+    },
+    {
+      "name": "concurrent_add_and_revoke",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["g"], "subject": "N2" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "revoked_admin_backdated_add",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["a2"], "subject": "N2", "reason": "stolen" },
+        { "op": "a3", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "a3": "excluded_by_revoke" }
+    },
+    {
+      "name": "revoker_saw_the_op",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "a3", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["a3"], "subject": "N2" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked", "N3": "active" },
+        "caps": { "N1": "preset:first_device", "N3": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "cascade_through_an_excluded_add",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["a2"], "subject": "N2" },
+        { "op": "a3", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N3", "caps_add": "preset:first_device" },
+        { "op": "a4", "kind": "add", "issuer": "N3", "parents": ["a3"], "subject": "N4", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "a3": "excluded_by_revoke", "a4": "issuer_not_active" }
+    },
+    {
+      "name": "mutual_revokes_leave_one_admin",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "a3", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N3", "caps_add": "preset:first_device" },
+        { "op": "r3", "kind": "revoke", "issuer": "N2", "parents": ["a3"], "subject": "N3" },
+        { "op": "r2", "kind": "revoke", "issuer": "N3", "parents": ["a3"], "subject": "N2" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked", "N3": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "mutual_revokes_lock_the_constellation",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "a3", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["a3"], "subject": "N2" },
+        { "op": "r1", "kind": "revoke", "issuer": "N2", "parents": ["a3"], "subject": "N1" },
+        { "op": "rot3", "kind": "rotate", "issuer": "N3", "parents": ["r1", "r2"], "new_key": "N5" }
+      ],
+      "expect": {
+        "status": { "N1": "revoked", "N2": "revoked", "N3": "active" },
+        "caps": { "N3": "preset:phone" },
+        "admins": [],
+        "locked": true
+      },
+      "rejections": { "rot3": "locked" }
+    },
+    {
+      "name": "last_admin_cannot_revoke_itself",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "r1", "kind": "revoke", "issuer": "N1", "parents": ["a2"], "subject": "N1" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "r1": "last_admin" }
+    },
+    {
+      "name": "last_admin_cannot_drop_admin",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "gr1", "kind": "grant", "issuer": "N1", "parents": ["g"], "subject": "N1", "caps_remove": ["admin.full"] }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "gr1": "last_admin" }
+    },
+    {
+      "name": "admin_hands_over",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "gr1", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N1", "caps_remove": ["admin.full"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": {
+          "N1": ["approve", "catalog", "catalog.write", "devices.approve", "node.execute", "node.replicate", "node.takeover", "store", "ui"],
+          "N2": "preset:first_device"
+        },
+        "admins": ["N2"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "concurrent_grant_and_removal_remove_wins",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "gp", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N2", "caps_add": ["node.execute"] },
+        { "op": "gm", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N2", "caps_remove": ["node.execute"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "grant_after_removal_holds",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone_execution" },
+        { "op": "gm", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N2", "caps_remove": ["node.execute"] },
+        { "op": "gp", "kind": "grant", "issuer": "N1", "parents": ["gm"], "subject": "N2", "caps_add": ["node.execute"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone_execution" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "rotate_then_op_by_old_key",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": ["devices.approve", "store", "ui"], "name": "tab" },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N5" },
+        { "op": "a6", "kind": "add", "issuer": "N2", "parents": ["rot"], "subject": "N6", "caps_add": ["ui"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "rotated", "N5": "active" },
+        "rotated_to": { "N2": "N5" },
+        "caps": { "N1": "preset:first_device", "N5": ["devices.approve", "store", "ui"] },
+        "admins": ["N1"],
+        "locked": false,
+        "names": { "N2": "tab", "N5": "tab" }
+      },
+      "rejections": { "a6": "issuer_not_active" }
+    },
+    {
+      "name": "rotate_concurrent_with_op_by_old_key",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": ["devices.approve", "store", "ui"] },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N5" },
+        { "op": "a6", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N6", "caps_add": ["ui"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "rotated", "N5": "active", "N6": "active" },
+        "rotated_to": { "N2": "N5" },
+        "caps": { "N1": "preset:first_device", "N5": ["devices.approve", "store", "ui"], "N6": ["ui"] },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "rotate_with_bad_proof_of_possession",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N5", "pop_signer": "N7" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "rot": "bad_proof_of_possession" }
+    },
+    {
+      "name": "rotate_to_a_member_key",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N1" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "rot": "rotate_key_reused" }
+    },
+    {
+      "name": "revoke_after_rotate_keeps_the_new_key",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N5" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["rot"], "subject": "N2" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked", "N5": "active" },
+        "caps": { "N1": "preset:first_device", "N5": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "revoke_concurrent_with_rotate_excludes_it",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "rot", "kind": "rotate", "issuer": "N2", "parents": ["a2"], "new_key": "N5" },
+        { "op": "r2", "kind": "revoke", "issuer": "N1", "parents": ["a2"], "subject": "N2" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "rot": "excluded_by_revoke" }
+    },
+    {
+      "name": "devices_approve_inside_the_ceiling",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": ["catalog", "devices.approve", "ui"] },
+        { "op": "a3", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active", "N3": "active" },
+        "caps": { "N1": "preset:first_device", "N2": ["catalog", "devices.approve", "ui"], "N3": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "devices_approve_outside_the_ceiling",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": ["catalog", "devices.approve", "ui"] },
+        { "op": "a4", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N4", "caps_add": ["node.execute"] },
+        { "op": "a5", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N5", "caps_add": ["devices.approve"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": ["catalog", "devices.approve", "ui"] },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "a4": "ceiling_exceeded", "a5": "ceiling_exceeded" }
+    },
+    {
+      "name": "invalid_issuers",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "x1", "kind": "add", "issuer": "N8", "parents": ["g"], "subject": "N3", "caps_add": "preset:phone" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "x2", "kind": "grant", "issuer": "N2", "parents": ["a2"], "subject": "N2", "caps_add": ["node.execute"] },
+        { "op": "x3", "kind": "revoke", "issuer": "N2", "parents": ["a2"], "subject": "N1" },
+        { "op": "x4", "kind": "policy_set", "issuer": "N2", "parents": ["a2"], "policy": { "map": [[0, { "uint": 0 }]] } },
+        { "op": "x5", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N4", "caps_add": "preset:phone" },
+        { "op": "x6", "kind": "catalog_root_move", "issuer": "N2", "parents": ["a2"], "new_root": "R1", "prev_root": "R0" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false,
+        "catalog_root": "R0"
+      },
+      "rejections": {
+        "x1": "issuer_not_active",
+        "x2": "issuer_lacks_capability",
+        "x3": "issuer_lacks_capability",
+        "x4": "issuer_lacks_capability",
+        "x5": "issuer_lacks_capability",
+        "x6": "issuer_lacks_capability"
+      }
+    },
+    {
+      "name": "preemptive_revoke_then_add",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "r4", "kind": "revoke", "issuer": "N1", "parents": ["g"], "subject": "N4" },
+        { "op": "a4", "kind": "add", "issuer": "N1", "parents": ["r4"], "subject": "N4", "caps_add": "preset:phone" },
+        { "op": "r4b", "kind": "revoke", "issuer": "N1", "parents": ["a4"], "subject": "N4" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N4": "revoked" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": { "a4": "subject_tombstoned", "r4b": "already_tombstoned" }
+    },
+    {
+      "name": "subject_rules",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" },
+        { "op": "x1", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N1", "caps_add": ["ui"] },
+        { "op": "x2", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N2", "caps_add": ["store"] },
+        { "op": "x3", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N9", "caps_add": ["ui"] },
+        { "op": "x4", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N2" },
+        { "op": "x5", "kind": "grant", "issuer": "N1", "parents": ["a2"], "subject": "N2", "caps_add": ["ui"], "caps_remove": ["ui"] }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {
+        "x1": "self_add",
+        "x2": "subject_already_member",
+        "x3": "subject_not_active",
+        "x4": "empty_grant",
+        "x5": "overlapping_grant"
+      }
+    },
+    {
+      "name": "policy_last_writer_wins_concurrently",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "p1", "kind": "policy_set", "issuer": "N1", "parents": ["g"], "policy": { "map": [[0, { "uint": 0 }]] } },
+        { "op": "p2", "kind": "policy_set", "issuer": "N1", "parents": ["g"], "policy": { "map": [[1, { "uint": 60000 }]] } }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "policy_op": "p2"
+      },
+      "rejections": {}
+    },
+    {
+      "name": "policy_causal_order",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "p1", "kind": "policy_set", "issuer": "N1", "parents": ["g"], "policy": { "map": [[0, { "uint": 0 }]] } },
+        { "op": "p2", "kind": "policy_set", "issuer": "N1", "parents": ["p1"], "policy": { "map": [[1, { "uint": 60000 }]] } }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "policy_op": "p2"
+      },
+      "rejections": {}
+    },
+    {
+      "name": "policy_invalid",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "pb", "kind": "policy_set", "issuer": "N1", "parents": ["g"], "policy": { "map": [[0, { "uint": 5 }]] } },
+        { "op": "pk", "kind": "policy_set", "issuer": "N1", "parents": ["g"], "policy": { "map": [[12, { "uint": 1 }]] } }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "policy_op": null
+      },
+      "rejections": { "pb": "policy_invalid", "pk": "policy_invalid" }
+    },
+    {
+      "name": "catalog_root_chain",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "m1", "kind": "catalog_root_move", "issuer": "N1", "parents": ["g"], "new_root": "R1", "prev_root": "R0" },
+        { "op": "m2", "kind": "catalog_root_move", "issuer": "N1", "parents": ["m1"], "new_root": "R2", "prev_root": "R1" }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "catalog_root": "R2",
+        "superseded_roots": ["R0", "R1"]
+      },
+      "rejections": {}
+    },
+    {
+      "name": "concurrent_root_moves_lower_op_id_wins",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "m1", "kind": "catalog_root_move", "issuer": "N1", "parents": ["g"], "new_root": "R1", "prev_root": "R0" },
+        { "op": "m2", "kind": "catalog_root_move", "issuer": "N1", "parents": ["g"], "new_root": "R2", "prev_root": "R0" }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "catalog_root": "R2",
+        "superseded_roots": ["R0", "R1"]
+      },
+      "rejections": {}
+    },
+    {
+      "name": "catalog_root_move_rejections",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "m1", "kind": "catalog_root_move", "issuer": "N1", "parents": ["g"], "new_root": "R1", "prev_root": "R0" },
+        { "op": "m2", "kind": "catalog_root_move", "issuer": "N1", "parents": ["m1"], "new_root": "R3", "prev_root": "R0" },
+        { "op": "m3", "kind": "catalog_root_move", "issuer": "N1", "parents": ["m1"], "new_root": "R0", "prev_root": "R1" },
+        { "op": "m4", "kind": "catalog_root_move", "issuer": "N1", "parents": ["m1"], "new_root": "R1", "prev_root": "R1" }
+      ],
+      "expect": {
+        "status": { "N1": "active" },
+        "caps": { "N1": "preset:first_device" },
+        "admins": ["N1"],
+        "locked": false,
+        "catalog_root": "R1",
+        "superseded_roots": ["R0"]
+      },
+      "rejections": { "m2": "prev_root_mismatch", "m3": "root_reused", "m4": "root_reused" }
+    },
+    {
+      "name": "add_with_and_without_catalog_write",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:read_only" },
+        { "op": "a3", "kind": "add", "issuer": "N1", "parents": ["a2"], "subject": "N3", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active", "N3": "active" },
+        "caps": { "N1": "preset:first_device", "N2": ["catalog", "ui"], "N3": "preset:phone" },
+        "admins": ["N1"],
+        "locked": false
+      },
+      "rejections": {}
+    },
+    {
+      "name": "genesis_without_admin",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": ["ui"], "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": {},
+        "caps": {},
+        "admins": [],
+        "locked": false,
+        "catalog_root": null
+      },
+      "rejections": { "g": "genesis_without_admin", "a2": "locked" }
+    },
+    {
+      "name": "every_arrival_order",
+      "permutations": "all",
+      "ops": [
+        { "op": "g", "kind": "genesis", "issuer": "N1", "caps_add": "preset:first_device", "catalog_root": "R0" },
+        { "op": "a2", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N2", "caps_add": "preset:first_device" },
+        { "op": "a3", "kind": "add", "issuer": "N1", "parents": ["g"], "subject": "N3", "caps_add": "preset:phone" },
+        { "op": "r3", "kind": "revoke", "issuer": "N2", "parents": ["a2"], "subject": "N3" },
+        { "op": "gr", "kind": "grant", "issuer": "N1", "parents": ["a3"], "subject": "N3", "caps_add": ["node.execute"] },
+        { "op": "a4", "kind": "add", "issuer": "N2", "parents": ["a2"], "subject": "N4", "caps_add": "preset:phone" }
+      ],
+      "expect": {
+        "status": { "N1": "active", "N2": "active", "N3": "revoked", "N4": "active" },
+        "caps": { "N1": "preset:first_device", "N2": "preset:first_device", "N4": "preset:phone" },
+        "admins": ["N1", "N2"],
+        "locked": false
+      },
+      "rejections": {}
+    }
+  ]
+}

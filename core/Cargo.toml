@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership"]
 
 [workspace.package]
 edition = "2024"
@@ -26,6 +26,8 @@ tempfile = "3"
 blake3 = { version = "1.8", default-features = false }
 ed25519-dalek = { version = "3", default-features = false, features = ["fast", "zeroize"] }
 core-log = { path = "crates/core-log" }
+core-membership = { path = "crates/core-membership" }
+fixedbitset = { version = "0.5.9", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 sha1 = { version = "0.10", default-features = false }
 sha2 = { version = "0.10", default-features = false }

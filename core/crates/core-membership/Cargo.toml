@@ -1,0 +1,24 @@
+[package]
+name = "core-membership"
+version = "0.1.0"
+description = "Constellation membership (M1): signed op DAG, BCBOR encoding, causal evaluation. Pure; no I/O; wasm-safe."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+core-proto.workspace = true
+core-store.workspace = true
+fixedbitset.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+core-testkit.workspace = true
+proptest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
