@@ -119,7 +119,7 @@ class IrohNodeConnectionDrainingTest {
             AppServerInboundFrame.AbortMessageResponse(requestId = "abort", runtime = runtime, aborted = true, success = true)
     }
 
-    private fun inputFrame(requestId: String): String = AppServerProtocol.json.encodeToString(
+    private fun inputFrame(requestId: String?): String = AppServerProtocol.json.encodeToString(
         AppServerCommand.serializer(),
         AppServerCommand.Input(
             runtime = runtime,
@@ -182,6 +182,42 @@ class IrohNodeConnectionDrainingTest {
         assertEquals(0, turnHost.liveTurnCount, "no turn was started for the refused input")
         assertTrue(controller.commands.isEmpty(), "the controller never saw the refused input")
 
+        wire.inbound.close()
+    }
+
+    @Test
+    fun inputWithoutRequestIdIsSilentlyRefusedDuringDrain() = runTest {
+        val controller = HangingTurnController()
+        val host = drainingHost()
+        val wire = serveConnection(controller, host)
+        assertNotNull(host.beginDrain(5.minutes))
+        wire.inbound.send(inputFrame(null))
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(controller.commands.isEmpty())
+        assertEquals(0, host.liveTurnCount)
+        assertTrue(wire.outbound.none { it.contains("input_accepted") })
+        wire.inbound.close()
+    }
+
+    @Test
+    fun redeliveryDuringDrainAcknowledgesTheRunningTurn() = runTest {
+        val controller = HangingTurnController()
+        val host = drainingHost()
+        val wire = serveConnection(controller, host)
+        wire.inbound.send(inputFrame("req-redelivery"))
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(1, controller.commands.size)
+        assertNotNull(host.beginDrain(5.minutes))
+        wire.inbound.send(inputFrame("req-redelivery"))
+        advanceTimeBy(100)
+        runCurrent()
+        val acknowledgements = wire.outbound.filter { it.contains("input_accepted") }
+        assertTrue(acknowledgements.any { it.contains("\"accepted\":true") })
+        assertTrue(acknowledgements.none { it.contains("\"accepted\":false") })
+        assertEquals(1, controller.commands.size)
+        controller.releaseTurns.single().complete(Unit)
         wire.inbound.close()
     }
 

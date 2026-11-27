@@ -16,6 +16,27 @@ import org.junit.jupiter.api.Test
  */
 class ShutdownDrainWiringTest {
     @Test
+    fun `owned host closes after drain even if cleanup fails`() = runBlocking {
+        val events = mutableListOf<String>()
+        runCatching {
+            cleanupAfterDrain(
+                drain = { events += "drain" },
+                cleanup = { events += "cleanup"; error("cleanup failure") },
+                closeOwned = { events += "owned close" },
+            )
+        }
+        assertEquals(listOf("drain", "cleanup", "owned close"), events)
+    }
+
+    @Test
+    fun `owned server startup does not register an independent shutdown hook`() {
+        val source = java.io.File("src/main/kotlin/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt").readText()
+        val startup = source.substringAfter("private suspend fun startOwnedAppServer(").substringBefore("\n    }")
+        assertTrue(startup.contains("host.acquire()"))
+        assertFalse(startup.contains("addShutdownHook"))
+    }
+
+    @Test
     fun `the drain bound defaults to the unit's 300s and clamps negatives to zero`() {
         assertEquals(300.seconds, shutdownDrainBound(DEFAULT_SHUTDOWN_DRAIN_SECONDS))
         assertEquals(300.seconds, shutdownDrainBound(300))
