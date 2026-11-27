@@ -77,10 +77,9 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `Android keeps the brand slate and steel support roles on the Default palette`() {
-        val colors = presetThemeColors(ThemePreset.DEFAULT)
-        val dark = lettaThemeScheme(colors.darkScheme, brandPalette = true)
-        val light = lettaThemeScheme(colors.lightScheme, brandPalette = true)
+    fun `the Default palette keeps the brand support roles`() {
+        val dark = lettaColorScheme(dark = true, preset = ThemePreset.DEFAULT)
+        val light = lettaColorScheme(dark = false, preset = ThemePreset.DEFAULT)
         assertEquals(Color(0xFF8C98A3), dark.secondary)
         assertEquals(Color(0xFFA9B3BC), dark.tertiary)
         assertEquals(Color(0xFF4C5761), light.secondary)
@@ -90,17 +89,9 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `Android Default draws the same vermilion primary roles as desktop and the web`() {
-        val colors = presetThemeColors(ThemePreset.DEFAULT)
-        for (base in listOf(colors.darkScheme, colors.lightScheme)) {
-            val drawn = lettaThemeScheme(base, brandPalette = true)
-            assertEquals(base.primary, drawn.primary)
-            assertEquals(base.onPrimary, drawn.onPrimary)
-            assertEquals(base.primaryContainer, drawn.primaryContainer)
-            assertEquals(base.onPrimaryContainer, drawn.onPrimaryContainer)
-        }
-        assertEquals(Color(0xFFEE5A3F), lettaThemeScheme(colors.darkScheme, brandPalette = true).primary)
-        assertEquals(Color(0xFFE04A32), lettaThemeScheme(colors.lightScheme, brandPalette = true).primary)
+    fun `the Default palette draws the brand vermilion primary roles`() {
+        assertEquals(Color(0xFFEE5A3F), lettaColorScheme(dark = true, preset = ThemePreset.DEFAULT).primary)
+        assertEquals(Color(0xFFE04A32), lettaColorScheme(dark = false, preset = ThemePreset.DEFAULT).primary)
     }
 
     @Test

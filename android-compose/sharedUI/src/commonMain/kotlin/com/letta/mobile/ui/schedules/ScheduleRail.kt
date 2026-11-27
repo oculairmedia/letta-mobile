@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.schedules
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -178,7 +177,7 @@ private fun StatusBadge(label: String, active: Boolean) {
 @Composable
 private fun NextRunCard(def: ScheduleDef, now: Instant, zone: TimeZone) {
     val next = ScheduleProjection.nextRun(def, now)
-    LettaPanel(Modifier.fillMaxWidth(), border = false) {
+    LettaPanel(Modifier.fillMaxWidth()) {
         NextRunContent(def, next, now, zone)
     }
 }

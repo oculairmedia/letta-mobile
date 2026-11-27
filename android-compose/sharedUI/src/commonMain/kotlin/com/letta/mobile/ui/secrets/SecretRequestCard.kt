@@ -69,7 +69,7 @@ data class SecretRequestCardModel(
 @Composable
 fun SecretRequestCard(model: SecretRequestCardModel, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val details = model.request.details
-    LettaPanel(modifier = modifier.fillMaxWidth().testTag(SecretRequestCardTags.CARD), tone = LettaPanelTone.Info, border = false) {
+    LettaPanel(modifier = modifier.fillMaxWidth().testTag(SecretRequestCardTags.CARD), tone = LettaPanelTone.Info) {
         Column(Modifier.padding(LettaDimens.Space.lg), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 Icon(LettaIcons.Key, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))

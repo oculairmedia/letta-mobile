@@ -37,7 +37,7 @@ internal fun SecretRow(key: String, page: AgentVaultPageScope) {
     val revealed = key in page.state.revealed
     // On touch each action reserves its 48dp target in the layout, so neighbouring targets never overlap.
     val actionModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-    LettaPanel(modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.row(key)), border = false) {
+    LettaPanel(modifier = Modifier.fillMaxWidth().testTag(AgentVaultPageTags.row(key))) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,

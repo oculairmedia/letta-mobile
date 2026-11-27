@@ -13175,6 +13175,10 @@ public final class com/letta/mobile/ui/theme/tokens/LettaComponentDimens {
 	public final fun getSwatchSelectedStroke-D9Ej5fM ()F
 }
 
+public final class com/letta/mobile/ui/theme/tokens/LettaContrastPreferenceKt {
+	public static final fun getLocalLettaHighContrast ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/theme/tokens/LettaControlTokens {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/tokens/LettaControlTokens;

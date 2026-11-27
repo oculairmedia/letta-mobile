@@ -70,7 +70,7 @@ class CardGroupScope {
     }
 }
 
-/** Default [ListItemColors] for card group items using [MaterialTheme.colorScheme.surfaceBright]. */
+/** Default [ListItemColors] for card group items using [MaterialTheme.colorScheme.surfaceContainer]. */
 object CardGroupDefaults {
     val listItemColors: ListItemColors
         @Composable get() = MaterialTheme.customColors.listItemColors

@@ -12,6 +12,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
@@ -129,7 +130,7 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         onFreshAccent = if (isLightTheme) Color.White else colorScheme.background,
         freshAccentContainer = freshAccentContainer,
         onFreshAccentContainer = colorScheme.onSurface,
-        listItemContainerColor = colorScheme.surfaceBright,
+        listItemContainerColor = colorScheme.surfaceContainer,
         selectionContainer = complementary.copy(alpha = SELECTION_FILL_ALPHA),
         onSelectionContainer = colorScheme.onSurface,
         selectionIndicator = complementary,
@@ -139,43 +140,36 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     )
 }
 
-/**
- * The scheme LettaTheme draws: [base] with the accent contrast boost. On the brand palette (Default, no wallpaper
- * colours) the primary roles stay the brand's own vermilion, as desktop and the web draw it (the boost's lightness
- * clamp would shift it), and the support roles stay the brand's slate and steel greys: the boost's saturation floor
- * would turn the muted slate into a vivid blue, and vermilion is the only accent.
- */
-@VisibleForTesting
-internal fun lettaThemeScheme(base: ColorScheme, brandPalette: Boolean): ColorScheme {
-    val boosted = base.withLettaContrastBoost()
-    if (!brandPalette) return boosted
-    return boosted.copy(
-        primary = base.primary,
-        onPrimary = base.onPrimary,
-        primaryContainer = base.primaryContainer,
-        onPrimaryContainer = base.onPrimaryContainer,
-        secondary = base.secondary,
-        onSecondary = base.onSecondary,
-        secondaryContainer = base.secondaryContainer,
-        onSecondaryContainer = base.onSecondaryContainer,
-        tertiary = base.tertiary,
-        onTertiary = base.onTertiary,
-        tertiaryContainer = base.tertiaryContainer,
-        onTertiaryContainer = base.onTertiaryContainer,
-    )
-}
-
 // The only caller performs the API 31 SDK check; Qodana does not propagate that guard into this helper.
 @SuppressLint("NewApi")
 private fun dynamicColorSchemeForApi31(context: Context, useDarkTheme: Boolean): ColorScheme =
     if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 
+/**
+ * The wallpaper palette's scheme (Material You, Android 12+, only when the person opted into it in
+ * Settings): the same accent contrast boost and high-contrast lift every other scheme gets.
+ */
+private fun ColorScheme.lettaWallpaperScheme(highContrast: Boolean): ColorScheme =
+    withLettaContrastBoost().let { if (highContrast) it.withHighContrast() else it }
+
+/**
+ * The Material 3 theme Android draws. Its colour scheme is the one the shared theme draws: [lettaColorScheme]'s
+ * Baken North Sea Buoy palette (or the chosen preset's) — byte for byte the scheme the desktop and the web
+ * compose through [SharedMaterialTheme] — with the wallpaper's own colours (Material You, Android 12+) in its
+ * place only when the person opted into them in Settings. High contrast flows through the same
+ * [lettaColorScheme] the shared theme reads, so the accessibility lift is identical on every client. The
+ * Android-only stays Android-only: the OS accessibility policy ([ProvideAccessibilityPolicy]), the expressive
+ * motion scheme, the phone-density [Typography] (Inter at Material 3's phone sizes — the split from the
+ * desktop's compact [SharedTypography] is by screen density, not drift), and the Letta [CustomColors] bridge
+ * ([deriveCustomColors]), whose extra roles (HCT-harmonized warning and error, the fresh accent, selection)
+ * only the Android design system reads.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LettaTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
     themePreset: ThemePreset = ThemePreset.DEFAULT,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -186,20 +180,19 @@ fun LettaTheme(
         AppTheme.SYSTEM -> systemDarkTheme
     }
 
-    val presetColors = presetThemeColors(themePreset)
     val wallpaperColors = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val baseColorScheme = if (wallpaperColors) {
-        dynamicColorSchemeForApi31(context, useDarkTheme)
-    } else {
-        if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
-    }
     ProvideAccessibilityPolicy {
         val highContrast = LocalHighContrast.current
-        val brandPalette = !wallpaperColors && themePreset == ThemePreset.DEFAULT
-        val colorScheme = lettaThemeScheme(baseColorScheme, brandPalette).let { boosted ->
-            if (highContrast) boosted.withHighContrast() else boosted
+        // The desktop's scheme for the appearance, remembered as the shared theme remembers it.
+        val sharedScheme = remember(useDarkTheme, highContrast, themePreset) {
+            lettaColorScheme(useDarkTheme, highContrast, themePreset)
         }
-        val customColors = deriveCustomColors(colorScheme)
+        val colorScheme = if (wallpaperColors) {
+            dynamicColorSchemeForApi31(context, useDarkTheme).lettaWallpaperScheme(highContrast)
+        } else {
+            sharedScheme
+        }
+        val customColors = remember(colorScheme) { deriveCustomColors(colorScheme) }
 
         CompositionLocalProvider(LocalCustomColors provides customColors) {
             MaterialExpressiveTheme(
