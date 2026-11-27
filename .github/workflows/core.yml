@@ -93,9 +93,12 @@ jobs:
         run: cargo build --locked -p core-ffi --lib --profile ffi-release
       - name: Generated Kotlin bindings match the library
         run: |
+          # The shipped Linux library has its symbols stripped, and UniFFI reads its metadata from them:
+          # generate from the unstripped dev build. The bindings do not depend on the profile.
+          cargo build --locked -p core-ffi --lib
           out="$RUNNER_TEMP/uniffi"
           cargo run --locked -p core-ffi --features bindgen --bin uniffi-bindgen -- generate \
-            --library target/ffi-release/libbaken_core.so --language kotlin --no-format --out-dir "$out"
+            --library target/debug/libbaken_core.so --language kotlin --no-format --out-dir "$out"
           diff -ru ../android-compose/sharedLogic/src/jvmAndAndroid/generated/uniffi "$out" \
             || { echo "::error::Regenerate the bindings (docs/reference/contracts/ffi/ffi-v1.md F-6)"; exit 1; }
       - name: Size report (report-only)

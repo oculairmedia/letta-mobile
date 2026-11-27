@@ -32,13 +32,15 @@ core-node's. The runtime and binding model is core-architecture's §(c): one tok
 
   ```
   cd core
-  cargo build -p core-ffi --lib --profile ffi-release
+  cargo build -p core-ffi --lib
   cargo run -p core-ffi --features bindgen --bin uniffi-bindgen -- generate \
-    --library target/ffi-release/<lib> --language kotlin --no-format \
+    --library target/debug/<lib> --language kotlin --no-format \
     --out-dir ../android-compose/sharedLogic/src/jvmAndAndroid/generated/uniffi
   ```
 
-  CI regenerates it from the Linux library and fails when the committed file differs (§8).
+  The generator reads the library's UniFFI metadata from its symbols, so it runs on the unstripped dev build (the
+  stripped `ffi-release` Linux library carries none). CI regenerates it from the Linux dev library and fails when the
+  committed file differs (§8).
 - F-7 Nothing outside the adapter package uses the generated types directly. The adapter exposes `CoreNodeHandle` (an
   interface), `callbackFlow` streams and `suspend` calls, and the Kotlin implementations of the foreign traits.
 
