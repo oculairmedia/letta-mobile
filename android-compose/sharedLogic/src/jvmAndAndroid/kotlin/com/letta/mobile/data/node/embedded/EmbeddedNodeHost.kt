@@ -20,6 +20,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,9 +72,16 @@ class EmbeddedNodeHost(
         return generation().carrier.dial(address)
     }
 
-    /** Ends the current generation, if any; its links are lost and the next dial starts a new one. */
+    /**
+     * Ends the current generation, if any, and waits for it to finish, so that a replacement never opens the stores the
+     * old one is still closing. Its links are lost and the next dial starts a new one.
+     */
     suspend fun restart() {
-        mutex.withLock { stopCurrent() }
+        mutex.withLock {
+            val ending = current?.job
+            stopCurrent()
+            ending?.cancelAndJoin()
+        }
     }
 
     /** Ends the current generation and refuses every later dial. Idempotent. */
