@@ -125,6 +125,7 @@ internal class IrohLinkCore(
                     val frame = decode(text) ?: return@readFrames close(MALFORMED_FRAME)
                     sink.send(frame)
                 }
+                if (!closeAtEnd) close(NodeLinkClosure.LOST)
             } catch (error: CancellationException) {
                 throw error
             } catch (violation: IrohFrameCodec.ProtocolException) {
