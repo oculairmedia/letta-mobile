@@ -293,7 +293,9 @@ Error codes: `constellation_mismatch`, `not_member`, `forbidden`, `bad_signature
    `epoch_open` ahead of queued entries. With a live want the responder also sends a `head` for each of the log's
    other segments; a receiver wants any head it does not hold (unless it already asked for that far). When a node
    stores entries of a log a peer has not subscribed to (a log new to the peer), it announces that log's segment
-   heads to the peer once; a receiver's want for a log it has no live subscription to is live.
+   heads to the peer once; a receiver's want for a log it has no live subscription to is live. A receiver that
+   already holds an announced head (another session brought it first) still sends one live `want` from its canonical
+   head if it has no live subscription to that log on this session, so later entries the peer stores reach it.
 6. The receiver verifies and stores each entry (section 4), evaluates the log once per frame when needed, commits,
    and then acks: one `ack` per segment touched by the frame, naming the highest position of that segment it took
    from the frame (stored, duplicate or buffered). It reports newly stored entries to its node, which pushes them to

@@ -398,6 +398,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [shell.state.propose: shell state v1](reference/contracts/shell.state.propose/shell-state-v1.md)
 
+### reference/contracts/simulator
+
+- [Baken core simulator v1](reference/contracts/simulator/simulator-v1.md)
+
 ### reference/contracts/slash\_command.execute
 
 - [Slash command execution v1](reference/contracts/slash_command.execute/execute-v1.md)
