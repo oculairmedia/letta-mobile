@@ -317,6 +317,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [monitor.stop: Background process stop v1](reference/contracts/monitor.stop/process-v1.md)
 
+### reference/contracts/node
+
+- [Node v1: the composition root \(core-node\)](reference/contracts/node/node-v1.md)
+
 ### reference/contracts/node-carrier
 
 - [Node carrier v1: one client stack over any transport](reference/contracts/node-carrier/node-carrier-v1.md)
@@ -341,6 +345,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/placement
 
 - [Placement v1: placement, handoff and failover \(X1/X6\)](reference/contracts/placement/placement-v1.md)
+
+### reference/contracts/projection
+
+- [Projection v1: the letta-code store as log payloads, and back \(R2\)](reference/contracts/projection/projection-v1.md)
 
 ### reference/contracts/reflection.get
 

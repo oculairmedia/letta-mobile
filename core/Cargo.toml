@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement", "crates/core-carrier", "crates/core-carrier-iroh", "crates/core-catalog"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement", "crates/core-carrier", "crates/core-carrier-iroh", "crates/core-catalog", "crates/core-projection", "crates/core-node"]
 
 [workspace.package]
 edition = "2024"
@@ -45,6 +45,11 @@ samod = { version = "=0.9.0", default-features = false, features = ["tokio"] }
 ciborium = "=0.2.2"
 regex = { version = "1.12", default-features = false, features = ["std", "unicode-perl"] }
 base64 = "0.22"
+# core-projection: git objects, refs and checkout; backend file watching; directory walks.
+gix = { version = "=0.91.0", default-features = false, features = ["sha1", "index", "excludes", "worktree-mutation"] }
+notify-debouncer-mini = { version = "=0.8.0", default-features = false }
+walkdir = "2.5.1"
+core-projection = { path = "crates/core-projection" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

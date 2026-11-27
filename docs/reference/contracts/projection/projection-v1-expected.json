@@ -1,0 +1,41 @@
+{
+  "manifest": [
+    [
+      "agents/YWdlbnQtbG9jYWwtMjEyZDA4YmEtZmNlZi00ODAwLThhMTEtZTU4ZTQxNWJjOTM0.json",
+      "4f2c614d1919a35d4d2cacbee9cbe3734d4de5210d4e75a065788d7f85494c6c",
+      213
+    ],
+    [
+      "conversations/Y29udmVyc2F0aW9uOmxvY2FsLWNvbnYtODZjODA0NmEtOTI0NS00ZmQzLTlhMDYtNmZkN2MzMTY3Yzgz/blobs/note.txt",
+      "d3c596beff3569ad0436f52ac241a1a38f17c1f97c5c253b59e5264a28718706",
+      17
+    ],
+    [
+      "conversations/Y29udmVyc2F0aW9uOmxvY2FsLWNvbnYtODZjODA0NmEtOTI0NS00ZmQzLTlhMDYtNmZkN2MzMTY3Yzgz/conversation.json",
+      "8911c90474ca2b7abd2af5e2ba03454c52c3e84372c07db55a8bb7071f0ca79e",
+      228
+    ],
+    [
+      "conversations/Y29udmVyc2F0aW9uOmxvY2FsLWNvbnYtODZjODA0NmEtOTI0NS00ZmQzLTlhMDYtNmZkN2MzMTY3Yzgz/messages.jsonl",
+      "34213b8fcf2038e7eec9ddccc2b7ae12a0e737c7134a8b35ca2565abd84e37c9",
+      244
+    ],
+    [
+      "conversations/ZGVmYXVsdDphZ2VudC1sb2NhbC0yMTJkMDhiYS1mY2VmLTQ4MDAtOGExMS1lNThlNDE1YmM5MzQ/conversation.json",
+      "a88a4196f18b3ff0869df2e498347fd92eab9b02dc1da6d1361aacb5e40f468f",
+      141
+    ],
+    [
+      "conversations/ZGVmYXVsdDphZ2VudC1sb2NhbC0yMTJkMDhiYS1mY2VmLTQ4MDAtOGExMS1lNThlNDE1YmM5MzQ/messages.jsonl",
+      "d1e5e4ef9d4f0dc7ebf21b4f4f31d3baff1bcffe1d6a94256329ce597f5528ee",
+      415
+    ]
+  ],
+  "refs": [
+    [
+      "memfs/agent-local-212d08ba-fcef-4800-8a11-e58e415bc934/memory",
+      "refs/heads/main",
+      "975c33f00294ec8362fe052ac4ee8a7c576eeb71"
+    ]
+  ]
+}

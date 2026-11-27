@@ -1,0 +1,37 @@
+[package]
+name = "core-node"
+version = "0.1.0"
+description = "The Baken node composition root: one tokio runtime per node holding the store, membership, the catalog node, the carrier and its protocols (the node session, baken/log/1, baken/place/1, baken/member/1, meridian/automerge-repo/1) and the feed journal; one actor per held agent driving the log, placement (moves, failover, fenced reporting) and the projection; the RuntimeHost trait for supervising letta-code; node.info."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+backon.workspace = true
+bytes.workspace = true
+core-carrier.workspace = true
+core-catalog = { path = "../core-catalog" }
+core-log.workspace = true
+core-membership.workspace = true
+core-placement = { path = "../core-placement" }
+core-projection.workspace = true
+core-proto.workspace = true
+core-store.workspace = true
+futures.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "rt-multi-thread", "macros", "time", "io-util"] }
+tokio-util = { workspace = true, features = ["codec"] }
+
+[dev-dependencies]
+core-projection = { workspace = true, features = ["testing"] }
+core-testkit.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "rt-multi-thread", "macros", "time", "io-util", "test-util"] }
+
+[lints]
+workspace = true
