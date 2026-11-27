@@ -7,6 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 class NodeInfoServiceTest {
@@ -120,5 +121,34 @@ class NodeInfoServiceTest {
         assertEquals(NodeHandshakeResult.Legacy, unknown.run())
         assertEquals(NodeHandshakeResult.Legacy, gated.run())
         assertEquals(NodeHandshakeResult.Failed("Not connected to a host"), broken.run())
+    }
+
+    @Test
+    fun aResponseWithoutAStoreFormatIsNotChecked() = runTest {
+        val wire = JsonObject(NodeInfoService(NodeFacts.UNKNOWN).readJson().jsonObject - "store_format")
+
+        val result = NodeHandshake(NodeInfoRpc { _, _ -> wire }).run()
+
+        assertIs<NodeHandshakeResult.Failed>(result)
+    }
+
+    @Test
+    fun aFailingReferenceDoesNotMakeTheTargetLegacy() = runTest {
+        val wire = NodeInfoService(NodeFacts.UNKNOWN).readJson()
+
+        val result = NodeHandshake(NodeInfoRpc { _, _ -> wire }) { throw IllegalStateException("forbidden") }.run()
+
+        assertIs<NodeHandshakeResult.Checked>(result)
+    }
+
+    @Test
+    fun patchCountsCompareSkippedOnlyWhenBothSidesReportIt() {
+        val bootLine = RuntimePatchSet.SOURCE_BOOT_LINE
+        val withSkipped = RuntimePatchSet(bootLine, applied = 36, skipped = 2)
+        val withoutSkipped = RuntimePatchSet(bootLine, applied = 36)
+
+        assertNull(withSkipped.differsFrom(withoutSkipped))
+        assertEquals(true, withSkipped.differsFrom(RuntimePatchSet(bootLine, applied = 36, skipped = 1)))
+        assertEquals(true, withoutSkipped.differsFrom(RuntimePatchSet(bootLine, applied = 35)))
     }
 }
