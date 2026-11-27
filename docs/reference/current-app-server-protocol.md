@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 63528bef8639a3ce3aace2a6b83177ef2a35258d7bc7d7b6459f9c098584dbd9 | 6037b48e26e5e4a5583e3337dbb6c396b962d813 |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 114a04ad06da980a98306e1b8c7c6e19426a2bd614686f74a853a73fc7002fe4 | 398a627051a461afcef93062d5d6a7fceefda3ca |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 4854dc8ef2bfb8ea88a81b33314c7ab1004c0eac15d6ca30f1ff51c1012df2c2 | 117b806af6648cebd4afa91d154f0bd8b125b680 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 8b56983a48cf380cd51e7a54d3c852d3ac70b93300468170af6037a2bdc6179b | 0e17045be62c5513c09d719781721d382d5f2bba |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -299,7 +299,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (187 methods)
+## Admin ownership (188 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -308,7 +308,7 @@ These are declared ownership decisions, not newly observed production execution.
 | app&#95;server&#95;v2 | 62 |
 | beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
-| controller&#95;native | 60 |
+| controller&#95;native | 61 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
 | vibesync&#95;service | 8 |
@@ -316,7 +316,7 @@ These are declared ownership decisions, not newly observed production execution.
 | Fallback | Method count |
 | --- | --- |
 | deny&#95;fail&#95;closed | 74 |
-| none | 113 |
+| none | 114 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
 | --- | --- | --- | --- | --- | --- |
@@ -417,6 +417,7 @@ These are declared ownership decisions, not newly observed production execution.
 | model.list.embedding | controller&#95;native | none | admin&#95;read | ModelAdminHandlers.kt | controller-owned embedding-model catalog |
 | model.update | app&#95;server&#95;v2 | none | conversation&#95;scoped | ModelAdminHandlers.kt | update&#95;model |
 | monitor.stop | app&#95;server&#95;v2 | none | runtime&#95;write | BackgroundProcessAdminHandler.kt | monitor&#95;stop |
+| node.info | controller&#95;native | none | admin&#95;read | NodeInfoService.kt | node identity for the version handshake (OS family, app and letta-code versions, store format, capabilities, models, runtime patch set) |
 | pair.invite.create | controller&#95;native | none | admin&#95;write | PairingAdminHandlers.kt | IrohPairingService one-time invite |
 | pair.invite.list | controller&#95;native | none | admin&#95;read | PairingAdminHandlers.kt | Unredeemed invite listing (non-secret ids, expiry, grant only) |
 | pair.invite.revoke | controller&#95;native | none | admin&#95;write | PairingAdminHandlers.kt | Revoke an unredeemed invite by non-secret id |
