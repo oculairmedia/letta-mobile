@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -14,7 +14,10 @@ import { spawnSync } from "node:child_process";
 // so the load hook sees the main-entry URL, not an import from the test.
 
 const REGISTER = fileURLToPath(new URL("../letta-code-patch-register.mjs", import.meta.url));
-const ENTRY_SOURCE = "console.log('entry ok');\n";
+// The loader hook prints from a worker thread whose stderr writes are forwarded asynchronously
+// and are dropped when the process exits immediately (any stdio kind; production's server lives
+// far longer than its boot lines). Hold the child open briefly so every loader line lands.
+const ENTRY_SOURCE = "console.log('entry ok');\nawait new Promise((resolve) => setTimeout(resolve, 300));\n";
 const BUNDLE_SEGMENTS = join("node_modules", "@letta-ai", "letta-code", "letta.js");
 
 type Sandbox = { root: string; bundle: (name: string) => string };
@@ -36,13 +39,29 @@ function sandbox(t: { after: (fn: () => void) => void }): Sandbox {
   return { root, bundle };
 }
 
-/** Runs `node <entry>` with the real register in NODE_OPTIONS, the way the service env does. */
+let stderrFileCount = 0;
+
+/**
+ * Runs `node <entry>` with the real register in NODE_OPTIONS, the way the service env does, and
+ * returns the child with `stderr` read back from a file: the loader hook writes from a worker
+ * thread, and to a pipe those writes are async and can be lost when the child exits immediately
+ * (production's boot log is a file, where Node writes synchronously).
+ */
 function runWithRegister(entry: string, env: Record<string, string>) {
-  return spawnSync(process.execPath, [entry], {
-    encoding: "utf8",
-    env: { PATH: process.env.PATH ?? "", NODE_OPTIONS: `--import=${pathToFileURL(REGISTER).href}`, ...env },
-    timeout: 60_000,
-  });
+  const errPath = join(tmpdir(), `lcp-bundle-mismatch-stderr-${process.pid}-${stderrFileCount++}.log`);
+  const errFd = openSync(errPath, "w");
+  try {
+    const child = spawnSync(process.execPath, [entry], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "", NODE_OPTIONS: `--import=${pathToFileURL(REGISTER).href}`, ...env },
+      stdio: ["ignore", "pipe", errFd],
+      timeout: 60_000,
+    });
+    return { ...child, stderr: readFileSync(errPath, "utf8") };
+  } finally {
+    closeSync(errFd);
+    rmSync(errPath, { force: true });
+  }
 }
 
 test("bundle mismatch: a letta.js other than the pin loads with a loud ERROR naming both paths", (t) => {
