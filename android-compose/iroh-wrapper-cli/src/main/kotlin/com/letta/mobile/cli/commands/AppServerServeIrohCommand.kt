@@ -381,14 +381,18 @@ class AppServerServeIrohCommand : CliktCommand(
                 // FIRST, before anything closes: drain the live turns while the endpoint still
                 // relays their frames, so the App Server connection close that follows cancels
                 // no in-flight turn with cause "transport".
-                drainActiveTurnsBeforeShutdown(irohEndpoint, shutdownDrainBound(shutdownDrainSeconds))
-                println("\n[iroh-app-server] Shutting down...")
-                runCatching { irohEndpoint?.shutdown() }
-                runCatching { notebookProtocol?.close() }
-                runCatching { notebookStore?.close() }
-                runCatching { ownedServer?.close() }
-                runCatching { pluginHost?.close() }
-                scope.cancel()
+                cleanupAfterDrain(
+                    drain = { drainActiveTurnsBeforeShutdown(irohEndpoint, shutdownDrainBound(shutdownDrainSeconds)) },
+                    cleanup = {
+                        println("\n[iroh-app-server] Shutting down...")
+                        runCatching { irohEndpoint?.shutdown() }
+                        runCatching { notebookProtocol?.close() }
+                        runCatching { notebookStore?.close() }
+                        runCatching { pluginHost?.close() }
+                        scope.cancel()
+                    },
+                    closeOwned = { ownedServer?.close() },
+                )
             },
         ) {
             val authPolicy = resolveAuthPolicy()
@@ -687,7 +691,6 @@ class AppServerServeIrohCommand : CliktCommand(
      */
     private suspend fun startOwnedAppServer(host: LocalAppServerHost, scope: CoroutineScope): LocalAppServerLease {
         println("[iroh-app-server] Starting owned App Server ($lettaCommand server)...")
-        Runtime.getRuntime().addShutdownHook(Thread(host::close))
         val lease = host.acquire()
         println("[iroh-app-server] Owned App Server ready at ${lease.serverUrl}")
         scope.launch {
@@ -1046,3 +1049,13 @@ internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?, environmentDir: 
 /** [voiceMemoryDir] with this process's `LETTA_LOCAL_BACKEND_DIR`. */
 internal fun voiceMemoryDir(effectiveBackendDir: java.io.File?): java.io.File? =
     voiceMemoryDir(effectiveBackendDir, System.getenv("LETTA_LOCAL_BACKEND_DIR"))
+
+internal suspend fun cleanupAfterDrain(drain: suspend () -> Unit, cleanup: suspend () -> Unit, closeOwned: () -> Unit) {
+    try {
+        drain()
+        cleanup()
+    } finally {
+        // The owned child must outlive the drain, including on cleanup failure.
+        runCatching { closeOwned() }
+    }
+}

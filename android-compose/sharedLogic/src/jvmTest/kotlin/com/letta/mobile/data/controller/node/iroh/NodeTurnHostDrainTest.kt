@@ -82,6 +82,21 @@ class NodeTurnHostDrainTest : TelemetryRecordingTest() {
         assertNotNull(attrs[attr]?.textOrNull, "$name must carry $attr")
 
     @Test
+    fun admittedInputIsCountedBeforeItsJobStarts() = runTest {
+        val host = NodeTurnHost(CoroutineScope(backgroundScope.coroutineContext + SupervisorJob()))
+        assertEquals(1, host.admitInput(null) { false })
+        assertNotNull(host.beginDrain(5.minutes))
+        val waiting = async { host.awaitDrained() }
+        runCurrent()
+        assertFalse(waiting.isCompleted)
+        assertEquals(0, host.admitInput(null) { false })
+        host.finishAdmission(null, releaseLive = true)
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(waiting.isCompleted)
+    }
+
+    @Test
     fun shutdownWithNoLiveTurnsClosesAtOnce() = runTest {
         val host = NodeTurnHost(CoroutineScope(backgroundScope.coroutineContext + SupervisorJob()))
         var clock = 1_000L
