@@ -489,6 +489,10 @@ Per-OS bindings of a node's ports on JVM hosts: App Server process identity that
 
 The Iroh node carrier. `IrohNodeCarrier` dials a node over QUIC with the stream layout and frame codec nodes already serve (first bi-stream control, second push, every later one an admin_rpc call lane; `frame_part` chunking stays inside the carrier), and `serveIrohNodePeer` serves one accepted Iroh connection to a `NodePeerAcceptor` as the node end of the link. Application close codes and reasons cross unchanged; a connection lost without one is `LOST`.
 
+# Package com.letta.mobile.data.node.info
+
+What a node tells a peer about itself and how a peer judges the answer: the `node.info` wire shape (identity, protocol and store format versions, runtime patch set), the service that assembles it from host facts, the handshake that asks for it, and the compatibility rule that turns the answer into a verdict with named reasons. Hosts supply facts through ports; nothing here reads a platform.
+
 # Package com.letta.mobile.data.pairing
 
 Pair-invite parsing, flow state, device access and paired-host storage ports. Scanned data moves through explicit invite/session states before becoming a stored connection. Keep scanners, QR drawing and platform storage outside pairing state; provide effects through [PairingRedeemer](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-pairing-redeemer/index.html), [PairedHostStore](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-paired-host-store/index.html), [QrEncoder](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) and [BackendConfigSink](https://oculairmedia.github.io/baken/api/sharedLogic/com.letta.mobile.data.pairing/-backend-config-sink/index.html).
