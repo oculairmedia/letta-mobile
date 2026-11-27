@@ -85346,7 +85346,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSock
 final suspend fun com.letta.mobile.ui.chat.render/chatSearchRemoteHits(com.letta.mobile.data.model/AgentId, kotlin/String, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/MessageSearchRequest, kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage>>): kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage> // com.letta.mobile.ui.chat.render/chatSearchRemoteHits|chatSearchRemoteHits(com.letta.mobile.data.model.AgentId;kotlin.String;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.MessageSearchRequest,kotlin.collections.List<com.letta.mobile.data.model.ParsedSearchMessage>>){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative, wasmJs]
+// Targets: [mingwX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 
@@ -85391,7 +85391,7 @@ final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kot
     }
 }
 
-// Targets: [mingwX64.hostNative, wasmJs]
+// Targets: [wasmJs]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 
