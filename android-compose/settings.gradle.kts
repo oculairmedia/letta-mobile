@@ -17,6 +17,10 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
+        maven {
+            url = uri("third_party/maven")
+            content { includeVersion("org.automerge", "automerge", "0.0.9-letta1") }
+        }
         // google() only serves Google/AndroidX/AGP coordinates. Filtering it keeps
         // third-party artifacts (leakcanary, ...) from being probed there, so a
         // negative-cache entry from Google's mirror cannot shadow Maven Central.

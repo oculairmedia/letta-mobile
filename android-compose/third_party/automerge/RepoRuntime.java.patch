@@ -1,0 +1,118 @@
+--- a/org/automerge/repo/RepoRuntime.java
++++ b/org/automerge/repo/RepoRuntime.java
+@@ -40,6 +40,7 @@
+     private final ExecutorService documentExecutor;
+     private final SerializingExecutor<DocumentActorId> serializingDocumentExecutor;
+     private final ExecutorService ioExecutor;
++    private final SerializingExecutor<ConnectionId> serializingNetworkExecutor;
+     private final ScheduledExecutorService tickScheduler;
+ 
+     private static final Logger log = LoggerFactory.getLogger(RepoRuntime.class);
+@@ -100,6 +101,7 @@
+             t.setDaemon(true);
+             return t;
+         });
++        this.serializingNetworkExecutor = new SerializingExecutor<>(ioExecutor);
+         this.tickScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+             Thread t = new Thread(r, "automerge-tick");
+             t.setDaemon(true);
+@@ -322,6 +324,7 @@
+ 
+         // Close all transports
+         for (Map.Entry<ConnectionId, Transport> entry : transports.entrySet()) {
++            serializingNetworkExecutor.cleanup(entry.getKey());
+             entry.getValue().close();
+         }
+         transports.clear();
+@@ -517,40 +520,49 @@
+                 ConnectionId connId = send.getConnectionId();
+                 byte[] message = send.getMessage();
+ 
+-                submitToIo(() -> {
+-                    Transport transport = transports.get(connId);
+-                    if (transport == null) {
+-                        log.error("Cannot send on unknown connection: {}", connId);
+-                        return;
+-                    }
+-
+-                    transport.send(message).thenAccept(v -> {
+-                        IoResult<HubIoResult> ioResult = new IoResult<>(taskId, HubIoResult.SEND);
+-                        long now = System.currentTimeMillis();
+-                        submitToHub(() -> RepoSys.hubHandleEventIoComplete(hubPointer, now, ioResult));
+-                    }).exceptionally(err -> {
+-                        log.error("Send failed on connection {}: {}", connId, err.getMessage());
+-
+-                        long now = System.currentTimeMillis();
+-                        submitToHub(() -> RepoSys.hubHandleEventConnectionLost(hubPointer, now, connId));
+-
+-                        IoResult<HubIoResult> ioResult = new IoResult<>(taskId, HubIoResult.SEND);
+-                        submitToHub(() -> RepoSys.hubHandleEventIoComplete(hubPointer, now, ioResult));
+-
+-                        Transport failedTransport = transports.remove(connId);
+-                        if (failedTransport != null) {
+-                            failedTransport.close();
++                try {
++                    serializingNetworkExecutor.execute(connId, new java.util.concurrent.FutureTask<Void>(() -> {
++                        Transport transport = transports.get(connId);
++                        if (transport == null) {
++                            serializingNetworkExecutor.cleanup(connId);
++                            log.error("Cannot send on unknown connection: {}", connId);
++                            return;
+                         }
+ 
+-                        return null;
+-                    });
+-                });
++                        transport.send(message).thenAccept(v -> {
++                            IoResult<HubIoResult> ioResult = new IoResult<>(taskId, HubIoResult.SEND);
++                            long now = System.currentTimeMillis();
++                            submitToHub(() -> RepoSys.hubHandleEventIoComplete(hubPointer, now, ioResult));
++                        }).exceptionally(err -> {
++                            log.error("Send failed on connection {}: {}", connId, err.getMessage());
++
++                            long now = System.currentTimeMillis();
++                            submitToHub(() -> RepoSys.hubHandleEventConnectionLost(hubPointer, now, connId));
++
++                            IoResult<HubIoResult> ioResult = new IoResult<>(taskId, HubIoResult.SEND);
++                            submitToHub(() -> RepoSys.hubHandleEventIoComplete(hubPointer, now, ioResult));
++
++                            Transport failedTransport = transports.remove(connId);
++                            serializingNetworkExecutor.cleanup(connId);
++                            if (failedTransport != null) {
++                                failedTransport.close();
++                            }
++
++                            return null;
++                        });
++                    }, null));
++                } catch (java.util.concurrent.RejectedExecutionException e) {
++                    if (!stopped.get()) {
++                        throw e;
++                    }
++                }
+             } else if (action instanceof HubIoAction.Disconnect) {
+                 HubIoAction.Disconnect disconnect = (HubIoAction.Disconnect) action;
+                 ConnectionId connId = disconnect.getConnectionId();
+ 
+                 submitToIo(() -> {
+                     Transport transport = transports.remove(connId);
++                    serializingNetworkExecutor.cleanup(connId);
+                     if (transport != null) {
+                         transport.close();
+                     }
+@@ -718,6 +730,7 @@
+                 // Clean up transport
+                 ConnectionId connId = event.getConnectionId();
+                 Transport transport = transports.remove(connId);
++                serializingNetworkExecutor.cleanup(connId);
+                 if (transport != null) {
+                     transport.close();
+                 }
+@@ -753,6 +766,7 @@
+                 // onClose
+                 () -> {
+                     transports.remove(connId);
++                    serializingNetworkExecutor.cleanup(connId);
+                     long now = System.currentTimeMillis();
+                     submitToHub(() -> RepoSys.hubHandleEventConnectionLost(hubPointer, now, connId));
+                 });

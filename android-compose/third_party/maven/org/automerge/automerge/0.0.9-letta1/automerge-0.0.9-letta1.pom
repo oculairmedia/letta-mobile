@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.automerge</groupId>
+  <artifactId>automerge</artifactId>
+  <version>0.0.9-letta1</version>
+  <name>Automerge for Java</name>
+  <description>Automerge is a JSON-like data structure that can be modified concurrently by different users, and merged again automatically.</description>
+  <url>https://automerge.org</url>
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>alex</id>
+      <name>Alex Good</name>
+      <email>alex@memoryandthought.me</email>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git://github.com/automerge/automerge-java.git</connection>
+    <developerConnection>scm:git:git://github.com/automerge/automerge-java.git</developerConnection>
+    <url>https://automerge.org</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.9</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.automerge</groupId>
+      <artifactId>androidnative</artifactId>
+      <version>0.0.9</version>
+      <scope>runtime</scope>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+</project>
