@@ -222,6 +222,7 @@ class ApprovalAdminHandlersTest {
             runtime: AppServerRuntimeScope,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
+            resumeInterruptedTurn: Boolean,
         ): AppServerInboundFrame.SyncResponse = error("not used")
 
         override suspend fun abort(

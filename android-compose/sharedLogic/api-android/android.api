@@ -18031,8 +18031,8 @@ public abstract interface class com/letta/mobile/data/controller/AppServerContro
 	public fun submitApproval (Lcom/letta/mobile/data/controller/ControllerApprovalAnswer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun submitApproval-gmR8AXU (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun submitApproval-gmR8AXU$default (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public abstract fun sync (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun sync$default (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun sync (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sync$default (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/controller/AppServerController$DefaultImpls {
@@ -18055,7 +18055,7 @@ public final class com/letta/mobile/data/controller/AppServerController$DefaultI
 	public static fun submitApproval (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/ControllerApprovalAnswer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun submitApproval-gmR8AXU (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun submitApproval-gmR8AXU$default (Lcom/letta/mobile/data/controller/AppServerController;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static synthetic fun sync$default (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun sync$default (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/controller/AppServerControllerException : java/lang/Exception {
@@ -18228,7 +18228,7 @@ public final class com/letta/mobile/data/controller/DefaultAppServerController :
 	public fun stopRuntime-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun submitApproval (Lcom/letta/mobile/data/controller/ControllerApprovalAnswer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun submitApproval-gmR8AXU (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun sync (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun sync (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;ZZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/controller/DefaultAppServerController$Companion {
@@ -66712,18 +66712,20 @@ public final class com/letta/mobile/data/transport/appserver/AppServerCommand$Sk
 
 public final class com/letta/mobile/data/transport/appserver/AppServerCommand$Sync : com/letta/mobile/data/transport/appserver/AppServerCommand {
 	public static final field Companion Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync$Companion;
-	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/Boolean;
 	public final fun component4 ()Ljava/lang/Boolean;
-	public final fun copy (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;
+	public final fun component5 ()Z
+	public final fun copy (Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Z)Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ZILjava/lang/Object;)Lcom/letta/mobile/data/transport/appserver/AppServerCommand$Sync;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getForceDeviceStatus ()Ljava/lang/Boolean;
 	public final fun getRecoverApprovals ()Ljava/lang/Boolean;
 	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getResumeInterruptedTurn ()Z
 	public final fun getRuntime ()Lcom/letta/mobile/data/transport/appserver/AppServerRuntimeScope;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

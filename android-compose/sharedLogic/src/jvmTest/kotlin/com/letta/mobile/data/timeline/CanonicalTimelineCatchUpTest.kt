@@ -93,6 +93,26 @@ class CanonicalTimelineCatchUpTest {
         assertEquals(listOf(AppServerRuntimeScope("agent", "A")), host.synced)
     }
 
+    @Test fun wrapperNeverRelaysAViewerResumeInterruptedTurnRequest() = runTest {
+        val host = TranscriptHost()
+        // A viewer is not the conversation's execution owner: even a buggy or hostile
+        // client that puts resume_interrupted_turn on its own sync must not make the
+        // wrapper ask the server to resume an interrupted turn. Only the wrapper's own
+        // reconnect sync (ReconnectCoordinator) may set it.
+        val response = host.control("handleControlSync", buildJsonObject {
+            put("request_id", "viewer-sync")
+            put("runtime", buildJsonObject {
+                put("agent_id", "agent")
+                put("conversation_id", "A")
+            })
+            put("resume_interrupted_turn", true)
+        })
+        assertEquals("true", response["success"]?.jsonPrimitive?.content,
+            "the relayed sync itself must still succeed: $response")
+        assertEquals(listOf(false), host.relayedSyncResumes,
+            "the wrapper must drop a viewer's resume_interrupted_turn, not forward it")
+    }
+
     private suspend fun TestScope.recoverMissedTurn(reconnect: Boolean): Set<String> {
         val host = TranscriptHost()
         val gateway = IrohAdminRpcChatGateway(host)
@@ -201,6 +221,9 @@ class CanonicalTimelineCatchUpTest {
             "B" to mutableListOf<LettaMessage>())
         val reads = mutableListOf<String>()
         val synced = mutableListOf<AppServerRuntimeScope>()
+
+        /** The resumeInterruptedTurn argument of every controller.sync the wrapper relayed. */
+        val relayedSyncResumes = mutableListOf<Boolean>()
         private val native = proxy<AppServerClient> { name, args ->
             check(name == "conversationMessagesList") { "Unexpected native call: $name" }
             val request = args[0] as AppServerCommand.ConversationMessagesList
@@ -217,6 +240,9 @@ class CanonicalTimelineCatchUpTest {
             name.startsWith("startRuntime") -> CanonicalRuntime(AppServerRuntimeScope(args[0] as String, args[1] as String))
             name == "sync" -> (args[0] as AppServerRuntimeScope).let {
                 synced += it
+                // The proxy always receives the resolved parameters: a missing or mistyped
+                // 4th argument is a signature break that must fail loudly here.
+                relayedSyncResumes += args[3] as Boolean
                 AppServerInboundFrame.SyncResponse("upstream", it, true)
             }
             else -> error("Unexpected controller call: $name")

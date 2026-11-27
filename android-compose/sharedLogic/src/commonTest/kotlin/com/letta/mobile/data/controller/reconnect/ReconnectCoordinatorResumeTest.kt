@@ -131,6 +131,9 @@ class ReconnectCoordinatorResumeTest {
         controller.syncCalls.forEach { call ->
             assertFalse(call.recoverApprovals, "Resume sync should not recover approvals")
             assertTrue(call.forceDeviceStatus, "Resume sync must force device status")
+            // A foreground resume sync is not the wrapper's reconnect: it must not ask the
+            // server to resume an interrupted turn, only the reconnect flow may.
+            assertFalse(call.resumeInterruptedTurn, "Foreground resume sync must not resume interrupted turns")
         }
     }
 
@@ -381,8 +384,9 @@ private class TestAppServerController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
+        resumeInterruptedTurn: Boolean,
     ): AppServerInboundFrame.SyncResponse {
-        syncCalls += SyncCall(runtime, recoverApprovals, forceDeviceStatus)
+        syncCalls += SyncCall(runtime, recoverApprovals, forceDeviceStatus, resumeInterruptedTurn)
         onSyncHook(runtime, forceDeviceStatus)
         return AppServerInboundFrame.SyncResponse(
             requestId = "sync-test-${syncCalls.size}",
@@ -407,6 +411,7 @@ private class TestAppServerController(
         val runtime: AppServerRuntimeScope,
         val recoverApprovals: Boolean,
         val forceDeviceStatus: Boolean,
+        val resumeInterruptedTurn: Boolean,
     )
 
     data class StartRuntimeCall(

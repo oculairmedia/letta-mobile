@@ -408,6 +408,7 @@ private class FakeAppServerControllerForRecovery(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
+        resumeInterruptedTurn: Boolean,
     ): AppServerInboundFrame.SyncResponse {
         return AppServerInboundFrame.SyncResponse(
             requestId = "sync-1",
