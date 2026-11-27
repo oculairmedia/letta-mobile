@@ -76,10 +76,10 @@ class BakenCoreBridgeTest {
             keyA,
             AddMemberRequest(genesis.opId, listOf(genesis.opId), nodeIdOfSecretKey(keyB), MemberPreset.DesktopNode, "node-b", 2uL),
         )
-        val network = InProcessNetwork()
+        val constellation = TestConstellation(genesis.opId, InProcessNetwork())
         val signals = MutableSharedFlow<Boolean>(replay = 1)
-        val a = node("a", keyA, genesis.opId, listOf(genesis.envelope, add.envelope), network, PlatformSignals(foreground = signals))
-        val b = node("b", keyB, genesis.opId, listOf(genesis.envelope), network, PlatformSignals())
+        val a = constellation.node("a", keyA, listOf(genesis.envelope, add.envelope), PlatformSignals(foreground = signals))
+        val b = constellation.node("b", keyB, listOf(genesis.envelope))
         try {
             assertFailsWith<CoreException.NotRunning> { a.info() }
             val idA = a.start()
@@ -119,13 +119,14 @@ class BakenCoreBridgeTest {
         }
     }
 
-    private fun node(
+    /** The constellation the test nodes join, over one in-process network. */
+    private class TestConstellation(val id: String, val network: InProcessNetwork)
+
+    private fun TestConstellation.node(
         name: String,
         key: ByteArray,
-        constellation: String,
         ops: List<ByteArray>,
-        network: InProcessNetwork,
-        signals: PlatformSignals,
+        signals: PlatformSignals = PlatformSignals(),
     ): CoreNodeHandle = UniffiCoreNode.create(
         NodeOptions(
             backendDir = File(dir, "$name/backend").path,
@@ -133,7 +134,7 @@ class BakenCoreBridgeTest {
             `class` = NodeClass.DESKTOP,
             appVersion = "1.0.0",
             workerThreads = 2u,
-            constellation = constellation,
+            constellation = id,
             membershipOps = ops,
             tickMs = 200uL,
             watchDebounceMs = 50uL,
