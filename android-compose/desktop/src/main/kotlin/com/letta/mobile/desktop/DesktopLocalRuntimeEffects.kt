@@ -2,15 +2,14 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.controller.reconnect.SuspendEvent
 import com.letta.mobile.data.controller.reconnect.SystemSuspendSignal
 import com.letta.mobile.data.controller.reconnect.WallClockJumpSuspendSignal
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.runtime.DesktopBundledRuntimeNode
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import com.letta.mobile.desktop.runtime.DesktopRuntimeRestartResponder
 import kotlinx.coroutines.launch
 
 /** Who reacts to sleep and wake on desktop (letta-mobile-bzvro.4, F04). */
@@ -36,22 +35,24 @@ internal class DesktopSuspendResponder(
  *
  * - When the supervisor restarts a crashed child (F03), the desktop's node is restarted over its new
  *   URL through a bridge lease, so the fresh child is not stopped and spawned again by the handoff;
- *   the chat's node session redials the new node by itself.
+ *   the chat's node session redials the new node by itself. This happens on every backend, not only
+ *   while the window shows LOCAL ([DesktopRuntimeRestartResponder]).
  * - On wake (F04), crash counters reset, a dead child restarts, and a dropped chat connection
  *   retries at once.
  */
 @Composable
 internal fun DesktopLocalRuntimeLifecycleEffect(
     chatController: DesktopChatController,
-    isLocalMode: Boolean,
     suspendSignal: SystemSuspendSignal = remember { WallClockJumpSuspendSignal() },
 ) {
-    val localMode by rememberUpdatedState(isLocalMode)
     LaunchedEffect(chatController) {
         val effectScope = this
-        DesktopLocalRuntimeHost.appServer.restarted.collect {
-            if (localMode) DesktopLocalRuntimeHost.handOffAfterRestart { effectScope.launch { DesktopBundledRuntimeNode.restart() } }
-        }
+        val responder = DesktopRuntimeRestartResponder(
+            nodeRunning = { DesktopBundledRuntimeNode.host.running.value },
+            handOff = DesktopLocalRuntimeHost::handOffAfterRestart,
+            restartNode = { effectScope.launch { DesktopBundledRuntimeNode.restart() } },
+        )
+        DesktopLocalRuntimeHost.appServer.restarted.collect { responder.onRuntimeRestarted() }
     }
     LaunchedEffect(chatController, suspendSignal) {
         val responder = DesktopSuspendResponder(
