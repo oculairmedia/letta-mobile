@@ -27,6 +27,10 @@ Host App Server command specifications and argument validation shared by the com
 
 The product's display identity at runtime. `Brand` is generated at build time from `branding/brand.properties` (the `com.letta.mobile.brand` Gradle plugin), so window titles, the shell header, notifications and `DisplayNames.PRODUCT` read the product name from that one file. Nothing here is edited by hand.
 
+# Package com.letta.mobile.core.ffi
+
+The UniFFI bindings of the Rust core's combined library (`baken_core`), generated from the core-ffi crate and committed under `src/jvmAndAndroid/generated/uniffi`. Nothing here is edited by hand: regenerate it as `docs/reference/contracts/ffi/ffi-v1.md` describes, and use it only through `com.letta.mobile.data.node.core`.
+
 # Package com.letta.mobile.data.chat.layout
 
 Stable view identities for the shared chat content lane. The shell layout owns their order and protects the transcript and composer; chat presentation owns responsive docking, overlays and gestures. No transient run state is persisted in the layout.
@@ -492,6 +496,10 @@ The Iroh node carrier. `IrohNodeCarrier` dials a node over QUIC with the stream 
 # Package com.letta.mobile.data.node.info
 
 What a node tells a peer about itself and how a peer judges the answer: the `node.info` wire shape (identity, protocol and store format versions, runtime patch set), the service that assembles it from host facts, the handshake that asks for it, and the compatibility rule that turns the answer into a verdict with named reasons. Hosts supply facts through ports; nothing here reads a platform.
+
+# Package com.letta.mobile.data.node.core
+
+The Rust core node (the `baken_core` combined library) behind the CoreNodeHandle interface: suspend calls, cold callbackFlow streams over the core's listener and TaskHandle streams, and the Kotlin sides of the core's two foreign traits, a RuntimeHost over LocalAppServerHost and PlatformHooks over the node key store and the platform's foreground and network signals. The generated UniFFI bindings live in `com.letta.mobile.core.ffi` and are used only from here. The app does not compose this node yet; each platform switches to it separately. The contract is `docs/reference/contracts/ffi/ffi-v1.md`.
 
 # Package com.letta.mobile.data.pairing
 

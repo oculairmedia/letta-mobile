@@ -44,11 +44,21 @@ detekt {
     parallel = true
 }
 
+// The Rust core's combined library (core-ffi, ffi-release profile). When it is built, the tests that
+// cross the bridge find it through JNA; everywhere else (CI's Kotlin jobs) they skip themselves.
+val bakenCoreLibraryDir: File? = (providers.gradleProperty("bakenCoreLibraryDir").orNull?.let(::file)
+    ?: rootDir.resolve("../core/target/ffi-release"))
+    .takeIf { dir -> listOf("baken_core.dll", "libbaken_core.so", "libbaken_core.dylib").any { dir.resolve(it).isFile } }
+
 // Forward the opt-in flag for live Iroh suites that need the public relay or address lookup.
 // The loopback suites bind with relays disabled and run by default; a suite that must reach
 // the internet is skipped (via JUnit Assume) unless this is "true".
 tasks.withType<Test>().configureEach {
     System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
+    bakenCoreLibraryDir?.let { dir ->
+        systemProperty("bakenCore.libraryDir", dir.absolutePath)
+        systemProperty("jna.library.path", dir.absolutePath)
+    }
     // A planted host secret (letta-mobile-cdgpr.10): PluginTrustTest asserts a plugin process
     // never inherits it. Fake value; nothing reads it but that test.
     environment("LETTA_TOKEN", "letta-trust-test-planted-host-token")
@@ -126,7 +136,13 @@ kotlin {
         // Compose UI moved to :sharedUI in Phase 3b.
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
+            // The Rust core's UniFFI bindings, generated from the core-ffi library and committed
+            // (docs/reference/contracts/ffi/ffi-v1.md). They compile against JNA here; at run time
+            // JNA comes with the Iroh artifacts below (the jar on the JVM, the AAR with its native
+            // dispatch library on Android), so it is never packaged twice.
+            kotlin.srcDir("src/jvmAndAndroid/generated/uniffi")
             dependencies {
+                compileOnly(libs.jna)
                 // Former :core:domain contracts (IMessageRepository,
                 // IAllConversationsRepository) live in this source set because they
                 // expose java.time.Instant. paging-common comes from commonMain.

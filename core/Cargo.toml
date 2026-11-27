@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement", "crates/core-carrier", "crates/core-carrier-iroh", "crates/core-catalog", "crates/core-projection", "crates/core-node"]
+members = ["crates/core-proto", "crates/core-testkit", "crates/core-store", "crates/core-store-sqlite", "crates/core-log", "crates/core-membership", "crates/core-placement", "crates/core-carrier", "crates/core-carrier-iroh", "crates/core-catalog", "crates/core-projection", "crates/core-node", "crates/core-ffi"]
 
 [workspace.package]
 edition = "2024"
@@ -50,6 +50,8 @@ gix = { version = "=0.91.0", default-features = false, features = ["sha1", "inde
 notify-debouncer-mini = { version = "=0.8.0", default-features = false }
 walkdir = "2.5.1"
 core-projection = { path = "crates/core-projection" }
+# core-ffi: the UniFFI bindings (proc-macro scaffolding; bindgen only behind the crate's bindgen feature).
+uniffi = { version = "=0.33.0", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -62,3 +64,13 @@ pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"
 # Protocol prose names wire terms (NodeId, frame_part) constantly; backticking every one hurts reading.
 doc_markdown = "allow"
+
+# The shipped combined library (core-ffi): smallest code, one codegen unit, full LTO, symbols
+# stripped. Panics unwind so UniFFI turns one into an error instead of aborting the host app.
+[profile.ffi-release]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "unwind"
+strip = "symbols"

@@ -616,6 +616,18 @@ impl<S: Store + 'static> Node<S> {
         self.inner.info()
     }
 
+    /// The node's membership: the ops it holds and the view evaluated from them.
+    #[must_use]
+    pub fn membership(&self) -> &Membership {
+        &self.inner.membership
+    }
+
+    /// A handle to the node's own tokio runtime, for bindings that hop their calls onto it.
+    #[must_use]
+    pub fn runtime(&self) -> tokio::runtime::Handle {
+        self.handle().clone()
+    }
+
     /// The I6 runtime parity this node reports.
     #[must_use]
     pub fn runtime_parity(&self) -> &str {

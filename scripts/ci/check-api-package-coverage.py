@@ -93,6 +93,26 @@ BRAND_SOURCE_PACKAGE = re.compile(
 )
 
 
+# The Rust core's committed UniFFI bindings (core-ffi): a literal generated root inside a source set,
+# whose declared packages are published like any other source.
+UNIFFI_SOURCE_ROOT = re.compile(r'\bkotlin\s*\.\s*srcDir\(\s*"(src/\w+/generated/uniffi)"\s*\)')
+
+
+def generated_uniffi_packages(module):
+    """Packages of the committed UniFFI bindings, when the module adds their root."""
+    build_file = module / "build.gradle.kts"
+    if not build_file.exists():
+        return set()
+    build = code_without_comments(build_file.read_text(encoding="utf-8"))
+    packages = set()
+    for root in UNIFFI_SOURCE_ROOT.findall(build):
+        files = language_source_files(module / root)
+        if not files:
+            raise ValueError(f"{build_file}: UniFFI source root {root} has no sources")
+        packages |= {declared_package(path) for path in files}
+    return packages
+
+
 def generated_brand_packages(module):
     """Packages written by the brand source generator, when the module adds its root."""
     build_file = module / "build.gradle.kts"
@@ -113,6 +133,7 @@ def verify_standard_source_roots(module):
     if build_file.exists():
         build = code_without_comments(build_file.read_text(encoding="utf-8"))
         build = BRAND_SOURCE_ROOT.sub("BRAND_SOURCE_ROOT", build)
+        build = UNIFFI_SOURCE_ROOT.sub("UNIFFI_SOURCE_ROOT", build)
         # Only this literal test receiver is known not to add a published source root.
         build = re.sub(
             r'\bkotlin\s*\.\s*sourceSets\s*\.\s*getByName\(\s*"commonTest"\s*\)'
@@ -134,7 +155,11 @@ def declared_package(path):
 
 def source_packages(module):
     verify_standard_source_roots(module)
-    return {declared_package(path) for path in production_source_files(module)} | generated_brand_packages(module)
+    return (
+        {declared_package(path) for path in production_source_files(module)}
+        | generated_brand_packages(module)
+        | generated_uniffi_packages(module)
+    )
 
 
 def is_production_source_set(path):

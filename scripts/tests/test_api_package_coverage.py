@@ -113,6 +113,20 @@ class PackageCoverageTest(unittest.TestCase):
         self.write('android-compose/example/build.gradle.kts', 'kotlin.srcDir(generateBrandSource)')
         self.assertIn('one literal packageName', self.problems())
 
+    def test_generated_uniffi_root_publishes_its_declared_packages(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.srcDir("src/jvmAndAndroid/generated/uniffi")')
+        self.write('android-compose/example/src/jvmAndAndroid/generated/uniffi/example/ffi/lib.kt',
+                   'package example.ffi\nclass Lib')
+        self.assertIn('missing # Package example.ffi', self.problems())
+        self.overview('# Package example\n\n' + PROSE + '\n\n# Package example.ffi\n\n' + PROSE)
+        self.assertEqual((2, []), coverage.check(self.root))
+
+    def test_empty_generated_uniffi_root_fails_closed(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.srcDir("src/jvmAndAndroid/generated/uniffi")')
+        self.assertIn('has no sources', self.problems())
+
     def test_explicit_production_root_still_fails_closed(self):
         self.write('android-compose/example/build.gradle.kts',
                    'kotlin.sourceSets.getByName("commonMain").kotlin.srcDir("extra")')

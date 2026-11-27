@@ -289,6 +289,7 @@ texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
 calendar-compose-multiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
 jcefmaven = { module = "me.friwi:jcefmaven", version.ref = "jcefmaven" }
 rive-android = { module = "app.rive:rive-android", version.ref = "rive" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 kotzilla-sdk-compose-jvm = { module = "io.kotzilla:kotzilla-sdk-compose-jvm", version.ref = "kotzilla" }
 compose-desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-desktop-ui-test" }
