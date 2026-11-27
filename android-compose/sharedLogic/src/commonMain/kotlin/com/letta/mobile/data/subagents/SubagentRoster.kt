@@ -54,6 +54,8 @@ data class SubagentRosterItem(
     val identity: SubagentIdentity,
     /** Tool calls made so far; null when the host does not report it. */
     val toolCallCount: Int?,
+    /** Token usage the host reported for the run so far; null when it does not report one. */
+    val totalTokens: Long? = null,
     /** Latest bounded activity lines, oldest first. */
     val activity: List<String>,
     /** Running: time since start. Ended: the run's duration when reported. */
@@ -137,6 +139,7 @@ private fun SubagentEntry.toRosterItem(now: Long): SubagentRosterItem {
         status = status,
         identity = identity(),
         toolCallCount = toolCallCount,
+        totalTokens = totalTokens,
         activity = activity?.lines.orEmpty(),
         elapsedMs = elapsed(status, now),
         model = model?.takeIf { it.isNotBlank() },

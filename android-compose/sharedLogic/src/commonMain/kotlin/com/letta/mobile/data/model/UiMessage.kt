@@ -186,6 +186,8 @@ data class UiSubagentDispatch(
     val prompt: String,
     val taskId: String? = null,
     val subagentAgentId: String? = null,
+    /** The child's own conversation when the result names one (a background launch receipt). */
+    val subagentConversationId: String? = null,
 )
 
 @Immutable

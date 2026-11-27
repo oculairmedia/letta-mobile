@@ -4022,7 +4022,7 @@ final class com.letta.mobile.ui.components.picker/PickerTags { // com.letta.mobi
 }
 
 final class com.letta.mobile.ui.components.row/LettaListRowSpec { // com.letta.mobile.ui.components.row/LettaListRowSpec|null[0]
-    constructor <init>(kotlin/String, androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., androidx.compose.ui.semantics/Role? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.ui.components.row/LettaListRowSpec.<init>|<init>(kotlin.String;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;androidx.compose.ui.semantics.Role?;kotlin.String?;kotlin.Int;kotlin.Int){}[0]
+    constructor <init>(kotlin/String, androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., androidx.compose.ui.semantics/Role? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ...) // com.letta.mobile.ui.components.row/LettaListRowSpec.<init>|<init>(kotlin.String;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;androidx.compose.ui.semantics.Role?;kotlin.String?;kotlin.Int;kotlin.Int;kotlin.String?){}[0]
 
     final val description // com.letta.mobile.ui.components.row/LettaListRowSpec.description|{}description[0]
         final fun <get-description>(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.description.<get-description>|<get-description>(){}[0]
@@ -4044,6 +4044,8 @@ final class com.letta.mobile.ui.components.row/LettaListRowSpec { // com.letta.m
         final fun <get-subtitle>(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.subtitle.<get-subtitle>|<get-subtitle>(){}[0]
     final val subtitleLines // com.letta.mobile.ui.components.row/LettaListRowSpec.subtitleLines|{}subtitleLines[0]
         final fun <get-subtitleLines>(): kotlin/Int // com.letta.mobile.ui.components.row/LettaListRowSpec.subtitleLines.<get-subtitleLines>|<get-subtitleLines>(){}[0]
+    final val subtitleTag // com.letta.mobile.ui.components.row/LettaListRowSpec.subtitleTag|{}subtitleTag[0]
+        final fun <get-subtitleTag>(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.subtitleTag.<get-subtitleTag>|<get-subtitleTag>(){}[0]
     final val title // com.letta.mobile.ui.components.row/LettaListRowSpec.title|{}title[0]
         final fun <get-title>(): kotlin/String // com.letta.mobile.ui.components.row/LettaListRowSpec.title.<get-title>|<get-title>(){}[0]
     final val titleLines // com.letta.mobile.ui.components.row/LettaListRowSpec.titleLines|{}titleLines[0]
@@ -4059,6 +4061,7 @@ final class com.letta.mobile.ui.components.row/LettaListRowSpec { // com.letta.m
     final fun component12(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.component12|component12(){}[0]
     final fun component13(): kotlin/Int // com.letta.mobile.ui.components.row/LettaListRowSpec.component13|component13(){}[0]
     final fun component14(): kotlin/Int // com.letta.mobile.ui.components.row/LettaListRowSpec.component14|component14(){}[0]
+    final fun component15(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.component15|component15(){}[0]
     final fun component2(): androidx.compose.ui.graphics.vector/ImageVector? // com.letta.mobile.ui.components.row/LettaListRowSpec.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.ui.components.row/LettaListRowSpec.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.letta.mobile.ui.components.row/LettaListRowSpec.component4|component4(){}[0]
@@ -4067,7 +4070,7 @@ final class com.letta.mobile.ui.components.row/LettaListRowSpec { // com.letta.m
     final fun component7(): kotlin/Boolean // com.letta.mobile.ui.components.row/LettaListRowSpec.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean // com.letta.mobile.ui.components.row/LettaListRowSpec.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.ui.components.row/LettaListRowSpec.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., androidx.compose.ui.semantics/Role? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.ui.components.row/LettaListRowSpec // com.letta.mobile.ui.components.row/LettaListRowSpec.copy|copy(kotlin.String;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;androidx.compose.ui.semantics.Role?;kotlin.String?;kotlin.Int;kotlin.Int){}[0]
+    final fun copy(kotlin/String = ..., androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., androidx.compose.ui.semantics/Role? = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ...): com.letta.mobile.ui.components.row/LettaListRowSpec // com.letta.mobile.ui.components.row/LettaListRowSpec.copy|copy(kotlin.String;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;androidx.compose.ui.semantics.Role?;kotlin.String?;kotlin.Int;kotlin.Int;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.components.row/LettaListRowSpec.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.components.row/LettaListRowSpec.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.components.row/LettaListRowSpec.toString|toString(){}[0]

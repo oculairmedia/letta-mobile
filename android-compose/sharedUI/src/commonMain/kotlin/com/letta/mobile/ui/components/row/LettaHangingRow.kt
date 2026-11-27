@@ -53,9 +53,16 @@ internal fun LettaHangingRow(
  * a button to assistive technology, the platform's minimum touch size, and no horizontal inset, so
  * its first letter lines up with the title above it. A label narrower than the minimum touch width
  * keeps its start on the edge: the touch box grows to the right of it instead of centring the label.
+ * [destructive] inks the label as the error colour instead of the primary one (the row's "Dismiss").
  */
 @Composable
-internal fun LettaHangingRowAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, tag: String = "") {
+internal fun LettaHangingRowAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tag: String = "",
+    destructive: Boolean = false,
+) {
     Box(
         modifier = modifier
             .lettaClickable(role = Role.Button, target = LettaClickTarget.Inline, onClick = onClick)
@@ -66,7 +73,7 @@ internal fun LettaHangingRowAction(label: String, onClick: () -> Unit, modifier:
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             maxLines = 1,
         )
     }
