@@ -38653,8 +38653,8 @@ public final class com/letta/mobile/data/node/info/NodeFacts$Companion {
 }
 
 public final class com/letta/mobile/data/node/info/NodeHandshake {
-	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/node/info/NodeInfoRpc;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun run (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -38759,6 +38759,10 @@ public final synthetic class com/letta/mobile/data/node/info/NodeInfo$$serialize
 
 public final class com/letta/mobile/data/node/info/NodeInfo$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/node/info/NodeInfoRpc {
+	public abstract fun invoke (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/node/info/NodeInfoService {
